@@ -1,0 +1,801 @@
+# NEO PROJECT: ENTERPRISE BLUEPRINT & TARGET OPERATING MODEL
+
+**Lightweight ERP/CRM Architecture & Operational Transformation Plan**
+
+**Prepared for:** Mr. X (Business Owner) & Neo Project Leadership
+
+**Subject:** End-to-End Digital Operations Blueprint for Multi-Site Food Trading & Processed Food Production
+
+---
+
+## 1. EXECUTIVE SUMMARY & CASE STUDY SYNTHESIS
+
+The Neo Project represents an operationally active, multi-site business managed by Mr. X across two tightly coupled value streams: **Food Trading** (buying and selling food commodities) and **Processed Food Production** (manufacturing finished goods at a factory supported by 10 to 15 employees). Logistics and field activities are carried out by approximately 3 to 4 drivers alongside dedicated delivery and collection staff.
+
+A comprehensive review of the field study reveals a classic growth bottleneck: the business has outgrown personal, phone-based coordination, making the owner the primary constraint to scale. Mr. X currently acts as a live human router for customer price negotiations, order capture, supplier price/shortage resolution, factory production prioritization, driver dispatch, field troubleshooting, and end-of-day manual account reconciliation. Because operational state resides in phone calls, personal memory, and fragmented manual notes, any change in one stage (such as a supplier price hike or quantity shortfall) triggers a cascade of reactive phone calls across multiple functions.
+
+### The Strategic Solution: "NeoCore" Lightweight ERP/CRM
+
+The solution is not to add administrative headcount or deploy a bloated, rigid legacy ERP. Instead, Neo requires **NeoCore**—a mobile-first, lightweight, exception-driven ERP/CRM tailored for fast-moving food trading and batch food processing.
+
+**Core Transformation Objectives:**
+
+1. **Shift Mr. X from "Live Router" to "Exception Approver":** Routine orders, standard pricing, dispatch assignments, and payment logging are executed directly by staff within strict system guardrails. Mr. X only intervenes via one-tap mobile approvals when margin thresholds, credit limits, or supplier shortages breach defined tolerances.
+
+
+2. **Eliminate Verbal State:** Convert transient phone conversations into structured, real-time digital records (Quotes, Sales Orders, Purchase Orders, Production Batches, Trip Sheets, and Collection Receipts).
+
+
+3. **Close the Financial Loop:** Replace error-prone end-of-day manual account reviews with real-time field collection capture, automated ledger posting, and daily cash/bank reconciliation.
+
+
+
+---
+
+## 2. CONFIRMED FACTS, ASSUMPTIONS & OPEN QUESTIONS
+
+To maintain strict engineering and consulting rigor, the system design separates verified observations from the field study, architectural assumptions required to build a complete blueprint, and discovery questions required before code freeze.
+
+### 2.1 Confirmed Facts (Derived Directly from Case Study)
+
+* **Dual Business Model:** The company operates both a food trading division and a processed food manufacturing division that share customers, suppliers, and logistics.
+
+
+* **Multi-Site Footprint:** Operations span multiple physical locations (including a manufacturing factory, trading storage/warehouses, and administrative points).
+
+
+* **Workforce Structure:** Headed by Mr. X, supported by a Production Manager, 10–15 factory employees, 3–4 drivers, and dedicated delivery/collection staff.
+
+
+* **Communication Bottleneck:** Mr. X handles high daily call volumes covering customer price negotiations, order taking, supplier price/quantity negotiations, production scheduling, driver directions, and payment follow-ups.
+
+
+* **Supplier Volatility:** Suppliers frequently change prices or fail to fulfill agreed quantities, directly impacting customer commitments and margins.
+
+
+* **Financial Vulnerability:** Collections are followed up by staff and Mr. X, with accounts checked manually at the end of the day—creating a documented risk of missed financial entries and incomplete receivable tracking.
+
+
+
+### 2.2 Working Architectural Assumptions
+
+* **A1 (Product Nature):** Food items and raw materials are subject to shelf-life expiration, batch/lot tracking requirements, and variable weight/packaging units (e.g., kg, crates, cartons, metric tons).
+* **A2 (Device Availability):** Field drivers, collection agents, and the Production Manager have access to entry-level Android smartphones with intermittent 4G/5G connectivity, while office/sales staff have access to desktop browsers or tablets.
+* **A3 (Pricing Model):** Because food trading prices fluctuate daily based on supplier costs, the business uses a **Daily Base Price List** with allowed negotiation bands (e.g., Floor Price vs. Target Price) rather than static annual catalog prices.
+* **A4 (Payment Modes):** Collections involve a mix of physical cash, bank transfers (NEFT/RTGS/IMPS/UPI), and post-dated checks collected in the field by drivers or collection staff.
+* **A5 (Tax & Compliance):** The system must support standard regional tax invoicing (e.g., GST/VAT calculation, HSN/SAC codes, and e-Way bill/delivery challan generation for goods in transit).
+
+### 2.3 Open Questions & Prescriptive Architectural Answers
+
+The case study explicitly identifies 10 open questions for the next discovery phase. Below are the questions paired with our recommended **Default Design Baseline** so implementation can proceed without delay:
+
+| # | Case Study Open Question
+
+ | Recommended Default System Baseline (To Confirm with Mr. X) |
+| --- | --- | --- |
+| **1** | How are customer orders currently recorded after a phone call?
+
+ | **Baseline:** Currently ad-hoc/verbal. *Future State:* Inside Sales/Order Desk logs orders directly into NeoCore during/immediately after the call, or customers submit via a structured WhatsApp catalog bot.
+
+ |
+| **2** | Who has authority to approve customer pricing and supplier purchases?
+
+ | **Baseline:** Currently 100% Mr. X. *Future State:* Tiered matrix. Staff can confirm orders within defined daily Floor Prices and approved Supplier Master rates; variances >3% route to Mr. X's mobile approval queue.
+
+ |
+| **3** | How are customer outstanding balances calculated and reconciled?
+
+ | **Baseline:** Manual end-of-day ledger/notes. *Future State:* Automated double-entry sub-ledger. Invoices auto-debit Customer AR; verified field collection receipts auto-credit Customer AR.
+
+ |
+| **4** | How is a delivery considered completed and who confirms completion?
+
+ | **Baseline:** Verbal driver call. *Future State:* Driver captures Electronic Proof of Delivery (ePOD) via mobile app (customer signature, photo of stamped challan, or OTP) + logs exact delivered vs. returned quantities.
+
+ |
+| **5** | What happens when a supplier cannot fulfill the required quantity?
+
+ | **Baseline:** Ad-hoc replanning by Mr. X. *Future State:* System flags "Shortfall Exception," auto-suggests secondary approved suppliers with latest quotes, or triggers partial shipment/production re-allocation workflow.
+
+ |
+| **6** | How are raw material requirements communicated to the factory?
+
+ | **Baseline:** Direct phone calls to Production Manager. *Future State:* Confirmed Sales Orders trigger Material Requirements Planning (MRP) calculations against Bill of Materials (BOM), pushing a digital Production Work Order to the factory tablet.
+
+ |
+| **7** | How are production quantities, wastage, and finished goods recorded?
+
+ | **Baseline:** Informal/untracked. *Future State:* Production Manager closes Work Orders on a tablet by entering actual output yield, scrap/wastage weight, and packaging lot numbers.
+
+ |
+| **8** | What information must be visible separately for each operating location?
+
+ | **Baseline:** Siloed by site. *Future State:* Site-level inventory stock, site dispatch queues, and site cash registers are segregated by location ID, with a consolidated global view for Mr. X.
+
+ |
+| **9** | Which activities should remain under direct owner control vs. delegated?
+
+ | **Baseline:** All with owner. *Future State:* Mr. X controls Daily Base Pricing, Credit Limit overrides, Non-standard Supplier rate approvals, and EOD Cash Sign-off. Routine execution is 100% delegated.
+
+ |
+| **10** | What reports does the owner need daily, weekly, and monthly?
+
+ | **Baseline:** Manual EOD review. *Future State:* Real-time mobile dashboard showing Daily Cash/Collections, Margin by Order, Pending Approvals, Stock Alerts, and AR Aging.
+
+ |
+
+---
+
+## 3. PROBLEM ANALYSIS: OPERATIONAL GAPS, RISKS & OPPORTUNITIES
+
+```
+CURRENT STATE: THE "OWNER BOTTLENECK" (HUB-AND-SPOKE CHAOS)
+===========================================================
+
+   [Customers]             [Suppliers]           [3-4 Drivers]
+  (Orders/Prices)       (Price Changes/Short)   (Route/Issues)
+        \                       |                      /
+         \--- (Phone) ---\      |     /--- (Phone) ---/
+                          v     v    v
+                     +--------------------+
+                     |       MR. X        | <--- Single Point of Failure
+                     |  (Business Owner)  | <--- Memory & Manual Notes
+                     +--------------------+
+                          ^     ^    ^
+         /--- (Phone) ---/      |     \--- (Phone) ---\
+        /                       |                      \
+ [Production Mgr]       [Collection Staff]      [Manual EOD Books]
+ (10-15 Workers)        (Payment Status)        (Missed Entries!)
+
+```
+
+### 3.1 Root Cause & Operational Gap Matrix
+
+| Operational Domain | Observed Current State Gap | Business & Financial Risk | Target Improvement Opportunity |
+| --- | --- | --- | --- |
+| **Sales & Pricing** | Negotiations happen on calls with Mr. X; agreed prices live in memory. Supplier cost hikes aren't immediately visible during sales quoting.
+
+ | **Margin Erosion & Billing Disputes:** Selling below replacement cost when supplier prices spike; invoicing customers at the wrong verbal price. | **Dynamic Price Guardrails:** Link real-time supplier landed cost to sales quoting. Enforce floor prices so staff can quote autonomously. |
+| **Order & Inventory Visibility** | Stock availability across multiple sites is checked via phone calls. No unified view of committed vs. available stock.
+
+ | **Stockouts & Over-promising:** Committing goods to Customer A that were already promised to Customer B or needed for production. | **Multi-Site ATP (Available-to-Promise):** Real-time inventory reservation upon order confirmation across all warehouses and factory stores. |
+| **Supplier & Procurement** | Supplier price changes and quantity shortages require urgent owner intervention and manual order juggling.
+
+ | **Fulfillment Failure:** Delayed customer deliveries, emergency high-cost spot buying, and unrecorded supplier performance issues. | **Exception-Driven Procurement:** Automated shortage workflows, split-PO generation across backup suppliers, and vendor fill-rate tracking. |
+| **Production Alignment** | Factory requirements are passed verbally from Mr. X to the Production Manager. No formal link between sales pipeline and factory schedule.
+
+ | **Idle Labor or Rush Bottlenecks:** 10–15 factory workers producing low-priority items while urgent customer orders wait for stock.
+
+ | **Demand-Driven MRP:** Auto-convert Sales Orders for processed foods into prioritized Factory Work Orders with BOM raw material reservation. |
+| **Logistics & Delivery** | 3–4 drivers call Mr. X directly for route instructions, travel needs, and delivery exceptions during the day.
+
+ | **Owner Distraction & Fleet Inefficiency:** Constant context-switching for Mr. X; unoptimized routes; unverified delivery claims or transit losses.
+
+ | **Digital Dispatch & Driver App:** Consolidated trip sheets, digital route manifests, in-app exception logging, and mandatory ePOD capture. |
+| **Collections & Accounting** | Field collections are tracked informally; Mr. X manually reviews accounts at EOD with confirmed risk of missed entries.
+
+ | **Revenue Leakage & Cash Pilferage:** Unrecorded cash collections, forgotten credit invoices, delayed working capital cycle, and owner burnout.
+
+ | **Closed-Loop Receivables:** Mobile receipt generation in the field, instant SMS/WhatsApp receipt to customer, and automated EOD cash-handover reconciliation. |
+
+---
+
+## 4. PRACTICAL FUTURE-STATE TARGET OPERATING MODEL (TOM)
+
+The future-state operating model reorganizes the business from a **Hub-and-Spoke (Owner-Centric)** model to a **Tiered Process-Driven Model** governed by **Management by Exception**.
+
+```
+FUTURE STATE: "NEOCORE" CENTRALIZED SYSTEM OF RECORD
+====================================================
+
+ [Customers] ---> [Sales & Dispatch Coordinator] (Handles 85% Routine Orders/Routes)
+                         |
+                         v
+            +-------------------------+
+            |   NEOCORE CLOUD ERP     | <--- Real-Time State, ATP Inventory,
+            | (Single Source of Truth)|      Automated Ledgers & Audit Trail
+            +-------------------------+
+             /        |        |      \
+            v         v        v       v
+    [Prod. Mgr]  [Drivers] [Collectors] [MR. X - OWNER DASHBOARD]
+   (Work Orders)  (ePOD)   (Receipts)   (Handles ONLY the 15% Exceptions:
+                                         Price Overrides, Credit Breaches,
+                                         Supplier Shortfalls, EOD Sign-off)
+
+```
+
+### 4.1 The Three Operational Layers
+
+1. **Layer 1: Standard Execution (Automated & Staff-Led — ~85% of daily volume)**
+* A designated **Operations / Sales Coordinator** (existing administrative/collection staff upskilled, not necessariamente a new hire) answers routine customer order calls, enters quantities into NeoCore, and quotes prices within Mr. X’s pre-approved daily price band.
+
+
+* The **Production Manager** views confirmed demand on a factory tablet, executes production batches, and logs finished output without calling Mr. X.
+
+
+* **Drivers & Collection Staff** view their daily assigned stops, delivery quantities, and collection targets on their mobile app, capturing deliveries and payments digitally.
+
+
+
+
+2. **Layer 2: Exception Escalation (System-Routed — ~15% of daily volume)**
+* Whenever a transaction violates a business rule (e.g., customer requests a 5% discount below floor price, customer exceeds credit limit, supplier hikes price by >2%, or supplier short-ships by 20%), NeoCore pauses the transaction and pushes an actionable **Exception Card** to Mr. X’s smartphone.
+
+
+
+
+3. **Layer 3: Strategic Control & Governance (Owner-Led — Mr. X)**
+* **Morning (15 mins):** Mr. X updates the **Daily Base Price & Floor Sheet** based on market rates and reviews the day's Production & Dispatch capacity.
+* **Daytime (On-Demand via App):** Mr. X approves/rejects Exception Cards with a single tap (Approve / Counter-Offer / Reject) instead of fielding 50+ unstructured phone calls.
+
+
+* **Evening (15 mins):** Instead of manually hunting for missed entries, Mr. X reviews the **Automated EOD Reconciliation Dashboard**, verifying that physical cash handed over to the cashier matches the digital receipts logged by field staff.
+
+
+
+
+
+---
+
+## 5. SYSTEM MODULES, USERS, ROLES, WORKFLOWS & BUSINESS RULES
+
+### 5.1 System Modules Overview (NeoCore Suite)
+
+1. **M1: Commercial & CRM Module:** Customer Master, Credit Profiles, Daily Price Lists, Margin Calculator, Quotation & Sales Order Management.
+
+
+2. **M2: Procurement & Supplier Module:** Supplier Master, Rate Contracts, Purchase Requisitions, Purchase Orders (PO), Shortfall/Price-Variance Handler, Goods Receipt Note (GRN).
+
+
+3. **M3: Multi-Site Inventory & Warehouse Module:** Site/Location Ledger, Real-time Available-to-Promise (ATP), Batch/Lot & Expiry Tracking, Inter-Site Stock Transfers.
+
+
+4. **M4: Factory Production (Light MES/MRP) Module:** Bill of Materials (BOM)/Recipes, Demand-to-Production Planner, Work Orders, Raw Material Issue, Yield & Wastage Logging.
+
+
+5. **M5: Fleet, Dispatch & Delivery Module:** Route/Trip Builder, Vehicle & Driver Assignment, Digital Delivery Challans, Mobile Driver App with ePOD & Return/Damage logging.
+
+
+6. **M6: Collections & Financials (AR/AP/Cashbook) Module:** Automated Invoicing, Customer AR Sub-ledger, Mobile Field Collection App, Cash-in-Hand Custodian Tracking, Supplier AP, EOD Reconciliation.
+
+
+7. **M7: Executive Control Tower & Exception Engine:** Real-time Push Approval Queue for Mr. X, Multi-Site Dashboards, Audit Trail & WhatsApp Notification Engine.
+
+
+
+---
+
+### 5.2 Role-Based Access Control (RBAC) & User Matrix
+
+| User Role | Mapped Case Study Persona
+
+ | Primary Interface | Allowed Actions (Create / Execute) | Restricted Actions (Requires Owner Approval) |
+| --- | --- | --- | --- | --- |
+| **Owner / Super Admin** | Mr. X (Business Owner)
+
+ | Mobile Executive App + Web Dashboard | Full system access; set daily floor prices; approve exceptions; adjust credit limits; view global P&L and multi-site ledgers. | N/A (System enforces dual-log audit trail on manual ledger adjustments). |
+| **Ops & Sales Coordinator** | Internal Office / Order / Collection Staff
+
+ | Web Desktop App | Log customer inquiries/orders; issue quotes within allowed price band; generate POs from approved vendor rates; assign drivers to trips; reconcile physical cash handover. | Cannot confirm order below Floor Price; cannot override Customer Credit Hold; cannot delete posted invoices or receipts. |
+| **Production Manager** | Factory Production Manager (overseeing 10–15 staff)
+
+ | Factory Tablet / Web App | View pending Sales demand; start/complete Production Work Orders; consume raw materials; log finished goods output and wastage; request raw material replenishment. | Cannot view customer pricing or financial ledgers; cannot write off inventory wastage >5% of standard BOM without Owner approval. |
+| **Field Driver** | 3–4 Delivery Drivers
+
+ | Mobile Field App (Simplified UI) | View assigned Trip Manifest; navigate to customer; log delivered quantities; capture ePOD; log transit expenses/issues; collect COD payments against assigned invoices. | Cannot see unassigned customers; cannot alter invoice unit prices; cannot mark delivery complete without ePOD or exception reason. |
+| **Collection Agent** | Delivery & Collection Staff
+
+ | Mobile Field App | View assigned customer AR aging list; log cash/check/UPI collections; issue digital payment receipts; log promised-to-pay (PTP) follow-up dates. | Cannot edit invoice amounts; cannot grant credit rebates/write-offs without Owner approval; must settle cash custody daily. |
+| **Warehouse / Site Keeper** | Multi-site / Factory Store Staff
+
+ | Mobile / Tablet Scanner App | Record Supplier GRNs (blind quantity check); load delivery vehicles against Trip Manifests; log inter-site transfers. | Cannot see supplier unit prices on blind GRN (prevents collusion); cannot adjust stock variance without approval. |
+
+---
+
+### 5.3 Core Business Rules & Automated Guardrails
+
+To eliminate routine phone calls to Mr. X while protecting profitability, NeoCore enforces 8 hard coded business rules:
+
+* **BR-01: Dynamic Pricing Band Rule:** Every product has a daily `Target_Price` and `Floor_Price` (auto-calculated as `Latest_Landed_Cost + Min_Margin_%`, or manually set by Mr. X). Orders priced $\ge$ `Floor_Price` auto-approve. Orders priced $<$ `Floor_Price` enter `PENDING_OWNER_APPROVAL` status.
+* **BR-02: Automated Credit Control Rule:** Every customer has a `Credit_Limit` and `Max_Overdue_Days` (e.g., ₹1,00,000 and 15 days). If `Current_AR_Balance + New_Order_Value > Credit_Limit` OR any invoice is overdue beyond `Max_Overdue_Days`, the system blocks dispatch and triggers a **Credit Hold Exception** to Mr. X (or requires Cash-on-Delivery).
+* **BR-03: Supplier Price Variance Rule:** If a supplier quotes a price on a PO that exceeds the `Last_Purchase_Price` by more than $X\%$ (e.g., 2%), the PO is locked for Mr. X's approval, and the system automatically flags all open customer quotes/orders for that item whose margin would drop below threshold.
+
+
+* **BR-04: Hard Inventory Allocation (ATP):** Confirming a Sales Order immediately places a soft lock on available stock at the designated site (`Available_Stock = Physical_Stock - Committed_Stock`). For processed foods with insufficient finished stock, the deficit automatically generates a `Production_Requisition` for the Production Manager.
+
+
+* **BR-05: Blind Receiving & Shortfall Rule:** Warehouse staff receiving goods from suppliers enter actual physical quantities received without seeing the PO quantity (Blind GRN). If `Received_Qty < PO_Qty`, the system automatically flags a **Supplier Shortfall Exception**.
+
+
+* **BR-06: Production Yield Tolerance Rule:** When closing a factory Work Order, if `Actual_Output + Recorded_Wastage` deviates from `Standard_BOM_Input` by more than $\pm 3\%$, the system flags an **Abnormal Yield Variance** alert to Mr. X while allowing finished goods to enter stock.
+* **BR-07: Mobile Custody Chain for Cash (Zero Missed Entries):** When a Driver or Collection Agent logs a cash collection of ₹10,000 in the field, two entries happen simultaneously:
+1. Customer AR Balance decreases by ₹10,000 (Customer gets instant SMS/WhatsApp receipt).
+2. Field Agent's **Virtual Wallet (Cash-in-Transit)** increases by ₹10,000.
+The agent's wallet is only cleared when they physically hand over the cash at the office at EOD and the Cashier/Mr. X clicks **"Verify Cash Handover."** It is mathematically impossible for an entry to be forgotten at the end of the day.
+
+
+
+
+* **BR-08: Mandatory ePOD Closure:** A trip cannot be closed by a driver until every invoice on the manifest is marked as `Delivered (Full)`, `Delivered (Partial - with returned qty logged)`, or `Undelivered (with reason code)`.
+
+---
+
+### 5.4 Scenario-Based Exception Workflows (Addressing Case Study Scenarios A–F)
+
+The case study highlights six specific operational scenarios (Scenarios A through F). Below is how NeoCore resolves each scenario systematically:
+
+#### Scenario A: Customer Negotiates a Price
+
+
+
+1. Customer calls the Sales Desk (or Mr. X) requesting 500 kg of Item Y at ₹92/kg.
+
+
+2. Staff enters the inquiry into NeoCore. The screen displays: `Latest Cost: ₹82/kg | Floor Price: ₹90/kg | Target Price: ₹95/kg`.
+3. **Path 1 (Within Band):** Since ₹92 $\ge$ ₹90 Floor Price, the staff member confirms the order immediately on the call. **Zero calls to Mr. X.**
+4. **Path 2 (Below Band):** Customer insists on ₹88/kg. Staff clicks *"Request Price Override."* Mr. X gets a push notification: *"Customer ABC wants 500kg Item Y @ ₹88 (Margin: 7.3%, Floor: ₹90). [Approve ₹88] [Counter ₹89.50] [Reject]."* Mr. X taps `[Counter ₹89.50]` in 3 seconds. Staff relays and locks the order.
+
+#### Scenario B: Supplier Changes Price
+
+
+
+1. Supplier informs procurement that raw/traded Material Z has increased from ₹50/kg to ₹56/kg (+12%).
+
+
+2. Staff enters ₹56/kg into the draft PO. **BR-03** triggers a **Supplier Price Spike Alert** to Mr. X.
+
+
+3. Mr. X’s approval card shows: *"Supplier X raised Material Z by +12% (₹50 -> ₹56). Impact: 3 Open Customer Orders will drop below 5% margin; Floor Price for Item Z needs adjustment from ₹58 to ₹64."*
+4. Mr. X taps *"Approve PO & Auto-Update Floor Price to ₹64"* and selects whether to honor or renegotiate the 3 unconfirmed customer quotes.
+
+
+
+#### Scenario C: Supplier Cannot Fulfill Quantity
+
+
+
+1. Neo orders 1,000 kg from Supplier A, but Supplier A can only supply 600 kg.
+
+
+2. Staff logs `Confirmed Qty: 600 kg` on the PO. NeoCore splits the remaining 400 kg into an **Unfulfilled Deficit** and displays ranked backup suppliers (Supplier B @ ₹51/kg, Supplier C @ ₹52/kg) alongside affected customer orders.
+
+
+3. If backup supply covers the 400 kg within price tolerance, staff issues a secondary PO automatically. If total supply is constrained, Mr. X receives an **Allocation Card** to prioritize which customers receive full delivery vs. partial delivery.
+
+
+
+#### Scenario D: Delivery Requires Immediate Attention
+
+
+
+1. A driver encounters a vehicle breakdown, road closure, or customer refusal to accept bruised crates during a route.
+
+
+2. Instead of calling Mr. X, the driver taps **"Report Issue"** on the Driver App (selecting `Customer Partial Rejection`, entering rejected quantity, and snapping a photo).
+
+
+3. The alert routes to the **Logistics/Ops Coordinator** dashboard first. For routine re-routing or logging standard returns into the credit-note queue, the Coordinator resolves it using pre-set SOPs. Only high-value disputes (e.g., full load rejection) escalate to Mr. X.
+
+#### Scenario E: Customer Payment is Outstanding
+
+
+
+1. Every morning at 8:00 AM, NeoCore generates a prioritized **Collection Worklist** for Collection Staff and Drivers based on overdue invoices and scheduled delivery stops.
+
+
+2. When visiting a customer, the agent views the exact real-time ledger on their phone.
+3. If the customer pays cash/check, the agent logs it (**BR-07**), firing an automated WhatsApp receipt to the customer and updating Mr. X's live Cash-in-Transit tracker. If the customer delays payment, the agent must log a mandatory **Promise-to-Pay (PTP) Date & Reason**, which schedules an automated follow-up alert.
+
+
+
+#### Scenario F: Production Must Meet an Upcoming Order
+
+
+
+1. A confirmed Sales Order requires 200 cartons of Processed Food Item P for delivery tomorrow at 2:00 PM. Current warehouse stock is 50 cartons.
+
+
+2. NeoCore automatically creates a **Net Production Requirement** of 150 cartons and places it at the top of the Production Manager's tablet queue with a `Required By: Tomorrow 11:00 AM` timestamp.
+
+
+3. The system checks the BOM raw material stock across sites. If raw materials are available, the Production Manager clicks **"Start Batch,"** allocates the 10–15 factory workers, and clicks **"Complete Batch"** once packaged—automatically notifying Dispatch that the 200 cartons are ready to load.
+
+
+
+---
+
+## 6. END-TO-END FUNCTIONAL COVERAGE ACROSS ALL 9 DOMAINS
+
+### 6.1 Sales & Order Management
+
+* **Quick Order Entry Screen:** Single-screen grid allowing keyboard-fast entry of Customer, Site, Delivery Date, and multiple line items with live stock (ATP) and margin indicators.
+
+
+* **Quote-to-Order Conversion:** Track verbal/WhatsApp inquiries as `Draft Quotes` with expiration timestamps (e.g., valid for 4 hours given food price volatility) before locking stock as `Confirmed Sales Orders`.
+
+
+* **Order Lifecycle States:** `Draft` $\rightarrow$ `Pending Approval (if exception)` $\rightarrow$ `Confirmed` $\rightarrow$ `In Production / Sourcing` $\rightarrow$ `Ready for Dispatch` $\rightarrow$ `In Transit` $\rightarrow$ `Delivered (Full/Partial)` $\rightarrow$ `Invoiced & Closed`.
+
+
+
+### 6.2 Customer Relationship Management (CRM)
+
+* **360-Degree Customer Profile:** Stores negotiated price tiers, preferred delivery windows, site GPS coordinates, credit limits, payment reliability score, and communication log.
+
+
+* **Customer Specific Price Memory:** Displays the last 5 prices and quantities sold to that specific customer right on the order screen—eliminating the need to ask Mr. X *"What price did we give them last week?"*.
+
+
+
+### 6.3 Supplier Management & Procurement
+
+* **Supplier Rate Card & Volatility Tracker:** Tracks daily/weekly supplier price quotes, historical fill rates (% of ordered quantity actually delivered), and lead times.
+
+
+* **Back-to-Back Trading POs:** For pure food trading items, allows 1-click generation of a Supplier Purchase Order directly from a Customer Sales Order while displaying net trading spread (₹ and %).
+
+
+
+### 6.4 Multi-Site Inventory Management
+
+* **Location-Segregated Stock Ledger:** Tracks inventory separately across Factory Raw Material Store, Factory Finished Goods Store, Trading Warehouses (Site A, Site B), and In-Transit Vehicles.
+
+
+* **FEFO (First-Expiry, First-Out) & Batch Control:** Tracks perishable food batches by receipt/production date and expiry date, alerting staff when stock approaches shelf-life limits.
+* **Dual Unit of Measure (Catch Weight Support):** Supports food items tracked simultaneously by Packaging Unit (Crates/Bags) and Actual Weight (Kilograms).
+
+### 6.5 Factory Production & Light MRP
+
+* **Recipe / Bill of Materials (BOM) Engine:** Defines standard raw material inputs, packaging materials, expected labor hours, and standard yield/wastage % for every processed food SKU.
+* **Daily Production Board (Kanban):** Visual tablet interface for the Production Manager showing `Queued Batches`, `In-Progress (Cooking/Processing/Packing)`, and `Completed`.
+
+
+* **Floor Labor Allocation Log:** Simple daily headcount tracker logging attendance and shift output across the 10–15 factory employees.
+
+
+
+### 6.6 Logistics, Dispatch & Delivery
+
+* **Trip & Load Consolidation:** Groups confirmed orders by geographical route and vehicle capacity across the 3–4 drivers.
+
+
+* **Driver Mobile App:** Offline-capable Android interface providing turn-by-turn stop lists, customer contact buttons, item counts to unload, crate/container return tracking, and fuel/toll expense logging with receipt photo capture.
+
+
+
+### 6.7 Collections, Receivables & Day-End Accounting
+
+* **Real-Time Receivables Sub-Ledger:** Instant invoicing upon dispatch; live tracking of `Total Outstanding`, `Overdue Amount`, and `Unsettled Field Collections`.
+
+
+* **Custodian Wallet Reconciliation (EOD Fix):** Tracks exactly how much physical cash or checks each driver and collection staff member is holding at any minute of the day.
+
+
+* **10-Minute EOD Closing Checklist:** Automated screen showing:
+1. All Trips Closed? (Yes/No)
+2. All Field Cash Handed Over & Counted? (Yes/No)
+3. Any Uninvoiced Deliveries? (Yes/No)
+4. Daily Net Cash Position & Bank Deposit Slip generated.
+
+
+
+
+
+### 6.8 Reporting & Executive Control Tower
+
+Mr. X receives three structured views instead of making dozens of phone calls:
+
+1. **Live Pulse Header (Mobile Top Bar):** `Today's Sales (₹)` | `Gross Margin (%)` | `Cash Collected Today (₹)` | `Pending Exceptions (Count)`.
+2. **Operational Status Matrix:** Live progress bars for `Orders Pending Dispatch`, `Factory Batches Running`, `Trucks on Road (Stop X of Y)`, and `Supplier Shortfalls`.
+3. **Weekly/Monthly Strategic Analytics:** Customer Profitability Ranking, Supplier Fill-Rate & Price Inflation Report, Factory Yield & Wastage Trend, and AR Aging (0–7, 8–15, 16–30, 30+ days).
+
+
+
+---
+
+## 7. TECHNICAL ARCHITECTURE, DATABASE DESIGN, SECURITY & INTEGRATIONS
+
+### 7.1 Recommended Technical Architecture (Lightweight, Cloud-Native, Offline-Resilient)
+
+To keep Total Cost of Ownership (TCO) low, deployment fast, and maintenance simple for an SME food business, we recommend a **Modular Monolith Backend with Progressive Web & Offline-First Mobile Apps**.
+
+```
++-------------------------------------------------------------------------+
+|                        CLIENT PRESENTATION LAYER                        |
+|                                                                         |
+|  +-------------------+  +---------------------+  +-------------------+  |
+|  |   Mr. X & Field   |  |  Factory Floor &    |  |   Office Sales &  |  |
+|  |   Mobile App      |  |  Warehouse Tablet   |  |   Finance Desk    |  |
+|  | (Flutter / React  |  |  (PWA Touch UI +    |  | (React / Next.js  |  |
+|  |  Native + SQLite  |  |   Barcode/Weight)   |  |  Web Application) |  |
+|  |  Offline Sync)    |  +---------------------+  +-------------------+  |
++----------+-------------------------+-----------------------+------------+
+           |                         |                       |
+           +-------------------------+-----------------------+
+                                     | HTTPS / REST / WebSockets
+                                     v
++-------------------------------------------------------------------------+
+|                     API GATEWAY & SECURITY LAYER                        |
+|          (JWT Auth, RBAC Middleware, Rate Limiting, TLS 1.3)            |
++------------------------------------+------------------------------------+
+                                     |
+                                     v
++-------------------------------------------------------------------------+
+|                 NEOCORE APPLICATION SERVER (MODULAR MONOLITH)           |
+|                     (Node.js / NestJS  OR  Python / FastAPI)            |
+|                                                                         |
+|  +---------------+  +---------------+  +---------------+  +----------+  |
+|  | Sales & Price |  | Procurement & |  | Multi-Site    |  | Factory  |  |
+|  | Guardrail Svc |  | Supplier Svc  |  | Inventory ATP |  | MRP/MES  |  |
+|  +---------------+  +---------------+  +---------------+  +----------+  |
+|  +---------------+  +---------------+  +-----------------------------+  |
+|  | Fleet & ePOD  |  | AR/AP & Cash  |  | Exception Rule Engine &     |  |
+|  | Logistics Svc |  | Custody Svc   |  | Real-Time Notification Hub  |  |
+|  +---------------+  +---------------+  +-----------------------------+  |
++----------+---------------------------------+--------------------+-------+
+           |                                 |                    |
+           v                                 v                    v
++-----------------------+       +---------------------+  +----------------+
+|  PostgreSQL Database  |       |  Redis Cache &      |  | Object Storage |
+|  (ACID Transactions,  |       |  BullMQ Job Queue   |  | (AWS S3 / GCP) |
+|   Row-Level Security, |       |  (Async Alerts,     |  | (ePOD Photos,  |
+|   Immutable Audit Log)|       |   EOD Cron Jobs)    |  |  Challan PDFs) |
++-----------------------+       +---------------------+  +----------------+
+                                                                  |
+                                                                  v
++-------------------------------------------------------------------------+
+|                      EXTERNAL INTEGRATIONS LAYER                        |
+|  * WhatsApp Business API (Customer Quotes, Invoices, Payment Receipts)  |
+|  * Firebase Cloud Messaging (FCM) (Instant Push Approvals to Mr. X)     |
+|  * Google Maps Routes API (Driver Sequence & Distance Calculation)      |
+|  * Accounting Export Bridge (Tally Prime / Zoho Books XML/JSON Sync)    |
++-------------------------------------------------------------------------+
+
+```
+
+* **Why Offline-First Mobile (SQLite / WatermelonDB Sync)?** Drivers and collection staff travel across multiple areas where cellular connectivity may drop. The mobile app caches the assigned Trip Manifest and Customer Ledger locally, allowing drivers to capture ePOD signatures and cash receipts offline and auto-syncing the moment connectivity returns.
+
+
+* **Why PostgreSQL with ACID Compliance?** Inventory reservation across sites and financial sub-ledger postings (Customer AR + Agent Cash Custody) require strict database transaction isolation (`SERIALIZABLE` / `READ COMMITTED` with row locking) to prevent double-allocation of food stock or missing financial entries.
+
+
+
+---
+
+### 7.2 Core Database Schema & Entity-Relationship Design
+
+Below is the production-ready relational schema blueprint covering all operational domains:
+
+#### 1. Organization, Sites & Users
+
+* **`sites`**: `id (PK)`, `name`, `site_type (FACTORY | WAREHOUSE | OFFICE)`, `address`, `is_active`
+
+* **`users`**: `id (PK)`, `full_name`, `phone (Unique)`, `role (OWNER | OPS_COORD | PROD_MGR | DRIVER | COLLECTOR | STOREKEEPER)`, `assigned_site_id (FK)`, `cash_custody_balance (Decimal)`, `is_active`
+
+
+#### 2. Products, BOM & Pricing
+
+* **`items`**: `id (PK)`, `sku_code`, `name`, `item_category (TRADED_GOOD | RAW_MATERIAL | PROCESSED_FG | PACKAGING)`, `primary_uom (KG | CRATE | CARTON)`, `secondary_uom`, `shelf_life_days`, `tax_rate_pct`
+
+* **`daily_price_lists`**: `id (PK)`, `item_id (FK)`, `effective_date`, `latest_landed_cost`, `floor_price`, `target_price`, `updated_by (FK)`
+
+* **`bom_headers`**: `id (PK)`, `finished_item_id (FK)`, `standard_batch_output_qty`, `expected_wastage_pct`, `is_active`
+* **`bom_lines`**: `id (PK)`, `bom_id (FK)`, `raw_material_item_id (FK)`, `required_qty_per_batch`
+
+#### 3. Customers & Sales Orders
+
+* **`customers`**: `id (PK)`, `business_name`, `contact_person`, `phone`, `whatsapp_no`, `billing_address`, `gps_lat_lng`, `credit_limit`, `credit_days`, `current_ar_balance`
+
+* **`sales_orders`**: `id (PK)`, `order_no`, `customer_id (FK)`, `fulfillment_site_id (FK)`, `order_status (DRAFT | PENDING_APPROVAL | CONFIRMED | READY | DISPATCHED | DELIVERED | INVOICED)`, `total_amount`, `margin_pct`, `created_by (FK)`, `approved_by (FK, Nullable)`, `delivery_date`
+
+* **`sales_order_lines`**: `id (PK)`, `order_id (FK)`, `item_id (FK)`, `ordered_qty`, `quoted_unit_price`, `floor_price_snapshot`, `allocated_from_stock_qty`, `requires_production_qty`, `delivered_qty`
+
+
+#### 4. Suppliers, Procurement & Inventory
+
+* **`suppliers`**: `id (PK)`, `company_name`, `phone`, `reliability_score_pct`, `current_ap_balance`
+
+* **`purchase_orders`**: `id (PK)`, `po_no`, `supplier_id (FK)`, `receiving_site_id (FK)`, `po_status (DRAFT | PENDING_APPROVAL | ISSUED | PARTIALLY_RECEIVED | CLOSED)`, `total_amount`
+
+* **`purchase_order_lines`**: `id (PK)`, `po_id (FK)`, `item_id (FK)`, `ordered_qty`, `confirmed_qty`, `received_qty`, `unit_price`, `last_purchase_price_snapshot`
+
+* **`inventory_batches`**: `id (PK)`, `site_id (FK)`, `item_id (FK)`, `batch_lot_no`, `physical_qty`, `committed_qty`, `mfg_date`, `expiry_date`
+
+* **`stock_ledger_txns`**: `id (PK)`, `site_id (FK)`, `item_id (FK)`, `batch_id (FK)`, `txn_type (GRN | PROD_CONSUME | PROD_OUTPUT | SALE_DISPATCH | RETURN | TRANSFER | ADJUSTMENT)`, `qty_delta`, `reference_doc_id`, `created_at`
+
+
+#### 5. Factory Production (MES/MRP)
+
+* **`production_work_orders`**: `id (PK)`, `wo_no`, `site_id (FK)`, `bom_id (FK)`, `finished_item_id (FK)`, `linked_sales_order_id (FK, Nullable)`, `planned_qty`, `actual_output_qty`, `wastage_qty`, `wo_status (PLANNED | IN_PROGRESS | COMPLETED)`, `assigned_manager_id (FK)`, `worker_headcount`, `scheduled_date`
+
+
+#### 6. Logistics, Dispatch & Deliveries
+
+* **`delivery_trips`**: `id (PK)`, `trip_no`, `origin_site_id (FK)`, `driver_id (FK)`, `vehicle_no`, `trip_status (LOADING | IN_TRANSIT | COMPLETED)`, `departure_time`, `completion_time`
+
+* **`delivery_stops`**: `id (PK)`, `trip_id (FK)`, `sales_order_id (FK)`, `customer_id (FK)`, `stop_sequence`, `stop_status (PENDING | DELIVERED_FULL | DELIVERED_PARTIAL | FAILED)`, `epod_signature_url`, `epod_photo_url`, `exception_notes`, `completed_at`
+
+
+#### 7. Financials, Collections & Audit/Exceptions
+
+* **`invoices`**: `id (PK)`, `invoice_no`, `sales_order_id (FK)`, `customer_id (FK)`, `invoice_date`, `due_date`, `total_amount`, `paid_amount`, `balance_due`, `status (UNPAID | PARTIAL | PAID | OVERDUE)`
+
+* **`collection_receipts`**: `id (PK)`, `receipt_no`, `customer_id (FK)`, `collected_by_user_id (FK)`, `payment_mode (CASH | UPI | BANK_TRANSFER | CHEQUE)`, `amount`, `reference_utr_or_cheque_no`, `handover_status (IN_AGENT_CUSTODY | HANDED_OVER_VERIFIED)`, `verified_by_owner_id (FK, Nullable)`, `collected_at`
+
+* **`exception_approvals`**: `id (PK)`, `exception_type (PRICE_OVERRIDE | CREDIT_BREACH | SUPPLIER_PRICE_SPIKE | SUPPLIER_SHORTFALL | YIELD_VARIANCE)`, `reference_table`, `reference_id`, `requested_by (FK)`, `context_payload_json`, `status (PENDING | APPROVED | REJECTED)`, `owner_remarks`, `resolved_at`
+
+* **`immutable_audit_logs`**: `id (PK)`, `user_id (FK)`, `action`, `entity_name`, `entity_id`, `old_value_json`, `new_value_json`, `ip_address`, `timestamp`
+
+
+---
+
+### 7.3 Security, Governance & Fraud Prevention
+
+1. **Site-Scoped Data Isolation:** Row-Level Security (RLS) ensures warehouse staff and production managers only see operational queues relevant to their assigned location, while Mr. X has unrestricted cross-site visibility.
+
+
+2. **Append-Only Financial & Stock Ledgers:** Users cannot `UPDATE` or `DELETE` rows in `stock_ledger_txns` or `collection_receipts`. Corrections require a formal reversal entry, creating an unbreakable audit trail that eliminates "missed entries" or silent manipulation.
+
+
+3. **Price & Margin Masking:** Factory employees, drivers, and warehouse staff see only product names, batch numbers, and quantities—unit prices, supplier rates, and customer profit margins are hidden at the API serialization layer.
+
+
+4. **Automated Geo-Tagging & Timestamps:** Every mobile ePOD delivery confirmation and field cash collection captures automatic GPS coordinates and device timestamps to verify field staff presence at customer locations.
+
+---
+
+### 7.4 Key External Integrations
+
+* **WhatsApp Business API (Primary Customer/Supplier Channel):** Because customers and suppliers in the food trade are accustomed to phone/messaging communication, NeoCore automatically sends PDF Order Confirmations, Dispatch Alerts (with driver contact), Tax Invoices, and Instant Payment Receipts to customers via WhatsApp—drastically cutting inbound *"Where is my order?"* or *"Did you record my payment?"* calls to Mr. X.
+
+
+* **Accounting Software Bridge (Tally Prime / Zoho Books / QuickBooks):** NeoCore acts as the operational front-end and sub-ledger, exporting verified daily sales invoices, purchase bills, and reconciled collection vouchers via automated nightly XML/API sync to the statutory tax accounting system.
+
+---
+
+## 8. MVP SCOPE vs. FUTURE ENHANCEMENTS (PHASED FEATURE MATRIX)
+
+To avoid overwhelming Mr. X and his staff during the transition from manual notes to digital workflows, features are strictly bifurcated into **Phase 1 (MVP: Core Control & Bottleneck Relief)** and **Phase 2 (Advanced Automation & Optimization)**.
+
+| Functional Area | MVP Features (Day 1 Must-Haves — High Priority)
+
+ | Future Enhancements (Phase 2+ — Medium/Long Term) |
+| --- | --- | --- |
+| **Sales & Pricing** | • Customer Master & Credit Limits<br>
+
+<br>• Daily Base/Floor Price Sheet<br>
+
+<br>• Quick Order Entry with Margin Check<br>
+
+<br>• One-Tap Owner Mobile Exception Approvals | • WhatsApp Self-Service Customer Ordering Bot<br>
+
+<br>• Automated AI dynamic pricing based on commodity index<br>
+
+<br>• Salesperson commission calculation engine |
+| **Collections & Finance** | • Automated Invoicing from Delivery<br>
+
+<br>• Mobile Field Collection Logging<br>
+
+<br>• **Agent Cash Custody Wallet** & EOD Handover Reconciliation<br>
+
+<br>• Automated WhatsApp Payment Receipts | • Automated UPI Dynamic QR Code generation on Driver App<br>
+
+<br>• OCR scanning of physical checks and bank deposit slips<br>
+
+<br>• Automated dunning/payment reminder calls/messages |
+| **Delivery & Fleet** | • Trip Manifest Builder & Driver Assignment (3–4 drivers)<br>
+
+<br>• Mobile Driver App with Offline Sync<br>
+
+<br>• Mandatory ePOD (Signature/Photo) & Partial Delivery logging | • Live GPS Fleet Telemetry & Route Optimization AI<br>
+
+<br>• Cold-chain temperature sensor integration (if applicable)<br>
+
+<br>• Automated crate/empty container deposit ledger |
+| **Suppliers & Procurement** | • Supplier Master & Last Purchase Price memory<br>
+
+<br>• PO Creation with Price Spike & Shortfall Alerts<br>
+
+<br>• Blind Mobile GRN at receiving sites | • Supplier Portal / WhatsApp RFQ broadcast for spot bidding<br>
+
+<br>• Automated 3-way matching (PO vs. GRN vs. Supplier Bill) with OCR<br>
+
+<br>• Automated reorder point (ROP) PO generation |
+| **Inventory & Multi-Site** | • Multi-site Stock Ledger (Physical vs. Committed ATP)<br>
+
+<br>• Batch/Expiry Date tracking<br>
+
+<br>• Inter-site Stock Transfer workflow | • Barcode/QR label printing & handheld scanner integration<br>
+
+<br>• Digital Weighing Scale Bluetooth/RS232 integration |
+| **Factory Production** | • Basic BOM / Recipe Master<br>
+
+<br>• Sales-to-Production Demand Queue<br>
+
+<br>• Factory Tablet Work Order closure (Output + Wastage) | • Machine downtime & OEE tracking<br>
+
+<br>• Biometric attendance link for 10–15 factory workers<br>
+
+<br>• Granular batch cost accounting (overhead absorption) |
+
+---
+
+## 9. IMPLEMENTATION ROADMAP, TESTING STRATEGY, RISKS & SUCCESS MEASURES
+
+### 9.1 12-Week Phased Implementation Roadmap
+
+The rollout is structured into four 3-week sprints designed to relieve Mr. X's workload progressively without disrupting live daily trading or factory production.
+
+```
+WEEK 1-3: PHASE 0          WEEK 4-6: PHASE 1           WEEK 7-9: PHASE 2          WEEK 10-12: PHASE 3
+Discovery & Master Data    Order-to-Cash & Collections  Logistics & Multi-Site     Production & Procurement
+=======================    ===========================  ======================     ========================
+• Lock 10 Open Questions   • Go-Live: Customer Master   • Go-Live: Driver App      • Go-Live: Factory Tablet
+• Cleanse Customer AR      • Go-Live: Daily Price List  • Trip Manifests & ePOD    • BOMs & Work Orders
+  & Supplier AP balances   • Go-Live: Sales Order Desk  • Multi-Site ATP Stock     • Supplier POs & Shortfall
+• Map SKU & BOM Masters    • Go-Live: Mobile Field      • Blind GRN at Warehouses    Exception Workflows
+• Provision Cloud Infra      Collections & EOD Cash     • Full Tally/Accounting    • Full Executive Dashboard
+                             Custody Reconciliation       Bridge Sync                Sign-off & Optimization
+
+```
+
+* **Why start with Order-to-Cash & Collections in Phase 1?** The case study explicitly identifies Order Lifecycle, Owner Workload, Collections/Financial Records, and Delivery Coordination as the four **High Priority** areas. Stopping financial leakage at EOD and taking routine order/collection calls off Mr. X’s plate delivers immediate ROI within 6 weeks.
+
+
+
+---
+
+### 9.2 Comprehensive Testing & Validation Strategy
+
+1. **Conference Room Pilot (CRP) — Scenario Simulation:** Before writing production code, walk Mr. X, the Production Manager, and lead collection staff through clickable wireframes using **Scenarios A through F** from the case study to validate screen simplicity.
+
+
+2. **Parallel Run for Financial Reconciliation (7 Days):** During Week 6, run the Mobile Collection App and EOD Cash Handover module in parallel with Mr. X's existing manual end-of-day account review. Verify that NeoCore catches 100% of transactions and highlights any entries missed by the manual process.
+
+
+3. **Field Offline & Low-Connectivity Stress Test:** Test the Driver and Collector mobile apps in airplane mode and weak 2G/3G zones to verify that offline ePOD photos, partial delivery adjustments, and cash receipts queue cleanly in local SQLite storage and sync without duplication upon reconnection.
+4. **Guardrail & Penetration Testing:** Attempt to bypass Floor Prices, Credit Limits, and Cash Custody balances using non-owner accounts to verify that RBAC permissions and database triggers block unauthorized actions.
+
+---
+
+### 9.3 Adoption Risks & Practical Mitigation Plan
+
+| Risk Category | Specific Operational Risk in Neo's Context | Concrete Mitigation Strategy |
+| --- | --- | --- |
+| **Owner Habit Regression** | Customers and drivers are habituated to calling Mr. X’s personal mobile number directly, bypassing the new system and staff.
+
+ | **Call Redirection & Protocol:** Mr. X greets routine callers with: *"I've approved your price band on the desk—transferring you to [Coordinator] to lock your dispatch slot immediately."* Customers quickly learn the Order Desk is faster for routine confirmation. |
+| **Field Staff Digital Literacy** | Drivers (3–4) and factory staff may struggle with complex ERP screens or English-heavy text inputs.
+
+ | **Zero-Typing / Local Language UI:** The Driver and Factory apps use large, color-coded buttons, local language labels, voice-note attachments for exceptions, and numeric keypads only. |
+| **Shadow Pricing / Cash Leakage** | Collection staff might collect cash from a customer and delay logging it in the app to use the float personally.
+
+ | **Customer WhatsApp Loop:** Customers are informed that only digital WhatsApp receipts generated instantly by NeoCore are valid proof of payment. Additionally, any delivery marked `COD` blocks trip closure until cash is logged. |
+| **Master Data Setup Fatigue** | Defining exact BOM recipes for processed foods or initial customer opening balances stalls go-live. | **Progressive Data Enrichment:** Launch Phase 1 with Simple Item SKUs and verified Customer AR balances. Layer in multi-level BOM recipes in Phase 3 once daily order/collection habits are established. |
+
+---
+
+### 9.4 Key Performance Indicators (KPIs) & Success Measures
+
+To prove the transformation succeeded, NeoProject will track six concrete metrics comparing the **Pre-Implementation Baseline** against **Day 90 Post-Go-Live Targets**:
+
+| # | Success Metric (KPI) | Current Baseline (Case Study) | Day 90 Target State | Measurement Method |
+| --- | --- | --- | --- | --- |
+| **1** | **Owner Operational Call Volume** | ~40–70+ routine calls/day across all functions
+
+ | **< 10 calls/day** (80%+ handled via mobile tap approvals) | Phone call log sample + NeoCore Exception Queue count |
+| **2** | **End-of-Day Reconciliation Time** | 60–90 mins of manual checking with missed entries
+
+ | **< 10 mins** automated EOD Cash Custody verification | System timestamp from EOD Close initiation to Owner sign-off |
+| **3** | **Unrecorded / Missed Financial Entries** | Frequent risk of missed collection/account entries
+
+ | **0% missed entries** (100% digital receipt + wallet match) | Weekly audit of Customer AR disputes vs. Cash Register |
+| **4** | **Routine Order Confirmation Speed** | Delayed while waiting for Mr. X to finish other calls
+
+ | **< 2 minutes** (handled autonomously within Floor Price) | System timestamp (`Order Created` to `Order Confirmed`) |
+| **5** | **Unplanned Margin Erosion Events** | Unmeasured (selling at old prices after supplier hikes)
+
+ | **100% visibility** before order lock via BR-01 & BR-03 | Count of orders sold below target margin without Owner override |
+| **6** | **Delivery Completion Visibility** | Reconstructed via ad-hoc driver phone calls
+
+ | **100% real-time ePOD** logged at customer doorstep | % of daily trips closed with valid digital ePOD before 8:00 PM |
