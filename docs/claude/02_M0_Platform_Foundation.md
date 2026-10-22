@@ -47,6 +47,17 @@ Six roles (schema `users.role`). The owner has all permissions; the rest follow 
 | **`attachments`** | `id` PK · `entity_name` · `entity_id` · `storage_key` · `mime_type` · `uploaded_by` · `gps_lat_lng` · `captured_at` | ADD |
 | **`idempotency_keys`** | `key` PK · `user_id` · `endpoint` · `request_hash` · `response_json` · `created_at` | ADD |
 | **`device_registrations`** | `id` PK · `user_id` · `fcm_token` · `platform` · `app_version` · `last_sync_at` | ADD |
+
+**Tables pre-created in migration 002 (confirmed decisions — owned by other modules but seeded here to avoid cross-module migration ordering):**
+
+| Table | Columns | Src |
+| --- | --- | --- |
+| **`approval_policies`** | `id` PK · `exception_type` UNIQUE · `primary_approver_role` · `can_delegate` · `delegate_user_id` FK · `delegate_value_cap_inr` · `escalation_wait_minutes` (default 60) · `second_escalation_user_id` FK · `updated_by` · `updated_at` | **CONFIRMED OD-019** |
+| **`opening_balance_imports`** | `id` PK · `import_type` (`CUSTOMER_AR` \| `SUPPLIER_AP` \| `INVENTORY`) · `cut_off_date` · `status` (`DRAFT` \| `SIGNED_OFF` \| `IMPORTED` \| `REVERSED`) · `signed_off_by` FK · `signed_off_at` · `imported_by` FK · `imported_at` · `reversed_by` FK · `reversed_at` · `reversal_reason` · `row_count` · `total_value` · `notes` · `created_by` FK · `created_at` · `UNIQUE(import_type, cut_off_date, status)` | **CONFIRMED OD-023** |
+| **`opening_balance_import_lines`** | `id` PK · `import_id` FK · `row_number` · `entity_code` · `entity_name` · `document_ref` · `document_date` · `due_date` · `quantity` · `uom` · `amount_inr` · `currency` · `validation_status` (`OK` \| `WARN` \| `ERROR`) · `validation_notes` · `ledger_entry_id` | **CONFIRMED OD-023** |
+
+**Reusable domain type:** `tax_treatment_type` enum (`TAXABLE` \| `EXEMPT` \| `NIL_RATED` \| `NON_GST`) — consumed by M1 `items` and M6 `invoice_lines` per **CONFIRMED OD-003**.
+
 | **`immutable_audit_logs`** | `id` PK · `user_id` FK · `action` · `entity_name` · `entity_id` · `old_value_json` · `new_value_json` · `ip_address` · `timestamp` | BP |
 
 > `users.cash_custody_balance` is a **cached** value. The source of truth is the custody ledger in M6; a nightly check job must prove they match.
@@ -161,22 +172,23 @@ M0 publishes no business events. It provides the shared `EventBus` + **outbox** 
 
 ## 12. Open questions
 
-- `[DECISION]` OTP delivery channel for field staff: SMS or WhatsApp?
-- `[DECISION]` Can one coordinator work across sites (`user_site_access`) or is it one site each?
-- `[DECISION]` Languages needed for the driver/factory apps?
+- `[DECISION]` OTP delivery channel for field staff: SMS or WhatsApp? (OD-006 — AWAITING)
+- `[DECISION]` Can one coordinator work across sites (`user_site_access`) or is it one site each? (OD-007 — AWAITING)
+- `[DECISION]` Languages needed for the driver/factory apps? (OD-008 — AWAITING)
 - Does Neo want a customer-facing login ever (Phase 2 WhatsApp bot aside)?
+- `[CONFIRMED 2026-10-22]` OD-019 — exception delegation + escalation: `approval_policies` table seeded with all 12 exception types; `escalation_wait_minutes` = 60; silent auto-approval never permitted.
 
 ---
 
 ## 13. Build checklist
 
-- [ ] Project skeleton, shared utilities (`Money`, `Qty`, `Clock`), event bus + outbox
-- [ ] Migrations: `sites`, `users`, `locations`, `user_site_access`, `role_permissions`, `business_rule_config`, `doc_sequences`, `attachments`, `idempotency_keys`, `device_registrations`, `immutable_audit_logs`
+- [x] Project skeleton, shared utilities (`Money`, `Qty`, `Clock`), event bus + outbox, port contracts/stubs
+- [x] Migrations: `sites`, `users`, `locations`, `user_site_access`, `role_permissions`, `business_rule_config`, `doc_sequences`, `attachments`, `idempotency_keys`, `device_registrations`, `immutable_audit_logs`, `outbox_events` (migration 001)
 - [ ] Auth endpoints (login, OTP, refresh, logout) + rate limiting
 - [ ] RBAC guard + permission seed + masking serialiser
 - [ ] RLS policies + request-scoped `SET LOCAL`
-- [ ] Append-only triggers/revokes
-- [ ] Audit service/hook
+- [x] Append-only triggers/revokes (defined in migration 001)
+- [ ] Audit service/hook writing to `immutable_audit_logs`
 - [ ] Config service + seed of README §6 defaults
 - [ ] Doc numbering service
 - [ ] File upload service (pre-signed)

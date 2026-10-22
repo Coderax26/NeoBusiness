@@ -1,7 +1,7 @@
 # NeoBus — Implementation Roadmap
 
 **Version:** 1.0.0-draft
-**Date:** 2026-10-21
+**Date:** 2026-10-22
 
 ---
 
@@ -14,11 +14,23 @@
 - [x] Blueprint traceability document created
 - [x] Implementation roadmap created (this document)
 - [x] Repository structure established
+- [x] Docker Compose dev stack defined (PostgreSQL 16, Redis 7, MinIO, Mailhog)
+- [x] NestJS API scaffold (`apps/api`) — TypeScript strict, Vitest, Swagger, Helmet, throttler
+- [x] Shared utilities (Money, Qty, Clock, UUIDv7) — 42 unit tests passing
+- [x] Port contract interfaces + stubs for all 9 ports
+- [x] Domain event envelope + per-event payload types
+- [x] Health check endpoint (`GET /health`)
+- [x] M0 platform foundation migration (001) + confirmed-decision schema additions (002)
 
 ### Milestone 1.2 — Open decisions closure (Week 1–2)
-- [ ] Schedule business owner review of AWAITING decisions (OD-001 through OD-025)
-- [ ] Prioritize: OD-001 (margin%), OD-003 (invoice timing), OD-019 (owner delegate) — these block Sprint 1 code
-- [ ] Document all confirmed decisions and update OPEN_DECISIONS.md
+- [x] Schedule business owner review of AWAITING decisions (OD-001 through OD-025)
+- [x] Prioritize: OD-001 (margin%), OD-003 (invoice timing), OD-019 (owner delegate) — these block Sprint 1 code
+- [x] Document all confirmed decisions and update OPEN_DECISIONS.md
+- [x] OD-001 CONFIRMED — 10% gross margin, per-category overrides, `Money.autoFloor` implemented + tested
+- [x] OD-003 CONFIRMED — invoice at dispatch; `tax_treatment_type` enum created
+- [x] OD-019 CONFIRMED — delegation + escalation, no auto-approve; `approval_policies` table + 12-row seed
+- [x] OD-023 CONFIRMED — signed-off cut-off + CSV template; `opening_balance_imports` + `_lines` tables
+- [ ] Remaining AWAITING: OD-002 (owner escalation value), OD-004 (e-invoicing IRN), OD-020 (today's sales), OD-021 (dashboard refresh), OD-022 (WhatsApp BSP)
 
 ---
 
@@ -26,30 +38,31 @@
 
 ### Milestone 2.1 — Repository and development environment
 - [x] Directory structure created
-- [ ] `apps/api` NestJS project initialized (`@nestjs/cli new`)
-- [ ] TypeScript strict mode configured
-- [ ] ESLint + Prettier configured
-- [ ] Jest configured for unit and e2e tests
-- [ ] Docker Compose created (PostgreSQL 16, Redis 7, MinIO, Mailhog)
+- [x] `apps/api` NestJS project initialized
+- [x] TypeScript strict mode configured
+- [x] ESLint + Prettier configured (oxlint + prettier)
+- [x] Vitest configured for unit and e2e tests
+- [x] Docker Compose created (PostgreSQL 16, Redis 7, MinIO, Mailhog)
+- [x] `.gitignore` created
+- [x] Git repository initialized
 - [ ] `.env.example` created with all required variables documented
-- [ ] `.gitignore` created
-- [ ] Git repository initialized
 - [ ] CI pipeline configured (GitHub Actions or equivalent): lint → test → build
 
 ### Milestone 2.2 — Shared utilities and infrastructure
-- [ ] `Money` utility class (numeric(14,2) precision, INR, arithmetic operations)
-- [ ] `Qty` utility class (numeric(14,3), UoM-aware operations)
-- [ ] `Clock` utility (now-in-UTC, toKolkata display, device-skew check)
-- [ ] UUIDv7 generator
+- [x] `Money` utility class (numeric(14,2) precision, INR, arithmetic operations, `autoFloor`, `marginPct`)
+- [x] `Qty` utility class (numeric(14,3), UoM-aware operations)
+- [x] `Clock` utility (now-in-UTC, toKolkata display, device-skew check)
+- [x] UUIDv7 generator
 - [ ] `ConfigService` (reads `business_rule_config` table by key, caches with TTL)
 - [ ] Event bus + Outbox: `OutboxService`, `OutboxRelay` (polls → BullMQ)
-- [ ] Stubs for all 9 ports (ready to be replaced when owning module is built)
+- [x] Stubs for all 9 ports (ready to be replaced when owning module is built)
 
 ### Milestone 2.3 — Database baseline
-- [ ] Migration runner configured (using `node-pg-migrate` or `umzug`)
-- [ ] Migration 001: M0 tables (sites, users, locations, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events)
-- [ ] RLS policies on all M0 tables
-- [ ] Append-only triggers on ledger tables (already defined in M0)
+- [x] Migration 001: M0 tables (sites, users, locations, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events)
+- [x] Migration 002: confirmed-decision schema additions (`tax_treatment_type`, `approval_policies`, `opening_balance_imports`, `opening_balance_import_lines`)
+- [x] RLS policies on M0 tables (defined in migration 001)
+- [x] Append-only triggers on ledger tables (defined in migration 001)
+- [ ] Migration runner configured (node-pg-migrate or umzug)
 - [ ] Seed script: default sites, roles, business_rule_config thresholds (README §6 defaults)
 
 ### Milestone 2.4 — Smoke test
@@ -236,13 +249,13 @@
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|------|-----------|--------|-----------|
-| R1 | Open decisions not resolved before Sprint 1 code starts | HIGH | HIGH | Schedule business owner meeting within Week 1; prioritize OD-001, OD-003, OD-019 |
+| R1 | Open decisions not resolved before Sprint 1 code starts | MEDIUM | HIGH | OD-001/003/019/023 CONFIRMED 2026-10-22; schema seeded. Residual: OD-002, OD-004, OD-020, OD-021, OD-022 still AWAITING |
 | R2 | FEFO reservation concurrency bug causes negative stock | MEDIUM | HIGH | Mandatory concurrency test (two concurrent requests for last 100 kg) before M3 ships |
 | R3 | Offline sync creates duplicate financial records | HIGH | HIGH | Idempotency keys on every mobile write; integration test with simulated replay |
 | R4 | Field staff digital literacy barrier (drivers, factory) | HIGH | MEDIUM | Large buttons, no free-text typing, local language in Phase 2; Conference Room Pilot before go-live |
 | R5 | WhatsApp template approvals delayed | MEDIUM | MEDIUM | Start WhatsApp BSP signup and template submission in Sprint 0; SMS fallback always available |
-| R6 | Opening AR/AP balance data unavailable or messy | MEDIUM | HIGH | Sprint 0 task: define cut-off date, get data from accountant; do not go live without verified opening balances |
-| R7 | e-Invoicing IRN applicability unknown | MEDIUM | HIGH | Confirm Neo's turnover with accountant in Sprint 0; leave IRN field nullable until confirmed |
+| R6 | Opening AR/AP balance data unavailable or messy | MEDIUM | HIGH | Schema (`opening_balance_imports`) and CSV template defined per OD-023; accountant still must confirm cut-off date and supply data |
+| R7 | e-Invoicing IRN applicability unknown | MEDIUM | HIGH | Confirm Neo's turnover with accountant in Sprint 0; IRN field left nullable in the invoice schema until confirmed |
 | R8 | Multi-site stock check performance degrades with volume | LOW | MEDIUM | Index on (site_id, item_id, status, expiry_date); materialised ATP view if needed |
 | R9 | Owner continues bypassing system via phone calls | MEDIUM | HIGH | Call-redirection SOP; Exception Cards must be faster than a phone call (< 30 second receipt) |
 | R10 | BullMQ job failures cause silent data loss | MEDIUM | HIGH | Dead-letter queues; job failure alerts; idempotent job handlers |

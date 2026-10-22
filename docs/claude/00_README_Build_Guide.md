@@ -161,8 +161,11 @@ Seed these defaults; **none are hard-coded** (resolves G8).
 | `collection_worklist_time` | `08:00` | Scenario E |
 | `trip_close_deadline` | `20:00` | KPI 6 |
 | `dispatch_buffer_hours` | 3 | Scenario F (delivery 2 PM → required by 11 AM) |
-| `owner_escalation_value_inr` | *[DECISION]* | Scenario D "high-value disputes" |
-| `min_margin_pct_default` | *[DECISION]* | BR-01 |
+| `owner_escalation_value_inr` | 5000 | Scenario D "high-value disputes" — **AWAITING OD-002** |
+| `min_margin_pct_default` | 0.10 | BR-01 — **CONFIRMED OD-001** (10% gross margin, global) |
+| `escalation_wait_minutes` | 60 | OD-019 — **CONFIRMED** (minutes before escalating to delegate) |
+
+**Per-category margin overrides** (OD-001): `min_margin_pct_<CATEGORY>` e.g. `min_margin_pct_PROCESSED_FG` = 0.12. Read by `ConfigService.get(key, scope='ITEM_CATEGORY')` when the pricing engine evaluates a line.
 
 ---
 

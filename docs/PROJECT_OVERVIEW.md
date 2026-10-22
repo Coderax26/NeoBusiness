@@ -3,7 +3,7 @@
 **Product name:** NeoBus
 **Internal code name:** NeoCore
 **Version:** 0.1.0 (Phase 1 — Discovery and Foundation)
-**Date:** 2026-10-21
+**Date:** 2026-10-22
 
 ---
 

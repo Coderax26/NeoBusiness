@@ -6,11 +6,13 @@
 
 ## OD-001 — Minimum margin percentage (BR-01 floor calculation)
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** Blueprint BR-01, M1 §12, README §6 `min_margin_pct_default`
-**Question:** What is the minimum acceptable margin percentage used to auto-calculate floor prices? Is it one global value, per item category, or per item?
-**Impact:** Directly drives `floor_price = landed_cost / (1 - min_margin_pct)`. Wrong value means staff can quote below replacement cost without triggering an exception.
-**Proposed default (build against):** 10% global; overridable per item category via `business_rule_config`.
+**Status:** CONFIRMED — 2026-10-22
+**Decision:** 10% gross margin, global default. Overridable per item category via `business_rule_config`.
+**Implementation:**
+- `business_rule_config` key `min_margin_pct_default` = `0.10` (global).
+- Per-category override: key `min_margin_pct_CATEGORY_NAME` e.g. `min_margin_pct_PROCESSED_FG` = `0.12`.
+- `Money.autoFloor(landedCost, minMarginPct)` uses this value; result rounded UP to nearest ₹0.50.
+- Margin definition (G7): `margin_pct = (price - cost) / price` (gross margin, not markup).
 
 ---
 
@@ -24,13 +26,18 @@
 
 ---
 
-## OD-003 — Invoice timing: at dispatch vs. at ePOD delivery confirmation (G1)
+## OD-003 — Invoice timing and GST tax treatment
 
-**Status:** AWAITING ACCOUNTANT CONFIRMATION
-**Source:** Blueprint G1, M6 §4
-**Question:** Generate the tax invoice at dispatch (invoice travels with the goods — required by GST rules for goods in transit) or at delivery (after ePOD)?
-**Impact:** Affects GST compliance and the credit note workflow. Partial delivery at ePOD always requires a credit note if invoiced at dispatch.
-**Proposed default:** Invoice generated at dispatch. Differences resolved via credit note (confirmed by G1 resolution in blueprint). Confirm with the accountant.
+**Status:** CONFIRMED — 2026-10-22
+**Decision:** Invoice generated at dispatch for all goods. Some goods are tax-free (GST-exempt or nil-rated); the system must handle both taxable and exempt/nil-rated lines on the same invoice.
+**Implementation:**
+- Invoice generated on `trip.dispatched` event (Sprint 2) or manually via "Mark Dispatched" in Sprint 1.
+- `items` table has `tax_treatment` field: `TAXABLE | EXEMPT | NIL_RATED | NON_GST`.
+- Invoice line tax calculation: if `tax_treatment = TAXABLE` → compute CGST/SGST or IGST. If `EXEMPT`, `NIL_RATED`, or `NON_GST` → tax_amount = 0, no HSN tax split.
+- Both taxable and non-taxable lines can appear on the same GST invoice (standard practice).
+- `hsn_code` still required on all lines for record-keeping; tax rates default to 0 for exempt/nil.
+- Delivery differences (short/partial delivery at ePOD) resolved via credit note — never by editing the original invoice.
+- `IRN` field present but nullable pending OD-004 (e-invoicing applicability confirmation).
 
 ---
 
@@ -186,11 +193,16 @@
 
 ## OD-019 — Owner delegate for exception approvals when unavailable (G13)
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M7 §12, G13
-**Question:** When Mr. X is unavailable, who (if anyone) can approve which exception types? What should happen to unresolved exceptions after a defined wait time (auto-expire, auto-approve within tolerance, or escalate to a delegate)?
-**Impact:** Prevents recreating the bottleneck. Critical for operational continuity.
-**Proposed default:** No delegate in MVP; exceptions queue until resolved. Auto-expire after `auto_expire_minutes` (default 120 min) with policy `REJECT`. Owner must confirm delegate and exception type scoping in Sprint 1.
+**Status:** CONFIRMED — 2026-10-22
+**Decision:** Delegated approval with escalation. Silent auto-approval is NEVER permitted.
+**Implementation:**
+- `approval_policies` table has `delegate_user_id` (nullable), `escalation_wait_minutes` (default 60), and `can_delegate` flag per exception type.
+- Escalation flow: owner → (wait `escalation_wait_minutes`) → push/SMS to delegate → (wait `escalation_wait_minutes` again) → push/SMS to owner's emergency contact (if set) → exception stays OPEN, never auto-resolved.
+- `PRICE_OVERRIDE` and `CREDIT_BREACH`: owner can delegate to OPS_COORD with a value cap (e.g. OPS_COORD can approve PRICE_OVERRIDE up to ₹5,000 value at risk).
+- `SUPPLIER_PRICE_SPIKE`, `WASTAGE_WRITEOFF`, `MANUAL_LEDGER_ADJUSTMENT`: owner-only, no delegation in MVP.
+- The `exception_approvals` table gains: `escalated_to_user_id`, `escalated_at`, `value_cap_inr` on delegate policies.
+- Owner must configure delegate assignments in the Policy Settings screen before go-live (M7b).
+- All escalation events are logged in `immutable_audit_logs`.
 
 ---
 
@@ -226,11 +238,17 @@
 
 ## OD-023 — Opening balance cut-off date and data format
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M6 §13 (opening-balance import), Sprint 0
-**Question:** What date is the cut-off for opening customer AR and supplier AP balances? In what format is the data available (Tally export, Excel, manual list)?
-**Impact:** Sprint 0 data cleansing activity; required before go-live of M6.
-**Proposed default:** No default — needs confirmation from the accountant before Sprint 0 closes.
+**Status:** CONFIRMED — 2026-10-22
+**Decision:** Use a signed-off cut-off date and a controlled CSV import template. Accountant signs off the data before it is imported.
+**Implementation:**
+- A dedicated `opening_balance_imports` table stores each import batch: `id`, `import_type` (`CUSTOMER_AR | SUPPLIER_AP | INVENTORY`), `cut_off_date`, `status` (`DRAFT | SIGNED_OFF | IMPORTED | REVERSED`), `signed_off_by`, `signed_off_at`, `imported_by`, `imported_at`, `row_count`, `total_value`.
+- Import template (CSV): `entity_code, entity_name, document_ref, document_date, due_date, amount_inr, currency` — one row per outstanding invoice/bill.
+- Import is idempotent: can be re-run on DRAFT; only one import per `(import_type, cut_off_date)` can be SIGNED_OFF.
+- Sign-off is a two-step action: accountant uploads + previews → owner or OPS_COORD clicks "Sign Off" → status moves to SIGNED_OFF → import runs → status becomes IMPORTED.
+- Once IMPORTED, the batch can be REVERSED (posts equal and opposite entries) but cannot be re-imported.
+- `customer_ledger_entries` and `supplier_ledger_entries` get `entry_type = OPENING_BALANCE` for these rows.
+- Provide an import template download endpoint and a preview-before-import endpoint.
+- Action: accountant to confirm cut-off date by end of Sprint 0 (target: last day of previous month).
 
 ---
 
@@ -258,9 +276,9 @@
 
 | ID | Topic | Status |
 |----|-------|--------|
-| OD-001 | Min margin pct | AWAITING |
+| OD-001 | Min margin pct | CONFIRMED (10% gross) |
 | OD-002 | Owner escalation value | AWAITING |
-| OD-003 | Invoice timing | AWAITING (accountant) |
+| OD-003 | Invoice timing + GST tax treatment | CONFIRMED (dispatch; mixed taxable/exempt) |
 | OD-004 | e-Invoicing applicability | AWAITING (accountant) |
 | OD-005 | e-Way bill generation | AWAITING |
 | OD-006 | OTP channel for field auth | AWAITING |
@@ -276,10 +294,10 @@
 | OD-016 | Cashier role | PROPOSED (Coordinator) |
 | OD-017 | Allocation policy | PROPOSED (FIFO) |
 | OD-018 | Accounting target | PROPOSED (Tally first) |
-| OD-019 | Owner delegate | AWAITING |
+| OD-019 | Owner delegate | CONFIRMED (delegate + escalation, no auto-approve) |
 | OD-020 | Today's sales definition | AWAITING |
 | OD-021 | Dashboard refresh rate | PROPOSED (30-60s) |
 | OD-022 | WhatsApp BSP provider | AWAITING |
-| OD-023 | Opening balance data | AWAITING |
+| OD-023 | Opening balance data | CONFIRMED (signed-off CSV template) |
 | OD-024 | Standing customer prices | PROPOSED (no MVP) |
 | OD-025 | Inter-site reservation | PROPOSED (single-site MVP) |

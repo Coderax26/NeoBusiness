@@ -1,7 +1,7 @@
 # NeoBus — Architecture Document
 
 **Version:** 1.0.0-draft
-**Date:** 2026-10-21
+**Date:** 2026-10-22
 **Status:** Confirmed baseline; deviations require a written ADR
 
 ---

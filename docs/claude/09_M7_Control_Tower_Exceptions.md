@@ -207,11 +207,15 @@ Template codes (ADD): `order_confirmation`, `dispatch_alert`, `tax_invoice`, `pa
 
 ## 12. Open questions
 
-- `[DECISION]` When Mr. X is unavailable, who approves, and which exception types may be auto-expired or delegated? (G13)
+- `[CONFIRMED 2026-10-22 — OD-019]` Delegated approval with escalation, **never silent auto-approval**. `approval_policies` table with `delegate_user_id`, `delegate_value_cap_inr`, `escalation_wait_minutes` (default 60), `second_escalation_user_id`, `can_delegate` flag per exception type. Seeded for all 12 types:
+  - Delegateable (owner can assign to OPS_COORD with value cap): `PRICE_OVERRIDE`, `CREDIT_BREACH`, `SUPPLIER_SHORTFALL`, `ALLOCATION`, `STOCK_VARIANCE`, `DELIVERY_DISPUTE`, `CASH_HANDOVER_VARIANCE`
+  - Owner-only (no delegation in MVP): `SUPPLIER_PRICE_SPIKE`, `YIELD_VARIANCE`, `WASTAGE_WRITEOFF`, `CREDIT_REBATE_WRITEOFF`, `MANUAL_LEDGER_ADJUSTMENT`
+  - Escalation flow: owner → wait 60 min → delegate push → wait 60 min → emergency contact → exception stays OPEN
+  - All escalation events logged in `immutable_audit_logs`.
 - `[DECISION]` Should approvals be possible directly from the push notification, or only after opening the app with PIN/biometric?
-- `[DECISION]` Definition of "Today's Sales": confirmed orders, dispatched orders, or invoices issued?
-- `[DECISION]` Which WhatsApp BSP/provider, and who completes template approvals and customer opt-ins?
-- `[DECISION]` Dashboard refresh expectations (real-time vs ~1 min).
+- `[DECISION]` Definition of "Today's Sales": confirmed orders, dispatched orders, or invoices issued? (OD-020 — AWAITING)
+- `[DECISION]` Which WhatsApp BSP/provider, and who completes template approvals and customer opt-ins? (OD-022 — AWAITING)
+- `[DECISION]` Dashboard refresh expectations (real-time vs ~1 min). (OD-021 — AWAITING)
 - Do coordinators see margin in dashboards, or only the owner?
 
 ---

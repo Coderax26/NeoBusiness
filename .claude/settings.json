@@ -1,0 +1,11 @@
+{
+  "models": [
+    {
+      "title": "Claude Sonnet 5.5",
+      "provider": "vertexai",
+      "model": "claude-sonnet-5-5",
+      "location": "global",
+      "project": "project-8536198e-876e-4b24-a58"
+    }
+  ]
+}

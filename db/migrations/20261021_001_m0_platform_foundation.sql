@@ -267,8 +267,9 @@ INSERT INTO business_rule_config (key, value_json, scope, description) VALUES
   ('collection_worklist_time',          '"08:00"', 'GLOBAL', 'Daily time (HH:MM IST) to build collection worklists'),
   ('trip_close_deadline',               '"20:00"', 'GLOBAL', 'Daily deadline (HH:MM IST) for all trips to be closed (KPI 6)'),
   ('dispatch_buffer_hours',             '3',     'GLOBAL', 'Hours before delivery time that goods must be ready (production Required By calculation)'),
-  ('min_margin_pct_default',            '0.10',  'GLOBAL', 'Default minimum margin % for auto-floor calculation — AWAITING OWNER CONFIRMATION (OD-001)'),
-  ('owner_escalation_value_inr',        '5000',  'GLOBAL', 'INR value above which delivery disputes escalate to owner — AWAITING OWNER CONFIRMATION (OD-002)')
+  ('min_margin_pct_default',            '0.10',  'GLOBAL', 'Minimum gross margin % for auto-floor: floor = cost / (1 - pct). CONFIRMED OD-001.'),
+  ('owner_escalation_value_inr',        '5000',  'GLOBAL', 'INR value above which delivery disputes escalate to owner — AWAITING OWNER CONFIRMATION (OD-002)'),
+  ('escalation_wait_minutes',           '60',    'GLOBAL', 'Minutes to wait before escalating unresolved exception to delegate. CONFIRMED OD-019.')
 ON CONFLICT (key) DO NOTHING;
 
 -- ============================================================
