@@ -105,9 +105,13 @@ CREATE TABLE IF NOT EXISTS doc_sequences (
   period      TEXT NOT NULL,           -- YYMM e.g. '2610'
   last_no     INTEGER NOT NULL DEFAULT 0,
   site_id     UUID REFERENCES sites(id),
-  device_id   TEXT,                    -- for offline device-scoped sequences
-  PRIMARY KEY (doc_type, period, COALESCE(site_id::TEXT, ''), COALESCE(device_id, ''))
+  device_id   TEXT                     -- for offline device-scoped sequences
 );
+-- Composite uniqueness with NULLs treated as distinct values, enforced
+-- via an expression index (PostgreSQL does not allow expressions in a
+-- PRIMARY KEY constraint).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_doc_sequences
+  ON doc_sequences (doc_type, period, COALESCE(site_id::TEXT, ''), COALESCE(device_id, ''));
 
 -- ============================================================
 -- ATTACHMENTS (ePOD photos, challan PDFs, GRN photos)

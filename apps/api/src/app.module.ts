@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthController } from './health.controller.js';
+import { M0PlatformModule } from './modules/m0-platform/m0-platform.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -31,7 +32,7 @@ import { HealthController } from './health.controller.js';
 
     // ── Business modules (activated sprint by sprint) ─────────────────────────
     // Sprint 0: M0 Platform Foundation
-    // M0PlatformModule,
+    M0PlatformModule,
 
     // Sprint 0–1: M7a Exception Engine + Notification Hub
     // M7aExceptionModule,
