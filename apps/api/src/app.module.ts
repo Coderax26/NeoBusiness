@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthController } from './health.controller.js';
 import { M0PlatformModule } from './modules/m0-platform/m0-platform.module.js';
 import { M7aExceptionsModule } from './modules/m7a-exceptions/m7a-exceptions.module.js';
+import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -39,7 +40,7 @@ import { M7aExceptionsModule } from './modules/m7a-exceptions/m7a-exceptions.mod
     M7aExceptionsModule,
 
     // Sprint 1: M1 Commercial and CRM
-    // M1CommercialModule,
+    M1CommercialModule,
 
     // Sprint 1: M6 Collections and Financials (core)
     // M6FinanceModule,
