@@ -8,6 +8,8 @@
  *   node dist/scripts/migrate.js
  */
 
+import 'dotenv/config'; // load .env before createKnex reads process.env
+
 import { createKnex } from '../shared/database/knex-instance.js';
 import { MigrationService } from '../modules/m0-platform/migration.service.js';
 

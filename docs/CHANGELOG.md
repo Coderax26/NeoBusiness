@@ -53,6 +53,31 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.2.0] — 2026-10-24 — M7a Exception Engine + Notification Hub Complete
+
+### Added
+- **Exception Engine**: Full management-by-exception lifecycle via `ExceptionService` (raise, resolve, expire, escalate)
+- **Approval policies**: Delegation + escalation rules per exception type (seeded for all 12 types in migration 002)
+- **Exception Card API**: `GET /exceptions`, `GET /exceptions/{id}`, `POST /exceptions/{id}/resolve` (APPROVED/REJECTED/COUNTERED)
+- **Transactional outbox integration**: `exception.requested` / `exception.resolved` domain events emitted atomically
+- **Notification Hub**: `NotificationService` implementing `NotifyPort` with FCM (log), SMS/WhatsApp (log), IN_APP (queue)
+- **Device registration**: `POST /devices/register` for FCM token storage in `device_registrations`
+- **Background jobs**: Exception expiry/escalation sweep (every 1 min), notification outbox relay (every 10s)
+- **Idempotency**: Single-resolution guarantee on exception cards; unique pending constraint at DB level
+- **RLS integration**: Exception queries automatically scoped to caller's sites via M0 middleware
+- **Migration 005**: `exception_approvals`, `exception_events`, `notification_outbox`, `notification_templates`, `whatsapp_optins` + 3 seeded templates
+- **Port wiring**: Real `ExceptionService` as `EXCEPTION_PORT`, real `NotificationService` as `NOTIFY_PORT` — replacing M0 stubs
+- **Unit tests**: 22 new tests (14 ExceptionService + 8 NotificationService) — total 64 passing
+
+### Fixed
+- Test environment: `vitest.config.ts` now loads `.env` via `setupFiles` for DB connectivity
+
+### Decisions Confirmed
+- **OD-019**: Delegated approval with escalation, never silent auto-approval; `escalation_wait_minutes` defaults to 60 per type
+- **ADR-005**: Transactional Outbox pattern extended to exception lifecycle events
+
+---
+
 ## [0.1.0] — 2026-10-24 — M0 Platform Foundation Complete
 
 ### Added

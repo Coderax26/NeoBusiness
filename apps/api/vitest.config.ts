@@ -8,5 +8,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    // Load .env so tests that use createKnex() (which reads process.env.DATABASE_URL)
+    // can connect to the dev/test database.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });
