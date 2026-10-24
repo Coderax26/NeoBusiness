@@ -53,4 +53,40 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.1.0] — 2026-10-24 — M0 Platform Foundation Complete
+
+### Added
+- **Database foundation**: PostgreSQL 16 with Knex.js, UUIDv7 keys, `numeric(14,2)` money, append-only triggers
+- **Migrations 001–004**: sites, users, locations, user_site_access, role_permissions (43 rows), business_rule_config (15 rows), doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events, refresh_tokens
+- **ConfigService**: reads `business_rule_config` with 5-min TTL cache, supports GLOBAL/SITE/ITEM_CATEGORY scope
+- **Auth module**: login (phone + password/PIN), refresh tokens (7-day rotation), logout, `/me` endpoint, bcrypt hashing
+- **JWT**: HS256, 15-min access / 7-day refresh via `JwtModule.registerAsync()` (secret loaded after ConfigModule)
+- **RBAC**: `PermissionService` + `RbacGuard` + `@RequirePermission(...)` decorator; 6 roles, 43 permissions seeded
+- **RLS middleware**: `SET LOCAL app.role` / `app.user_id` / `app.site_ids` per request; `FORCE ROW LEVEL SECURITY` on users/locations/sites; non-superuser `neobus_app` role for dev machines
+- **Audit interceptor**: writes to `immutable_audit_logs` on every POST/PUT/PATCH/DELETE; redacts password/pin/token fields
+- **Idempotency middleware**: `Idempotency-Key` header prevents duplicate offline writes; stores request hash + response; replays on duplicate
+- **Rate limiting**: `@Throttle({ default: { limit: 5, ttl: 60000 } })` on login endpoint
+- **DocNumberService**: generates `PREFIX-YYMM-NNNN` via `doc_sequences` table with upsert concurrency safety
+- **Transactional outbox**: `OutboxService.raise(trx, eventType, aggregateId, payload, moduleSource)` + `OutboxRelay` polling every 5s → BullMQ `domain-events` queue
+- **PriceMasker**: strips price/margin/cost/total/credit/ar fields for `PROD_MGR`, `DRIVER`, `STOREKEEPER` roles
+- **Seed script**: 3 sites (factory, warehouse, office), 6 users (all roles, bcrypt PINs), 1 multi-site access row
+- **Migrate script**: standalone migration runner for dev/CI
+- **Dev DB init**: creates `neobus_app` non-superuser role so RLS is actually enforced on dev machines
+- **CI pipeline**: GitHub Actions workflow (lint → test → build → migrate → e2e)
+- **Swagger/OpenAPI**: full API docs at `/api-docs`
+
+### Fixed
+- `doc_sequences` PRIMARY KEY expression → split into `CREATE UNIQUE INDEX uq_doc_sequences`
+- `idempotency_keys.user_id` nullable for unauthenticated routes (login/OTP)
+- `JwtModule.registerAsync()` so `JWT_SECRET` is read after `.env` is loaded
+- Nest `MiddlewareConsumer` wiring (was `app.use()` with middleware class)
+- `splitSql()` handles `$$` empty dollar-quote tags in migrations
+
+### Decisions Confirmed
+- **OD-001**: 10% gross margin global default, overridable per item category; `Money.autoFloor` = `cost / (1 - pct)` rounded UP to ₹0.50
+- **ADR-004**: PostgreSQL RLS + application `SET LOCAL` for site isolation
+- **ADR-005**: Transactional Outbox for domain events
+
+---
+
 *Previous versions: none (new project)*

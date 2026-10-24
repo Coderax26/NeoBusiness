@@ -1,18 +1,25 @@
 import { Module, Global } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Global()
 @Module({
   imports: [
     ConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET,
-      signOptions: {
-        expiresIn: (process.env.JWT_ACCESS_EXPIRES || '15m') as any,
-      },
+    // registerAsync ensures JWT_SECRET is read AFTER ConfigModule loads
+    // .env into process.env. Using .register() at import time is too early.
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        ({
+          secret: config.get<string>('JWT_SECRET'),
+          signOptions: {
+            expiresIn: config.get<string>('JWT_ACCESS_EXPIRES') || '15m',
+          },
+        }) as any,
     }),
   ],
   exports: [PassportModule, JwtModule],

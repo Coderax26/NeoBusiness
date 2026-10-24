@@ -136,7 +136,7 @@ CREATE INDEX idx_attachments_entity ON attachments(entity_name, entity_id);
 -- ============================================================
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   key           TEXT PRIMARY KEY,
-  user_id       UUID NOT NULL REFERENCES users(id),
+  user_id       UUID REFERENCES users(id),
   endpoint      TEXT NOT NULL,
   request_hash  TEXT,
   response_json JSONB,

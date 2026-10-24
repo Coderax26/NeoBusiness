@@ -1,4 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Get, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService, JwtPayload } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
@@ -9,6 +10,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with phone and password/PIN' })
   @ApiResponse({ status: 200, description: 'Login successful', schema: { example: { user: { id: 'uuid', phone: '+91...', role: 'OWNER' }, accessToken: 'eyJ...', refreshToken: 'eyJ...' } } })

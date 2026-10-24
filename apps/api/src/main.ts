@@ -38,7 +38,7 @@ async function bootstrap() {
       .setTitle('NeoBus API')
       .setDescription(
         'Enterprise business operations platform for multi-site food trading and manufacturing. ' +
-        'See /docs for module specifications.',
+          'See /docs for module specifications.',
       )
       .setVersion('0.1.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
