@@ -53,6 +53,28 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.3.0] — 2026-10-24 — M1 Commercial & CRM Complete
+
+### Added
+- **Pricing Engine**: `PricingService` with daily band lookup, `Money.autoFloor` (landed cost / (1 - min_margin_pct) rounded UP to ₹0.50), price memory (last 5 confirmed sales per customer+item), and BR-01 evaluation logic.
+- **Item Master**: `ItemService` implementing `ItemPort` with full item metadata (SKU, category, UoM, tax treatment `TAXABLE | EXEMPT | NIL_RATED | NON_GST` per OD-003, HSN, catch-weight, margin overrides).
+- **Credit Control**: `CreditService` implementing `CreditPort` + BR-02 evaluation (AR + new order ≤ credit limit, overdue check stubbed pending M6 integration).
+- **Order Lifecycle**: `OrderService` with state machine (`DRAFT → PENDING_APPROVAL → CONFIRMED...`), BR-01 price band evaluation, BR-02 credit evaluation, exception integration (`PRICE_OVERRIDE`, `CREDIT_BREACH` via `ExceptionPort`), and `exception.resolved` handler registration.
+- **Port Wiring**: Real `PRICING_PORT`, `ITEM_PORT`, `CREDIT_PORT` implementations replace M0 stubs, exported globally via `@Global() M1CommercialModule`.
+- **Migration 006**: 11 tables (`customers`, `customer_contacts`, `communication_log`, `items`, `uom_conversions`, `daily_price_lists`, `quotes`, `quote_lines`, `sales_orders`, `sales_order_lines`, `order_status_log`) with indexes, constraints, and seeded `role_permissions` for M1 entities.
+- **Scenario A Path 1 Verified**: Cost ₹82, floor ₹90, target ₹95 → in-band price confirms without exception.
+- **Scenario A Path 2 Verified**: Below-floor price raises `PRICE_OVERRIDE` exception; owner counter triggers handler flow.
+
+### Fixed
+- TypeScript build: `Money` class usage patterns fixed (`.of()`, `.isLessThan()`, `.toStorageString()`); `ExceptionPort` imported as type.
+
+### Decisions Confirmed
+- **OD-001**: 10% gross margin global default, overridable per item category via `min_margin_pct_<CATEGORY>` in `business_rule_config` (implemented in `ConfigService.getMinMarginPct()`).
+- **OD-003**: Invoice at dispatch; `tax_treatment` enum seeded in `items` table (`TAXABLE | EXEMPT | NIL_RATED | NON_GST`).
+- **OD-024**: Standing negotiated prices deferred to Phase 2; `price_tier` column added to `customers` table as placeholder.
+
+---
+
 ## [0.2.0] — 2026-10-24 — M7a Exception Engine + Notification Hub Complete
 
 ### Added
