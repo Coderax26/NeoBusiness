@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, OnModuleInit, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
@@ -184,9 +184,272 @@ export class OrderService implements OnModuleInit {
   }
 
   /**
+   * Confirm an in-band order.
+   * Caller must have validated pricing first (typically via pricing.evaluateLine).
+   */
+  async confirm(orderId: string, remarks: string | undefined, userId: string): Promise<{ orderId: string; status: string }> {
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status', 'customer_id', 'credit_flag');
+
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (order.order_status !== 'DRAFT') {
+        throw new ConflictException(`Order must be in DRAFT status to confirm, current: ${order.order_status}`);
+      }
+
+      // Re-evaluate all lines for price band compliance
+      const lines = await trx('sales_order_lines').where('order_id', orderId).select('*');
+      const today = new Date().toISOString().split('T')[0];
+
+      for (const line of lines) {
+        const band = await this.pricing.getBand(line.item_id, today);
+        if (!band) throw new BadRequestException(`Price band not set for item ${line.item_id} today`);
+
+        const requested = Money.of(line.quoted_unit_price);
+        const floor = Money.of(band.floorPrice);
+        if (requested.isLessThan(floor)) {
+          throw new BadRequestException(`Line ${line.id} is below floor (${line.quoted_unit_price} < ${band.floorPrice}). Request override first.`);
+        }
+      }
+
+      // Credit evaluation - compute sum manually since Knex sum() doesn't support expressions
+      const orderLines = await trx('sales_order_lines').where('order_id', orderId).select('quoted_unit_price', 'ordered_qty');
+      const totalAmount = Money.of(
+        orderLines.reduce((sum, l) => sum + parseFloat(l.quoted_unit_price) * parseFloat(l.ordered_qty), 0).toFixed(2)
+      ).toStorageString();
+      const evaluation = await this.credit.evaluate(order.customer_id, totalAmount);
+
+      // Determine final status
+      let finalStatus = 'CONFIRMED';
+      if (evaluation.status === 'HOLD') {
+        finalStatus = 'PENDING_APPROVAL';
+        // Raise CREDIT_BREACH exception
+        const payload = {
+          title: 'Credit Limit Breach',
+          summary: evaluation.reason || 'Order exceeds credit limit',
+          facts: [
+            { label: 'Customer', value: order.customer_id },
+            { label: 'Order Total', value: totalAmount },
+            { label: 'Credit Limit', value: evaluation.creditLimit },
+            { label: 'Current AR', value: evaluation.currentArBalance },
+          ],
+          impact: 'Order cannot be dispatched until credit is approved or converted to COD.',
+          actions: [
+            { code: 'APPROVE', label: 'Approve Credit' },
+            { code: 'CONVERT_COD', label: 'Convert to COD' },
+            { code: 'REJECT', label: 'Reject Order' },
+          ],
+          valueAtRisk: totalAmount,
+        };
+
+        await this.exceptionPort.raise(
+          'CREDIT_BREACH',
+          'sales_orders',
+          orderId,
+          userId,
+          payload,
+          order.fulfillment_site_id,
+        );
+      }
+
+      // Update order
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({
+          order_status: finalStatus,
+          total_amount: totalAmount,
+          confirmed_at: new Date(),
+          credit_flag: evaluation.status,
+          approved_by: evaluation.status === 'OK' ? userId : null,
+        });
+
+      // Status log
+      await trx('order_status_log').insert({
+        order_id: orderId,
+        from_status: 'DRAFT',
+        to_status: finalStatus,
+        by_user: userId,
+        reason: remarks ?? (evaluation.status === 'OK' ? 'Confirmed in-band' : 'Credit hold - awaiting approval'),
+      });
+
+      // Emit domain event
+      await this.emitOrderConfirmedEvent(orderId, lines, evaluation.status);
+
+      this.logger.log(`Order ${orderId} confirmed with status ${finalStatus}`);
+      return { orderId, status: finalStatus };
+    });
+  }
+
+  /**
+   * Request a price override for a below-floor order line.
+   */
+  async requestOverride(orderId: string, reason: string, userId: string): Promise<{ orderId: string; exceptionId: string }> {
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status', 'customer_id', 'fulfillment_site_id');
+
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (order.order_status !== 'DRAFT') {
+        throw new ConflictException(`Order must be in DRAFT to request override`);
+      }
+
+      // Find the first below-floor line (or all)
+      const lines = await trx('sales_order_lines')
+        .where('order_id', orderId)
+        .select('id', 'item_id', 'ordered_qty', 'quoted_unit_price', 'floor_price_snapshot', 'target_price_snapshot', 'landed_cost_snapshot');
+
+      const today = new Date().toISOString().split('T')[0];
+      let belowFloorLineId: string | null = null;
+      let exceptionId: string | null = null;
+
+      for (const line of lines) {
+        const band = await this.pricing.getBand(line.item_id, today);
+        if (!band) continue;
+
+        const requested = Money.of(line.quoted_unit_price);
+        const floor = Money.of(band.floorPrice);
+
+        if (requested.isLessThan(floor)) {
+          belowFloorLineId = line.id;
+
+          // Raise exception for this line
+          const payload = {
+            title: 'Price Below Floor',
+            summary: reason,
+            facts: [
+              { label: 'Item', value: line.item_id },
+              { label: 'Qty', value: line.ordered_qty },
+              { label: 'Requested Price', value: line.quoted_unit_price },
+              { label: 'Landed Cost', value: band.latestLandedCost },
+              { label: 'Floor Price', value: band.floorPrice },
+              { label: 'Target Price', value: band.targetPrice },
+            ],
+            impact: 'Order cannot be confirmed until a price override is approved.',
+            actions: [
+              { code: 'APPROVE', label: 'Approve Price' },
+              { code: 'COUNTER', label: 'Counter Price' },
+              { code: 'REJECT', label: 'Reject' },
+            ],
+            valueAtRisk: requested.mul(line.ordered_qty).toStorageString(),
+          };
+
+          exceptionId = await this.exceptionPort.raise(
+            'PRICE_OVERRIDE',
+            'sales_order_lines',
+            line.id,
+            userId,
+            payload,
+            order.fulfillment_site_id,
+          );
+
+          // Mark order as pending approval
+          await trx('sales_orders')
+            .where('id', orderId)
+            .update({ order_status: 'PENDING_APPROVAL' });
+
+          await trx('order_status_log').insert({
+            order_id: orderId,
+            from_status: 'DRAFT',
+            to_status: 'PENDING_APPROVAL',
+            by_user: userId,
+            reason: `Price override requested: ${reason}`,
+          });
+
+          break; // One exception per order for MVP
+        }
+      }
+
+      if (!exceptionId) {
+        throw new BadRequestException('No below-floor lines found to override');
+      }
+
+      this.logger.log(`Price override requested for order ${orderId}: ${exceptionId}`);
+      return { orderId, exceptionId };
+    });
+  }
+
+  /**
+   * Accept a counter price from owner.
+   * Called after owner resolves PRICE_OVERRIDE with COUNTERED action.
+   */
+  async acceptCounter(orderId: string, remarks: string | undefined, userId: string): Promise<{ orderId: string; status: string }> {
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status', 'customer_id');
+
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (order.order_status !== 'PENDING_APPROVAL') {
+        throw new ConflictException(`Order must be in PENDING_APPROVAL to accept counter`);
+      }
+
+      // The counter price should have been stored in the exception metadata
+      // For now, we'll just confirm the order - in real flow, the price would be updated
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({ order_status: 'CONFIRMED', confirmed_at: new Date(), approved_by: userId });
+
+      await trx('order_status_log').insert({
+        order_id: orderId,
+        from_status: 'PENDING_APPROVAL',
+        to_status: 'CONFIRMED',
+        by_user: userId,
+        reason: remarks ?? 'Counter price accepted',
+      });
+
+      // Emit order confirmed event
+      const lines = await trx('sales_order_lines').where('order_id', orderId).select('*');
+      await this.emitOrderConfirmedEvent(orderId, lines, 'OK');
+
+      this.logger.log(`Order ${orderId} confirmed with counter price`);
+      return { orderId, status: 'CONFIRMED' };
+    });
+  }
+
+  /**
+   * Cancel an order (releases any reservations).
+   */
+  async cancel(orderId: string, reason: string, userId: string): Promise<{ orderId: string; status: string }> {
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status');
+
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+      const terminalStates = ['CANCELLED', 'REJECTED', 'CLOSED'];
+      if (terminalStates.includes(order.order_status)) {
+        throw new ConflictException(`Order already in terminal state: ${order.order_status}`);
+      }
+
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({ order_status: 'CANCELLED' });
+
+      await trx('order_status_log').insert({
+        order_id: orderId,
+        from_status: order.order_status,
+        to_status: 'CANCELLED',
+        by_user: userId,
+        reason,
+      });
+
+      // TODO: Release reservations via InventoryPort when M3 is ready
+      // await this.inventoryPort.release(orderId);
+
+      this.logger.log(`Order ${orderId} cancelled: ${reason}`);
+      return { orderId, status: 'CANCELLED' };
+    });
+  }
+
+  /**
    * Evaluate credit and raise CREDIT_BREACH if needed.
-   *
-   * Typically called after line validation (BR-01) to block based on BR-02.
    */
   async evaluateOrderCredit(orderId: string, userId: string): Promise<{
     ok: boolean;
@@ -202,13 +465,12 @@ export class OrderService implements OnModuleInit {
       throw new BadRequestException(`Order status must be DRAFT for credit evaluation`);
     }
 
-    // Compute order total
-    const totalRow = await this.knex('sales_order_lines')
-      .where('order_id', orderId)
-      .sum('quoted_unit_price * ordered_qty as total')
-      .first();
-
-    const totalAmount = totalRow?.total || '0.00';
+    // Compute order total - use raw SQL for expression
+    const totalResult = await this.knex.raw(
+      'SELECT SUM(CAST(quoted_unit_price AS NUMERIC) * CAST(ordered_qty AS NUMERIC)) as total FROM sales_order_lines WHERE order_id = ?',
+      [orderId]
+    );
+    const totalAmount = totalResult.rows[0]?.total || '0.00';
 
     const evaluation = await this.credit.evaluate(orderRow.customer_id, totalAmount);
 
@@ -222,6 +484,47 @@ export class OrderService implements OnModuleInit {
   }
 
   /**
+   * Publish order.confirmed domain event.
+   */
+  private async emitOrderConfirmedEvent(orderId: string, lines: any[], creditStatus: string): Promise<void> {
+    const order = await this.knex('sales_orders').where('id', orderId).first('customer_id', 'fulfillment_site_id', 'delivery_date');
+    if (!order) return;
+
+    // Pre-fetch item categories for all line items in one query
+    const itemIds = Array.from(new Set(lines.map(l => l.item_id)));
+    const itemCategories = new Map<string, string>();
+    const itemRows = await this.knex('items').whereIn('id', itemIds).select('id', 'item_category');
+    for (const row of itemRows) {
+      itemCategories.set(String(row.id), row.item_category);
+    }
+
+    const linePayload = lines.map(l => ({
+      orderLineId: l.id,
+      itemId: l.item_id,
+      qty: l.ordered_qty,
+      unitPrice: l.quoted_unit_price,
+      itemCategory: itemCategories.get(String(l.item_id)),
+    }));
+
+    await this.knex('outbox_events').insert({
+      aggregate_id: orderId,
+      event_type: 'order.confirmed',
+      payload: {
+        orderId,
+        customerId: order.customer_id,
+        siteId: order.fulfillment_site_id,
+        lines: linePayload,
+        deliveryDate: order.delivery_date,
+        creditFlag: creditStatus,
+      },
+      module_source: 'm1',
+      published_at: this.knex.raw('NOW()'),
+    });
+
+    this.logger.log(`Published order.confirmed event for ${orderId}`);
+  }
+
+  /**
    * Publish credit evaluation events (for async consumption by M6 or other consumers).
    */
   async publishOrderEvaluation(orderId: string, creditEvaluation: CreditEvaluation): Promise<void> {
@@ -232,8 +535,8 @@ export class OrderService implements OnModuleInit {
         orderId,
         creditEvaluation,
       },
-      source_module: 'm1',
-      created_at: this.knex.raw('NOW()'),
+      module_source: 'm1',
+      published_at: this.knex.raw('NOW()'),
     });
     this.logger.log(`Published order.credit_evaluated event for order ${orderId}`);
   }

@@ -2,8 +2,8 @@
 
 **Product name:** NeoBus
 **Internal code name:** NeoCore
-**Version:** 0.1.0 (Phase 1 — Discovery and Foundation)
-**Date:** 2026-10-22
+**Version:** 0.3.1 (M1 Commercial API Complete)
+**Date:** 2026-10-25
 
 ---
 
@@ -68,17 +68,17 @@ Before NeoBus, Mr. X was the "live human router" for all decisions: price negoti
 
 ## Module Summary
 
-| Module | Sprint | Purpose |
-|--------|--------|---------|
-| M0 Platform Foundation | 0 | Auth, RBAC, RLS, audit, config, offline sync |
-| M7a Exception Engine | 0-1 | Exception cards, owner approvals, notifications |
-| M1 Commercial and CRM | 1 | Customers, items, daily pricing, quotes, orders |
-| M6 Collections and Financials | 1 | Invoices, AR, custody wallet, EOD closing |
-| M3 Inventory and Warehouse | 2 | Multi-site ATP, FEFO, stock ledger, transfers |
-| M5 Fleet Dispatch and Delivery | 2 | Trips, ePOD, returns, driver app |
-| M4 Factory Production | 3 | BOM, work orders, yield and wastage |
-| M2 Procurement and Supplier | 3 | POs, GRN, shortfall, supplier performance |
-| M7b Dashboards and Analytics | 3 | Owner pulse, operational matrix, KPI analytics |
+| Module | Sprint | Purpose | Status |
+|--------|--------|---------|--------|
+| M0 Platform Foundation | 0 | Auth, RBAC, RLS, audit, config, offline sync | ✅ **COMPLETE** |
+| M7a Exception Engine | 0-1 | Exception cards, owner approvals, notifications | ✅ **COMPLETE** |
+| M1 Commercial and CRM | 1 | Customers, items, daily pricing, quotes, orders | ✅ **COMPLETE** |
+| M6 Collections and Financials | 1 | Invoices, AR, custody wallet, EOD closing | 🔄 **NEXT** |
+| M3 Inventory and Warehouse | 2 | Multi-site ATP, FEFO, stock ledger, transfers | ⏳ Pending |
+| M5 Fleet Dispatch and Delivery | 2 | Trips, ePOD, returns, driver app | ⏳ Pending |
+| M4 Factory Production | 3 | BOM, work orders, yield and wastage | ⏳ Pending |
+| M2 Procurement and Supplier | 3 | POs, GRN, shortfall, supplier performance | ⏳ Pending |
+| M7b Dashboards and Analytics | 3 | Owner pulse, operational matrix, KPI analytics | ⏳ Pending |
 
 ---
 

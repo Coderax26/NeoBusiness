@@ -162,7 +162,7 @@ export class PricingService implements OnModuleInit {
     const rows = await this.knex('sales_orders as so')
       .join('sales_order_lines as sol', 'so.id', 'sol.order_id')
       .where('so.customer_id', customerId)
-      .where('sold_item_id', itemId)
+      .where('sol.item_id', itemId)
       .andWhere('so.order_status', 'CONFIRMED')
       .orderBy('so.created_at_idx', 'desc')
       .limit(limit)
@@ -179,6 +179,133 @@ export class PricingService implements OnModuleInit {
       unitPrice: r.unitPrice,
       orderId: String(r.orderId),
     }));
+  }
+
+  /**
+   * Bulk upsert daily prices for a date.
+   * If floorPrice/targetPrice not provided, they are auto-calculated using minMarginPct from config.
+   */
+  async upsertDailyPrices(date: string, items: Array<{
+    itemId: string;
+    landedCost: number;
+    floorPrice?: number;
+    targetPrice?: number;
+    source?: 'AUTO' | 'MANUAL';
+  }>, userId: string): Promise<string[]> {
+    const updatedItemIds: string[] = [];
+
+    for (const item of items) {
+      // Get min margin pct from config (category-specific or global)
+      const itemRow = await this.knex('items').where('id', item.itemId).first('item_category', 'min_margin_pct');
+      const category = itemRow?.item_category;
+      const itemMinMargin = itemRow?.min_margin_pct ?? 0.10;
+
+      const minMarginPct = await this.configService.getMinMarginPct(category);
+      const effectiveMargin = minMarginPct ?? itemMinMargin;
+
+      // Calculate floor if not provided
+      let floorPrice = item.floorPrice;
+      if (floorPrice === undefined) {
+        const cost = Money.of(item.landedCost);
+        floorPrice = Money.autoFloor(cost, effectiveMargin).toNumber();
+      }
+
+      // Calculate target if not provided (floor + 5% buffer)
+      let targetPrice = item.targetPrice;
+      if (targetPrice === undefined) {
+        targetPrice = Money.of(floorPrice.toString()).mul(1.05).toNumber();
+      }
+
+      const source = item.source ?? (item.floorPrice !== undefined ? 'MANUAL' : 'AUTO');
+
+      await this.knex('daily_price_lists').insert({
+        item_id: item.itemId,
+        effective_date: date,
+        latest_landed_cost: item.landedCost,
+        floor_price: floorPrice,
+        target_price: targetPrice,
+        min_margin_pct_used: effectiveMargin,
+        source,
+        published_at: new Date(),
+        updated_by: userId,
+      }).onConflict(['item_id', 'effective_date'])
+        .merge({
+          latest_landed_cost: item.landedCost,
+          floor_price: floorPrice,
+          target_price: targetPrice,
+          min_margin_pct_used: effectiveMargin,
+          source,
+          published_at: new Date(),
+          updated_by: userId,
+          updated_at: new Date(),
+        });
+
+      updatedItemIds.push(item.itemId);
+    }
+
+    return updatedItemIds;
+  }
+
+  /**
+   * Get all prices for a date (with item details for display).
+   */
+  async getPricesForDate(date: string, filters?: { itemCategory?: string }) {
+    let query = this.knex('daily_price_lists as dpl')
+      .join('items as i', 'dpl.item_id', 'i.id')
+      .where('dpl.effective_date', date)
+      .select(
+        'dpl.item_id as itemId',
+        'i.sku_code as skuCode',
+        'i.name as itemName',
+        'i.item_category as itemCategory',
+        'i.primary_uom as primaryUom',
+        'dpl.latest_landed_cost as latestLandedCost',
+        'dpl.floor_price as floorPrice',
+        'dpl.target_price as targetPrice',
+        'dpl.min_margin_pct_used as minMarginPctUsed',
+        'dpl.source as source',
+        'dpl.published_at as publishedAt',
+      );
+
+    if (filters?.itemCategory) {
+      query = query.andWhere('i.item_category', filters.itemCategory);
+    }
+
+    const rows = await query.orderBy('i.item_category').orderBy('i.name');
+
+    return rows.map(r => ({
+      itemId: r.itemId,
+      skuCode: r.skuCode,
+      itemName: r.itemName,
+      itemCategory: r.itemCategory,
+      primaryUom: r.primaryUom,
+      latestLandedCost: r.latestLandedCost,
+      floorPrice: r.floorPrice,
+      targetPrice: r.targetPrice,
+      minMarginPctUsed: Number(r.minMarginPctUsed),
+      source: r.source,
+      publishedAt: r.publishedAt,
+    }));
+  }
+
+  /**
+   * Get items missing prices for a date (for owner alert).
+   */
+  async getItemsMissingPrices(date: string, filters?: { itemCategory?: string }) {
+    let query = this.knex('items')
+      .where('is_active', true)
+      .whereNotExists(
+        this.knex('daily_price_lists')
+          .whereRaw('daily_price_lists.item_id = items.id')
+          .andWhere('effective_date', date)
+      )
+      .select('id', 'sku_code', 'name', 'item_category', 'primary_uom');
+
+    if (filters?.itemCategory) {
+      query = query.andWhere('item_category', filters.itemCategory);
+    }
+
+    return query.orderBy('item_category').orderBy('name');
   }
 
   /**
@@ -204,8 +331,8 @@ export class PricingService implements OnModuleInit {
               targetPrice: row.target_price,
               landedCost: row.latest_landed_cost,
             },
-            source_module: 'm1',
-            created_at: trx.raw('NOW()'),
+            module_source: 'm1',
+            published_at: trx.raw('NOW()'),
           });
         }
       }

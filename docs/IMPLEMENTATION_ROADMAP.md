@@ -81,38 +81,38 @@
 ### Build order: M0 → M7a → M1 → M6
 
 #### M0 Platform Foundation
-- [ ] Auth endpoints (login, OTP, refresh, logout)
-- [ ] JWT guard + RBAC guard (permission code enforcement)
-- [ ] RLS context middleware (SET LOCAL per request)
-- [ ] Audit interceptor (auto-logs all business writes)
-- [ ] Document numbering service (prefix + sequence per doc type)
-- [ ] File upload service (pre-signed S3 PUT)
-- [ ] Idempotency middleware (check + store)
-- [ ] Rate limiting on auth endpoints
-- [ ] M0 acceptance tests (items 1–6 from M0 §10)
+- [x] Auth endpoints (login, OTP, refresh, logout)
+- [x] JWT guard + RBAC guard (permission code enforcement)
+- [x] RLS context middleware (SET LOCAL per request)
+- [x] Audit interceptor (auto-logs all business writes)
+- [x] Document numbering service (prefix + sequence per doc type)
+- [x] File upload service (pre-signed S3 PUT)
+- [x] Idempotency middleware (check + store)
+- [x] Rate limiting on auth endpoints
+- [x] M0 acceptance tests (items 1–6 from M0 §10)
 
 #### M7a Exception Engine + Notification Hub
-- [ ] Migration: exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox
-- [ ] ExceptionService (raise, resolve, expire, escalate) — ExceptionPort
-- [ ] Card payload builders for PRICE_OVERRIDE and CREDIT_BREACH
-- [ ] Notification hub: FCM push + in-app (WhatsApp = log-only for now) — NotifyPort
-- [ ] Owner approval queue API (GET /exceptions, POST /exceptions/:id/resolve)
-- [ ] Device registration endpoint
-- [ ] M7a acceptance tests (items 1–4 from M7 §10)
+- [x] Migration: exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox
+- [x] ExceptionService (raise, resolve, expire, escalate) — ExceptionPort
+- [x] Card payload builders for PRICE_OVERRIDE and CREDIT_BREACH
+- [x] Notification hub: FCM push + in-app (WhatsApp = log-only for now) — NotifyPort
+- [x] Owner approval queue API (GET /exceptions, POST /exceptions/:id/resolve)
+- [x] Device registration endpoint
+- [x] M7a acceptance tests (items 1–4 from M7 §10)
 
 #### M1 Commercial and CRM
-- [ ] Migration: all M1 tables
-- [ ] PricingService (band lookup, auto-floor, margin) + PricingPort
-- [ ] CreditService (BR-02, reads AR via placeholder) + CreditPort stub
-- [ ] Item master CRUD
-- [ ] Customer master CRUD (coordinator creates, owner sets credit terms)
-- [ ] Daily price list (bulk upsert, auto-floor, publish, price.updated event)
-- [ ] Quote service (create, validate, expiry job)
-- [ ] Order state machine (DRAFT → CONFIRMED or PENDING_APPROVAL)
-- [ ] BR-01 evaluation with exception raise
-- [ ] price-memory query (last 5 confirmed sales per customer+item)
-- [ ] M1 API endpoints (see M1 §7)
-- [ ] M1 acceptance tests (items 1–9 from M1 §10) including Scenario A end-to-end
+- [x] Migration: all M1 tables
+- [x] PricingService (band lookup, auto-floor, margin) + PricingPort
+- [x] CreditService (BR-02, reads AR via placeholder) + CreditPort stub
+- [x] Item master CRUD
+- [x] Customer master CRUD (coordinator creates, owner sets credit terms)
+- [x] Daily price list (bulk upsert, auto-floor, publish, price.updated event)
+- [x] Quote service (create, validate, expiry job)
+- [x] Order state machine (DRAFT → CONFIRMED or PENDING_APPROVAL)
+- [x] BR-01 evaluation with exception raise
+- [x] price-memory query (last 5 confirmed sales per customer+item)
+- [x] M1 API endpoints (see M1 §7)
+- [x] M1 acceptance tests (items 1–9 from M1 §10) including Scenario A end-to-end
 
 #### M6 Collections and Financials (Sprint 1 core)
 - [ ] Migration: invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, eod_closings

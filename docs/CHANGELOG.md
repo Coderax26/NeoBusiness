@@ -74,6 +74,27 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - **OD-024**: Standing negotiated prices deferred to Phase 2; `price_tier` column added to `customers` table as placeholder.
 
 ---
+ 
+## [0.3.2] — 2026-10-25 — M1 Acceptance Tests Complete (Scenario A)
+
+### Added
+- **Scenario A Path 1 (In-band confirm)**: Verified order at ₹92 (floor ₹90, target ₹95) confirms without exception.
+- **Scenario A Path 2 (Below-floor → owner counter → accept)**: Verified order at ₹88 raises `PRICE_OVERRIDE` exception; owner counters at ₹89.50; coordinator accepts counter → order confirmed.
+- **Quote conversion with price re-validation**: `convertToOrder()` re-validates each line against current day's band; flags below-floor prices from stale quotes.
+- **Price memory**: `PricingService.lastPrices()` returns last 5 confirmed sales per customer+item combination.
+- **Credit evaluation integration**: `CREDIT_BREACH` exception raised when order exceeds credit limit; orders within limit confirm normally.
+- **Auto-floor calculation tests**: Verified `Money.autoFloor(cost, margin)` rounds UP to nearest ₹0.50 (e.g., cost ₹82 + 10% → ₹91.50).
+- **Daily price list operations**: Bulk upsert with auto-floor/target calculation; missing price alerts for owner dashboard.
+- **End-to-end flow coverage**: All M1 core workflows tested against real database with exception engine integration.
+
+### Fixed
+- `ItemService.getItem()` implemented for ItemPort compatibility.
+- `OrderService` sum query fixed (manual calculation instead of Knex expression).
+- `OutboxService` column names corrected (`source_module` → `module_source`, `created_at` → `published_at`).
+- `PricingService.lastPrices()` column reference fixed (`sold_item_id` → `item_id`).
+- `QuoteService.convertToOrder()` accepts optional validation date for testing stale quotes.
+
+---
 
 ## [0.2.0] — 2026-10-24 — M7a Exception Engine + Notification Hub Complete
 

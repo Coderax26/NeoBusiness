@@ -3,10 +3,18 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../m0-platform/database.module.js';
 import { AuthModule } from '../m0-platform/auth.module.js';
 import { ConfigService } from '../m0-platform/config.service.js';
-import { ExceptionPort } from '../../shared/ports/ports.interface.js';
+import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { PricingService } from './pricing.service.js';
 import { ItemService } from './item.service.js';
 import { CreditService } from './credit.service.js';
+import { CustomerService } from './customer.service.js';
+import { OrderService } from './order.service.js';
+import { QuoteService } from './quote.service.js';
+import { CustomerController } from './customer.controller.js';
+import { ItemController } from './item.controller.js';
+import { PricingController } from './pricing.controller.js';
+import { OrderController } from './order.controller.js';
+import { QuoteController } from './quote.controller.js';
 
 /**
  * M1 Commercial & CRM Module.
@@ -28,6 +36,10 @@ import { CreditService } from './credit.service.js';
     PricingService,
     ItemService,
     CreditService,
+    CustomerService,
+    OrderService,
+    QuoteService,
+    DocNumberService,
     // Wire the real implementations as the global port tokens.
     // M1 does not import M7aExceptionsModule here — it subscribes to event handlers directly.
     {
@@ -43,10 +55,21 @@ import { CreditService } from './credit.service.js';
       useExisting: CreditService,
     },
   ],
+  controllers: [
+    CustomerController,
+    ItemController,
+    PricingController,
+    OrderController,
+    QuoteController,
+  ],
   exports: [
     PricingService,
     ItemService,
     CreditService,
+    CustomerService,
+    OrderService,
+    QuoteService,
+    DocNumberService,
     'PRICING_PORT',
     'ITEM_PORT',
     'CREDIT_PORT',

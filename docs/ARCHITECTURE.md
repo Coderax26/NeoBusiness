@@ -131,30 +131,30 @@ Field device (SQLite write queue)
 
 ### 4.1 Data ownership (no cross-module table reads)
 
-| Module | Owns these tables |
-|--------|-----------------|
-| M0 | sites, locations, users, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events |
-| M1 | customers, customer_contacts, communication_log, items, uom_conversions, daily_price_lists, quotes, quote_lines, sales_orders, sales_order_lines, order_status_log |
-| M2 | suppliers, supplier_items, supplier_rate_quotes, rate_contracts, purchase_requisitions, purchase_orders, purchase_order_lines, goods_receipts, goods_receipt_lines, po_shortfalls, supplier_bills |
-| M3 | inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments |
-| M4 | bom_headers, bom_lines, production_requisitions, production_work_orders, work_order_materials, work_order_outputs, wastage_records, labour_attendance_logs |
-| M5 | vehicles, delivery_trips, delivery_stops, delivery_stop_lines, delivery_challans, issue_reports, trip_expenses |
-| M6 | invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, credit_notes, supplier_ledger_entries, supplier_payments, cashbook_entries, bank_deposits, eod_closings, accounting_export_batches |
-| M7 | exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox, whatsapp_optins |
+| Module | Owns these tables | Status |
+|--------|-----------------|--------|
+| M0 | sites, locations, users, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events | **COMPLETE** |
+| M1 | customers, customer_contacts, communication_log, items, uom_conversions, daily_price_lists, quotes, quote_lines, sales_orders, sales_order_lines, order_status_log | **COMPLETE** |
+| M2 | suppliers, supplier_items, supplier_rate_quotes, rate_contracts, purchase_requisitions, purchase_orders, purchase_order_lines, goods_receipts, goods_receipt_lines, po_shortfalls, supplier_bills | Pending |
+| M3 | inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments | Pending |
+| M4 | bom_headers, bom_lines, production_requisitions, production_work_orders, work_order_materials, work_order_outputs, wastage_records, labour_attendance_logs | Pending |
+| M5 | vehicles, delivery_trips, delivery_stops, delivery_stop_lines, delivery_challans, issue_reports, trip_expenses | Pending |
+| M6 | invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, credit_notes, supplier_ledger_entries, supplier_payments, cashbook_entries, bank_deposits, eod_closings, accounting_export_batches | **NEXT** |
+| M7 | exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox, whatsapp_optins | **COMPLETE** |
 
 ### 4.2 Port contracts (synchronous interfaces)
 
-| Port | Owner | Stub behaviour until built |
-|------|-------|--------------------------|
-| PricingPort | M1 | Returns a hardcoded band (cost=0, floor=0, target=MAX) |
-| ItemPort | M1 | Returns a mock item object |
-| CreditPort | M1 (reads M6 AR) | Returns {status: OK} always |
-| InventoryPort | M3 | Returns {available: true, qty: MAX} always |
-| ProcurementPort | M2 | Returns landedCost = 0 |
-| ProductionPort | M4 | Logs the requirement only; takes no action |
-| LedgerPort | M6 | Writes invoices only; skips receipt/credit |
-| ExceptionPort | M7a | Log-only until M7a is built |
-| NotifyPort | M7a | console.log only until M7a is built |
+| Port | Owner | Status |
+|------|-------|--------|
+| PricingPort | M1 | **REAL** (PricingService) |
+| ItemPort | M1 | **REAL** (ItemService) |
+| CreditPort | M1 | **REAL** (CreditService - reads M6 AR placeholder) |
+| InventoryPort | M3 | Stub (returns {available: true, qty: MAX}) |
+| ProcurementPort | M2 | Stub (returns landedCost = 0) |
+| ProductionPort | M4 | Stub (logs only) |
+| LedgerPort | M6 | Stub (writes invoices only) |
+| ExceptionPort | M7a | **REAL** (ExceptionService) |
+| NotifyPort | M7a | **REAL** (NotificationService) |
 
 ### 4.3 Domain event contracts
 
