@@ -96,6 +96,36 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.4.0] — 2026-10-25 — M6 Collections & Financials Complete (Sprint 1 Core)
+
+### Added
+- **Invoice Service**: `InvoiceService` with `generateAtDispatch()` (BR-03 wrapper) and `generateFromOrder()`; COD flag support; `getInvoice()` with camelCase output; due date = `invoice_date + credit_days`.
+- **Collection Service**: `CollectionService.logCollection()` implementing BR-07 atomic transaction — inserts `collection_receipts`, allocates to invoices (FIFO default), posts `customer_ledger_entries CREDIT`, posts `custody_ledger COLLECTION` (+amount), inserts `cheque_register RECEIVED` for CHEQUE mode.
+- **Ledger Service**: `LedgerService` implementing `LedgerPort` — core financial operations with `getOpenInvoicesForAllocation()` (FIFO), `getCustomerBalance()`, `getCustodyBalance()`, `getCustodyLedger()`; idempotency validation rejects mismatched amounts on same key.
+- **Handover Service**: `HandoverService` — cash custody chain (BR-07): `getExpectedHandover()`, `initiateHandover()`, `verifyHandover()` (VERIFIED/DISPUTED), `resolveDispute()` (ACCEPT_COUNTED/ADJUST_TO_EXPECTED/PARTIAL); wallet cleared on VERIFIED.
+- **PTP Service**: `PTPService` — Promise-to-Pay workflow: `createPTP()`, `updatePTPStatus()` (KEPT/BROKEN/DISPUTED), `checkAndMarkBrokenPTPs()` aging job (00:30).
+- **EOD Service**: `EodService` — End of Day closing checklist (4 checks): trips closed, wallets zero, uninvoiced deliveries, net cash position; owner sign-off with `< 10 min` KPI target.
+- **Worklist Service**: `WorklistService` — daily collection worklist at 08:00; priority scoring `overdue_amount × days_overdue`; reasons: OVERDUE, DELIVERY_STOP, PTP_DUE; round-robin collector assignment.
+- **Migration 007**: 9 tables (`invoices`, `invoice_lines`, `collection_receipts`, `receipt_allocations`, `customer_ledger_entries`, `custody_ledger`, `cash_handovers`, `cheque_register`, `ptp_followups`, `eod_closings`) with RLS, REVOKE UPDATE/DELETE on append-only tables for `neobus_app` role.
+- **Migration 008**: `worklist_worklists`, `worklist_items` with RLS.
+- **Module wiring**: `M6FinancialsModule` with real `InvoiceService`, `CollectionService`, `LedgerService`, `HandoverService`, `PTPService`, `EodService`, `WorklistService`; enabled in `AppModule` after M7a, M1.
+- **Acceptance tests**: 11 Scenario E tests covering all BR-07 flows — E1001 (collection + PTP), E1002 (handover variance + owner resolution), E1003 (EOD 4-checks + sign-off), E1004 (idempotency + duplicate prevention + mismatch rejection), E1005 (PTP aging job), E1006 (worklist priority scoring + PTP_DUE).
+
+### Fixed
+- Handover expected amount calculation: correctly subtracts HANDOVER entries (negative amount_delta) from collections.
+- EOD date handling: uses local date from PostgreSQL DATE column to avoid timezone shift.
+- Idempotency: now rejects mismatched amounts on same key (previously returned same receipt).
+- Worklist table names: unified to `worklist_worklists` / `worklist_items` (was `collection_worklists`).
+- Test isolation: proper FK cleanup order for all M6 tables.
+
+### Decisions Confirmed
+- **BR-07**: Atomic collection logging across 3 ledgers in single transaction (customer_ledger CREDIT, custody_ledger COLLECTION, cashbook RECEIPT_CASH).
+- **Money precision**: `numeric(14,2)` storage; `Decimal.js` arithmetic; `autoFloor` rounds UP to ₹0.50.
+- **Append-only enforcement**: REVOKE UPDATE/DELETE on `collection_receipts`, `customer_ledger_entries`, `custody_ledger` for `neobus_app` role.
+- **RLS policies**: All M6 tables scoped to `app.site_ids` via existing M0 middleware pattern.
+
+---
+
 ## [0.2.0] — 2026-10-24 — M7a Exception Engine + Notification Hub Complete
 
 ### Added

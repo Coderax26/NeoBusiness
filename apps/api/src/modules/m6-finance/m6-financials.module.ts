@@ -1,0 +1,159 @@
+import { Module, Global, Inject, Logger } from '@nestjs/common';
+import { KnexModule } from 'nestjs-knex';
+import { InvoiceService } from './invoice.service.js';
+import { CollectionService } from './collection.service.js';
+import { LedgerService } from './ledger.service.js';
+import { HandoverService } from './handover.service.js';
+import { PTPService } from './ptp.service.js';
+import { EodService } from './eod.service.js';
+import { WorklistService } from './worklist.service.js';
+import { DocNumberService } from '../m0-platform/doc-number.service.js';
+import {
+  LEDGER_PORT,
+  EXCEPTION_PORT,
+} from '../../shared/ports/ports.interface.js';
+import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
+import { InjectKnex } from 'nestjs-knex';
+import type { Knex } from 'knex';
+
+@Global()
+@Module({
+  imports: [KnexModule],
+  providers: [
+    InvoiceService,
+    CollectionService,
+    LedgerService,
+    HandoverService,
+    PTPService,
+    EodService,
+    WorklistService,
+    DocNumberService,
+    {
+      provide: LEDGER_PORT,
+      useFactory: (ledger: LedgerService) => ledger,
+      inject: [LedgerService],
+    },
+  ],
+  exports: [
+    InvoiceService,
+    CollectionService,
+    LedgerService,
+    HandoverService,
+    PTPService,
+    EodService,
+    WorklistService,
+    LEDGER_PORT,
+  ],
+})
+export class M6FinancialsModule {
+  private readonly logger = new Logger(M6FinancialsModule.name);
+
+  constructor(
+    @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
+    @InjectKnex() private readonly knex: Knex,
+  ) {}
+
+  onModuleInit(): void {
+    this.exceptionPort.onResolved(
+      'CREDIT_REBATE_WRITEOFF',
+      async (
+        exceptionId: string,
+        action: string,
+        remarks: string,
+        counterJson?: object,
+      ) => {
+        try {
+          // Fetch the exception to get context
+          const exception = await this.knex('exception_approvals')
+            .where('id', exceptionId)
+            .first('reference_table', 'reference_id', 'context_payload_json');
+
+          if (!exception) {
+            this.logger.warn(
+              `CREDIT_REBATE_WRITEOFF handler: Exception ${exceptionId} not found`,
+            );
+            return;
+          }
+
+          const payload = exception.context_payload_json
+            ? typeof exception.context_payload_json === 'string'
+              ? JSON.parse(exception.context_payload_json)
+              : exception.context_payload_json
+            : {};
+
+          const creditNoteId = exception.reference_id;
+          const creditNoteType = payload?.cnType || 'WRITEOFF';
+
+          if (action === 'APPROVED') {
+            // APPROVED: Credit note can be posted
+            // NOTE: Full credit note posting logic will be implemented in CreditNoteService (Sprint 2)
+            // For now, we mark the credit_note as APPROVED if it exists
+            if (creditNoteId) {
+              await this.knex('credit_notes')
+                .where('id', creditNoteId)
+                .update({
+                  status: 'APPROVED',
+                  approved_by: remarks || 'OWNER',
+                  approved_at: new Date(),
+                });
+              this.logger.log(
+                `CREDIT_REBATE_WRITEOFF ${exceptionId}: Credit note ${creditNoteId} (${creditNoteType}) APPROVED`,
+              );
+            } else {
+              // If no credit_note reference, create a placeholder entry
+              this.logger.log(
+                `CREDIT_REBATE_WRITEOFF ${exceptionId}: APPROVED for ${creditNoteType}, amount ${payload.valueAtRisk || 'unknown'}`,
+              );
+            }
+          } else if (action === 'REJECTED') {
+            // REJECTED: Credit note is rejected
+            if (creditNoteId) {
+              await this.knex('credit_notes').where('id', creditNoteId).update({
+                status: 'REJECTED',
+                rejected_reason: remarks,
+                rejected_at: new Date(),
+              });
+              this.logger.log(
+                `CREDIT_REBATE_WRITEOFF ${exceptionId}: Credit note ${creditNoteId} REJECTED - ${remarks}`,
+              );
+            } else {
+              this.logger.log(
+                `CREDIT_REBATE_WRITEOFF ${exceptionId}: REJECTED for ${creditNoteType} - ${remarks}`,
+              );
+            }
+          } else if (action === 'COUNTERED') {
+            // COUNTERED: Owner proposed a different amount
+            const counterAmount =
+              counterJson &&
+              typeof counterJson === 'object' &&
+              'amount' in counterJson
+                ? String(counterJson.amount)
+                : null;
+
+            if (creditNoteId && counterAmount) {
+              await this.knex('credit_notes').where('id', creditNoteId).update({
+                amount: counterAmount,
+                status: 'REQUESTED', // Back to requested for re-approval
+                counter_amount: counterAmount,
+                counter_remarks: remarks,
+              });
+              this.logger.log(
+                `CREDIT_REBATE_WRITEOFF ${exceptionId}: COUNTERED with amount ${counterAmount}`,
+              );
+            }
+          }
+        } catch (err) {
+          const error = err as Error;
+          this.logger.error(
+            `CREDIT_REBATE_WRITEOFF handler failed for ${exceptionId}: ${error.message}`,
+          );
+          // Don't re-throw - exception resolution should not fail silently
+        }
+      },
+    );
+
+    this.logger.log(
+      'M6FinancialsModule: CREDIT_REBATE_WRITEOFF handler registered',
+    );
+  }
+}

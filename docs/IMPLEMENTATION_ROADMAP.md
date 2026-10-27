@@ -115,18 +115,19 @@
 - [x] M1 acceptance tests (items 1–9 from M1 §10) including Scenario A end-to-end
 
 #### M6 Collections and Financials (Sprint 1 core)
-- [ ] Migration: invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, eod_closings
-- [ ] Append-only triggers on M6 ledger tables
-- [ ] Invoice generation service (manual "Mark Dispatched" trigger in Sprint 1)
-- [ ] logCollection transaction (BR-07) with idempotency — LedgerPort
-- [ ] Custody wallet + handover verification
-- [ ] AR aging job (00:30 daily)
-- [ ] Collection worklist job (08:00 daily)
-- [ ] PTP workflow
-- [ ] EOD closing checklist + sign-off
-- [ ] Mobile collection screens (offline capable)
-- [ ] M6 acceptance tests (items 1–9 from M6 §10) including Scenario E end-to-end
-- [ ] 7-day parallel run with Mr. X's manual EOD (Sprint 1 end)
+- [x] Migration 007: invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, eod_closings
+- [x] Append-only triggers on M6 ledger tables (RLS + REVOKE UPDATE/DELETE)
+- [x] Invoice generation service (manual "Mark Dispatched" trigger) with GST split (OD-003)
+- [x] logCollection transaction (BR-07) with idempotency — LedgerPort
+- [x] Custody wallet + handover verification (variance handling, owner dispute resolution)
+- [x] AR aging job (00:30 daily) + credit hold recompute
+- [x] Collection worklist job (08:00 daily) with priority scoring (overdue_amount × days_overdue)
+- [x] PTP workflow (Promise-to-Pay with BROKEN detection)
+- [x] EOD closing checklist (4 checks) + sign-off
+- [x] Core services: InvoiceService, CollectionService, LedgerService, HandoverService, PTPService, EodService, WorklistService
+- [ ] Mobile collection screens (offline capable) — Sprint 2
+- [ ] M6 acceptance tests (items 1–9 from M6 §10) including Scenario E end-to-end — Sprint 2
+- [ ] 7-day parallel run with Mr. X's manual EOD (Sprint 1 end) — Sprint 2
 
 **Sprint 1 completion criteria:**
 - Owner can set daily floor prices on mobile

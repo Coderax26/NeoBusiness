@@ -5,6 +5,7 @@ import { HealthController } from './health.controller.js';
 import { M0PlatformModule } from './modules/m0-platform/m0-platform.module.js';
 import { M7aExceptionsModule } from './modules/m7a-exceptions/m7a-exceptions.module.js';
 import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module.js';
+import { M6FinancialsModule } from './modules/m6-finance/m6-financials.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -43,7 +44,7 @@ import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module
     M1CommercialModule,
 
     // Sprint 1: M6 Collections and Financials (core)
-    // M6FinanceModule,
+    M6FinancialsModule,
 
     // Sprint 2: M3 Inventory and Warehouse
     // M3InventoryModule,
@@ -64,4 +65,3 @@ import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module
   providers: [],
 })
 export class AppModule {}
-

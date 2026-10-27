@@ -6,7 +6,10 @@ import { createKnex } from '../../shared/database/knex-instance.js';
 import { ConfigService } from '../m0-platform/config.service.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
 import { NOTIFY_PORT } from '../../shared/ports/ports.interface.js';
-import type { ExceptionPayload, ExceptionType } from '../../shared/ports/ports.interface.js';
+import type {
+  ExceptionPayload,
+  ExceptionType,
+} from '../../shared/ports/ports.interface.js';
 
 describe('ExceptionService', () => {
   let knex: Knex;
@@ -40,21 +43,118 @@ describe('ExceptionService', () => {
 
   // Helper to parse payload_json (Knex returns JSONB as already-parsed objects)
   const parsePayload = (row: any) => {
-    return typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+    return typeof row.payload_json === 'string'
+      ? JSON.parse(row.payload_json)
+      : row.payload_json;
   };
 
   beforeAll(async () => {
     knex = await createKnex();
 
+    // Run migrations to ensure schema is up to date
+    const { MigrationService } =
+      await import('../m0-platform/migration.service.js');
+    const migrationService = new MigrationService(knex);
+    await migrationService.runMigrations();
+
+    // Seed approval policies (required for ExceptionService)
+    await knex('approval_policies')
+      .insert([
+        {
+          exception_type: 'PRICE_OVERRIDE',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'CREDIT_BREACH',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'SUPPLIER_PRICE_SPIKE',
+          primary_approver_role: 'OWNER',
+          can_delegate: false,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'SUPPLIER_SHORTFALL',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'ALLOCATION',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'YIELD_VARIANCE',
+          primary_approver_role: 'OWNER',
+          can_delegate: false,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'WASTAGE_WRITEOFF',
+          primary_approver_role: 'OWNER',
+          can_delegate: false,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'STOCK_VARIANCE',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'CREDIT_REBATE_WRITEOFF',
+          primary_approver_role: 'OWNER',
+          can_delegate: false,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'DELIVERY_DISPUTE',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 30,
+        },
+        {
+          exception_type: 'MANUAL_LEDGER_ADJUSTMENT',
+          primary_approver_role: 'OWNER',
+          can_delegate: false,
+          escalation_wait_minutes: 60,
+        },
+        {
+          exception_type: 'CASH_HANDOVER_VARIANCE',
+          primary_approver_role: 'OWNER',
+          can_delegate: true,
+          escalation_wait_minutes: 30,
+        },
+      ])
+      .onConflict('exception_type')
+      .ignore();
+
     // Load test users
     const owner = await knex('users').where('role', 'OWNER').first('id');
     const opsCoord = await knex('users').where('role', 'OPS_COORD').first('id');
-    const storekeeper = await knex('users').where('role', 'STOREKEEPER').first('id');
+    const storekeeper = await knex('users')
+      .where('role', 'STOREKEEPER')
+      .first('id');
     const site = await knex('sites').first('id');
+
+    if (!owner) throw new Error('OWNER user not found in database');
+    if (!opsCoord) throw new Error('OPS_COORD user not found in database');
+    // STOREKEEPER may not exist in seed; use coordinator as fallback
+    if (!storekeeper) {
+      console.warn('STOREKEEPER user not found, using OPS_COORD as fallback');
+    }
+    if (!site) throw new Error('Site not found in database');
 
     ownerId = String(owner.id);
     opsCoordId = String(opsCoord.id);
-    storekeeperId = String(storekeeper.id);
+    storekeeperId = storekeeper ? String(storekeeper.id) : opsCoordId;
     siteId = String(site.id);
 
     // Initialize services
@@ -62,7 +162,12 @@ describe('ExceptionService', () => {
     await configSvc.onModuleInit();
     outbox = new OutboxService(knex);
     notificationSvc = new NotificationService(knex);
-    exceptionSvc = new ExceptionService(knex, configSvc, outbox, notificationSvc);
+    exceptionSvc = new ExceptionService(
+      knex,
+      configSvc,
+      outbox,
+      notificationSvc,
+    );
     await exceptionSvc.onModuleInit();
   });
 
@@ -76,18 +181,42 @@ describe('ExceptionService', () => {
       .where('reference_table', 'test_orders')
       .select('id');
     if (testCardIds.length > 0) {
-      await knex('exception_events').whereIn('exception_id', testCardIds.map(r => r.id)).del();
+      await knex('exception_events')
+        .whereIn(
+          'exception_id',
+          testCardIds.map((r) => r.id),
+        )
+        .del();
     }
-    await knex('exception_approvals').where('reference_table', 'test_orders').del();
+    await knex('exception_approvals')
+      .where('reference_table', 'test_orders')
+      .del();
 
     // Also clean up test cards with other reference tables used by tests
     const otherCardIds = await knex('exception_approvals')
-      .whereIn('reference_table', ['test_pos', 'test_allocations', 'test_workorders', 'test_wastage'])
+      .whereIn('reference_table', [
+        'test_pos',
+        'test_allocations',
+        'test_workorders',
+        'test_wastage',
+      ])
       .select('id');
     if (otherCardIds.length > 0) {
-      await knex('exception_events').whereIn('exception_id', otherCardIds.map(r => r.id)).del();
+      await knex('exception_events')
+        .whereIn(
+          'exception_id',
+          otherCardIds.map((r) => r.id),
+        )
+        .del();
     }
-    await knex('exception_approvals').whereIn('reference_table', ['test_pos', 'test_allocations', 'test_workorders', 'test_wastage']).del();
+    await knex('exception_approvals')
+      .whereIn('reference_table', [
+        'test_pos',
+        'test_allocations',
+        'test_workorders',
+        'test_wastage',
+      ])
+      .del();
 
     // Clean up test notification outbox
     await knex('notification_outbox').where('recipient_ref', ownerId).del();
@@ -146,8 +275,14 @@ describe('ExceptionService', () => {
 
       // Only one PENDING card should exist
       const count = await knex('exception_approvals')
-        .where({ exception_type: 'CREDIT_BREACH', reference_table: 'test_orders', reference_id: 'ORD-002', status: 'PENDING' })
-        .count('* as cnt').first();
+        .where({
+          exception_type: 'CREDIT_BREACH',
+          reference_table: 'test_orders',
+          reference_id: 'ORD-002',
+          status: 'PENDING',
+        })
+        .count('* as cnt')
+        .first();
       expect(Number(count?.cnt ?? 0)).toBe(1);
     });
 
@@ -162,11 +297,18 @@ describe('ExceptionService', () => {
       );
 
       const card = await knex('exception_approvals').where({ id }).first();
-      const policy = await knex('approval_policies').where({ exception_type: 'PRICE_OVERRIDE' }).first();
+      const policy = await knex('approval_policies')
+        .where({ exception_type: 'PRICE_OVERRIDE' })
+        .first();
 
-      const expectedExpiry = new Date(card.created_at.getTime() + Number(policy.escalation_wait_minutes) * 60_000);
+      const expectedExpiry = new Date(
+        card.created_at.getTime() +
+          Number(policy.escalation_wait_minutes) * 60_000,
+      );
       // Allow up to 60 seconds tolerance for test execution time
-      expect(Math.abs(card.expires_at.getTime() - expectedExpiry.getTime())).toBeLessThan(60_000);
+      expect(
+        Math.abs(card.expires_at.getTime() - expectedExpiry.getTime()),
+      ).toBeLessThan(60_000);
     });
 
     it('emits exception.requested domain event via OutboxService', async () => {
@@ -184,7 +326,10 @@ describe('ExceptionService', () => {
         .select('*');
 
       expect(events.length).toBe(1);
-      const payload = typeof events[0].payload === 'string' ? JSON.parse(events[0].payload) : events[0].payload;
+      const payload =
+        typeof events[0].payload === 'string'
+          ? JSON.parse(events[0].payload)
+          : events[0].payload;
       expect(payload.exceptionType).toBe('SUPPLIER_PRICE_SPIKE');
       expect(payload.referenceTable).toBe('test_pos');
       expect(payload.referenceId).toBe('PO-001');
@@ -206,7 +351,7 @@ describe('ExceptionService', () => {
         .whereIn('template_code', ['exception_card_push', 'in_app_exception']);
 
       expect(notifications.length).toBeGreaterThanOrEqual(1);
-      const channels = notifications.map(n => n.channel);
+      const channels = notifications.map((n) => n.channel);
       expect(channels).toContain('IN_APP');
     });
   });
@@ -222,7 +367,12 @@ describe('ExceptionService', () => {
         siteId,
       );
 
-      const status = await exceptionSvc.resolve(id, 'APPROVED', 'Approved by owner', { proposedPrice: '89.00' });
+      const status = await exceptionSvc.resolve(
+        id,
+        'APPROVED',
+        'Approved by owner',
+        { proposedPrice: '89.00' },
+      );
 
       expect(status).toBe('APPROVED');
 
@@ -243,7 +393,11 @@ describe('ExceptionService', () => {
         siteId,
       );
 
-      const status = await exceptionSvc.resolve(id, 'REJECTED', 'Customer credit limit exceeded');
+      const status = await exceptionSvc.resolve(
+        id,
+        'REJECTED',
+        'Customer credit limit exceeded',
+      );
 
       expect(status).toBe('REJECTED');
 
@@ -262,7 +416,12 @@ describe('ExceptionService', () => {
       );
 
       const counterJson = { proposedPrice: '90.50', reason: 'Meeting halfway' };
-      const status = await exceptionSvc.resolve(id, 'COUNTERED', 'Countered at 90.50', counterJson);
+      const status = await exceptionSvc.resolve(
+        id,
+        'COUNTERED',
+        'Countered at 90.50',
+        counterJson,
+      );
 
       expect(status).toBe('COUNTERED');
 
@@ -281,7 +440,11 @@ describe('ExceptionService', () => {
       );
 
       await exceptionSvc.resolve(id, 'APPROVED', 'First resolution');
-      const status2 = await exceptionSvc.resolve(id, 'REJECTED', 'Attempt to reject');
+      const status2 = await exceptionSvc.resolve(
+        id,
+        'REJECTED',
+        'Attempt to reject',
+      );
 
       expect(status2).toBe('APPROVED'); // original status unchanged
     });
@@ -303,7 +466,10 @@ describe('ExceptionService', () => {
         .select('*');
 
       expect(events.length).toBe(1);
-      const meta = typeof events[0].metadata_json === 'string' ? JSON.parse(events[0].metadata_json) : events[0].metadata_json;
+      const meta =
+        typeof events[0].metadata_json === 'string'
+          ? JSON.parse(events[0].metadata_json)
+          : events[0].metadata_json;
       expect(meta.action).toBe('APPROVED');
       expect(meta.counter).toBeNull();
     });
@@ -321,17 +487,24 @@ describe('ExceptionService', () => {
       await exceptionSvc.resolve(id, 'APPROVED', 'Approved');
 
       const events = await knex('outbox_events')
-        .where({ event_type: 'exception.resolved', aggregate_id: 'YIELD_VARIANCE' })
+        .where({
+          event_type: 'exception.resolved',
+          aggregate_id: 'YIELD_VARIANCE',
+        })
         .select('*');
 
       // Find the event whose payload references our exception id
       const matching = events.filter((e: any) => {
-        const p = typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload;
+        const p =
+          typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload;
         return p.exceptionId === id;
       });
 
       expect(matching.length).toBe(1);
-      const payload = typeof matching[0].payload === 'string' ? JSON.parse(matching[0].payload) : matching[0].payload;
+      const payload =
+        typeof matching[0].payload === 'string'
+          ? JSON.parse(matching[0].payload)
+          : matching[0].payload;
       expect(payload.exceptionId).toBe(id);
       expect(payload.exceptionType).toBe('YIELD_VARIANCE');
       expect(payload.action).toBe('APPROVED');
@@ -343,9 +516,12 @@ describe('ExceptionService', () => {
     it('calls registered handler after resolution', async () => {
       const handlerCalls: Array<{ id: string; action: string }> = [];
 
-      exceptionSvc.onResolved('PRICE_OVERRIDE', async (exceptionId, action, _remarks, _counter) => {
-        handlerCalls.push({ id: exceptionId, action });
-      });
+      exceptionSvc.onResolved(
+        'PRICE_OVERRIDE',
+        async (exceptionId, action, _remarks, _counter) => {
+          handlerCalls.push({ id: exceptionId, action });
+        },
+      );
 
       const id = await exceptionSvc.raise(
         'PRICE_OVERRIDE' as ExceptionType,
@@ -359,7 +535,7 @@ describe('ExceptionService', () => {
       await exceptionSvc.resolve(id, 'APPROVED', 'Test handler');
 
       // Handler runs async — wait a tick
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
 
       expect(handlerCalls.length).toBe(1);
       expect(handlerCalls[0].id).toBe(id);
@@ -387,19 +563,27 @@ describe('ExceptionService', () => {
 
       await exceptionSvc.expireOrEscalate(String(card.id), 1000);
 
-      const updated = await knex('exception_approvals').where({ id: card.id }).first();
+      const updated = await knex('exception_approvals')
+        .where({ id: card.id })
+        .first();
       expect(updated.status).toBe('EXPIRED');
     });
 
     it('escalates to delegate when policy allows and value under cap', async () => {
       // Ensure PRICE_OVERRIDE policy has delegate
-      const policy = await knex('approval_policies').where({ exception_type: 'PRICE_OVERRIDE' }).first();
+      const policy = await knex('approval_policies')
+        .where({ exception_type: 'PRICE_OVERRIDE' })
+        .first();
       expect(policy.can_delegate).toBe(true);
       expect(policy.delegate_user_id).toBeDefined();
 
       // Set the delegate to the OWNER user (seed sets delegate_user_id to NULL)
-      await knex('approval_policies').where({ exception_type: 'PRICE_OVERRIDE' }).update({ delegate_user_id: ownerId });
-      const policy2 = await knex('approval_policies').where({ exception_type: 'PRICE_OVERRIDE' }).first();
+      await knex('approval_policies')
+        .where({ exception_type: 'PRICE_OVERRIDE' })
+        .update({ delegate_user_id: ownerId });
+      const policy2 = await knex('approval_policies')
+        .where({ exception_type: 'PRICE_OVERRIDE' })
+        .first();
       expect(policy2.delegate_user_id).toBe(ownerId);
 
       const [card] = await knex('exception_approvals')
@@ -419,7 +603,9 @@ describe('ExceptionService', () => {
 
       await exceptionSvc.expireOrEscalate(String(card.id), 1000);
 
-      const updated = await knex('exception_approvals').where({ id: card.id }).first();
+      const updated = await knex('exception_approvals')
+        .where({ id: card.id })
+        .first();
       // Should be COUNTERED (escalation) with escalated_to set to delegate
       expect(updated.status).toBe('COUNTERED');
       expect(updated.escalated_to).toBe(policy2.delegate_user_id);

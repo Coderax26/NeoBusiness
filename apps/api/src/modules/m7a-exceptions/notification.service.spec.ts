@@ -14,6 +14,40 @@ describe('NotificationService', () => {
   beforeAll(async () => {
     knex = await createKnex();
 
+    // Run migrations to ensure schema and seed data (notification_templates) are present
+    const { MigrationService } =
+      await import('../m0-platform/migration.service.js');
+    const migrationService = new MigrationService(knex);
+    await migrationService.runMigrations();
+
+    // Seed notification templates (in case they're missing)
+    await knex('notification_templates')
+      .insert([
+        {
+          code: 'in_app_exception',
+          channel: 'IN_APP',
+          language: 'en',
+          title: null,
+          body: 'Exception card: {title} — value at risk: ₹{value_at_risk}',
+        },
+        {
+          code: 'exception_card_push',
+          channel: 'FCM',
+          language: 'en',
+          title: 'Action Required',
+          body: '{count} exception card(s) need your review. Tap to resolve.',
+        },
+        {
+          code: 'otp_delivery',
+          channel: 'SMS',
+          language: 'en',
+          title: null,
+          body: 'Your NeoBus OTP code is {otp_code}. Valid for 5 minutes.',
+        },
+      ])
+      .onConflict('code')
+      .ignore();
+
     const owner = await knex('users').where('role', 'OWNER').first('id');
     const site = await knex('sites').first('id');
 
@@ -49,16 +83,17 @@ describe('NotificationService', () => {
       const row = rows[0];
       expect(row.status).toBe('QUEUED');
       expect(row.template_code).toBe('in_app_exception');
-      const payload = typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+      const payload =
+        typeof row.payload_json === 'string'
+          ? JSON.parse(row.payload_json)
+          : row.payload_json;
       expect(payload.title).toBe('Test Exception');
       expect(payload.valueAtRisk).toBe('1000.00');
     });
 
     it('sends FCM notification by looking up device token and logging', async () => {
       // Register a test device token
-      await knex('device_registrations')
-        .where({ user_id: ownerId })
-        .del(); // Clean first
+      await knex('device_registrations').where({ user_id: ownerId }).del(); // Clean first
 
       await knex('device_registrations').insert({
         user_id: ownerId,
@@ -92,10 +127,15 @@ describe('NotificationService', () => {
 
     it('sends WHATSAPP notification by logging (no actual provider)', async () => {
       // Should not throw, just log
-      await notificationSvc.send('WHATSAPP', 'order_confirmation', '+919876543210', {
-        orderId: 'ORD-001',
-        amount: '5000.00',
-      });
+      await notificationSvc.send(
+        'WHATSAPP',
+        'order_confirmation',
+        '+919876543210',
+        {
+          orderId: 'ORD-001',
+          amount: '5000.00',
+        },
+      );
 
       // No rows in notification_outbox for WHATSAPP in this test
     });
@@ -112,7 +152,10 @@ describe('NotificationService', () => {
         .orderBy('created_at', 'desc')
         .first();
 
-      const payload = typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+      const payload =
+        typeof row.payload_json === 'string'
+          ? JSON.parse(row.payload_json)
+          : row.payload_json;
       expect(payload.body).toContain('Price Override');
       expect(payload.body).toContain('2500.00');
     });
@@ -123,8 +166,10 @@ describe('NotificationService', () => {
         foo: 'bar',
       });
 
-      const rows = await knex('notification_outbox')
-        .where({ recipient_ref: ownerId, template_code: 'nonexistent_template' });
+      const rows = await knex('notification_outbox').where({
+        recipient_ref: ownerId,
+        template_code: 'nonexistent_template',
+      });
       expect(rows.length).toBe(0);
     });
   });
@@ -154,7 +199,10 @@ describe('NotificationService', () => {
         .where({ recipient_ref: ownerId, template_code: 'test_template' })
         .first();
 
-      const payload = typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+      const payload =
+        typeof row.payload_json === 'string'
+          ? JSON.parse(row.payload_json)
+          : row.payload_json;
       expect(payload.body).toBe('Hello John, your order ORD-123 is confirmed');
     });
 
@@ -179,7 +227,10 @@ describe('NotificationService', () => {
         .where({ recipient_ref: ownerId, template_code: 'test_template2' })
         .first();
 
-      const payload = typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+      const payload =
+        typeof row.payload_json === 'string'
+          ? JSON.parse(row.payload_json)
+          : row.payload_json;
       expect(payload.body).toBe('Hello John, unknown {missing}');
     });
   });
