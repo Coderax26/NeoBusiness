@@ -7,6 +7,7 @@ import { M7aExceptionsModule } from './modules/m7a-exceptions/m7a-exceptions.mod
 import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module.js';
 import { M6FinancialsModule } from './modules/m6-finance/m6-financials.module.js';
 import { M3InventoryModule } from './modules/m3-inventory/m3-inventory.module.js';
+import { M5FleetModule } from './modules/m5-fleet/m5-fleet.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -51,7 +52,7 @@ import { M3InventoryModule } from './modules/m3-inventory/m3-inventory.module.js
     M3InventoryModule,
 
     // Sprint 2: M5 Fleet, Dispatch and Delivery
-    // M5FleetModule,
+    M5FleetModule,
 
     // Sprint 3: M4 Factory Production
     // M4ProductionModule,

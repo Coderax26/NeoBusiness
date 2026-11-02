@@ -3,7 +3,12 @@ import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
-import { EXCEPTION_PORT } from '../../shared/ports/ports.interface.js';
+import {
+  CREDIT_PORT,
+  EXCEPTION_PORT,
+  ITEM_PORT,
+  PRICING_PORT,
+} from '../../shared/ports/ports.interface.js';
 import type {
   PricingPort,
   CreditPort,
@@ -35,9 +40,9 @@ export class OrderService implements OnModuleInit {
 
   constructor(
     @InjectKnex() private readonly knex: Knex,
-    @Inject('PRICING_PORT') private readonly pricing: PricingPort,
-    @Inject('CREDIT_PORT') private readonly credit: CreditPort,
-    @Inject('ITEM_PORT') private readonly items: ItemPort,
+    @Inject(PRICING_PORT) private readonly pricing: PricingPort,
+    @Inject(CREDIT_PORT) private readonly credit: CreditPort,
+    @Inject(ITEM_PORT) private readonly items: ItemPort,
     @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
     private readonly docNumber: DocNumberService,
   ) {}

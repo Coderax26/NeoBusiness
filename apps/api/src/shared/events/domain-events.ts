@@ -144,6 +144,26 @@ export interface DeliveryCompletedPayload {
   codAmount: string;
 }
 
+export interface DeliveryFailedPayload {
+  stopId: string;
+  tripId: string;
+  orderId: string;
+  customerId: string;
+  reasonCode: string;
+}
+
+export interface TripClosedPayload {
+  tripId: string;
+  siteId: string;
+}
+
+export interface IssueReportedPayload {
+  issueId: string;
+  tripId: string;
+  category: string;
+  valueAtRisk: string;
+}
+
 export interface CollectionLoggedPayload {
   receiptId: string;
   customerId: string;
@@ -191,6 +211,10 @@ export interface DomainEventPayloads {
   'grn.posted': GrnPostedPayload;
   'trip.loaded': TripLoadedPayload;
   'delivery.completed': DeliveryCompletedPayload;
+  'delivery.failed': DeliveryFailedPayload;
+  'trip.closed': TripClosedPayload;
+  'issue.reported': IssueReportedPayload;
+  'issue.escalated': IssueReportedPayload;
   'exception.resolved': ExceptionResolvedPayload;
   'stock.expiring': StockExpiringPayload;
   'stock.low': StockLowPayload;

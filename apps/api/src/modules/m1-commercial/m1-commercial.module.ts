@@ -16,6 +16,11 @@ import { PricingController } from './pricing.controller.js';
 import { OrderController } from './order.controller.js';
 import { QuoteController } from './quote.controller.js';
 import { M7aExceptionsModule } from '../m7a-exceptions/m7a-exceptions.module.js';
+import {
+  CREDIT_PORT,
+  ITEM_PORT,
+  PRICING_PORT,
+} from '../../shared/ports/ports.interface.js';
 
 /**
  * M1 Commercial & CRM Module.
@@ -41,15 +46,15 @@ import { M7aExceptionsModule } from '../m7a-exceptions/m7a-exceptions.module.js'
     // M1 does not import M7aExceptionsModule here — it subscribes to event handlers directly.
     // M1 also provides INVENTORY_PORT stub for Sprint 1 backward compatibility
     {
-      provide: 'PRICING_PORT',
+      provide: PRICING_PORT,
       useExisting: PricingService,
     },
     {
-      provide: 'ITEM_PORT',
+      provide: ITEM_PORT,
       useExisting: ItemService,
     },
     {
-      provide: 'CREDIT_PORT',
+      provide: CREDIT_PORT,
       useExisting: CreditService,
     },
   ],
@@ -68,9 +73,9 @@ import { M7aExceptionsModule } from '../m7a-exceptions/m7a-exceptions.module.js'
     OrderService,
     QuoteService,
     DocNumberService,
-    'PRICING_PORT',
-    'ITEM_PORT',
-    'CREDIT_PORT',
+    PRICING_PORT,
+    ITEM_PORT,
+    CREDIT_PORT,
   ],
 })
 export class M1CommercialModule {}
