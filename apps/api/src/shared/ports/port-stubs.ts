@@ -11,20 +11,31 @@
  */
 
 import {
-  CreditPort, CreditEvaluation,
-  InventoryPort, AtpResult, ReserveResult,
+  CreditPort,
+  CreditEvaluation,
+  InventoryPort,
+  AtpResult,
+  ReserveResult,
   ProcurementPort,
   ProductionPort,
   LedgerPort,
-  ExceptionPort, ExceptionType, ExceptionPayload,
-  NotifyPort, NotifyChannel,
+  ExceptionPort,
+  ExceptionType,
+  ExceptionPayload,
+  NotifyPort,
+  NotifyChannel,
 } from './ports.interface.js';
 
 // ─── CreditPort Stub (replaced when M6 AR ledger is built in Sprint 1) ────────
 
 export class CreditPortStub implements CreditPort {
-  async evaluate(customerId: string, _newOrderValue: string): Promise<CreditEvaluation> {
-    console.warn(`[STUB] CreditPort.evaluate(${customerId}) — returning OK always`);
+  async evaluate(
+    customerId: string,
+    _newOrderValue: string,
+  ): Promise<CreditEvaluation> {
+    console.warn(
+      `[STUB] CreditPort.evaluate(${customerId}) — returning OK always`,
+    );
     return {
       status: 'OK',
       currentArBalance: '0.00',
@@ -34,7 +45,9 @@ export class CreditPortStub implements CreditPort {
     };
   }
 
-  async canDispatch(_orderId: string): Promise<{ allowed: boolean; reason?: string }> {
+  async canDispatch(
+    _orderId: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     console.warn('[STUB] CreditPort.canDispatch — returning allowed always');
     return { allowed: true };
   }
@@ -43,18 +56,33 @@ export class CreditPortStub implements CreditPort {
 // ─── InventoryPort Stub (replaced when M3 is built in Sprint 2) ───────────────
 
 export class InventoryPortStub implements InventoryPort {
-  async checkATP(_locationId: string, itemId: string, _qty: string, _deliveryDate: string): Promise<AtpResult> {
-    console.warn(`[STUB] InventoryPort.checkATP(${itemId}) — returning unlimited stock`);
+  async checkATP(
+    _locationId: string,
+    itemId: string,
+    _qty: string,
+    _deliveryDate: string,
+  ): Promise<AtpResult> {
+    console.warn(
+      `[STUB] InventoryPort.checkATP(${itemId}) — returning unlimited stock`,
+    );
     return {
       itemId,
       siteId: 'stub',
       availableQty: '999999.000',
       uom: 'KG',
+      canFulfil: true,
     };
   }
 
-  async reserve(orderLineId: string, _siteId: string, itemId: string, qty: string): Promise<ReserveResult> {
-    console.warn(`[STUB] InventoryPort.reserve(${orderLineId}, ${itemId}) — returning fully allocated`);
+  async reserve(
+    orderLineId: string,
+    _siteId: string,
+    itemId: string,
+    qty: string,
+  ): Promise<ReserveResult> {
+    console.warn(
+      `[STUB] InventoryPort.reserve(${orderLineId}, ${itemId}) — returning fully allocated`,
+    );
     return {
       allocated: qty,
       deficit: '0.000',
@@ -66,11 +94,22 @@ export class InventoryPortStub implements InventoryPort {
     console.warn('[STUB] InventoryPort.release — no-op');
   }
 
-  async postDispatch(_tripStopId: string, _lines: Array<{ itemId: string; batchId: string; qty: string }>): Promise<void> {
+  async postDispatch(
+    _tripStopId: string,
+    _lines: Array<{ itemId: string; batchId: string; qty: string }>,
+  ): Promise<void> {
     console.warn('[STUB] InventoryPort.postDispatch — no-op');
   }
 
-  async postReturn(_tripStopId: string, _lines: Array<{ itemId: string; batchId: string; qty: string; damaged: boolean }>): Promise<void> {
+  async postReturn(
+    _tripStopId: string,
+    _lines: Array<{
+      itemId: string;
+      batchId: string;
+      qty: string;
+      damaged: boolean;
+    }>,
+  ): Promise<void> {
     console.warn('[STUB] InventoryPort.postReturn — no-op');
   }
 
@@ -83,17 +122,32 @@ export class InventoryPortStub implements InventoryPort {
 
 export class ProcurementPortStub implements ProcurementPort {
   async latestLandedCost(itemId: string): Promise<string | null> {
-    console.warn(`[STUB] ProcurementPort.latestLandedCost(${itemId}) — returning null (enter manually)`);
+    console.warn(
+      `[STUB] ProcurementPort.latestLandedCost(${itemId}) — returning null (enter manually)`,
+    );
     return null;
   }
 
   async createBackToBackPO(orderLineId: string): Promise<string> {
-    console.warn(`[STUB] ProcurementPort.createBackToBackPO(${orderLineId}) — no-op, returning stub ID`);
+    console.warn(
+      `[STUB] ProcurementPort.createBackToBackPO(${orderLineId}) — no-op, returning stub ID`,
+    );
     return 'stub-po-id';
   }
 
-  async suggestBackups(_itemId: string, _deficitQty: string): Promise<Array<{ supplierId: string; unitPrice: string; availableQty: string | null }>> {
-    console.warn('[STUB] ProcurementPort.suggestBackups — returning empty list');
+  async suggestBackups(
+    _itemId: string,
+    _deficitQty: string,
+  ): Promise<
+    Array<{
+      supplierId: string;
+      unitPrice: string;
+      availableQty: string | null;
+    }>
+  > {
+    console.warn(
+      '[STUB] ProcurementPort.suggestBackups — returning empty list',
+    );
     return [];
   }
 }
@@ -113,7 +167,13 @@ export class ProductionPortStub implements ProductionPort {
     return 'stub-requisition-id';
   }
 
-  async workOrderStatus(_workOrderId: string): Promise<{ status: string; plannedQty: string; actualOutputQty: string | null } | null> {
+  async workOrderStatus(
+    _workOrderId: string,
+  ): Promise<{
+    status: string;
+    plannedQty: string;
+    actualOutputQty: string | null;
+  } | null> {
     console.warn('[STUB] ProductionPort.workOrderStatus — returning null');
     return null;
   }
@@ -150,17 +210,25 @@ export class ExceptionPortStub implements ExceptionPort {
   ): Promise<string> {
     console.warn(
       `[STUB] ExceptionPort.raise: type=${type}, ref=${referenceTable}:${referenceId}, by=${requestedBy}`,
-      '\nPayload:', payload.summary,
+      '\nPayload:',
+      payload.summary,
     );
     return 'stub-exception-id';
   }
 
   onResolved(
     type: ExceptionType,
-    handler: (exceptionId: string, action: string, remarks: string, counterJson?: object) => Promise<void>,
+    handler: (
+      exceptionId: string,
+      action: string,
+      remarks: string,
+      counterJson?: object,
+    ) => Promise<void>,
   ): void {
     this.handlers.set(type, handler);
-    console.warn(`[STUB] ExceptionPort.onResolved registered for type=${type} (handler will never fire until M7a is built)`);
+    console.warn(
+      `[STUB] ExceptionPort.onResolved registered for type=${type} (handler will never fire until M7a is built)`,
+    );
   }
 }
 
@@ -175,7 +243,8 @@ export class NotifyPortStub implements NotifyPort {
   ): Promise<void> {
     console.log(
       `[STUB] NotifyPort.send: channel=${channel}, template=${templateCode}, to=${recipientRef}`,
-      '\nPayload:', JSON.stringify(payload, null, 2),
+      '\nPayload:',
+      JSON.stringify(payload, null, 2),
     );
   }
 }

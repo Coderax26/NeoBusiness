@@ -3,7 +3,7 @@ import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
 import { ConfigService } from '../m0-platform/config.service.js';
-import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
+import { EXCEPTION_PORT, type ExceptionPort } from '../../shared/ports/ports.interface.js';
 
 /**
  * PricingService — calculates dynamic pricing bands and returns price memory.
@@ -21,7 +21,7 @@ export class PricingService implements OnModuleInit {
 
   constructor(
     @InjectKnex() private readonly knex: Knex,
-    @Inject('EXCEPTION_PORT') private readonly exceptionPort: ExceptionPort,
+    @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
     private readonly configService: ConfigService,
   ) {}
 

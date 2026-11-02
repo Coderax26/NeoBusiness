@@ -188,3 +188,15 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 ---
 
 *Previous versions: none (new project)*
+## 0.4.1 — 2026-11-02
+
+### M3 Inventory hardening
+- Completed the unified transactional ledger posting boundary, including cache
+  deltas, reversals, append-only protection, transfer variance resolution, and
+  expiry removals.
+- Added typed cross-module event payload contracts and idempotent stock-variance
+  resolution handling.
+- Hardened inventory DTO validation and repaired the HTTP e2e harness with real
+  UUID fixtures, idempotency mismatch coverage, and deterministic startup.
+- Added true concurrent last-stock reservation coverage; M3 service, acceptance,
+  and HTTP e2e suites pass.

@@ -143,17 +143,17 @@
 ### Build order: M3 → M5 → M6 Part 2
 
 #### M3 Inventory and Warehouse
-- [ ] Migration: inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments
-- [ ] Append-only trigger on stock_ledger_txns
-- [ ] Ledger posting service (single entry point, updates cached qty in-transaction)
-- [ ] ATP query (physical - committed, FEFO-ordered)
-- [ ] FEFO reservation algorithm with row locking (FOR UPDATE)
-- [ ] InventoryPort (replaces stub in M1)
-- [ ] GRN posting handler (before PO link)
-- [ ] Transfer workflow and variance handling
-- [ ] Expiry/drift/stale-reservation jobs
-- [ ] M3 acceptance tests (items 1–9 from M3 §10) including Scenario F stock part
-- [ ] Concurrency test: two concurrent reservations for the last 100 kg
+- [x] Migration: inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments
+- [x] Append-only trigger on stock_ledger_txns
+- [x] Ledger posting service (single entry point, updates cached qty in-transaction)
+- [x] ATP query (physical - committed, FEFO-ordered)
+- [x] FEFO reservation algorithm with row locking (FOR UPDATE)
+- [x] InventoryPort (replaces stub in M1)
+- [x] GRN posting handler (before PO link)
+- [x] Transfer workflow and variance handling
+- [x] Expiry/drift/stale-reservation jobs
+- [x] M3 acceptance tests (HTTP, service, and acceptance coverage including stock deficit handling)
+- [x] Concurrency test: two concurrent reservations for the last 100 kg
 
 #### M5 Fleet, Dispatch and Delivery
 - [ ] Migration: vehicles, delivery_trips, delivery_stops, delivery_stop_lines, delivery_challans, issue_reports, trip_expenses

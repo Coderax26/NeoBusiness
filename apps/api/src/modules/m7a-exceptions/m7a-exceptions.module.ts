@@ -48,6 +48,8 @@ import { DeviceController } from './device.controller.js';
     ExceptionService,
     NotificationService,
     OutboxService,
+    EXCEPTION_PORT,
+    NOTIFY_PORT,
   ],
 })
 export class M7aExceptionsModule {}

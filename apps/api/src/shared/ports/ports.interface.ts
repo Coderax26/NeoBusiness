@@ -42,7 +42,11 @@ export interface PriceMemoryEntry {
 
 export interface PricingPort {
   getBand(itemId: string, date: string): Promise<PriceBand | null>;
-  lastPrices(customerId: string, itemId: string, limit?: number): Promise<PriceMemoryEntry[]>;
+  lastPrices(
+    customerId: string,
+    itemId: string,
+    limit?: number,
+  ): Promise<PriceMemoryEntry[]>;
 }
 
 // ─── Item Port (owned by M1) ──────────────────────────────────────────────────
@@ -70,7 +74,11 @@ export interface UomConversion {
 
 export interface ItemPort {
   getItem(itemId: string): Promise<ItemSummary | null>;
-  getUomConversion(itemId: string, fromUom: string, toUom: string): Promise<UomConversion | null>;
+  getUomConversion(
+    itemId: string,
+    fromUom: string,
+    toUom: string,
+  ): Promise<UomConversion | null>;
 }
 
 // ─── Credit Port (owned by M1, reads M6) ─────────────────────────────────────
@@ -87,7 +95,10 @@ export interface CreditEvaluation {
 }
 
 export interface CreditPort {
-  evaluate(customerId: string, newOrderValue: string): Promise<CreditEvaluation>;
+  evaluate(
+    customerId: string,
+    newOrderValue: string,
+  ): Promise<CreditEvaluation>;
   canDispatch(orderId: string): Promise<{ allowed: boolean; reason?: string }>;
 }
 
@@ -99,20 +110,43 @@ export interface AtpResult {
   locationId?: string;
   availableQty: string; // numeric string (Qty)
   uom: string;
+  canFulfil: boolean;
 }
 
 export interface ReserveResult {
   allocated: string; // qty that was reserved
-  deficit: string;   // qty that could not be reserved (0 if fully covered)
+  deficit: string; // qty that could not be reserved (0 if fully covered)
   reservationIds: string[];
 }
 
 export interface InventoryPort {
-  checkATP(locationId: string, itemId: string, qty: string, deliveryDate: string): Promise<AtpResult>;
-  reserve(orderLineId: string, siteId: string, itemId: string, qty: string, deliveryDate: string): Promise<ReserveResult>;
+  checkATP(
+    locationId: string,
+    itemId: string,
+    qty: string,
+    deliveryDate: string,
+  ): Promise<AtpResult>;
+  reserve(
+    orderLineId: string,
+    siteId: string,
+    itemId: string,
+    qty: string,
+    deliveryDate: string,
+  ): Promise<ReserveResult>;
   release(orderLineId: string): Promise<void>;
-  postDispatch(tripStopId: string, lines: Array<{ itemId: string; batchId: string; qty: string }>): Promise<void>;
-  postReturn(tripStopId: string, lines: Array<{ itemId: string; batchId: string; qty: string; damaged: boolean }>): Promise<void>;
+  postDispatch(
+    tripStopId: string,
+    lines: Array<{ itemId: string; batchId: string; qty: string }>,
+  ): Promise<void>;
+  postReturn(
+    tripStopId: string,
+    lines: Array<{
+      itemId: string;
+      batchId: string;
+      qty: string;
+      damaged: boolean;
+    }>,
+  ): Promise<void>;
   postGRN(grnId: string): Promise<void>;
 }
 
@@ -121,7 +155,16 @@ export interface InventoryPort {
 export interface ProcurementPort {
   latestLandedCost(itemId: string): Promise<string | null>; // null = not available yet
   createBackToBackPO(orderLineId: string): Promise<string>; // returns PO draft ID
-  suggestBackups(itemId: string, deficitQty: string): Promise<Array<{ supplierId: string; unitPrice: string; availableQty: string | null }>>;
+  suggestBackups(
+    itemId: string,
+    deficitQty: string,
+  ): Promise<
+    Array<{
+      supplierId: string;
+      unitPrice: string;
+      availableQty: string | null;
+    }>
+  >;
 }
 
 // ─── Production Port (owned by M4) ────────────────────────────────────────────
@@ -133,7 +176,13 @@ export interface ProductionPort {
     netQty: string,
     requiredBy: Date,
   ): Promise<string>; // returns requisition ID
-  workOrderStatus(workOrderId: string): Promise<{ status: string; plannedQty: string; actualOutputQty: string | null } | null>;
+  workOrderStatus(
+    workOrderId: string,
+  ): Promise<{
+    status: string;
+    plannedQty: string;
+    actualOutputQty: string | null;
+  } | null>;
 }
 
 // ─── Ledger Port (owned by M6) ────────────────────────────────────────────────
@@ -182,7 +231,12 @@ export interface ExceptionPort {
 
   onResolved(
     type: ExceptionType,
-    handler: (exceptionId: string, action: string, remarks: string, counterJson?: object) => Promise<void>,
+    handler: (
+      exceptionId: string,
+      action: string,
+      remarks: string,
+      counterJson?: object,
+    ) => Promise<void>,
   ): void;
 }
 

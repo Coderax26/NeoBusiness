@@ -15,6 +15,7 @@ import { ItemController } from './item.controller.js';
 import { PricingController } from './pricing.controller.js';
 import { OrderController } from './order.controller.js';
 import { QuoteController } from './quote.controller.js';
+import { M7aExceptionsModule } from '../m7a-exceptions/m7a-exceptions.module.js';
 
 /**
  * M1 Commercial & CRM Module.
@@ -27,11 +28,7 @@ import { QuoteController } from './quote.controller.js';
  */
 @Global()
 @Module({
-  imports: [
-    ConfigModule,
-    DatabaseModule,
-    AuthModule,
-  ],
+  imports: [ConfigModule, DatabaseModule, AuthModule, M7aExceptionsModule],
   providers: [
     PricingService,
     ItemService,
@@ -42,6 +39,7 @@ import { QuoteController } from './quote.controller.js';
     DocNumberService,
     // Wire the real implementations as the global port tokens.
     // M1 does not import M7aExceptionsModule here — it subscribes to event handlers directly.
+    // M1 also provides INVENTORY_PORT stub for Sprint 1 backward compatibility
     {
       provide: 'PRICING_PORT',
       useExisting: PricingService,

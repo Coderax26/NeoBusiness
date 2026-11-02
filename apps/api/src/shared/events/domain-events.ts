@@ -84,6 +84,20 @@ export interface OrderCancelledPayload {
   reason: string;
 }
 
+export interface GrnPostedPayload {
+  siteId: string;
+  poId: string;
+  itemId: string;
+  requestedQty: string;
+  receivedQty: string;
+}
+
+export interface TripLoadedPayload {
+  tripId: string;
+  siteId: string;
+  lines: Array<{ itemId: string; batchId: string; qty: string }>;
+}
+
 export interface StockReservedPayload {
   orderLineId: string;
   itemId: string;
@@ -148,6 +162,21 @@ export interface ExceptionResolvedPayload {
   resolvedBy: string;
 }
 
+export interface StockExpiringPayload {
+  siteId: string;
+  itemId: string;
+  batchId: string;
+  qty: string;
+  expiryDate: string;
+}
+
+export interface StockLowPayload {
+  siteId: string;
+  itemId: string;
+  availableQty: string;
+  thresholdQty: string;
+}
+
 export interface EodClosedPayload {
   eodId: string;
   date: string;
@@ -155,3 +184,18 @@ export interface EodClosedPayload {
   signedOffBy: string;
   signedOffAt: string;
 }
+
+export interface DomainEventPayloads {
+  'order.confirmed': OrderConfirmedPayload;
+  'order.cancelled': OrderCancelledPayload;
+  'grn.posted': GrnPostedPayload;
+  'trip.loaded': TripLoadedPayload;
+  'delivery.completed': DeliveryCompletedPayload;
+  'exception.resolved': ExceptionResolvedPayload;
+  'stock.expiring': StockExpiringPayload;
+  'stock.low': StockLowPayload;
+}
+
+export type TypedDomainEvent<T extends keyof DomainEventPayloads> = DomainEvent<
+  DomainEventPayloads[T]
+> & { type: T };
