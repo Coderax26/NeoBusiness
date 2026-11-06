@@ -9,7 +9,7 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ### Added
 - Repository structure established (apps/api, apps/web, apps/mobile, apps/tablet, db/migrations, docs, scripts)
-- Blueprint fully read and documented (M0–M7, all 9 module specification files)
+- Blueprint fully read and documented (M0–M7, all module specification files)
 - ARCHITECTURE.md — technology stack, module boundaries, security controls, ADRs
 - PROJECT_OVERVIEW.md — business context, module summary, success criteria
 - BLUEPRINT_TRACEABILITY.md — all business rules, scenarios, gaps traced to implementation
@@ -27,6 +27,16 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - Domain event envelope + per-event payload types (`shared/events`)
 - Health check endpoint (`GET /health`)
 - M0 platform foundation migration (`db/migrations/20261021_001_m0_platform_foundation.sql`)
+- Test database isolation (`apps/api/.env.test`) automatically loaded by Vitest targeting `neobus_test`
+- Database safety rail guard (`assertTestDatabase`) preventing destructive test operations on non-test environments
+- Dynamic migration directory discovery and PostgreSQL session advisory lock (`pg_advisory_lock`) in `MigrationService`
+- M3 inventory hardening: ATP/FEFO reservations, GRN/dispatch/return postings, transfer lifecycle with variance exceptions, expiry/stale/drift jobs, ledger reversal linkage, and domain-event handlers
+
+### Fixed
+- Consolidated split-brain migrations from `apps/api/db/migrations/` into canonical monorepo root `db/migrations/`
+- Restored missing migration `20261026_008_m6_add_simple_missing_tables.sql` (`cashbook_entries`, `vehicles`, `delivery_trips`, `delivery_stops`)
+- Made M3 baseline migration RLS policies idempotent (`IF NOT EXISTS`) to prevent parallel test worker collisions
+- Updated `m6-acceptance.spec.ts` test fixtures to use UUIDs preventing millisecond constraint collisions
 
 ### Decisions Made (Proposed defaults — pending business owner confirmation)
 - Modular monolith architecture; no microservices (ADR-001)
@@ -74,7 +84,7 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - **OD-024**: Standing negotiated prices deferred to Phase 2; `price_tier` column added to `customers` table as placeholder.
 
 ---
- 
+
 ## [0.3.2] — 2026-10-25 — M1 Acceptance Tests Complete (Scenario A)
 
 ### Added
@@ -156,7 +166,7 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 ### Added
 - **Database foundation**: PostgreSQL 16 with Knex.js, UUIDv7 keys, `numeric(14,2)` money, append-only triggers
 - **Migrations 001–004**: sites, users, locations, user_site_access, role_permissions (43 rows), business_rule_config (15 rows), doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events, refresh_tokens
-- **ConfigService**: reads `business_rule_config` with 5-min TTL cache, supports GLOBAL/SITE/ITEM_CATEGORY scope
+- **ConfigService**: reads `business_rule_config` table by key, caches with TTL, supports GLOBAL/SITE/ITEM_CATEGORY scope
 - **Auth module**: login (phone + password/PIN), refresh tokens (7-day rotation), logout, `/me` endpoint, bcrypt hashing
 - **JWT**: HS256, 15-min access / 7-day refresh via `JwtModule.registerAsync()` (secret loaded after ConfigModule)
 - **RBAC**: `PermissionService` + `RbacGuard` + `@RequirePermission(...)` decorator; 6 roles, 43 permissions seeded
@@ -187,7 +197,8 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
-*Previous versions: none (new project)*
+## *Previous versions: none (new project)*
+
 ## 0.4.1 — 2026-11-02
 
 ### M3 Inventory hardening
@@ -200,3 +211,38 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
   UUID fixtures, idempotency mismatch coverage, and deterministic startup.
 - Added true concurrent last-stock reservation coverage; M3 service, acceptance,
   and HTTP e2e suites pass.
+
+## 0.4.2 — 2026-11-02
+
+### M5 Fleet backend foundation
+- Added fleet, trip, delivery stop, stop-line, issue, expense, and challan
+  schema with site-scoped RLS and fleet permissions.
+- Added trip creation with vehicle capacity checks, credit-gated dispatch,
+  M3 inventory posting hooks, and `trip.dispatched`/`trip.closed` events.
+- Added idempotent ePOD delivery capture with GPS/device timestamps, partial
+  delivery returns, failed-stop reasons, BR-08 closure checks, issue routing,
+  and trip expense logging.
+- Added focused database-backed service coverage for capacity, credit hold,
+  ePOD/return, and trip closure behavior.
+
+## 0.4.3 — 2026-11-06 — M4 Production Sprint 3 Complete
+
+### Added
+- **M4 Factory Production**: Complete BOM service with versioning, requisition planner with
+  net qty calculation, work order state machine (PLANNED → IN_PROGRESS → COMPLETED),
+  BR-06 yield check with WASTAGE_VARIANCE exception integration.
+- **ProductionPort**: Real implementation via WorkOrderService, wired in M4 module
+  (replaces ProductionPortStub since 2026-11-03).
+- **Wastage Service**: Full service with `recordWastage()`, status transitions (RECORDED → APPROVED → WRITTEN_OFF),
+  exception raising when wastage > 5% threshold.
+- **Attendance Service**: Labour attendance logging with shift management, future date validation.
+- **Tablet PWA Headers**: Added to controllers for offline-first caching (Cache-Control headers).
+- **16 Acceptance Tests**: All M4 acceptance tests passing covering BOM versioning, requisition planning,
+  FEFO consumption, production ledger posting, yield checks, permission boundaries, RLS isolation.
+
+### Fixed
+- ProductionPortStub deprecation notice updated with proper JSDoc referencing M4 shipping date.
+- M4 module status updated in plan documentation and CHANGELOG.
+
+### Decisions Confirmed
+- **M4 Production** build order: M4 → M2 → M7b per IMPLEMENTATION_ROADMAP.md

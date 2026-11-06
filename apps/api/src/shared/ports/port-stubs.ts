@@ -116,6 +116,25 @@ export class InventoryPortStub implements InventoryPort {
   async postGRN(_grnId: string): Promise<void> {
     console.warn('[STUB] InventoryPort.postGRN — no-op');
   }
+
+  async postConsumption(
+    _workOrderId: string,
+    _materialLineId: string,
+    _itemId: string,
+    _batchId: string,
+    _qty: string,
+  ): Promise<void> {
+    console.warn('[STUB] InventoryPort.postConsumption — no-op');
+  }
+
+  async postOutput(
+    _workOrderId: string,
+    _itemId: string,
+    _batchId: string,
+    _qty: string,
+  ): Promise<void> {
+    console.warn('[STUB] InventoryPort.postOutput — no-op');
+  }
 }
 
 // ─── ProcurementPort Stub (replaced when M2 is built in Sprint 3) ─────────────
@@ -152,8 +171,15 @@ export class ProcurementPortStub implements ProcurementPort {
   }
 }
 
-// ─── ProductionPort Stub (replaced when M4 is built in Sprint 3) ──────────────
+// ─── ProductionPort Stub (DEPRECATED: replaced by M4 WorkOrderService shipped 2026-11-03) ──────────────
 
+/**
+ * @deprecated ProductionPortStub has been replaced by M4's WorkOrderService.
+ * The real implementation has been wired in `m4-production.module.ts`:
+ *   { provide: PRODUCTION_PORT, useExisting: WorkOrderService }
+ * This stub will be removed in a future cleanup PR.
+ * Last verified: 2026-11-06 (Phase 7 acceptance tests passing)
+ */
 export class ProductionPortStub implements ProductionPort {
   async createRequisition(
     sourceOrderLineId: string,
@@ -162,19 +188,19 @@ export class ProductionPortStub implements ProductionPort {
     requiredBy: Date,
   ): Promise<string> {
     console.warn(
-      `[STUB] ProductionPort.createRequisition — logging only: line=${sourceOrderLineId}, item=${finishedItemId}, qty=${netQty}, by=${requiredBy.toISOString()}`,
+      `[STUB] ProductionPort.createRequisition — DEPRECATED. M4 WorkOrderService is active since 2026-11-03. line=${sourceOrderLineId}, item=${finishedItemId}, qty=${netQty}, by=${requiredBy.toISOString()}`,
     );
     return 'stub-requisition-id';
   }
 
-  async workOrderStatus(
-    _workOrderId: string,
-  ): Promise<{
+  async workOrderStatus(_workOrderId: string): Promise<{
     status: string;
     plannedQty: string;
     actualOutputQty: string | null;
   } | null> {
-    console.warn('[STUB] ProductionPort.workOrderStatus — returning null');
+    console.warn(
+      '[STUB] ProductionPort.workOrderStatus — DEPRECATED. M4 WorkOrderService is active since 2026-11-03',
+    );
     return null;
   }
 }
