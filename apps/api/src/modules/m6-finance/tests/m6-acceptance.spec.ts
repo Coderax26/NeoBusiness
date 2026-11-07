@@ -14,6 +14,7 @@ import { OutboxService } from '../../../shared/events/outbox.service.js';
 import { ExceptionService } from '../../../modules/m7a-exceptions/exception.service.js';
 import { NotificationService } from '../../../modules/m7a-exceptions/notification.service.js';
 import { Money } from '../../../shared/utils/money.util.js';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * M6 Collections & Financials Acceptance Tests — Scenario E: Collection & PTP Workflow
@@ -105,11 +106,12 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
     // M6 services
     ledgerSvc = new LedgerService(knex, docNumberSvc, exceptionSvc);
     invoiceSvc = new InvoiceService(knex, docNumberSvc, ledgerSvc);
+    ptpSvc = new PTPService(knex, notificationSvc, exceptionSvc);
     collectionSvc = new CollectionService(
       knex,
       ledgerSvc,
+      ptpSvc,
       configSvc,
-      notificationSvc,
       exceptionSvc,
     );
     handoverSvc = new HandoverService(
@@ -118,7 +120,6 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
       ledgerSvc,
       exceptionSvc,
     );
-    ptpSvc = new PTPService(knex, notificationSvc, exceptionSvc);
     eodSvc = new EodService(
       knex,
       docNumberSvc,
@@ -132,7 +133,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
   });
 
   afterAll(async () => {
-    await knex.destroy();
+    await knex?.destroy();
   });
 
   beforeEach(async () => {
@@ -190,10 +191,13 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
     }
     // Clean up EOD closings for the site/date (test isolation)
     await knex('eod_closings').where('site_id', siteId).del();
-    // Clean up delivery_trips for the site/date
-    await knex('delivery_trips').where('site_id', siteId).del();
-    // Clean up vehicles
-    await knex('vehicles').where('site_id', siteId).del();
+    // Clean up delivery_trips & vehicles if M5 tables exist
+    if (await knex.schema.hasTable('delivery_trips')) {
+      await knex('delivery_trips').where('site_id', siteId).del();
+    }
+    if (await knex.schema.hasTable('vehicles')) {
+      await knex('vehicles').where('site_id', siteId).del();
+    }
     // Clean up worklist tables
     await knex('worklist_items')
       .whereIn(
@@ -220,9 +224,10 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
    * Helper: Create test customer with credit terms
    */
   async function createTestCustomer(): Promise<string> {
+    const unique = uuidv4().slice(0, 8);
     const customer = await knex('customers')
       .insert({
-        business_name: `Test Customer ${Date.now()}`,
+        business_name: `Test Customer ${unique}`,
         contact_person: 'Test Contact',
         phone: '+919876543210',
         billing_address: '123 Test St',
@@ -234,7 +239,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
         gstin: '29ABCDE1234F1Z5',
         price_tier: 'STANDARD',
         is_active: true,
-        customer_code: `CUST-${Date.now()}`,
+        customer_code: `CUST-${unique}`,
       })
       .returning('id');
     return String(customer[0].id);
@@ -244,9 +249,10 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
    * Helper: Create test item
    */
   async function createTestItem(): Promise<string> {
+    const unique = uuidv4().slice(0, 8);
     const item = await knex('items')
       .insert({
-        sku_code: `TEST-${Date.now()}`,
+        sku_code: `TEST-${unique}`,
         name: 'Test Product',
         item_category: 'PROCESSED_FG',
         primary_uom: 'KG',
@@ -271,7 +277,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
   ): Promise<string> {
     // Calculate total: qty * price as a simple multiplication
     const totalAmount = Money.of(Number(qty) * Number(price)).toStorageString();
-    const orderNo = `ORD-${Date.now()}`;
+    const orderNo = `ORD-${uuidv4().slice(0, 8)}`;
 
     // Insert sales order
     const order = await knex('sales_orders')

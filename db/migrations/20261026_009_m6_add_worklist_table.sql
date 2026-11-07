@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS worklist_worklists (
   total_overdue_amount numeric(14,2) NOT NULL DEFAULT 0.00,
   status varchar(20) NOT NULL DEFAULT 'GENERATED',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- 2. Collection Worklist Items
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS worklist_items (
   route_order integer,
   status varchar(20) NOT NULL DEFAULT 'PENDING',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Indexes for performance

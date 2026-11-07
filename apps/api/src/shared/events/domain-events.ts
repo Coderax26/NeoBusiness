@@ -13,15 +13,16 @@
 // ─── Event envelope ────────────────────────────────────────────────────────────
 
 export interface DomainEvent<T = Record<string, unknown>> {
-  id: string;            // UUIDv7
+  id: string; // UUIDv7
   type: EventType;
-  aggregateId: string;   // primary key of the source entity
+  aggregateId: string; // primary key of the source entity
   payload: T;
-  publishedAt: string;   // ISO 8601 UTC
+  publishedAt: string; // ISO 8601 UTC
   moduleSource: ModuleSource;
 }
 
-export type ModuleSource = 'm0' | 'm1' | 'm2' | 'm3' | 'm4' | 'm5' | 'm6' | 'm7';
+export type ModuleSource =
+  'm0' | 'm1' | 'm2' | 'm3' | 'm4' | 'm5' | 'm6' | 'm7';
 
 export type EventType =
   | 'price.updated'
@@ -44,6 +45,7 @@ export type EventType =
   | 'delivery.completed'
   | 'delivery.partial'
   | 'delivery.failed'
+  | 'stops.returned'
   | 'collection.logged'
   | 'handover.verified'
   | 'invoice.issued'
@@ -139,8 +141,17 @@ export interface DeliveryCompletedPayload {
   tripId: string;
   orderId: string;
   customerId: string;
-  deliveredLines: Array<{ itemId: string; deliveredQty: string; batchId: string }>;
-  returnedLines: Array<{ itemId: string; returnedQty: string; batchId: string; damaged: boolean }>;
+  deliveredLines: Array<{
+    itemId: string;
+    deliveredQty: string;
+    batchId: string;
+  }>;
+  returnedLines: Array<{
+    itemId: string;
+    returnedQty: string;
+    batchId: string;
+    damaged: boolean;
+  }>;
   codAmount: string;
 }
 
@@ -155,6 +166,21 @@ export interface DeliveryFailedPayload {
 export interface TripClosedPayload {
   tripId: string;
   siteId: string;
+}
+
+export interface StopsReturnedPayload {
+  stopId: string;
+  tripId: string;
+  orderId: string;
+  customerId: string;
+  returnedLines: Array<{
+    itemId: string;
+    returnedQty: string;
+    batchId: string;
+    damaged: boolean;
+    reason?: string;
+  }>;
+  totalValue: string;
 }
 
 export interface IssueReportedPayload {
@@ -212,6 +238,7 @@ export interface DomainEventPayloads {
   'trip.loaded': TripLoadedPayload;
   'delivery.completed': DeliveryCompletedPayload;
   'delivery.failed': DeliveryFailedPayload;
+  'stops.returned': StopsReturnedPayload;
   'trip.closed': TripClosedPayload;
   'issue.reported': IssueReportedPayload;
   'issue.escalated': IssueReportedPayload;

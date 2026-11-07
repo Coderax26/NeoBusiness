@@ -36,7 +36,8 @@ export class InventoryService implements InventoryPort {
     @InjectKnex() private readonly knex: Knex,
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly outbox?: OutboxService,
-    @Optional() @Inject(EXCEPTION_PORT)
+    @Optional()
+    @Inject(EXCEPTION_PORT)
     private readonly exceptionPort?: ExceptionPort,
     @Optional() private readonly ledgerPosting?: LedgerPostingService,
   ) {}
@@ -160,13 +161,16 @@ export class InventoryService implements InventoryPort {
       const original = await trx('stock_ledger_txns')
         .where({ id: transactionId })
         .first();
-      if (!original) throw new BadRequestException('Ledger transaction not found');
+      if (!original)
+        throw new BadRequestException('Ledger transaction not found');
       const existing = await trx('stock_ledger_txns')
         .where({ reverses_txn_id: transactionId })
         .first('id');
       if (existing) return String(existing.id);
       if (String(original.txn_type) === 'REVERSAL') {
-        throw new ConflictException('A reversal transaction cannot be reversed');
+        throw new ConflictException(
+          'A reversal transaction cannot be reversed',
+        );
       }
       if (original.batch_id) {
         const qty = Number(original.qty);
@@ -286,7 +290,11 @@ export class InventoryService implements InventoryPort {
         .where({ site_id: siteId, item_id: itemId, status: 'AVAILABLE' })
         .where('qty_available', '>', 0)
         .where(function () {
-          this.whereNull('expiry_date').orWhere('expiry_date', '>=', deliveryDate);
+          this.whereNull('expiry_date').orWhere(
+            'expiry_date',
+            '>=',
+            deliveryDate,
+          );
         })
         .orderBy([{ column: 'expiry_date', order: 'asc', nulls: 'last' }])
         .forUpdate()
@@ -297,7 +305,9 @@ export class InventoryService implements InventoryPort {
       for (const batch of batches) {
         if (remaining.isZero()) break;
         const available = Qty.of(String(batch.qty_available), 'KG');
-        const allocated = available.isLessThan(remaining) ? available : remaining;
+        const allocated = available.isLessThan(remaining)
+          ? available
+          : remaining;
         const reservationId = uuidv4();
 
         await trx('stock_reservations').insert({
@@ -310,8 +320,7 @@ export class InventoryService implements InventoryPort {
           qty: allocated.toStorageString(),
           uom: 'KG',
           status: 'ACTIVE',
-          idempotency_key:
-            reservationIds.length === 0 ? idempotencyKey : null,
+          idempotency_key: reservationIds.length === 0 ? idempotencyKey : null,
           expires_at: Clock.addHours(Clock.nowUtc(), 24),
           updated_at: Clock.nowUtc(),
         });
@@ -381,14 +390,7 @@ export class InventoryService implements InventoryPort {
       const reservation = await trx('stock_reservations')
         .where({ id: reservationId })
         .forUpdate()
-        .first(
-          'id',
-          'status',
-          'qty',
-          'item_id',
-          'site_id',
-          'batch_id',
-        );
+        .first('id', 'status', 'qty', 'item_id', 'site_id', 'batch_id');
       if (!reservation) return { success: false };
       if (reservation.status === 'RELEASED') return { success: true };
       if (reservation.status !== 'ACTIVE') {
@@ -507,6 +509,73 @@ export class InventoryService implements InventoryPort {
     );
   }
 
+  async postConsumption(
+    workOrderId: string,
+    materialLineId: string,
+    itemId: string,
+    batchId: string,
+    qty: string,
+  ): Promise<void> {
+    await this.knex.transaction(async (trx) => {
+      const batch = await trx('inventory_batches')
+        .where({ id: batchId, item_id: itemId })
+        .forUpdate()
+        .first('id', 'site_id', 'qty_on_hand');
+      if (!batch) throw new BadRequestException('Inventory batch not found');
+      const consumedQty = Qty.of(qty, 'KG');
+      if (Qty.of(String(batch.qty_on_hand), 'KG').isLessThan(consumedQty)) {
+        throw new BadRequestException('Insufficient physical stock');
+      }
+      await this.insertLedger(trx, {
+        siteId: String(batch.site_id),
+        itemId,
+        batchId,
+        txnType: 'PROD_CONSUME',
+        qty: consumedQty.toStorageString(),
+        referenceTable: 'work_order_materials',
+        referenceNo: materialLineId,
+        committedDelta: -consumedQty.toNumber(),
+      });
+      await trx('stock_reservations')
+        .where({
+          item_id: itemId,
+          batch_id: batchId,
+          status: 'ACTIVE',
+        })
+        .update({
+          status: 'CONSUMED',
+          consumed_at: Clock.nowUtc(),
+          updated_at: Clock.nowUtc(),
+        });
+    });
+  }
+
+  async postOutput(
+    workOrderId: string,
+    itemId: string,
+    batchId: string,
+    qty: string,
+  ): Promise<void> {
+    await this.knex.transaction(async (trx) => {
+      const batch = await trx('inventory_batches')
+        .where({ id: batchId, item_id: itemId })
+        .forUpdate()
+        .first('id', 'site_id');
+      if (!batch) throw new BadRequestException('Inventory batch not found');
+      const outputQty = Qty.of(qty, 'KG');
+      await this.insertLedger(trx, {
+        siteId: String(batch.site_id),
+        itemId,
+        batchId,
+        txnType: 'PROD_OUTPUT',
+        qty: outputQty.toStorageString(),
+        referenceTable: 'work_order_outputs',
+        referenceNo: `${workOrderId}-out`,
+        committedDelta: outputQty.toNumber(),
+      });
+    });
+  }
+
   async receiveGRN(
     siteId: string,
     poId: string,
@@ -533,9 +602,7 @@ export class InventoryService implements InventoryPort {
         return {
           success: true,
           receivedQty: received.toStorageString(),
-          shortfall: Qty.of(requestedQty, 'KG')
-            .sub(received)
-            .toStorageString(),
+          shortfall: Qty.of(requestedQty, 'KG').sub(received).toStorageString(),
         };
       }
 
@@ -569,7 +636,9 @@ export class InventoryService implements InventoryPort {
       let exceptionType: string | undefined;
       if (shortfall.isGreaterThan(tolerance)) {
         exceptionType = 'SUPPLIER_SHORTFALL';
-        this.logger.warn(`GRN shortfall for ${poId}: ${shortfall.toStorageString()}`);
+        this.logger.warn(
+          `GRN shortfall for ${poId}: ${shortfall.toStorageString()}`,
+        );
       }
       return {
         success: true,
@@ -612,7 +681,9 @@ export class InventoryService implements InventoryPort {
       for (const batch of batches) {
         if (remaining.isZero()) break;
         const available = Qty.of(String(batch.qty_available), 'KG');
-        const allocated = available.isLessThan(remaining) ? available : remaining;
+        const allocated = available.isLessThan(remaining)
+          ? available
+          : remaining;
         allocations.push({ batchId: String(batch.id), qty: allocated });
         remaining = remaining.sub(allocated);
       }
@@ -664,7 +735,9 @@ export class InventoryService implements InventoryPort {
         .forUpdate()
         .first('id', 'status', 'transfer_no');
       if (!transfer || transfer.status !== 'RESERVED') {
-        throw new BadRequestException('Only reserved transfers can be dispatched');
+        throw new BadRequestException(
+          'Only reserved transfers can be dispatched',
+        );
       }
 
       const lines = await trx('stock_transfer_lines')
@@ -676,7 +749,8 @@ export class InventoryService implements InventoryPort {
           .where({ id: line.from_batch_id })
           .forUpdate()
           .first('id', 'site_id');
-        if (!batch) throw new BadRequestException('Transfer source batch not found');
+        if (!batch)
+          throw new BadRequestException('Transfer source batch not found');
         await this.insertLedger(trx, {
           siteId: String(batch.site_id),
           itemId: String(line.item_id),
@@ -688,13 +762,11 @@ export class InventoryService implements InventoryPort {
           referenceNo: String(transfer.transfer_no),
           committedDelta: -qty.toNumber(),
         });
-        await trx('stock_transfer_lines')
-          .where({ id: line.id })
-          .update({
-            dispatched_qty: qty.toStorageString(),
-            status: 'DISPATCHED',
-            updated_at: Clock.nowUtc(),
-          });
+        await trx('stock_transfer_lines').where({ id: line.id }).update({
+          dispatched_qty: qty.toStorageString(),
+          status: 'DISPATCHED',
+          updated_at: Clock.nowUtc(),
+        });
       }
       await trx('stock_transfers').where({ id: transferId }).update({
         status: 'IN_TRANSIT',
@@ -719,7 +791,9 @@ export class InventoryService implements InventoryPort {
         .forUpdate()
         .first('id', 'status', 'to_site_id', 'transfer_no');
       if (!transfer || transfer.status !== 'IN_TRANSIT') {
-        throw new BadRequestException('Only in-transit transfers can be received');
+        throw new BadRequestException(
+          'Only in-transit transfers can be received',
+        );
       }
 
       const lines = await trx('stock_transfer_lines')
@@ -755,22 +829,27 @@ export class InventoryService implements InventoryPort {
           referenceId: transferId,
           referenceNo: String(transfer.transfer_no),
         });
-        await trx('stock_transfer_lines').where({ id: line.id }).update({
-          to_batch_id: batch.id,
-          received_qty: qty.toStorageString(),
+        await trx('stock_transfer_lines')
+          .where({ id: line.id })
+          .update({
+            to_batch_id: batch.id,
+            received_qty: qty.toStorageString(),
+            status: 'RECEIVED',
+            note: receivedLine?.varianceReason ?? null,
+            updated_at: Clock.nowUtc(),
+          });
+      }
+      await trx('stock_transfers')
+        .where({ id: transferId })
+        .update({
           status: 'RECEIVED',
-          note: receivedLine?.varianceReason ?? null,
+          received_at: Clock.nowUtc(),
+          variance_qty: totalVariance.toStorageString(),
+          variance_reason: totalVariance.isZero()
+            ? null
+            : 'Short receipt recorded at receiving',
           updated_at: Clock.nowUtc(),
         });
-      }
-      await trx('stock_transfers').where({ id: transferId }).update({
-        status: 'RECEIVED',
-        received_at: Clock.nowUtc(),
-        variance_qty: totalVariance.toStorageString(),
-        variance_reason:
-          totalVariance.isZero() ? null : 'Short receipt recorded at receiving',
-        updated_at: Clock.nowUtc(),
-      });
       varianceQty = totalVariance;
     });
     if (!varianceQty.isZero() && this.exceptionPort) {
@@ -785,7 +864,12 @@ export class InventoryService implements InventoryPort {
         {
           title: 'Stock transfer variance',
           summary: `Transfer ${transferId} was received short`,
-          facts: [{ label: 'Variance quantity', value: varianceQty.toStorageString() }],
+          facts: [
+            {
+              label: 'Variance quantity',
+              value: varianceQty.toStorageString(),
+            },
+          ],
           impact: 'Received stock is lower than dispatched stock.',
           actions: [
             { code: 'APPROVE', label: 'Approve variance' },
@@ -801,8 +885,13 @@ export class InventoryService implements InventoryPort {
   async completeTransfer(transferId: string): Promise<void> {
     const updated = await this.knex('stock_transfers')
       .where({ id: transferId, status: 'RECEIVED' })
-      .update({ status: 'COMPLETED', completed_at: Clock.nowUtc(), updated_at: Clock.nowUtc() });
-    if (updated === 0) throw new BadRequestException('Only received transfers can be completed');
+      .update({
+        status: 'COMPLETED',
+        completed_at: Clock.nowUtc(),
+        updated_at: Clock.nowUtc(),
+      });
+    if (updated === 0)
+      throw new BadRequestException('Only received transfers can be completed');
     await this.knex('stock_transfer_lines')
       .where({ transfer_id: transferId, status: 'RECEIVED' })
       .update({ status: 'COMPLETED', updated_at: Clock.nowUtc() });
@@ -845,19 +934,23 @@ export class InventoryService implements InventoryPort {
             note: 'Rejected stock transfer variance',
           });
         }
-        await trx('stock_transfers').where({ id: transferId }).update({
-          status: 'CANCELLED',
-          cancelled_at: Clock.nowUtc(),
-          variance_reason: `${marker}${remarks}`,
-          updated_at: Clock.nowUtc(),
-        });
+        await trx('stock_transfers')
+          .where({ id: transferId })
+          .update({
+            status: 'CANCELLED',
+            cancelled_at: Clock.nowUtc(),
+            variance_reason: `${marker}${remarks}`,
+            updated_at: Clock.nowUtc(),
+          });
       } else {
-        await trx('stock_transfers').where({ id: transferId }).update({
-          status: 'COMPLETED',
-          completed_at: Clock.nowUtc(),
-          variance_reason: `${marker}${remarks}`,
-          updated_at: Clock.nowUtc(),
-        });
+        await trx('stock_transfers')
+          .where({ id: transferId })
+          .update({
+            status: 'COMPLETED',
+            completed_at: Clock.nowUtc(),
+            variance_reason: `${marker}${remarks}`,
+            updated_at: Clock.nowUtc(),
+          });
         await trx('stock_transfer_lines')
           .where({ transfer_id: transferId, status: 'RECEIVED' })
           .update({ status: 'COMPLETED', updated_at: Clock.nowUtc() });
@@ -871,20 +964,27 @@ export class InventoryService implements InventoryPort {
         .where({ id: transferId })
         .forUpdate()
         .first('id', 'status');
-      if (!transfer || !['REQUESTED', 'RESERVED'].includes(String(transfer.status))) {
-        throw new BadRequestException('Only requested or reserved transfers can be cancelled');
+      if (
+        !transfer ||
+        !['REQUESTED', 'RESERVED'].includes(String(transfer.status))
+      ) {
+        throw new BadRequestException(
+          'Only requested or reserved transfers can be cancelled',
+        );
       }
       if (transfer.status === 'RESERVED') {
         const lines = await trx('stock_transfer_lines')
           .where({ transfer_id: transferId, status: 'RESERVED' })
           .select('from_batch_id', 'reserved_qty');
         for (const line of lines) {
-          await trx('inventory_batches').where({ id: line.from_batch_id }).update({
-            qty_committed: trx.raw('GREATEST(0, qty_committed - ?)', [
-              Number(line.reserved_qty),
-            ]),
-            updated_at: Clock.nowUtc(),
-          });
+          await trx('inventory_batches')
+            .where({ id: line.from_batch_id })
+            .update({
+              qty_committed: trx.raw('GREATEST(0, qty_committed - ?)', [
+                Number(line.reserved_qty),
+              ]),
+              updated_at: Clock.nowUtc(),
+            });
         }
       }
       await trx('stock_transfers').where({ id: transferId }).update({
@@ -914,7 +1014,8 @@ export class InventoryService implements InventoryPort {
         return { success: false, approvedBy: '' };
       }
       const threshold =
-        (await this.config?.getNumber('adjustment_variance_threshold_pct')) ?? 5;
+        (await this.config?.getNumber('adjustment_variance_threshold_pct')) ??
+        5;
       const variancePct = available.isZero()
         ? 100
         : (adjustment.toNumber() / available.toNumber()) * 100;
@@ -965,7 +1066,8 @@ export class InventoryService implements InventoryPort {
         .where({ id: adjustmentId, status: 'PENDING' })
         .forUpdate()
         .first();
-      if (!adjustment) throw new BadRequestException('Pending adjustment not found');
+      if (!adjustment)
+        throw new BadRequestException('Pending adjustment not found');
       await trx('stock_adjustments').where({ id: adjustmentId }).update({
         status: 'APPROVED',
         approved_by: approvedBy,
@@ -1000,7 +1102,8 @@ export class InventoryService implements InventoryPort {
         rejection_reason: rejectionReason,
         updated_at: Clock.nowUtc(),
       });
-    if (updated === 0) throw new BadRequestException('Pending adjustment not found');
+    if (updated === 0)
+      throw new BadRequestException('Pending adjustment not found');
   }
 
   async checkExpiryDrift(siteId: string) {
@@ -1010,7 +1113,10 @@ export class InventoryService implements InventoryPort {
         'stock_reservations.batch_id',
         'inventory_batches.id',
       )
-      .where({ 'inventory_batches.site_id': siteId, 'inventory_batches.status': 'AVAILABLE' })
+      .where({
+        'inventory_batches.site_id': siteId,
+        'inventory_batches.status': 'AVAILABLE',
+      })
       .whereNotNull('inventory_batches.expiry_date')
       .where('inventory_batches.expiry_date', '<', Clock.todayKolkata())
       .select(
@@ -1054,7 +1160,11 @@ export class InventoryService implements InventoryPort {
     return reservations.length;
   }
 
-  private async createBatch(trx: Knex.Transaction, siteId: string, itemId: string) {
+  private async createBatch(
+    trx: Knex.Transaction,
+    siteId: string,
+    itemId: string,
+  ) {
     const id = uuidv4();
     await trx('inventory_batches').insert({
       id,
@@ -1116,23 +1226,23 @@ export class InventoryService implements InventoryPort {
   }
 
   private reversalOnHandDelta(txnType: string, qty: number): number {
-      if (['RECEIPT', 'RETURN', 'TRANSFER_IN', 'PROD_OUTPUT'].includes(txnType)) {
-        return -qty;
-      }
-      if (
-        [
-          'SALE_DISPATCH',
-          'TRANSFER_OUT',
-          'ADJUSTMENT',
-          'WRITEOFF',
-          'EXPIRY_REMOVAL',
-          'SHRINKAGE',
-          'PROD_CONSUME',
-        ].includes(txnType)
-      ) {
-        return qty;
-      }
-      return 0;
+    if (['RECEIPT', 'RETURN', 'TRANSFER_IN', 'PROD_OUTPUT'].includes(txnType)) {
+      return -qty;
+    }
+    if (
+      [
+        'SALE_DISPATCH',
+        'TRANSFER_OUT',
+        'ADJUSTMENT',
+        'WRITEOFF',
+        'EXPIRY_REMOVAL',
+        'SHRINKAGE',
+        'PROD_CONSUME',
+      ].includes(txnType)
+    ) {
+      return qty;
+    }
+    return 0;
   }
 
   private async insertLedger(

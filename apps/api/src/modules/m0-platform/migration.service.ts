@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Knex } from 'knex';
 import { InjectKnex } from 'nestjs-knex';
 import * as fs from 'fs';
@@ -104,6 +104,8 @@ function splitSql(sql: string): string[] {
  */
 @Injectable()
 export class MigrationService implements OnModuleInit {
+  private readonly logger = new Logger(MigrationService.name);
+
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
   async onModuleInit(): Promise<void> {
@@ -114,42 +116,48 @@ export class MigrationService implements OnModuleInit {
    * Run all pending migrations in order.
    */
   async runMigrations(): Promise<void> {
-    await this.ensureMigrationsTable();
+    const MIGRATION_LOCK_ID = 849302115;
+    await this.knex.raw('SELECT pg_advisory_lock(?)', [MIGRATION_LOCK_ID]);
+    try {
+      await this.ensureMigrationsTable();
 
-    const applied = await this.getAppliedMigrations();
-    const appliedSet = new Set(applied);
+      const applied = await this.getAppliedMigrations();
+      const appliedSet = new Set(applied);
 
-    const migrationFiles = this.getMigrationFiles();
+      const migrationFiles = this.getMigrationFiles();
 
-    for (const file of migrationFiles) {
-      const migrationName = path.basename(file, '.sql');
+      for (const file of migrationFiles) {
+        const migrationName = path.basename(file, '.sql');
 
-      if (appliedSet.has(migrationName)) {
-        continue;
+        if (appliedSet.has(migrationName)) {
+          continue;
+        }
+
+        this.logger.log(`Applying: ${migrationName}`);
+
+        const sql = fs.readFileSync(file, 'utf-8');
+
+        await this.knex.transaction(async (trx) => {
+          const statements = splitSql(sql);
+          for (const stmt of statements) {
+            if (stmt.trim()) {
+              await trx.raw(stmt);
+            }
+          }
+          await trx('knex_migrations').insert({
+            name: migrationName,
+            batch: await this.getNextBatchNumber(trx),
+            migration_time: new Date(),
+          });
+        });
+
+        this.logger.log(`Applied: ${migrationName}`);
       }
 
-      console.log(`[Migration] Applying: ${migrationName}`);
-
-      const sql = fs.readFileSync(file, 'utf-8');
-
-      await this.knex.transaction(async (trx) => {
-        const statements = splitSql(sql);
-        for (const stmt of statements) {
-          if (stmt.trim()) {
-            await trx.raw(stmt);
-          }
-        }
-        await trx('knex_migrations').insert({
-          name: migrationName,
-          batch: await this.getNextBatchNumber(trx),
-          migration_time: new Date(),
-        });
-      });
-
-      console.log(`[Migration] Applied: ${migrationName}`);
+      this.logger.log('All migrations up to date');
+    } finally {
+      await this.knex.raw('SELECT pg_advisory_unlock(?)', [MIGRATION_LOCK_ID]);
     }
-
-    console.log('[Migration] All migrations up to date');
   }
 
   private async getAppliedMigrations(): Promise<string[]> {
@@ -169,20 +177,34 @@ export class MigrationService implements OnModuleInit {
         table.increments('id').primary();
         table.string('name').notNullable();
         table.integer('batch').notNullable();
-        table.timestamp('migration_time').notNullable().defaultTo(this.knex.fn.now());
+        table
+          .timestamp('migration_time')
+          .notNullable()
+          .defaultTo(this.knex.fn.now());
       });
     }
   }
 
   private getMigrationFiles(): string[] {
-    const migrationsDir = path.resolve(process.cwd(), '..', '..', 'db', 'migrations');
+    const candidateDirs = [
+      process.env.MIGRATIONS_DIR,
+      path.resolve(process.cwd(), 'db', 'migrations'),
+      path.resolve(process.cwd(), '..', '..', 'db', 'migrations'),
+      path.resolve(process.cwd(), '..', 'db', 'migrations'),
+    ].filter(Boolean) as string[];
 
-    if (!fs.existsSync(migrationsDir)) {
-      console.warn(`[Migration] Migrations directory not found: ${migrationsDir}`);
+    const migrationsDir = candidateDirs.find((dir) => fs.existsSync(dir));
+
+    if (!migrationsDir) {
+      this.logger.warn(
+        `Migrations directory not found in candidates:`,
+        candidateDirs,
+      );
       return [];
     }
 
-    const files = fs.readdirSync(migrationsDir)
+    const files = fs
+      .readdirSync(migrationsDir)
       .filter((f) => f.endsWith('.sql'))
       .map((f) => path.join(migrationsDir, f))
       .sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
@@ -193,7 +215,9 @@ export class MigrationService implements OnModuleInit {
   async getStatus(): Promise<{ applied: string[]; pending: string[] }> {
     await this.ensureMigrationsTable();
     const applied = await this.getAppliedMigrations();
-    const allFiles = this.getMigrationFiles().map((f) => path.basename(f, '.sql'));
+    const allFiles = this.getMigrationFiles().map((f) =>
+      path.basename(f, '.sql'),
+    );
     const pending = allFiles.filter((f) => !applied.includes(f));
     return { applied, pending };
   }

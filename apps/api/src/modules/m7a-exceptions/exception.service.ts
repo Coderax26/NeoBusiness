@@ -9,7 +9,7 @@ import {
   type ExceptionPort,
   type NotifyPort,
 } from '../../shared/ports/ports.interface.js';
-import type { ConfigService } from '../m0-platform/config.service.js';
+import { ConfigService } from '../m0-platform/config.service.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
 
 type ResolutionAction = 'APPROVED' | 'REJECTED' | 'COUNTERED';

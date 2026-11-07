@@ -148,6 +148,21 @@ export interface InventoryPort {
     }>,
   ): Promise<void>;
   postGRN(grnId: string): Promise<void>;
+  /** Post production consumption to stock ledger (M4 → M3) */
+  postConsumption(
+    workOrderId: string,
+    materialLineId: string,
+    itemId: string,
+    batchId: string,
+    qty: string,
+  ): Promise<void>;
+  /** Post production output to stock ledger (M4 → M3) */
+  postOutput(
+    workOrderId: string,
+    itemId: string,
+    batchId: string,
+    qty: string,
+  ): Promise<void>;
 }
 
 // ─── Procurement Port (owned by M2) ──────────────────────────────────────────
@@ -176,9 +191,7 @@ export interface ProductionPort {
     netQty: string,
     requiredBy: Date,
   ): Promise<string>; // returns requisition ID
-  workOrderStatus(
-    workOrderId: string,
-  ): Promise<{
+  workOrderStatus(workOrderId: string): Promise<{
     status: string;
     plannedQty: string;
     actualOutputQty: string | null;

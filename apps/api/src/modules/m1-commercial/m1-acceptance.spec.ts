@@ -193,7 +193,7 @@ describe('M1 Acceptance — Scenario A: Price Negotiation Flow', () => {
   });
 
   afterAll(async () => {
-    await knex.destroy();
+    await knex?.destroy();
   });
 
   beforeEach(async () => {
@@ -826,7 +826,7 @@ describe('M1 Acceptance — Daily Price List Operations', () => {
   });
 
   afterAll(async () => {
-    await knex.destroy();
+    await knex?.destroy();
   });
 
   beforeEach(async () => {

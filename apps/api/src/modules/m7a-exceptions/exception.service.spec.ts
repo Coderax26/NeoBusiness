@@ -172,7 +172,7 @@ describe('ExceptionService', () => {
   });
 
   afterAll(async () => {
-    await knex.destroy();
+    await knex?.destroy();
   });
 
   beforeEach(async () => {

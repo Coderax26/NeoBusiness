@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     pdf_attachment_id uuid REFERENCES attachments(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    updated_by uuid REFERENCES users(id),
-    created_by uuid REFERENCES users(id)
+    created_by uuid REFERENCES users(id),
+    updated_by uuid REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS invoice_lines (
@@ -115,8 +115,7 @@ CREATE TABLE IF NOT EXISTS cash_handovers (
     notes text,
     verified_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now,
-    updated_by uuid REFERENCES users(id),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- 7. Cheque Register
@@ -131,8 +130,7 @@ CREATE TABLE IF NOT EXISTS cheque_register (
     deposited_on date,
     bounce_reason text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now,
-    updated_by uuid REFERENCES users(id),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- 8. PTP (Promise to Pay) Follow-ups
@@ -147,8 +145,7 @@ CREATE TABLE IF NOT EXISTS ptp_followups (
     logged_by_user_id uuid NOT NULL REFERENCES users(id),
     status varchar(20) NOT NULL DEFAULT 'OPEN',
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now,
-    updated_by uuid REFERENCES users(id),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- 9. EOD Closings
@@ -223,3 +220,4 @@ BEGIN
         REVOKE UPDATE, DELETE ON custody_ledger FROM neobus_app;
     END IF;
 END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_columns WHERE tablename = 'ptp_followups' AND columnname = 'updated_by') THEN ALTER TABLE ptp_followups ADD COLUMN updated_by uuid REFERENCES users(id); END IF; END $$;

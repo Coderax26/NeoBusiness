@@ -1,4 +1,5 @@
 import { createKnex } from '../../../shared/database/knex-instance.js';
+import { assertTestDatabase } from '../../../shared/database/test-db-guard.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -16,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export async function setupTestDB() {
   const knex = await createKnex();
+  await assertTestDatabase(knex);
 
   // -------------------------------------------------
   // 1. Run all migrations to ensure production schema

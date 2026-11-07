@@ -58,7 +58,7 @@ describe('NotificationService', () => {
   });
 
   afterAll(async () => {
-    await knex.destroy();
+    await knex?.destroy();
   });
 
   beforeEach(async () => {

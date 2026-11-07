@@ -26,15 +26,22 @@ import {
   NotifyChannel,
 } from './ports.interface.js';
 
-// ─── CreditPort Stub (replaced when M6 AR ledger is built in Sprint 1) ────────
+// ─── CreditPort Stub (DEPRECATED: replaced by M6 CreditPortService shipped 2026-11-06) ────────
 
+/**
+ * @deprecated CreditPortStub has been replaced by M6's CreditPortService.
+ * The real implementation has been wired in `m6-financials.module.ts`:
+ *   { provide: CREDIT_PORT, useClass: CreditPortService }
+ * This stub will be removed in a future cleanup PR.
+ * Last verified: 2026-11-06 (M6 Part 2 integration)
+ */
 export class CreditPortStub implements CreditPort {
   async evaluate(
     customerId: string,
     _newOrderValue: string,
   ): Promise<CreditEvaluation> {
     console.warn(
-      `[STUB] CreditPort.evaluate(${customerId}) — returning OK always`,
+      `[STUB] CreditPort.evaluate(${customerId}) — DEPRECATED. M6 CreditPortService is active since 2026-11-06. Returning OK always.`,
     );
     return {
       status: 'OK',
@@ -48,7 +55,9 @@ export class CreditPortStub implements CreditPort {
   async canDispatch(
     _orderId: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
-    console.warn('[STUB] CreditPort.canDispatch — returning allowed always');
+    console.warn(
+      '[STUB] CreditPort.canDispatch — DEPRECATED. M6 CreditPortService is active since 2026-11-06. Returning allowed always.',
+    );
     return { allowed: true };
   }
 }

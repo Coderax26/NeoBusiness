@@ -9,11 +9,9 @@ import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
 import { LedgerService } from './ledger.service.js';
+import { PTPService } from './ptp.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
-import {
-  NOTIFY_PORT,
-  EXCEPTION_PORT,
-} from '../../shared/ports/ports.interface.js';
+import { EXCEPTION_PORT } from '../../shared/ports/ports.interface.js';
 import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
 
 /**
@@ -32,8 +30,8 @@ export class CollectionService {
   constructor(
     @InjectKnex() private readonly knex: Knex,
     private readonly ledger: LedgerService,
+    private readonly ptpService: PTPService,
     private readonly config: ConfigService,
-    @Inject(NOTIFY_PORT) private readonly notify: any,
     @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
   ) {}
 
@@ -71,40 +69,6 @@ export class CollectionService {
         custodyBalance: result.custodyBalance,
       };
     });
-  }
-
-  /**
-   * Send payment receipt via WhatsApp/SMS
-   */
-  private async sendReceiptNotification(
-    customerId: string,
-    receiptNo: string,
-    amount: string,
-    mode: string,
-  ): Promise<void> {
-    const customer = await this.knex('customers')
-      .where('id', customerId)
-      .first('name', 'phone', 'whatsapp_opt_in');
-    if (!customer) return;
-
-    const payload = {
-      customerName: customer.name,
-      receiptNo,
-      amount,
-      mode,
-      date: new Date().toLocaleDateString('en-IN'),
-    };
-
-    if (customer.whatsapp_opt_in) {
-      await this.notify.send(
-        'WHATSAPP',
-        'payment_receipt',
-        customer.phone,
-        payload,
-      );
-    } else {
-      await this.notify.send('SMS', 'payment_receipt', customer.phone, payload);
-    }
   }
 
   /**
@@ -188,6 +152,7 @@ export class CollectionService {
   /**
    * Log Promise-to-Pay (PTP)
    * Scenario E: Customer promises payment by date with reason
+   * Delegates to PTPService for validation and creation
    */
   async logPTP(cmd: {
     siteId: string;
@@ -198,24 +163,7 @@ export class CollectionService {
     note?: string;
     loggedByUserId: string;
   }) {
-    const [ptp] = await this.knex('ptp_followups')
-      .insert({
-        site_id: cmd.siteId,
-        customer_id: cmd.customerId,
-        invoice_id: cmd.invoiceId,
-        promised_date: cmd.promisedDate,
-        reason_code: cmd.reasonCode,
-        note: cmd.note,
-        logged_by_user_id: cmd.loggedByUserId,
-        status: 'OPEN',
-      })
-      .returning('*');
-
-    this.logger.log(
-      `PTP logged: customer ${cmd.customerId}, promised ${cmd.promisedDate.toISOString().split('T')[0]}`,
-    );
-
-    return ptp;
+    return this.ptpService.createPTP(cmd);
   }
 
   /**

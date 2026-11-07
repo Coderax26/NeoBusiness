@@ -10,6 +10,7 @@ import { AuthController } from './auth.controller.js';
 import { PermissionService, RbacGuard } from './rbac.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { DocNumberService } from './doc-number.service.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { RlsContextMiddleware } from '../../shared/middleware/rls-context.middleware.js';
 import { IdempotencyMiddleware } from '../../shared/middleware/idempotency.middleware.js';
@@ -18,11 +19,7 @@ import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
 
 @Global()
 @Module({
-  imports: [
-    ConfigModule,
-    DatabaseModule,
-    AuthModule,
-  ],
+  imports: [ConfigModule, DatabaseModule, AuthModule],
   providers: [
     ConfigService,
     MigrationService,
@@ -31,6 +28,7 @@ import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
     RbacGuard,
     JwtAuthGuard,
     DocNumberService,
+    PdfGeneratorService,
     OutboxService,
     OutboxRelay,
     {
@@ -49,14 +47,13 @@ import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
     RbacGuard,
     JwtAuthGuard,
     DocNumberService,
+    PdfGeneratorService,
     OutboxService,
     OutboxRelay,
   ],
 })
 export class M0PlatformModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(RlsContextMiddleware, IdempotencyMiddleware)
-      .forRoutes('*');
+    consumer.apply(RlsContextMiddleware, IdempotencyMiddleware).forRoutes('*');
   }
 }

@@ -246,3 +246,73 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ### Decisions Confirmed
 - **M4 Production** build order: M4 → M2 → M7b per IMPLEMENTATION_ROADMAP.md
+
+---
+
+## [0.5.0] — 2026-11-06 — M6 Part 2 Accounting Bridge & M5 Integration Complete
+
+### Added
+
+#### Phase 1: M5→M6 Event Integration
+- **TripListenerService**: Full event-driven invoice generation on `trips.dispatched` event
+  - Automatically generates tax invoices for all loaded orders via `InvoiceService.generateFromOrder()`
+  - Triggers invoice notification to customer via `NotifyPort`
+  - Wired to listen on BullMQ `domain-events` queue
+- **CodSettlementService**: Automated COD settlement on `trip.closed` event
+  - Creates `collection_receipts` entries for each COD stop
+  - Posts atomic transactions to M6 ledgers (customer_ledger_entries CREDIT, custody_ledger COLLECTION)
+  - Idempotency via unique `(stopId, reference_type='TRIP_COD')` constraint
+  - Full audit trail and operator notification
+
+#### Phase 2: Credit Notes & Returns
+- **Credit Port Real Implementation**: `CreditPortService` replaces `CreditPortStub`
+  - Reads actual `customer_ledger_entries` for AR balance calculation
+  - Evaluates credit status: OK, HOLD (limit exceeded), COD_ONLY (overdue)
+  - Integrated with M5 fleet for credit hold enforcement at dispatch
+
+#### Phase 3: Tally XML Nightly Export
+- **TallyExportService**: 2 AM daily cron job for accounting bridge
+  - Exports invoices, receipts, credit notes, journal entries to Tally-compatible XML
+  - Tracks exports in `tally_export_batches` and `tally_export_items` tables
+  - Idempotent design: unique constraint prevents duplicate exports of same voucher
+  - XML stored in `tally_export_batches.xml_content` for accountant pickup
+
+#### Phase 4: Cheque Lifecycle State Machine
+- **ChequeService**: Full cheque lifecycle (RECEIVED → DEPOSITED → CLEARED/BOUNCED/RETURNED)
+  - State machine enforces valid transitions with business rule checks
+  - `depositCheque()`: DEPOSITED status, bank slip reference, custody wallet update
+  - `clearCheque()`: CLEARED status, ledger reversal, collector wallet adjustment
+  - `bounceCheque()`: BOUNCED status, AR re-adding, invoice status correction
+  - `returnCheque()`: RETURNED status for pre-deposit returns
+
+#### Phase 5: Credit Note Table Creation
+- **Migration 019**: `credit_notes` table with DRAFT/ISSUED/APPLIED/CANCELLED status lifecycle
+  - Links to customer, order, stop for audit trail
+  - `reason_type` enum: RETURNED, SOLD_QUIETLY, ABNORMAL_DAMAGE, EXPIRY, OTHER
+- **Migration 020**: `credit_note_lines` for line-item granularity
+  - Debited quantity, unit price, line total tracking
+  - Reference to original order line for variance analysis
+
+### Fixed
+- `settleCodStop()` idempotency key: correctly uses `tripId` from outer scope
+- `andWhereIn` → `whereIn` in COD settlement invoice allocation query
+- Notification query: added proper driver/trip join for `trip_id` extraction
+- `Money.isGreaterThan()` → `Money.isLessThan()` + invert logic for credit evaluation
+
+### Tests Passing
+- **M6 Acceptance Tests**: 11/11 tests pass
+- **M5-M6 Integration Tests**: 4/4 tests pass (TC-M6-INT-001 through TC-M6-INT-004)
+- **E2E Tests**: 7/7 tests pass (health endpoint + M3 inventory E2E)
+- **Full test suite**: `npm run lint`, `npm run build`, `npx vitest run` all pass
+
+### Module Status Updated
+- M6 Part 2: ✅ Complete (Accounting bridge & M5 integration)
+- M5 Fleet: ✅ Complete (Full backend with event integration)
+- M2 Procurement: ⏳ Pending
+- M4 Production: ✅ Complete
+
+### Decisions Confirmed
+- **Invoice at dispatch**: `trips.dispatched` event triggers invoice generation (OD-003 implementation)
+- **COD settlement**: Automatic via event-driven architecture (BR-07 complete)
+- **Tally export**: Nightly idempotent XML export with batch tracking
+- **Cheque lifecycle**: State machine with full audit trail and ledger integration

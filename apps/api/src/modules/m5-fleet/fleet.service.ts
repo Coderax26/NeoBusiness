@@ -14,6 +14,7 @@ import { Money } from '../../shared/utils/money.util.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import {
   CREDIT_PORT,
   EXCEPTION_PORT,
@@ -69,8 +70,10 @@ export class FleetService {
     @Inject(INVENTORY_PORT) private readonly inventory: InventoryPort,
     @Inject(LEDGER_PORT) private readonly ledger: LedgerPort,
     @Optional() @Inject(NOTIFY_PORT) private readonly notify?: NotifyPort,
-    @Optional() @Inject(EXCEPTION_PORT)
+    @Optional()
+    @Inject(EXCEPTION_PORT)
     private readonly exception?: ExceptionPort,
+    @Optional() private readonly pdfGenerator?: PdfGeneratorService,
   ) {}
 
   async createVehicle(dto: CreateVehicleDto, userId: string) {
@@ -154,7 +157,9 @@ export class FleetService {
           .returning('id');
 
         if (stop.lines.length === 0) {
-          throw new BadRequestException('Every stop requires at least one line');
+          throw new BadRequestException(
+            'Every stop requires at least one line',
+          );
         }
         await trx('delivery_stop_lines').insert(
           stop.lines.map((line) => ({
@@ -193,19 +198,26 @@ export class FleetService {
     const query = this.knex('delivery_trips').where('site_id', siteId);
     if (status) query.andWhere('status', status);
     if (tripDate) query.andWhere('trip_date', tripDate);
-    return query.orderBy([{ column: 'trip_date', order: 'desc' }, { column: 'trip_no', order: 'desc' }]);
+    return query.orderBy([
+      { column: 'trip_date', order: 'desc' },
+      { column: 'trip_no', order: 'desc' },
+    ]);
   }
 
   async dispatchTrip(tripId: string, lines: DispatchLine[], userId: string) {
     return this.knex.transaction(async (trx) => {
-      const trip = await trx('delivery_trips').where('id', tripId).forUpdate().first();
+      const trip = await trx('delivery_trips')
+        .where('id', tripId)
+        .forUpdate()
+        .first();
       if (!trip) throw new NotFoundException('Trip not found');
       if (trip.status !== 'LOADING') {
         throw new ConflictException(`Trip cannot dispatch from ${trip.status}`);
       }
 
       const stops = await trx('delivery_stops').where('trip_id', tripId);
-      if (stops.length === 0) throw new BadRequestException('Trip has no stops');
+      if (stops.length === 0)
+        throw new BadRequestException('Trip has no stops');
       const orderIds = stops
         .map((stop) => stop.sales_order_id)
         .filter((id): id is string => Boolean(id));
@@ -227,7 +239,9 @@ export class FleetService {
       for (const stop of stops) {
         const stopLines = linesByStop.get(String(stop.id)) ?? [];
         if (stopLines.length === 0) {
-          throw new BadRequestException(`No loading lines supplied for stop ${stop.id}`);
+          throw new BadRequestException(
+            `No loading lines supplied for stop ${stop.id}`,
+          );
         }
         await this.inventory.postDispatch(
           String(stop.id),
@@ -264,14 +278,12 @@ export class FleetService {
           });
       }
 
-      await trx('delivery_trips')
-        .where('id', tripId)
-        .update({
-          status: 'IN_TRANSIT',
-          started_at: Clock.nowUtc(),
-          updated_at: Clock.nowUtc(),
-          updated_by: userId,
-        });
+      await trx('delivery_trips').where('id', tripId).update({
+        status: 'IN_TRANSIT',
+        started_at: Clock.nowUtc(),
+        updated_at: Clock.nowUtc(),
+        updated_by: userId,
+      });
       await this.outbox.raise(
         trx,
         'trip.dispatched',
@@ -311,35 +323,51 @@ export class FleetService {
     }
     this.validateEpod(dto);
 
-    const returnedQty = dto.lines.reduce((sum, line) => sum + line.returnedQty, 0);
-    const deliveredQty = dto.lines.reduce((sum, line) => sum + line.deliveredQty, 0);
+    const returnedQty = dto.lines.reduce(
+      (sum, line) => sum + line.returnedQty,
+      0,
+    );
+    const deliveredQty = dto.lines.reduce(
+      (sum, line) => sum + line.deliveredQty,
+      0,
+    );
     const loadedQty = await this.knex('delivery_stop_lines')
       .where('stop_id', stopId)
       .sum('loaded_qty as total')
       .first();
-    if (deliveredQty + returnedQty > Number(loadedQty?.total ?? 0) + 0.000001) {
-      throw new BadRequestException('Delivered and returned quantities exceed loaded quantity');
+    const totalLoaded = Number(loadedQty?.total ?? 0);
+    if (deliveredQty + returnedQty > totalLoaded + 0.000001) {
+      throw new BadRequestException(
+        'Delivered and returned quantities exceed loaded quantity',
+      );
     }
-    const status = returnedQty > 0 ? 'DELIVERED_PARTIAL' : 'DELIVERED_FULL';
+    // DELIVERED_PARTIAL if not all loaded qty was delivered (some returned or not delivered)
+    const status =
+      deliveredQty < totalLoaded ? 'DELIVERED_PARTIAL' : 'DELIVERED_FULL';
 
     return this.knex.transaction(async (trx) => {
-      const locked = await trx('delivery_stops').where('id', stopId).forUpdate().first();
+      const locked = await trx('delivery_stops')
+        .where('id', stopId)
+        .forUpdate()
+        .first();
       if (!locked || locked.status !== 'PENDING') {
         throw new ConflictException('Stop was finalized by another request');
       }
-      await trx('delivery_stops').where('id', stopId).update({
-        status,
-        epod_method: dto.epodMethod,
-        epod_signature_url: dto.epodSignatureUrl ?? null,
-        epod_photo_url: dto.epodPhotoUrl ?? null,
-        epod_otp_verified: dto.epodOtpVerified ?? false,
-        gps_lat_lng: `(${dto.gpsLat},${dto.gpsLng})`,
-        captured_at: dto.capturedAt,
-        cod_collected_amount: String(dto.codCollectedAmount ?? 0),
-        idempotency_key: idempotencyKey,
-        delivered_at: Clock.nowUtc(),
-        updated_by: userId,
-      });
+      await trx('delivery_stops')
+        .where('id', stopId)
+        .update({
+          status,
+          epod_method: dto.epodMethod,
+          epod_signature_url: dto.epodSignatureUrl ?? null,
+          epod_photo_url: dto.epodPhotoUrl ?? null,
+          epod_otp_verified: dto.epodOtpVerified ?? false,
+          gps_lat_lng: `(${dto.gpsLat},${dto.gpsLng})`,
+          captured_at: dto.capturedAt,
+          cod_collected_amount: String(dto.codCollectedAmount ?? 0),
+          idempotency_key: idempotencyKey,
+          delivered_at: Clock.nowUtc(),
+          updated_by: userId,
+        });
       for (const line of dto.lines) {
         await trx('delivery_stop_lines')
           .where({ stop_id: stopId, item_id: line.itemId })
@@ -388,6 +416,46 @@ export class FleetService {
         },
         'm5',
       );
+
+      // Emit stops.returned event if there are returned items (for credit note generation)
+      if (returnedQty > 0) {
+        const returnedLines = dto.lines.filter((line) => line.returnedQty > 0);
+        // Calculate total value of returned items
+        let totalValue = Money.zero();
+        for (const line of returnedLines) {
+          const orderLine = await trx('sales_order_lines')
+            .where({ order_id: stop.sales_order_id, item_id: line.itemId })
+            .first('quoted_unit_price');
+          if (orderLine) {
+            const lineValue = Money.of(orderLine.quoted_unit_price).mul(
+              line.returnedQty,
+            );
+            totalValue = totalValue.add(lineValue);
+          }
+        }
+
+        await this.outbox.raise(
+          trx,
+          'stops.returned',
+          stopId,
+          {
+            stopId,
+            tripId: String(stop.trip_id),
+            orderId: String(stop.sales_order_id ?? ''),
+            customerId: String(stop.customer_id),
+            returnedLines: returnedLines.map((line) => ({
+              itemId: line.itemId,
+              returnedQty: String(line.returnedQty),
+              batchId: String(line.batchId ?? ''),
+              damaged: line.damaged ?? false,
+              reason: line.returnReason ?? undefined,
+            })),
+            totalValue: totalValue.toStorageString(),
+          },
+          'm5',
+        );
+      }
+
       return this.getTrip(String(stop.trip_id), trx);
     });
   }
@@ -395,14 +463,17 @@ export class FleetService {
   async failStop(stopId: string, dto: FailStopDto, userId: string) {
     const stop = await this.knex('delivery_stops').where('id', stopId).first();
     if (!stop) throw new NotFoundException('Stop not found');
-    if (stop.status !== 'PENDING') throw new ConflictException('Stop is already finalized');
-    await this.knex('delivery_stops').where('id', stopId).update({
-      status: 'FAILED',
-      reason_code: dto.reasonCode,
-      exception_notes: dto.notes ?? null,
-      delivered_at: Clock.nowUtc(),
-      updated_by: userId,
-    });
+    if (stop.status !== 'PENDING')
+      throw new ConflictException('Stop is already finalized');
+    await this.knex('delivery_stops')
+      .where('id', stopId)
+      .update({
+        status: 'FAILED',
+        reason_code: dto.reasonCode,
+        exception_notes: dto.notes ?? null,
+        delivered_at: Clock.nowUtc(),
+        updated_by: userId,
+      });
     await this.outbox.raiseStandalone(
       'delivery.failed',
       stopId,
@@ -420,7 +491,10 @@ export class FleetService {
 
   async closeTrip(tripId: string, userId: string) {
     return this.knex.transaction(async (trx) => {
-      const trip = await trx('delivery_trips').where('id', tripId).forUpdate().first();
+      const trip = await trx('delivery_trips')
+        .where('id', tripId)
+        .forUpdate()
+        .first();
       if (!trip) throw new NotFoundException('Trip not found');
       if (trip.status !== 'IN_TRANSIT') {
         throw new ConflictException(`Trip cannot close from ${trip.status}`);
@@ -436,14 +510,23 @@ export class FleetService {
             .sum('returned_qty as total')
             .first();
           if (Number(returned?.total ?? 0) <= 0) {
-            throw new BadRequestException(`Stop ${stop.id} has no returned quantity`);
+            throw new BadRequestException(
+              `Stop ${stop.id} has no returned quantity`,
+            );
           }
         }
         if (stop.status === 'FAILED' && !stop.reason_code) {
-          throw new BadRequestException(`Stop ${stop.id} requires a reason code`);
+          throw new BadRequestException(
+            `Stop ${stop.id} requires a reason code`,
+          );
         }
-        if (stop.is_cod && Number(stop.cod_collected_amount) < Number(stop.cod_amount)) {
-          throw new BadRequestException(`COD is not fully collected for stop ${stop.id}`);
+        if (
+          stop.is_cod &&
+          Number(stop.cod_collected_amount) < Number(stop.cod_amount)
+        ) {
+          throw new BadRequestException(
+            `COD is not fully collected for stop ${stop.id}`,
+          );
         }
       }
       await trx('delivery_trips').where('id', tripId).update({
@@ -453,7 +536,13 @@ export class FleetService {
         updated_at: Clock.nowUtc(),
         updated_by: userId,
       });
-      await this.outbox.raise(trx, 'trip.closed', tripId, { tripId, siteId: String(trip.site_id) }, 'm5');
+      await this.outbox.raise(
+        trx,
+        'trip.closed',
+        tripId,
+        { tripId, siteId: String(trip.site_id) },
+        'm5',
+      );
       return this.getTrip(tripId, trx);
     });
   }
@@ -491,15 +580,112 @@ export class FleetService {
           stop_id: stopId,
         })
         .returning('*');
+
+      // Generate PDF if pdfGenerator is available
+      if (this.pdfGenerator) {
+        try {
+          const pdfBuffer = await this.generateChallanPdf(
+            tripId,
+            stopId,
+            challanNo,
+          );
+          // Store PDF buffer in attachments table and link to challan
+          // For now, we'll just store it in memory and return the buffer
+          // In production, this would upload to MinIO/S3
+          (challan as any).pdfBuffer = pdfBuffer;
+          (challan as any).pdfGeneratedAt = new Date();
+        } catch (err) {
+          // Log error but don't fail challan creation
+          console.warn(
+            `Failed to generate challan PDF: ${(err as Error).message}`,
+          );
+        }
+      }
+
       return challan;
     });
+  }
+
+  private async generateChallanPdf(
+    tripId: string,
+    stopId: string,
+    challanNo: string,
+  ): Promise<Buffer> {
+    // Fetch all required data for PDF
+    const trip = await this.knex('delivery_trips')
+      .where('id', tripId)
+      .first('*');
+    const stop = await this.knex('delivery_stops')
+      .where({ id: stopId, trip_id: tripId })
+      .first('*');
+    const vehicle = await this.knex('vehicles')
+      .where('id', trip.vehicle_id)
+      .first('registration_no');
+    const driver = await this.knex('users')
+      .where('id', trip.driver_id)
+      .first('full_name');
+    const customer = await this.knex('customers')
+      .where('id', stop.customer_id)
+      .first('*');
+    const site = await this.knex('sites').where('id', trip.site_id).first('*');
+    const lines = await this.knex('delivery_stop_lines')
+      .where('stop_id', stopId)
+      .join('items', 'delivery_stop_lines.item_id', 'items.id')
+      .select(
+        'items.name as itemName',
+        'items.hsn_code',
+        'items.primary_uom as uom',
+        'delivery_stop_lines.loaded_qty',
+        'delivery_stop_lines.batch_id',
+      );
+
+    // Get batch details if available
+    const batchIds = lines.map((l) => l.batch_id).filter(Boolean);
+    let batchDetails = new Map();
+    if (batchIds.length > 0) {
+      const batches = await this.knex('inventory_batches')
+        .whereIn('id', batchIds)
+        .select('id', 'batch_no', 'expiry_date');
+      batchDetails = new Map(batches.map((b) => [b.id, b]));
+    }
+
+    const challanData = {
+      challanNo,
+      challanDate: new Date().toISOString().split('T')[0],
+      tripNo: trip.trip_no,
+      tripDate: trip.trip_date,
+      vehicleNo: vehicle?.registration_no || 'N/A',
+      driverName: driver?.full_name || 'N/A',
+      customerName: customer?.business_name || customer?.customer_code || 'N/A',
+      customerAddress: customer?.billing_address || 'N/A',
+      customerGstin: customer?.gstin || 'N/A',
+      customerStateCode: customer?.state_code || 'N/A',
+      siteName: site?.name || 'N/A',
+      siteAddress: site?.address || 'N/A',
+      siteGstin: site?.gstin || 'N/A',
+      siteStateCode: site?.state_code || 'N/A',
+      lines: lines.map((line) => ({
+        itemName: line.itemName,
+        hsnCode: line.hsn_code || 'N/A',
+        uom: line.uom,
+        loadedQty: line.loaded_qty,
+        batchNo: batchDetails.get(line.batch_id)?.batch_no,
+        expiryDate: batchDetails.get(line.batch_id)?.expiry_date,
+      })),
+    };
+
+    return this.pdfGenerator!.generateChallan(challanData);
   }
 
   async createIssue(tripId: string, dto: CreateIssueDto, userId: string) {
     const trip = await this.knex('delivery_trips').where('id', tripId).first();
     if (!trip) throw new NotFoundException('Trip not found');
     const threshold =
-      (await this.config.getNumber('owner_escalation_value_inr', 'SITE', String(trip.site_id))) ??
+      (await this.config.getNumber(
+        'owner_escalation_value_inr',
+        'SITE',
+        String(trip.site_id),
+      )) ??
       (await this.config.getNumber('owner_escalation_value_inr')) ??
       5000;
     const shouldEscalate =
@@ -521,7 +707,12 @@ export class FleetService {
     await this.outbox.raiseStandalone(
       shouldEscalate ? 'issue.escalated' : 'issue.reported',
       String(issue.id),
-      { issueId: String(issue.id), tripId, category: dto.category, valueAtRisk: String(dto.valueAtRisk ?? 0) },
+      {
+        issueId: String(issue.id),
+        tripId,
+        category: dto.category,
+        valueAtRisk: String(dto.valueAtRisk ?? 0),
+      },
       'm5',
     );
     if (shouldEscalate && this.exception) {
@@ -533,18 +724,28 @@ export class FleetService {
         {
           title: 'Delivery dispute escalation',
           summary: dto.category,
-          facts: [{ label: 'Value at risk', value: String(dto.valueAtRisk ?? 0) }],
+          facts: [
+            { label: 'Value at risk', value: String(dto.valueAtRisk ?? 0) },
+          ],
           impact: 'Delivery outcome requires owner review',
-          actions: [{ code: 'APPROVED', label: 'Approve' }, { code: 'REJECTED', label: 'Reject' }],
+          actions: [
+            { code: 'APPROVED', label: 'Approve' },
+            { code: 'REJECTED', label: 'Reject' },
+          ],
           valueAtRisk: String(dto.valueAtRisk ?? 0),
         },
         String(trip.site_id),
       );
     } else {
-      await this.notify?.send('IN_APP', 'DELIVERY_ISSUE_REPORTED', String(trip.site_id), {
-        issueId: String(issue.id),
-        tripId,
-      });
+      await this.notify?.send(
+        'IN_APP',
+        'DELIVERY_ISSUE_REPORTED',
+        String(trip.site_id),
+        {
+          issueId: String(issue.id),
+          tripId,
+        },
+      );
     }
     return issue;
   }
@@ -555,13 +756,20 @@ export class FleetService {
     const status = dto.escalate ? 'ESCALATED' : 'RESOLVED';
     const [updated] = await this.knex('issue_reports')
       .where('id', issueId)
-      .update({ status, resolved_by: userId, resolution_note: dto.resolutionNote, updated_at: Clock.nowUtc() })
+      .update({
+        status,
+        resolved_by: userId,
+        resolution_note: dto.resolutionNote,
+        updated_at: Clock.nowUtc(),
+      })
       .returning('*');
     return updated;
   }
 
   async createExpense(tripId: string, dto: CreateExpenseDto, userId: string) {
-    const trip = await this.knex('delivery_trips').where('id', tripId).first('site_id');
+    const trip = await this.knex('delivery_trips')
+      .where('id', tripId)
+      .first('site_id');
     if (!trip) throw new NotFoundException('Trip not found');
     const [expense] = await this.knex('trip_expenses')
       .insert({
@@ -587,9 +795,16 @@ export class FleetService {
       throw new BadRequestException('OTP must be verified');
     }
     if (!Clock.isTimestampAcceptable(dto.capturedAt)) {
-      throw new BadRequestException('Captured timestamp is outside the allowed clock skew');
+      throw new BadRequestException(
+        'Captured timestamp is outside the allowed clock skew',
+      );
     }
-    if (dto.gpsLat < -90 || dto.gpsLat > 90 || dto.gpsLng < -180 || dto.gpsLng > 180) {
+    if (
+      dto.gpsLat < -90 ||
+      dto.gpsLat > 90 ||
+      dto.gpsLng < -180 ||
+      dto.gpsLng > 180
+    ) {
       throw new BadRequestException('GPS coordinates are invalid');
     }
   }

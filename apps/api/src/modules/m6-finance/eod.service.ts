@@ -10,6 +10,7 @@ import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { LedgerService } from './ledger.service.js';
+import { Clock } from '../../shared/utils/clock.util.js';
 import {
   NOTIFY_PORT,
   EXCEPTION_PORT,
@@ -200,16 +201,18 @@ export class EodService {
     const eod = await this.knex('eod_closings').where('id', eodId).first('*');
     if (!eod) throw new NotFoundException(`EOD ${eodId} not found`);
 
-    // Date in DB is DATE type, avoid timezone issues by using the raw date string
-    const dateStr =
-      eod.date instanceof Date
-        ? eod.date.toISOString().split('T')[0]
-        : String(eod.date).split('T')[0];
+    // Date in DB is a PostgreSQL DATE column. Read it as the local (IST) business
+    // date — never derive it from a UTC timestamp, or the day shifts at the
+    // UTC→IST boundary (e.g. IST midnight Oct 31 → UTC Oct 30).
+    const dateStr = Clock.toKolkata(eod.date).toISODate();
 
-    console.log(
+    this.logger.debug(
       `[EOD Debug] getChecklist for eodId=${eodId}, site=${eod.site_id}, date=${dateStr}`,
     );
 
+    if (!eod.site_id || !dateStr) {
+      throw new Error('EOD closing is missing site or business date');
+    }
     const checks = await this.runChecks(eod.site_id, dateStr);
 
     return {
@@ -250,17 +253,18 @@ export class EodService {
         throw new BadRequestException('Already signed off');
 
       // Re-run checks to ensure still valid
-      // The eod.date from PostgreSQL DATE column comes as a Date at local midnight
-      // Use toLocaleDateString to get the correct local date (YYYY-MM-DD)
-      const correctDateStr =
-        eod.date instanceof Date
-          ? eod.date.toLocaleDateString('en-CA') // Returns YYYY-MM-DD in local timezone
-          : String(eod.date).substring(0, 10);
+      // Date in DB is a PostgreSQL DATE column. Read it as the local (IST) business
+      // date — never derive it from a UTC timestamp, or the day shifts at the
+      // UTC→IST boundary (e.g. IST midnight Oct 31 → UTC Oct 30).
+      const correctDateStr = Clock.toKolkata(eod.date).toISODate();
 
       this.logger.log(
         `[EOD Debug signOff] eodId=${eodId}, site=${eod.site_id}, rawDate=${eod.date}, correctDate=${correctDateStr}`,
       );
 
+      if (!eod.site_id || !correctDateStr) {
+        throw new Error('EOD closing is missing site or business date');
+      }
       const checks = await this.runChecks(eod.site_id, correctDateStr);
       this.logger.log(`[EOD Debug signOff] checks: ${JSON.stringify(checks)}`);
       if (!checks.trips.passed)

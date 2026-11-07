@@ -153,11 +153,30 @@ describe('PricingService.evaluateLine()', () => {
 });
 ```
 
-### Test database
-E2E tests use a separate test database. Do not run e2e tests against the dev database. The test database is created and migrated fresh for each test run.
+### Test Database & Environment Separation
+
+Automated tests (unit, integration, and e2e specs) use a dedicated test database (`neobus_test`) separate from the development database (`neobus_dev`).
+
+- **Why separate databases?**
+  - **Isolation from Destructive Operations:** Test fixtures run `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` and `del()` hooks. Running these against `neobus_dev` destroys manual testing data, seed catalogs, and active orders.
+  - **Concurrency & Flakiness:** Vitest workers run tests in parallel. Running tests against a dirty or shared dev database causes unique key collisions, foreign key violations, and deadlocks.
+  - **Clean Schema Validation:** The test database verifies that all migrations apply cleanly without schema drift.
+
+- **Automatic Environment Configuration (`.env.test`)**:
+  - `apps/api/.env.test` configures `DATABASE_URL` pointing to `postgresql://neobus:neobus_dev_secret@localhost:5432/neobus_test`.
+  - Vitest automatically loads `.env.test` via `vitest.setup.ts` and sets `NODE_ENV=test`.
+  - **Safety Rail Guard:** `assertTestDatabase(knex)` verifies `current_database()` ends with `_test`. If tests are pointed to `neobus_dev` or production, execution immediately aborts before any table truncation or deletion can happen.
+
+- **Migrations Single Source of Truth**:
+  - All SQL migrations reside in the canonical monorepo root directory `db/migrations/`.
+  - `MigrationService` uses dynamic path resolution and PostgreSQL advisory locks (`pg_advisory_lock`) to coordinate parallel migration runs across workers.
 
 ```bash
-DATABASE_URL=postgresql://neobus:secret@localhost:5432/neobus_test npm run test:e2e
+# Run tests (automatically targets neobus_test via .env.test)
+cd apps/api && npm test
+
+# Run e2e tests
+npm run test:e2e
 ```
 
 ---

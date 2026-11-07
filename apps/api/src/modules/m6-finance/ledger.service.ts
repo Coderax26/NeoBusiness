@@ -365,9 +365,60 @@ export class LedgerService implements LedgerPort {
     );
   }
 
-  async postCreditNote(_creditNoteId: string): Promise<void> {
-    // Implemented in CreditNoteService (Sprint 2)
-    throw new Error('postCreditNote not implemented yet — Sprint 2');
+  async postCreditNote(creditNoteId: string): Promise<void> {
+    return this.knex.transaction(async (trx) => {
+      const creditNote = await trx('credit_notes')
+        .where('id', creditNoteId)
+        .first('*');
+
+      if (!creditNote) {
+        this.logger.warn(
+          `Credit note ${creditNoteId} not found for ledger posting`,
+        );
+        return;
+      }
+
+      // Only post if status is ISSUED or APPROVED (not DRAFT, REJECTED, CANCELLED)
+      if (!['ISSUED', 'APPROVED'].includes(creditNote.status)) {
+        this.logger.debug(
+          `Credit note ${creditNoteId} not in ISSUED/APPROVED status, skipping ledger post`,
+        );
+        return;
+      }
+
+      const totalDebit = Money.of(creditNote.total_debit);
+      const customerId = String(creditNote.customer_id);
+      const siteId = String(creditNote.site_id);
+
+      // Get previous customer balance
+      const prevBalance = await this.getCustomerBalance(customerId, trx);
+      // Credit note reduces AR (credit to customer ledger)
+      const newBalance = prevBalance.sub(totalDebit);
+
+      // Post to customer_ledger_entries as ADJUSTMENT with CREDIT
+      await trx('customer_ledger_entries').insert({
+        site_id: siteId,
+        customer_id: customerId,
+        entry_type: 'ADJUSTMENT',
+        credit: totalDebit.toStorageString(),
+        ref_id: creditNoteId,
+        ref_no: creditNote.credit_note_no,
+        running_balance: newBalance.toStorageString(),
+        note: `Credit note ${creditNote.credit_note_no} (${creditNote.reason_type})`,
+      });
+
+      // Update customer cached balance
+      await trx('customers').where('id', customerId).update({
+        current_ar_balance: newBalance.toStorageString(),
+      });
+
+      // If credit note is linked to an order, we may want to update invoice allocation
+      // But for returned goods, we typically just reduce AR without specific invoice allocation
+
+      this.logger.log(
+        `Credit note ${creditNote.credit_note_no} posted to ledger: ${totalDebit.toStorageString()} credit for customer ${customerId}`,
+      );
+    });
   }
 
   /**

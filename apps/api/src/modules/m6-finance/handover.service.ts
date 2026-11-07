@@ -49,10 +49,11 @@ export class HandoverService {
     breakdown: Array<{ type: string; amount: string }>;
   }> {
     // Get custody ledger entries that are not yet handed over
+    // Include all positive entry types: COLLECTION, REVERSAL (and any future positive types)
     const entries = await this.knex('custody_ledger')
       .where('user_id', userId)
       .andWhere('site_id', siteId)
-      .andWhere('entry_type', 'COLLECTION')
+      .whereIn('entry_type', ['COLLECTION', 'REVERSAL'])
       .select('*');
 
     // Also get handovers already done to net out
@@ -362,16 +363,43 @@ export class HandoverService {
           handover.handed_by_user_id,
           trx,
         );
+        this.logger.log(
+          `resolveDispute: prevCustody=${prevCustody.toStorageString()}, finalAmount=${finalAmount.toStorageString()}`,
+        );
         const newCustody = Money.zero();
 
-        await trx('custody_ledger').insert({
-          user_id: handover.handed_by_user_id,
-          site_id: handover.site_id,
-          entry_type: 'HANDOVER',
-          amount_delta: prevCustody.mul(-1).toStorageString(), // Subtract entire wallet
-          handover_id: cmd.handoverId,
-          running_balance: newCustody.toStorageString(),
-        });
+        // Get the latest posted_at to ensure our entry sorts after existing ones
+        const latestEntry = await trx('custody_ledger')
+          .where('user_id', handover.handed_by_user_id)
+          .orderBy('posted_at', 'desc')
+          .first('posted_at');
+        const postedAt = latestEntry
+          ? new Date(latestEntry.posted_at.getTime() + 1)
+          : new Date();
+
+        const [inserted] = await trx('custody_ledger')
+          .insert({
+            user_id: handover.handed_by_user_id,
+            site_id: handover.site_id,
+            entry_type: 'HANDOVER',
+            amount_delta: prevCustody.mul(-1).toStorageString(),
+            handover_id: cmd.handoverId,
+            running_balance: newCustody.toStorageString(),
+            posted_at: postedAt,
+          })
+          .returning('*');
+        this.logger.log(
+          `resolveDispute: HANDOVER entry inserted id=${inserted.id}, posted_at=${inserted.posted_at}, running_balance=${inserted.running_balance}`,
+        );
+
+        // Verify the balance was updated
+        const verifyBalance = await this.ledger.getCustodyBalance(
+          handover.handed_by_user_id,
+          trx,
+        );
+        this.logger.log(
+          `resolveDispute: verified balance after insert = ${verifyBalance.toStorageString()}`,
+        );
 
         // Post cashbook_entries HANDOVER_IN (+finalAmount) — site cashbook increases by what was counted
         await trx('cashbook_entries').insert({
@@ -409,6 +437,7 @@ export class HandoverService {
           amount_delta: diff.toStorageString(),
           handover_id: cmd.handoverId,
           running_balance: newCustody.toStorageString(),
+          posted_at: new Date(),
         });
 
         await trx('users').where('id', handover.handed_by_user_id).update({

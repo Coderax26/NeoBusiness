@@ -1,4 +1,5 @@
 import { Module, Global, Inject, Logger } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { KnexModule } from 'nestjs-knex';
 import { InvoiceService } from './invoice.service.js';
 import { CollectionService } from './collection.service.js';
@@ -7,9 +8,24 @@ import { HandoverService } from './handover.service.js';
 import { PTPService } from './ptp.service.js';
 import { EodService } from './eod.service.js';
 import { WorklistService } from './worklist.service.js';
+import { CreditNoteService } from './credit-note.service.js';
+import {
+  CreditPortService,
+  CreditPortProvider,
+} from './credit-port.service.js';
+import {
+  CodSettlementService,
+  CodSettlementProvider,
+} from './cod-settlement.service.js';
+import {
+  TallyExportService,
+  TallyExportProvider,
+} from './tally-export.service.js';
+import { ChequeService, ChequeProvider } from './cheque.service.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import {
   LEDGER_PORT,
+  CREDIT_PORT,
   EXCEPTION_PORT,
 } from '../../shared/ports/ports.interface.js';
 import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
@@ -18,7 +34,7 @@ import type { Knex } from 'knex';
 
 @Global()
 @Module({
-  imports: [KnexModule],
+  imports: [ScheduleModule.forRoot(), KnexModule],
   providers: [
     InvoiceService,
     CollectionService,
@@ -27,12 +43,21 @@ import type { Knex } from 'knex';
     PTPService,
     EodService,
     WorklistService,
+    CreditNoteService,
+    CreditPortService,
+    CodSettlementService,
+    TallyExportService,
+    ChequeService,
     DocNumberService,
     {
       provide: LEDGER_PORT,
       useFactory: (ledger: LedgerService) => ledger,
       inject: [LedgerService],
     },
+    CreditPortProvider,
+    CodSettlementProvider,
+    TallyExportProvider,
+    ChequeProvider,
   ],
   exports: [
     InvoiceService,
@@ -42,7 +67,13 @@ import type { Knex } from 'knex';
     PTPService,
     EodService,
     WorklistService,
+    CreditNoteService,
+    CreditPortService,
+    CodSettlementService,
+    TallyExportService,
+    ChequeService,
     LEDGER_PORT,
+    CREDIT_PORT,
   ],
 })
 export class M6FinancialsModule {
