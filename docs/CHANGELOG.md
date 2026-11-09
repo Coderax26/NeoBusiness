@@ -308,11 +308,43 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 ### Module Status Updated
 - M6 Part 2: ✅ Complete (Accounting bridge & M5 integration)
 - M5 Fleet: ✅ Complete (Full backend with event integration)
-- M2 Procurement: ⏳ Pending
 - M4 Production: ✅ Complete
+- M2 Procurement: ✅ Complete (all acceptance criteria verified)
 
 ### Decisions Confirmed
 - **Invoice at dispatch**: `trips.dispatched` event triggers invoice generation (OD-003 implementation)
 - **COD settlement**: Automatic via event-driven architecture (BR-07 complete)
 - **Tally export**: Nightly idempotent XML export with batch tracking
 - **Cheque lifecycle**: State machine with full audit trail and ledger integration
+
+---
+
+## [0.5.1] — 2026-11-09 — M2 Procurement Complete
+
+### Added
+- **Supplier Service**: Full CRUD operations, rate quote tracking with volatility history, approved supplier lookup by item
+- **PO Service**: Complete order lifecycle (DRAFT → CONFIRMED → PENDING_APPROVAL → ISSUED), BR-03 price spike detection with 2% threshold, `createBackToBack()` for sales order fulfillment
+- **GRN Service**: Blind goods receipt (storekeeper view only), BR-05 shortfall detection (received < confirmed × 0.98), SUPPLIER_SHORTFALL exception raising with automatic approval delegation
+- **Shortfall Service**: Backup supplier ranking by price tolerance → reliability → lead time, `autoResolveShortfalls()` for automated coverage, `createBackupPO()` for deficit compensation
+- **Requisition Service**: Production/sales order-driven requisitions, `getGroupedBySupplier()` for PO consolidation, source-linked status tracking
+- **Back-to-Back Service**: One-click PO creation from sales order, spread calculation (sales - purchase), `suggestBestSupplier()` for margin optimization
+- **Migration 021**: 11 tables (suppliers, supplier_items, supplier_rate_quotes, rate_contracts, purchase_requisitions, purchase_orders, purchase_order_lines, goods_receipts, goods_receipt_lines, po_shortfalls, supplier_bills) with idempotent RLS policies
+- **26 Acceptance Tests**: Full coverage of BR-03 (price spike), BR-05 (shortfall/allocation), BR-08 (trip closure) across all scenarios A-E
+- **Port Wiring**: InventoryPort, ProcurementPort, ProductionPort with real implementations replacing stubs
+
+### Fixed
+- FK constraint violations in test cleanup: replaced selective deletes with TRUNCATE CASCADE at test start
+- Method naming: `RequisitionService.create()` (was `createRequisition`)
+- Database inserts missing required fields: added `created_by`/`updated_by` to all manual inserts
+- Test data isolation: proper cleanup order for supplier_items → items references
+- AC4 test: added actual GRN creation to trigger shortfall detection
+- AC6 test: corrected PO confirmation before GRN to match real workflow
+
+### Module Status Updated
+- M2 Procurement: ✅ Complete (all acceptance criteria verified)
+- Next: M7b Dashboards (analytics) per IMPLEMENTATION_ROADMAP.md
+
+### Decisions Confirmed
+- **OD-001**: 10% gross margin default, overridable per item category
+- **OD-003**: Invoice generation timing confirmed (dispatch event triggers)
+- **OD-019**: Delegated approval with escalation (silent auto-approval never permitted)

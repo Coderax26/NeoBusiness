@@ -114,13 +114,13 @@ NeoBusinessSolution/
 | M7a — Exception Engine | ✅ Complete | Exception approvals (12 types, delegation + escalation) + notification hub |
 | M1 — Commercial & CRM | ✅ Complete | Customers, items, pricing (BR-01), credit (BR-02), quotes, orders. Scenario A verified |
 | M6 — Finance & Collections | ✅ Complete (part 2) | Invoices (BR-03), collections + custody (BR-07), ledger, handover, PTP, EOD, worklist, credit notes, COD settlement, Tally export, cheque lifecycle. Scenario E verified |
-| M2 — Procurement | ⏳ Pending | POs, GRN, shortfall |
+| M2 — Procurement | ✅ Complete | Suppliers, POs, GRN, shortfall, requisitions, price tracking, back-to-back, 26 acceptance tests passing |
 | M3 — Inventory | ✅ Complete (backend) | Unified transactional ledger/cache posting, append-only reversals, ATP/FEFO/reservations, GRN, transfers, adjustments, expiry/drift/stale jobs, typed event adapters, DTO/API surfaces, RLS-ready HTTP fixtures, and service/acceptance/e2e/concurrency coverage are implemented and passing. M5 vehicle-location behavior and frontend screens remain deferred to their owning modules. |
 | M4 — Production | ✅ Complete | BOM, work orders, yield, wastage, attendance |
 | M5 — Fleet & Delivery | ✅ Complete | Full backend with event integration (trips.dispatched/closed), COD settlement, credit notes, ePOD, BR-08 closure |
 | M7b — Dashboards | ⏳ Pending | Analytics |
 
-**Next module:** M2 Procurement — per `docs/IMPLEMENTATION_ROADMAP.md`
+**Next module:** M7b Dashboards — per `docs/IMPLEMENTATION_ROADMAP.md`
 
 **Known follow-up:** M1's `CreditService` BR-02 overdue check was wired to M6's ledger in v0.5.0.
 
@@ -135,6 +135,7 @@ NeoBusinessSolution/
 | M3 | 009 (`20261027_008_m3_inventory_baseline.sql` — `inventory_batches`, `stock_ledger_txns`, `stock_reservations`, `stock_transfers`, `stock_transfer_lines`, `stock_adjustments`) |
 | M4 | 018 |
 | M5 | 014–015, 017, 019 (includes `delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_command_queue`) |
+| M2 | 021 (`20261107_021_m2_procurement_baseline.sql` — `suppliers`, `supplier_items`, `supplier_rate_quotes`, `rate_contracts`, `purchase_requisitions`, `purchase_orders`, `purchase_order_lines`, `goods_receipts`, `goods_receipt_lines`, `po_shortfalls`, `supplier_bills`) |
 
 Always list `db/migrations/` to find the latest sequence number before creating a new migration.
 

@@ -8,6 +8,7 @@ import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module
 import { M6FinancialsModule } from './modules/m6-finance/m6-financials.module.js';
 import { M3InventoryModule } from './modules/m3-inventory/m3-inventory.module.js';
 import { M5FleetModule } from './modules/m5-fleet/m5-fleet.module.js';
+import { M2ProcurementModule } from './modules/m2-procurement/m2-procurement.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -58,7 +59,7 @@ import { M5FleetModule } from './modules/m5-fleet/m5-fleet.module.js';
     // M4ProductionModule,
 
     // Sprint 3: M2 Procurement and Supplier
-    // M2ProcurementModule,
+    M2ProcurementModule,
 
     // Sprint 3: M7b Dashboards and Analytics
     // M7bAnalyticsModule,
