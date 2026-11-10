@@ -118,9 +118,9 @@ NeoBusinessSolution/
 | M3 — Inventory | ✅ Complete (backend) | Unified transactional ledger/cache posting, append-only reversals, ATP/FEFO/reservations, GRN, transfers, adjustments, expiry/drift/stale jobs, typed event adapters, DTO/API surfaces, RLS-ready HTTP fixtures, and service/acceptance/e2e/concurrency coverage are implemented and passing. M5 vehicle-location behavior and frontend screens remain deferred to their owning modules. |
 | M4 — Production | ✅ Complete | BOM, work orders, yield, wastage, attendance |
 | M5 — Fleet & Delivery | ✅ Complete | Full backend with event integration (trips.dispatched/closed), COD settlement, credit notes, ePOD, BR-08 closure |
-| M7b — Dashboards | ⏳ Pending | Analytics |
+| M7b — Dashboards | ✅ Complete (part 3) | Pulse, Status Matrix, EOD, KPIs, Analytics (40 acceptance tests, materialized views) |
 
-**Next module:** M7b Dashboards — per `docs/IMPLEMENTATION_ROADMAP.md`
+**Next module:** M2 Procurement — per `docs/IMPLEMENTATION_ROADMAP.md` Sprint 3
 
 **Known follow-up:** M1's `CreditService` BR-02 overdue check was wired to M6's ledger in v0.5.0.
 
@@ -136,6 +136,7 @@ NeoBusinessSolution/
 | M4 | 018 |
 | M5 | 014–015, 017, 019 (includes `delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_command_queue`) |
 | M2 | 021 (`20261107_021_m2_procurement_baseline.sql` — `suppliers`, `supplier_items`, `supplier_rate_quotes`, `rate_contracts`, `purchase_requisitions`, `purchase_orders`, `purchase_order_lines`, `goods_receipts`, `goods_receipt_lines`, `po_shortfalls`, `supplier_bills`) |
+| M7b | 022, 023, 024 (materialized views, dashboard permissions, AR aging fix) |
 
 Always list `db/migrations/` to find the latest sequence number before creating a new migration.
 

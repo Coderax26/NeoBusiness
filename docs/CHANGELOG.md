@@ -348,3 +348,56 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - **OD-001**: 10% gross margin default, overridable per item category
 - **OD-003**: Invoice generation timing confirmed (dispatch event triggers)
 - **OD-019**: Delegated approval with escalation (silent auto-approval never permitted)
+
+---
+
+## [0.5.2] — 2026-11-10 — M7b Dashboards & Analytics Complete
+
+### Added
+
+#### Materialized Views (7 views, refreshed via Outbox pattern)
+- **mv_pulse_today**: Owner Pulse Header with todays_sales, gross_margin_pct, cash_collected_today, pending_exceptions
+- **mv_ops_status**: Operational Status Matrix (orders_pending_dispatch, batches_running, trucks_on_road, supplier_shortfalls)
+- **mv_inventory_alerts**: Stock alerts filtered by site (LOW_STOCK, EXPIRING_SOON, OUT_OF_STOCK, OVERCOMMITTED)
+- **mv_customer_profitability**: Customer ranking by revenue, gross profit, margin %
+- **mv_supplier_scorecard**: Supplier performance (fill rate, avg price variance %)
+- **mv_yield_trend**: Weekly production yield % and wastage %
+- **mv_ar_aging**: AR aging buckets (0-7, 8-15, 16-30, 30+ days overdue)
+
+#### Dashboard Endpoints (4 REST endpoints)
+- `GET /dashboard/pulse` — Owner dashboard (financial data, exception count)
+- `GET /dashboard/status-matrix` — Operations status (non-financial, shared with coordinators)
+- `GET /dashboard/eod?date=YYYY-MM-DD` — EOD reconciliation view (wallets, handovers, deposit slip, sign-off)
+- `GET /dashboard/kpis?date=YYYY-MM-DD` — KPI metrics (call volume, EOD time, missed entries, margin erosion, ePOD visibility)
+
+#### Analytics Endpoints (4 REST endpoints)
+- `GET /analytics/customers?from=DATE&to=DATE` — Customer profitability ranking
+- `GET /analytics/suppliers?from=DATE&to=DATE` — Supplier fill rate & price variance
+- `GET /analytics/yield-trend?from=DATE&to=DATE` — Factory yield & wastage trends
+- `GET /analytics/ar-aging` — AR aging bucket aggregation
+
+#### Infrastructure
+- **M7bDashboardsModule**: Global NestJS module with cross-module port exports (DashboardPort, AnalyticsPort)
+- **DashboardEventHandler**: Event-driven MV refresh (registers handlers for exception resolutions, domain events from M1-M6)
+- **MvRefreshJob**: Scheduled refresh jobs (pulse 30-60s, analytics nightly)
+- **Role permissions seeding**: 21 new permissions for dashboard/analytics access
+- **AR Aging bucket fix**: Separate migration (024) correcting inverted bucket logic
+
+### Tests Passing
+- **M7b Acceptance Tests**: 40/40 tests pass
+  - AC1: Pulse Header (4 tests)
+  - AC2: Operational Status Matrix (4 tests)
+  - AC3: Customer Profitability (3 tests)
+  - AC4: Supplier Scorecard (2 tests)
+  - AC5: Yield Trend (2 tests)
+  - AC6: AR Aging with corrected bucket logic (2 tests)
+  - AC7: Stock Alerts (3 tests)
+  - AC8: EOD Dashboard (1 test)
+  - AC9: Permissions & RLS (3 tests)
+  - AC10: KPI Queries (6 tests)
+  - Integration Tests: Scenarios A, B, C (3 tests)
+  - MV Structure Tests: 7 tests verifying materialized view schemas
+
+### Module Status Updated
+- M7b Dashboards: ✅ Complete (Backend with 40 acceptance tests, materialized views, event-driven refresh)
+- Next: M2 Procurement final polish and frontend screens
