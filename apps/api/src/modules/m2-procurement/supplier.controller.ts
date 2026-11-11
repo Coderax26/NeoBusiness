@@ -1,9 +1,31 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { SupplierService } from './supplier.service.js';
-import { CreateSupplierDto, UpdateSupplierDto, LinkSupplierItemDto, AddRateQuoteDto } from './dto/supplier.dto.js';
+import {
+  CreateSupplierDto,
+  UpdateSupplierDto,
+  LinkSupplierItemDto,
+  AddRateQuoteDto,
+} from './dto/supplier.dto.js';
 
 @ApiTags('Procurement - Suppliers')
 @ApiBearerAuth()
@@ -16,7 +38,10 @@ export class SupplierController {
   @RequirePermission('supplier.create')
   @ApiOperation({ summary: 'Create a new supplier' })
   @ApiResponse({ status: 201, description: 'Supplier created' })
-  async create(@Body() dto: CreateSupplierDto, @Query('userId') userId: string) {
+  async create(
+    @Body() dto: CreateSupplierDto,
+    @Query('userId') userId: string,
+  ) {
     return this.supplierService.create({ ...dto, userId });
   }
 
@@ -53,7 +78,11 @@ export class SupplierController {
   @RequirePermission('supplier.update')
   @ApiOperation({ summary: 'Update supplier' })
   @ApiResponse({ status: 200, description: 'Supplier updated' })
-  async update(@Param('id') id: string, @Body() dto: UpdateSupplierDto, @Query('userId') userId: string) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateSupplierDto,
+    @Query('userId') userId: string,
+  ) {
     return this.supplierService.update(id, { ...dto, userId });
   }
 
@@ -67,7 +96,10 @@ export class SupplierController {
     @Body() dto: LinkSupplierItemDto,
     @Query('userId') userId: string,
   ) {
-    return this.supplierService.linkItem(supplierId, itemId, { ...dto, userId });
+    return this.supplierService.linkItem(supplierId, itemId, {
+      ...dto,
+      userId,
+    });
   }
 
   @Get(':id/items')
@@ -114,7 +146,10 @@ export class SupplierController {
   @RequirePermission('supplier.read')
   @ApiOperation({ summary: 'Get latest rate for supplier-item' })
   @ApiResponse({ status: 200, description: 'Latest rate' })
-  async getLatestRate(@Param('id') supplierId: string, @Param('itemId') itemId: string) {
+  async getLatestRate(
+    @Param('id') supplierId: string,
+    @Param('itemId') itemId: string,
+  ) {
     return this.supplierService.getLatestRate(supplierId, itemId);
   }
 
@@ -130,7 +165,10 @@ export class SupplierController {
   @RequirePermission('supplier.update')
   @ApiOperation({ summary: 'Update supplier reliability score' })
   @ApiResponse({ status: 200, description: 'Reliability score updated' })
-  async updateReliabilityScore(@Param('id') supplierId: string, @Query('userId') userId: string) {
+  async updateReliabilityScore(
+    @Param('id') supplierId: string,
+    @Query('userId') userId: string,
+  ) {
     return this.supplierService.updateReliabilityScore(supplierId, userId);
   }
 
@@ -142,6 +180,9 @@ export class SupplierController {
     @Query('itemCategory') itemCategory?: string,
     @Query('daysThreshold') daysThreshold?: number,
   ) {
-    return this.supplierService.getSuppliersMissingRates(itemCategory, daysThreshold);
+    return this.supplierService.getSuppliersMissingRates(
+      itemCategory,
+      daysThreshold,
+    );
   }
 }

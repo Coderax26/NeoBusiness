@@ -1,4 +1,15 @@
-import { IsString, IsOptional, IsUUID, IsNumber, IsBoolean, IsEnum, IsInt, Min, Max, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsUUID,
+  IsNumber,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsUrl,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -189,7 +200,14 @@ export class CreateCustomerContactDto {
   @IsString()
   phone: string;
 
-  @IsEnum(['ACCOUNT_MANAGER', 'TAX_OFFICER', 'PURCHASING', 'PROCUREMENT', 'FINANCE', 'OTHER'])
+  @IsEnum([
+    'ACCOUNT_MANAGER',
+    'TAX_OFFICER',
+    'PURCHASING',
+    'PROCUREMENT',
+    'FINANCE',
+    'OTHER',
+  ])
   role: string;
 
   @IsOptional()

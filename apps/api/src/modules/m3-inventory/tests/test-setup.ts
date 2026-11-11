@@ -1,5 +1,6 @@
 import { createKnex } from '../../../shared/database/knex-instance.js';
 import { assertTestDatabase } from '../../../shared/database/test-db-guard.js';
+import { withTestIsolation } from '../../../shared/database/test-isolation.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -11,6 +12,10 @@ import { v4 as uuidv4 } from 'uuid';
  * 4. Seeds test items and inventory batches for testing.
  * 5. Returns the `knex` instance and mode-specific ids for use in tests.
  *
+ * IMPORTANT: Uses advisory lock (withTestIsolation) to prevent deadlocks when
+ * running tests in parallel. All TRUNCATE and INSERT operations must be
+ * wrapped in the lock.
+ *
  * Module: m3-inventory (Inventory and Warehouse)
  * Test files: m3-inventory.service.spec.ts, m3-inventory.e2e-spec.ts
  */
@@ -20,6 +25,7 @@ export async function setupTestDB() {
 
   // -------------------------------------------------
   // 1. Run all migrations to ensure production schema
+  // Uses MigrationService's built-in advisory lock internally.
   // -------------------------------------------------
   const { MigrationService } =
     await import('../../../modules/m0-platform/migration.service.js');
@@ -27,9 +33,9 @@ export async function setupTestDB() {
   await migrationService.runMigrations();
 
   // -------------------------------------------------
-  // 2. Truncate M3-specific tables only (CASCADE clears data + dependents)
-  // Do NOT truncate shared tables (users, sites, approval_policies, etc.)
-  // as they're managed by other test suites and cause deadlocks when run in parallel.
+  // 2. Truncate M3-specific tables within advisory lock
+  // TRUNCATE is atomic but can cause deadlocks with concurrent workers.
+  // The advisory lock ensures only one worker performs destructive operations.
   // -------------------------------------------------
   const m3TablesToTruncate = [
     'stock_adjustments',
@@ -52,9 +58,11 @@ export async function setupTestDB() {
   );
 
   if (tablesToTruncateFiltered.length > 0) {
-    await knex.raw(`
-      TRUNCATE TABLE ${tablesToTruncateFiltered.join(', ')} RESTART IDENTITY CASCADE;
-    `);
+    await withTestIsolation(knex, async () => {
+      await knex.raw(`
+        TRUNCATE TABLE ${tablesToTruncateFiltered.join(', ')} RESTART IDENTITY CASCADE;
+      `);
+    });
   }
 
   // -------------------------------------------------
@@ -158,9 +166,15 @@ export async function setupTestDB() {
   // -------------------------------------------------
   // 5. Seed test items (reuse existing or insert)
   // -------------------------------------------------
-  const existingRice = await knex('items').where({ sku_code: 'RICE-001' }).first();
-  const existingWheat = await knex('items').where({ sku_code: 'WHEAT-001' }).first();
-  const existingSugar = await knex('items').where({ sku_code: 'SUGAR-001' }).first();
+  const existingRice = await knex('items')
+    .where({ sku_code: 'RICE-001' })
+    .first();
+  const existingWheat = await knex('items')
+    .where({ sku_code: 'WHEAT-001' })
+    .first();
+  const existingSugar = await knex('items')
+    .where({ sku_code: 'SUGAR-001' })
+    .first();
 
   const itemRiceId = existingRice?.id ?? uuidv4();
   const itemWheatId = existingWheat?.id ?? uuidv4();

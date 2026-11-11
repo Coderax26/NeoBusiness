@@ -14,6 +14,7 @@ import { OutboxService } from '../../../shared/events/outbox.service.js';
 import { ExceptionService } from '../../../modules/m7a-exceptions/exception.service.js';
 import { NotificationService } from '../../../modules/m7a-exceptions/notification.service.js';
 import { Money } from '../../../shared/utils/money.util.js';
+import { withTestIsolation } from '../../../shared/database/test-isolation.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -112,6 +113,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
       ledgerSvc,
       ptpSvc,
       configSvc,
+      outboxSvc,
       exceptionSvc,
     );
     handoverSvc = new HandoverService(
@@ -124,6 +126,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
       knex,
       docNumberSvc,
       ledgerSvc,
+      outboxSvc,
       notificationSvc,
       exceptionSvc,
     );
@@ -138,86 +141,91 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
 
   beforeEach(async () => {
     // Clean up M6 test data - guard against null IDs on first run
-    // Order matters: children first, then parents (FK constraints)
-    if (invoiceId) {
-      await knex('receipt_allocations')
+    // Use advisory lock to prevent deadlocks during parallel test cleanup
+    await withTestIsolation(knex, async () => {
+      // Order matters: children first, then parents (FK constraints)
+      if (invoiceId) {
+        await knex('receipt_allocations')
+          .whereIn(
+            'receipt_id',
+            knex('collection_receipts')
+              .join(
+                'receipt_allocations',
+                'collection_receipts.id',
+                'receipt_allocations.receipt_id',
+              )
+              .where('receipt_allocations.invoice_id', invoiceId)
+              .select('collection_receipts.id'),
+          )
+          .del();
+        await knex('invoices').where('id', invoiceId).del();
+        invoiceId = '';
+      }
+      // Clean up all sales_orders for the customer (tracked + untracked from previous tests)
+      // First delete invoices for those sales_orders (FK constraint)
+      if (customerId) {
+        await knex('ptp_followups').where('customer_id', customerId).del();
+        // Delete receipt_allocations for all invoices of this customer first
+        await knex('receipt_allocations')
+          .whereIn(
+            'invoice_id',
+            knex('invoices').where('customer_id', customerId).select('id'),
+          )
+          .del();
+        await knex('invoices')
+          .whereIn(
+            'sales_order_id',
+            knex('sales_orders').where('customer_id', customerId).select('id'),
+          )
+          .del();
+        await knex('sales_orders').where('customer_id', customerId).del();
+        await knex('custody_ledger')
+          .whereIn(
+            'receipt_id',
+            knex('collection_receipts')
+              .where('customer_id', customerId)
+              .select('id'),
+          )
+          .del();
+        // Also clean up custody_ledger by collector user_id (HANDOVER entries don't have receipt_id)
+        await knex('custody_ledger').where('user_id', collectorId).del();
+        await knex('collection_receipts')
+          .where('customer_id', customerId)
+          .del();
+        await knex('customer_ledger_entries')
+          .where('customer_id', customerId)
+          .del();
+      }
+      // Clean up EOD closings for the site/date (test isolation)
+      await knex('eod_closings').where('site_id', siteId).del();
+      // Clean up delivery_trips & vehicles if M5 tables exist
+      if (await knex.schema.hasTable('delivery_trips')) {
+        await knex('delivery_trips').where('site_id', siteId).del();
+      }
+      if (await knex.schema.hasTable('vehicles')) {
+        await knex('vehicles').where('site_id', siteId).del();
+      }
+      // Clean up worklist tables
+      await knex('worklist_items')
         .whereIn(
-          'receipt_id',
-          knex('collection_receipts')
-            .join(
-              'receipt_allocations',
-              'collection_receipts.id',
-              'receipt_allocations.receipt_id',
-            )
-            .where('receipt_allocations.invoice_id', invoiceId)
-            .select('collection_receipts.id'),
+          'worklist_id',
+          knex('worklist_worklists').where('site_id', siteId).select('id'),
         )
         .del();
-      await knex('invoices').where('id', invoiceId).del();
-      invoiceId = '';
-    }
-    // Clean up all sales_orders for the customer (tracked + untracked from previous tests)
-    // First delete invoices for those sales_orders (FK constraint)
-    if (customerId) {
-      await knex('ptp_followups').where('customer_id', customerId).del();
-      // Delete receipt_allocations for all invoices of this customer first
-      await knex('receipt_allocations')
-        .whereIn(
-          'invoice_id',
-          knex('invoices').where('customer_id', customerId).select('id'),
-        )
-        .del();
-      await knex('invoices')
-        .whereIn(
-          'sales_order_id',
-          knex('sales_orders').where('customer_id', customerId).select('id'),
-        )
-        .del();
-      await knex('sales_orders').where('customer_id', customerId).del();
-      await knex('custody_ledger')
-        .whereIn(
-          'receipt_id',
-          knex('collection_receipts')
-            .where('customer_id', customerId)
-            .select('id'),
-        )
-        .del();
-      // Also clean up custody_ledger by collector user_id (HANDOVER entries don't have receipt_id)
-      await knex('custody_ledger').where('user_id', collectorId).del();
-      await knex('collection_receipts').where('customer_id', customerId).del();
-      await knex('customer_ledger_entries')
-        .where('customer_id', customerId)
-        .del();
-    }
-    // Clean up EOD closings for the site/date (test isolation)
-    await knex('eod_closings').where('site_id', siteId).del();
-    // Clean up delivery_trips & vehicles if M5 tables exist
-    if (await knex.schema.hasTable('delivery_trips')) {
-      await knex('delivery_trips').where('site_id', siteId).del();
-    }
-    if (await knex.schema.hasTable('vehicles')) {
-      await knex('vehicles').where('site_id', siteId).del();
-    }
-    // Clean up worklist tables
-    await knex('worklist_items')
-      .whereIn(
-        'worklist_id',
-        knex('worklist_worklists').where('site_id', siteId).select('id'),
-      )
-      .del();
-    await knex('worklist_worklists').where('site_id', siteId).del();
-    if (salesOrderId) {
-      // Already cleaned up above if customerId was set
-      salesOrderId = '';
-    }
-    if (customerId) {
-      await knex('customers').where('id', customerId).del();
-      customerId = '';
-    }
-    if (itemId) {
-      await knex('items').where('id', itemId).del();
-      itemId = '';
-    }
+      await knex('worklist_worklists').where('site_id', siteId).del();
+      if (salesOrderId) {
+        // Already cleaned up above if customerId was set
+        salesOrderId = '';
+      }
+      if (customerId) {
+        await knex('customers').where('id', customerId).del();
+        customerId = '';
+      }
+      if (itemId) {
+        await knex('items').where('id', itemId).del();
+        itemId = '';
+      }
+    });
   });
 
   /**

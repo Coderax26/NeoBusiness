@@ -38,12 +38,14 @@ export class OutboxService {
     payload: Record<string, unknown>,
     moduleSource: string,
   ): Promise<string> {
-    const [row] = await trx('outbox_events').insert({
-      event_type: eventType,
-      aggregate_id: aggregateId,
-      payload: JSON.stringify(payload),
-      module_source: moduleSource,
-    }).returning('id');
+    const [row] = await trx('outbox_events')
+      .insert({
+        event_type: eventType,
+        aggregate_id: aggregateId,
+        payload: JSON.stringify(payload),
+        module_source: moduleSource,
+      })
+      .returning('id');
 
     const id = String(row.id);
     this.logger.debug(`Outbox: enqueued ${eventType} (${id})`);

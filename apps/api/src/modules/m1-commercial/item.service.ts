@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 
@@ -30,23 +35,25 @@ export class ItemService {
     isActive?: boolean;
     userId: string;
   }) {
-    const [item] = await this.knex('items').insert({
-      sku_code: data.skuCode,
-      name: data.name,
-      item_category: data.itemCategory,
-      primary_uom: data.primaryUom,
-      secondary_uom: data.secondaryUom,
-      shelf_life_days: data.shelfLifeDays,
-      tax_rate_pct: data.taxRatePct,
-      hsn_code: data.hsnCode,
-      is_catch_weight: data.isCatchWeight ?? false,
-      standard_weight_per_secondary_kg: data.standardWeightPerSecondaryKg,
-      min_margin_pct: data.minMarginPct ?? 0.10,
-      tax_treatment: data.taxTreatment,
-      is_active: data.isActive ?? true,
-      created_by: data.userId,
-      updated_by: data.userId,
-    }).returning('*');
+    const [item] = await this.knex('items')
+      .insert({
+        sku_code: data.skuCode,
+        name: data.name,
+        item_category: data.itemCategory,
+        primary_uom: data.primaryUom,
+        secondary_uom: data.secondaryUom,
+        shelf_life_days: data.shelfLifeDays,
+        tax_rate_pct: data.taxRatePct,
+        hsn_code: data.hsnCode,
+        is_catch_weight: data.isCatchWeight ?? false,
+        standard_weight_per_secondary_kg: data.standardWeightPerSecondaryKg,
+        min_margin_pct: data.minMarginPct ?? 0.1,
+        tax_treatment: data.taxTreatment,
+        is_active: data.isActive ?? true,
+        created_by: data.userId,
+        updated_by: data.userId,
+      })
+      .returning('*');
 
     this.logger.log(`Created item ${data.skuCode}: ${data.name}`);
     return item;
@@ -55,7 +62,11 @@ export class ItemService {
   /**
    * List items with filters.
    */
-  async findAll(filters: { itemCategory?: string; isActive?: boolean; search?: string }) {
+  async findAll(filters: {
+    itemCategory?: string;
+    isActive?: boolean;
+    search?: string;
+  }) {
     const query = this.knex('items').select('*');
 
     if (filters.itemCategory) {
@@ -94,33 +105,43 @@ export class ItemService {
   /**
    * Update item (OWNER).
    */
-  async update(id: string, data: Partial<{
-    name: string;
-    itemCategory: string;
-    primaryUom: string;
-    secondaryUom: string;
-    shelfLifeDays: number;
-    taxRatePct: number;
-    hsnCode: string;
-    isCatchWeight: boolean;
-    standardWeightPerSecondaryKg: number;
-    minMarginPct: number;
-    taxTreatment: string;
-    isActive: boolean;
-    userId: string;
-  }>) {
+  async update(
+    id: string,
+    data: Partial<{
+      name: string;
+      itemCategory: string;
+      primaryUom: string;
+      secondaryUom: string;
+      shelfLifeDays: number;
+      taxRatePct: number;
+      hsnCode: string;
+      isCatchWeight: boolean;
+      standardWeightPerSecondaryKg: number;
+      minMarginPct: number;
+      taxTreatment: string;
+      isActive: boolean;
+      userId: string;
+    }>,
+  ) {
     const updateData: any = { updated_by: data.userId, updated_at: new Date() };
 
     if (data.name) updateData.name = data.name;
     if (data.itemCategory) updateData.item_category = data.itemCategory;
     if (data.primaryUom) updateData.primary_uom = data.primaryUom;
-    if (data.secondaryUom !== undefined) updateData.secondary_uom = data.secondaryUom;
-    if (data.shelfLifeDays !== undefined) updateData.shelf_life_days = data.shelfLifeDays;
-    if (data.taxRatePct !== undefined) updateData.tax_rate_pct = data.taxRatePct;
+    if (data.secondaryUom !== undefined)
+      updateData.secondary_uom = data.secondaryUom;
+    if (data.shelfLifeDays !== undefined)
+      updateData.shelf_life_days = data.shelfLifeDays;
+    if (data.taxRatePct !== undefined)
+      updateData.tax_rate_pct = data.taxRatePct;
     if (data.hsnCode !== undefined) updateData.hsn_code = data.hsnCode;
-    if (data.isCatchWeight !== undefined) updateData.is_catch_weight = data.isCatchWeight;
-    if (data.standardWeightPerSecondaryKg !== undefined) updateData.standard_weight_per_secondary_kg = data.standardWeightPerSecondaryKg;
-    if (data.minMarginPct !== undefined) updateData.min_margin_pct = data.minMarginPct;
+    if (data.isCatchWeight !== undefined)
+      updateData.is_catch_weight = data.isCatchWeight;
+    if (data.standardWeightPerSecondaryKg !== undefined)
+      updateData.standard_weight_per_secondary_kg =
+        data.standardWeightPerSecondaryKg;
+    if (data.minMarginPct !== undefined)
+      updateData.min_margin_pct = data.minMarginPct;
     if (data.taxTreatment) updateData.tax_treatment = data.taxTreatment;
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
 
@@ -145,14 +166,16 @@ export class ItemService {
   }) {
     await this.findById(data.itemId);
 
-    const [conversion] = await this.knex('uom_conversions').insert({
-      item_id: data.itemId,
-      from_uom: data.fromUom,
-      to_uom: data.toUom,
-      factor: data.factor,
-      created_by: data.userId,
-      updated_by: data.userId,
-    }).returning('*');
+    const [conversion] = await this.knex('uom_conversions')
+      .insert({
+        item_id: data.itemId,
+        from_uom: data.fromUom,
+        to_uom: data.toUom,
+        factor: data.factor,
+        created_by: data.userId,
+        updated_by: data.userId,
+      })
+      .returning('*');
 
     return conversion;
   }
@@ -187,7 +210,9 @@ export class ItemService {
       taxRatePct: String(item.tax_rate_pct),
       hsnCode: item.hsn_code,
       isCatchWeight: item.is_catch_weight,
-      standardWeightPerSecondaryKg: item.standard_weight_per_secondary_kg ? String(item.standard_weight_per_secondary_kg) : null,
+      standardWeightPerSecondaryKg: item.standard_weight_per_secondary_kg
+        ? String(item.standard_weight_per_secondary_kg)
+        : null,
       taxTreatment: item.tax_treatment,
       minMarginPct: Number(item.min_margin_pct),
       isActive: item.is_active,
@@ -272,15 +297,24 @@ export class ItemService {
         itemId,
         fromUom: toUom,
         toUom: fromUom,
-        factor: String(Math.round(1 / Number(reverse.factor) * 1000) / 1000),
+        factor: String(Math.round((1 / Number(reverse.factor)) * 1000) / 1000),
       };
     }
 
     // Catch-weight fallback: secondary -> primary
     const item = await this.findById(itemId);
-    if (item.is_catch_weight && fromUom === item.secondary_uom && toUom === item.primary_uom) {
+    if (
+      item.is_catch_weight &&
+      fromUom === item.secondary_uom &&
+      toUom === item.primary_uom
+    ) {
       const factor = item.standard_weight_per_secondary_kg ?? '1.000';
-      return { itemId, fromUom: item.secondary_uom, toUom: item.primary_uom, factor };
+      return {
+        itemId,
+        fromUom: item.secondary_uom,
+        toUom: item.primary_uom,
+        factor,
+      };
     }
 
     return null;

@@ -132,21 +132,33 @@ export class FleetController {
   @Post('trips/:id/issues')
   @RequirePermission('fleet.deliver')
   @ApiOperation({ summary: 'Report a delivery issue' })
-  createIssue(@Param('id') id: string, @Body() dto: CreateIssueDto, @Req() req: any) {
+  createIssue(
+    @Param('id') id: string,
+    @Body() dto: CreateIssueDto,
+    @Req() req: any,
+  ) {
     return this.fleet.createIssue(id, dto, req.user.id);
   }
 
   @Post('issues/:id/resolve')
   @RequirePermission('fleet.resolve_issue')
   @ApiOperation({ summary: 'Resolve or escalate a delivery issue' })
-  resolveIssue(@Param('id') id: string, @Body() dto: ResolveIssueDto, @Req() req: any) {
+  resolveIssue(
+    @Param('id') id: string,
+    @Body() dto: ResolveIssueDto,
+    @Req() req: any,
+  ) {
     return this.fleet.resolveIssue(id, dto, req.user.id);
   }
 
   @Post('trips/:id/expenses')
   @RequirePermission('fleet.deliver')
   @ApiOperation({ summary: 'Log a trip expense' })
-  createExpense(@Param('id') id: string, @Body() dto: CreateExpenseDto, @Req() req: any) {
+  createExpense(
+    @Param('id') id: string,
+    @Body() dto: CreateExpenseDto,
+    @Req() req: any,
+  ) {
     return this.fleet.createExpense(id, dto, req.user.id);
   }
 }

@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { QuoteService } from './quote.service.js';
@@ -14,12 +26,16 @@ export class QuoteController {
    */
   @Post()
   @RequirePermission('quote.create')
-  async create(@Body() dto: {
-    customerId: string;
-    siteId: string;
-    lines: Array<{ itemId: string; qty: string; requestedPrice: string }>;
-    validUntil?: string;
-  }, @Req() req: any) {
+  async create(
+    @Body()
+    dto: {
+      customerId: string;
+      siteId: string;
+      lines: Array<{ itemId: string; qty: string; requestedPrice: string }>;
+      validUntil?: string;
+    },
+    @Req() req: any,
+  ) {
     return this.quoteSvc.create({
       customerId: dto.customerId,
       siteId: dto.siteId,
@@ -34,11 +50,22 @@ export class QuoteController {
    */
   @Get()
   @RequirePermission('quote.view')
-  async list(@Query() q: { customerId?: string; status?: string; limit?: number; offset?: number }) {
+  async list(
+    @Query()
+    q: {
+      customerId?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
     const limit = Math.min(q.limit ?? 50, 100);
     const offset = q.offset ?? 0;
 
-    let query = this.quoteSvc['knex']('quotes').orderBy('created_at', 'desc').limit(limit).offset(offset);
+    let query = this.quoteSvc['knex']('quotes')
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
 
     if (q.customerId) query.andWhere('customer_id', q.customerId);
     if (q.status) query.andWhere('status', q.status);
@@ -60,11 +87,17 @@ export class QuoteController {
    */
   @Post(':id/convert')
   @RequirePermission('order.create')
-  async convert(@Param('id') id: string, @Body() dto: { fulfillmentSiteId?: string }, @Req() req: any) {
+  async convert(
+    @Param('id') id: string,
+    @Body() dto: { fulfillmentSiteId?: string },
+    @Req() req: any,
+  ) {
     const quote = await this.quoteSvc.findById(id);
 
     if (quote.status === 'EXPIRED') {
-      throw new BadRequestException('Expired quotes cannot be converted. Create a new quote.');
+      throw new BadRequestException(
+        'Expired quotes cannot be converted. Create a new quote.',
+      );
     }
     if (quote.status === 'CONVERTED') {
       throw new BadRequestException('Quote already converted to order.');

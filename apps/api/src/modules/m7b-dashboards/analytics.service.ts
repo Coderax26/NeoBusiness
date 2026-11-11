@@ -227,35 +227,28 @@ export class AnalyticsService implements AnalyticsPort {
         c.id as customer_id,
         c.business_name,
         c.customer_code,
-        COALESCE(SUM(cle.running_balance) FILTER (WHERE cle.running_balance > 0), 0)::numeric(14,2) as total_outstanding,
-        COALESCE(SUM(cle.running_balance) FILTER (
-          WHERE cle.running_balance > 0
-          AND i.due_date IS NOT NULL
-          AND i.due_date >= CURRENT_DATE - INTERVAL '7 days'
+        COALESCE(SUM(i.balance_due), 0)::numeric(14,2) as total_outstanding,
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.due_date >= CURRENT_DATE - INTERVAL '7 days'
         ), 0)::numeric(14,2) as aging_0_7,
-        COALESCE(SUM(cle.running_balance) FILTER (
-          WHERE cle.running_balance > 0
-          AND i.due_date IS NOT NULL
-          AND i.due_date < CURRENT_DATE - INTERVAL '7 days'
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.due_date < CURRENT_DATE - INTERVAL '7 days'
           AND i.due_date >= CURRENT_DATE - INTERVAL '15 days'
         ), 0)::numeric(14,2) as aging_8_15,
-        COALESCE(SUM(cle.running_balance) FILTER (
-          WHERE cle.running_balance > 0
-          AND i.due_date IS NOT NULL
-          AND i.due_date < CURRENT_DATE - INTERVAL '15 days'
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.due_date < CURRENT_DATE - INTERVAL '15 days'
           AND i.due_date >= CURRENT_DATE - INTERVAL '30 days'
         ), 0)::numeric(14,2) as aging_16_30,
-        COALESCE(SUM(cle.running_balance) FILTER (
-          WHERE cle.running_balance > 0
-          AND i.due_date IS NOT NULL
-          AND i.due_date < CURRENT_DATE - INTERVAL '30 days'
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.due_date < CURRENT_DATE - INTERVAL '30 days'
         ), 0)::numeric(14,2) as aging_30_plus
       FROM customers c
-      JOIN customer_ledger_entries cle ON cle.customer_id = c.id
-      LEFT JOIN invoices i ON i.id = cle.ref_id AND cle.entry_type IN ('INVOICE', 'DEBIT')
-      WHERE cle.running_balance > 0
+      JOIN invoices i ON i.customer_id = c.id
+      WHERE i.balance_due > 0
+        AND i.status NOT IN ('CANCELLED', 'PAID')
         AND c.default_site_id = ?
       GROUP BY c.id, c.business_name, c.customer_code
+      HAVING COALESCE(SUM(i.balance_due), 0) > 0
       ORDER BY total_outstanding DESC
     `,
       [siteId],

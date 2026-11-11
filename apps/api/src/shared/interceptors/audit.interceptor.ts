@@ -1,4 +1,9 @@
-import { Injectable, NestInterceptor, ExecutionContext, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  Logger,
+} from '@nestjs/common';
 import type { CallHandler } from '@nestjs/common';
 import type { Request } from 'express';
 import { Observable } from 'rxjs';
@@ -47,7 +52,14 @@ export class AuditInterceptor implements NestInterceptor {
       tap({
         next: (response: unknown) => {
           // Fire-and-forget — never block the response
-          this.writeAudit(user?.sub, method, route, entityName, response, ipAddress).catch((err) => {
+          this.writeAudit(
+            user?.sub,
+            method,
+            route,
+            entityName,
+            response,
+            ipAddress,
+          ).catch((err) => {
             this.logger.warn(`Audit write failed: ${(err as Error).message}`);
           });
         },
@@ -97,7 +109,14 @@ export class AuditInterceptor implements NestInterceptor {
     // Strip sensitive fields from the audited payload
     if (!response || typeof response !== 'object') return response;
     const obj = { ...(response as Record<string, unknown>) };
-    for (const key of ['password', 'password_hash', 'pin_hash', 'token', 'accessToken', 'refreshToken']) {
+    for (const key of [
+      'password',
+      'password_hash',
+      'pin_hash',
+      'token',
+      'accessToken',
+      'refreshToken',
+    ]) {
       if (key in obj) obj[key] = '[REDACTED]';
     }
     return obj;

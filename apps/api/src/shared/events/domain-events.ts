@@ -28,6 +28,7 @@ export type EventType =
   | 'price.updated'
   | 'order.pending_approval'
   | 'order.confirmed'
+  | 'order.credit_evaluated'
   | 'order.cancelled'
   | 'stock.reserved'
   | 'stock.insufficient'
@@ -39,6 +40,9 @@ export type EventType =
   | 'po.price_spike_detected'
   | 'po.shortfall_detected'
   | 'grn.posted'
+  | 'bill.created'
+  | 'bill.approved'
+  | 'bill.rejected'
   | 'trip.loaded'
   | 'trip.dispatched'
   | 'trip.closed'
@@ -55,7 +59,11 @@ export type EventType =
   | 'issue.reported'
   | 'issue.escalated'
   | 'notification.failed'
-  | 'rm.shortage';
+  | 'rm.shortage'
+  | 'dashboard.refresh_pulse'
+  | 'dashboard.refresh_ops'
+  | 'dashboard.refresh_inventory_alerts'
+  | 'dashboard.refresh_analytics';
 
 // ─── Per-event payload types ────────────────────────────────────────────────────
 
@@ -84,6 +92,18 @@ export interface OrderConfirmedPayload {
 export interface OrderCancelledPayload {
   orderId: string;
   reason: string;
+}
+
+export interface OrderCreditEvaluatedPayload {
+  orderId: string;
+  creditEvaluation: {
+    status: 'OK' | 'HOLD' | 'COD_ONLY';
+    currentArBalance: string;
+    creditLimit: string;
+    maxOverdueDays: number;
+    oldestOverdueDays: number | null;
+    reason?: string;
+  };
 }
 
 export interface GrnPostedPayload {
@@ -231,20 +251,148 @@ export interface EodClosedPayload {
   signedOffAt: string;
 }
 
+export interface DashboardRefreshPulsePayload {
+  siteId: string;
+  trigger:
+    | 'trip_dispatched'
+    | 'collection_logged'
+    | 'exception_raised'
+    | 'exception_resolved'
+    | 'manual';
+}
+
+export interface DashboardRefreshOpsPayload {
+  siteId: string;
+  trigger:
+    | 'trip_status_changed'
+    | 'work_order_status_changed'
+    | 'shortfall_detected'
+    | 'manual';
+}
+
+export interface DashboardRefreshInventoryAlertsPayload {
+  siteId: string;
+  trigger: 'stock_changed' | 'batch_expiring' | 'manual';
+}
+
+export interface DashboardRefreshAnalyticsPayload {
+  siteId: string;
+  trigger:
+    | 'order_completed'
+    | 'grn_posted'
+    | 'work_order_completed'
+    | 'collection_logged'
+    | 'eod_closed'
+    | 'manual';
+}
+
+export interface BillCreatedPayload {
+  billId: string;
+  billNumber: string;
+  supplierId: string;
+  poId: string;
+  siteId: string;
+  amount: string;
+  currency: string;
+  actorId: string;
+  createdAt: string;
+}
+
+export interface BillApprovedPayload {
+  billId: string;
+  billNumber: string;
+  supplierId: string;
+  siteId: string;
+  amount: string;
+  currency: string;
+  taxInvoiceId: string;
+  invoiceNo: string;
+  approvedBy: string;
+  approvedAt: string;
+}
+
+export interface BillRejectedPayload {
+  billId: string;
+  billNumber: string;
+  supplierId: string;
+  siteId: string;
+  reason: string;
+  rejectedBy: string;
+  rejectedAt: string;
+}
+
+export interface HandoverVerifiedPayload {
+  handoverId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: string;
+  verifiedBy: string;
+  verifiedAt: string;
+  status: 'VERIFIED' | 'DISPUTED';
+}
+
+export interface InvoiceIssuedPayload {
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  customerId: string;
+  siteId: string;
+  amount: string;
+  taxAmount: string;
+  totalAmount: string;
+  issuedAt: string;
+}
+
+export interface ProductionRequisitionPayload {
+  requisitionId: string;
+  workOrderId: string;
+  itemId: string;
+  requiredQty: string;
+  unitOfIssue: string;
+  requiredBy: string;
+  siteId: string;
+}
+
+export interface WorkorderStartedPayload {
+  workOrderId: string;
+  startedAt: string;
+  siteId: string;
+}
+
 export interface DomainEventPayloads {
   'order.confirmed': OrderConfirmedPayload;
+  'order.credit_evaluated': OrderCreditEvaluatedPayload;
   'order.cancelled': OrderCancelledPayload;
+  'stock.reserved': StockReservedPayload;
+  'stock.insufficient': StockInsufficientPayload;
+  'stock.low': StockLowPayload;
+  'stock.expiring': StockExpiringPayload;
+  'production.requisition_created': ProductionRequisitionPayload;
+  'workorder.started': WorkorderStartedPayload;
+  'workorder.completed': WorkorderCompletedPayload;
   'grn.posted': GrnPostedPayload;
+  'bill.created': BillCreatedPayload;
+  'bill.approved': BillApprovedPayload;
+  'bill.rejected': BillRejectedPayload;
   'trip.loaded': TripLoadedPayload;
   'delivery.completed': DeliveryCompletedPayload;
   'delivery.failed': DeliveryFailedPayload;
   'stops.returned': StopsReturnedPayload;
   'trip.closed': TripClosedPayload;
+  'collection.logged': CollectionLoggedPayload;
+  'handover.verified': HandoverVerifiedPayload;
+  'invoice.issued': InvoiceIssuedPayload;
+  'eod.closed': EodClosedPayload;
+  'exception.requested': ExceptionResolvedPayload;
+  'exception.resolved': ExceptionResolvedPayload;
   'issue.reported': IssueReportedPayload;
   'issue.escalated': IssueReportedPayload;
-  'exception.resolved': ExceptionResolvedPayload;
-  'stock.expiring': StockExpiringPayload;
-  'stock.low': StockLowPayload;
+  'notification.failed': IssueReportedPayload;
+  'rm.shortage': IssueReportedPayload;
+  'dashboard.refresh_pulse': DashboardRefreshPulsePayload;
+  'dashboard.refresh_ops': DashboardRefreshOpsPayload;
+  'dashboard.refresh_inventory_alerts': DashboardRefreshInventoryAlertsPayload;
+  'dashboard.refresh_analytics': DashboardRefreshAnalyticsPayload;
 }
 
 export type TypedDomainEvent<T extends keyof DomainEventPayloads> = DomainEvent<

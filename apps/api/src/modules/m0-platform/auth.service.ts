@@ -30,7 +30,10 @@ export class AuthService {
   /**
    * Validate user credentials (phone + password/PIN).
    */
-  async validateUser(phone: string, password: string): Promise<{ user: any; accessToken: string; refreshToken: string } | null> {
+  async validateUser(
+    phone: string,
+    password: string,
+  ): Promise<{ user: any; accessToken: string; refreshToken: string } | null> {
     const user = await this.knex('users')
       .where('phone', phone)
       .andWhere('is_active', true)
@@ -51,7 +54,9 @@ export class AuthService {
     }
 
     // Update last login
-    await this.knex('users').where('id', user.id).update({ last_login_at: new Date() });
+    await this.knex('users')
+      .where('id', user.id)
+      .update({ last_login_at: new Date() });
 
     // Get user's site access
     const siteAccess = await this.knex('user_site_access')
@@ -67,7 +72,10 @@ export class AuthService {
   /**
    * Generate access and refresh tokens.
    */
-  async generateTokens(user: any, siteIds: string[]): Promise<{ accessToken: string; refreshToken: string }> {
+  async generateTokens(
+    user: any,
+    siteIds: string[],
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const payload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
@@ -86,7 +94,10 @@ export class AuthService {
   /**
    * Create and store a refresh token.
    */
-  private async createRefreshToken(userId: string, deviceId?: string): Promise<string> {
+  private async createRefreshToken(
+    userId: string,
+    deviceId?: string,
+  ): Promise<string> {
     const crypto = await import('crypto');
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = await bcrypt.hash(token, 10);
@@ -105,7 +116,9 @@ export class AuthService {
   /**
    * Verify and rotate refresh token.
    */
-  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
+  async refreshAccessToken(
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string } | null> {
     const allTokens = await this.knex('refresh_tokens')
       .where('revoked_at', null)
       .andWhere('expires_at', '>', new Date());
@@ -128,7 +141,9 @@ export class AuthService {
       .update({ revoked_at: new Date() });
 
     // Get user
-    const user = await this.knex('users').where('id', matchedToken.user_id).first();
+    const user = await this.knex('users')
+      .where('id', matchedToken.user_id)
+      .first();
     if (!user || !user.is_active) {
       return null;
     }
@@ -148,8 +163,10 @@ export class AuthService {
    * Revoke a refresh token (logout).
    */
   async revokeRefreshToken(refreshToken: string): Promise<void> {
-    const allTokens = await this.knex('refresh_tokens')
-      .where('revoked_at', null);
+    const allTokens = await this.knex('refresh_tokens').where(
+      'revoked_at',
+      null,
+    );
 
     for (const t of allTokens) {
       if (await bcrypt.compare(refreshToken, t.token_hash)) {

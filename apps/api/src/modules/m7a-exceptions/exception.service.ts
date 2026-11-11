@@ -1,4 +1,12 @@
-import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, Inject, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import {
@@ -35,7 +43,15 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
   private readonly logger = new Logger(ExceptionService.name);
 
   /** Resolved handlers indexed by exception type (registered via onResolved). */
-  private handlers = new Map<ExceptionType, (exceptionId: string, action: string, remarks: string, counterJson?: object) => Promise<void>>();
+  private handlers = new Map<
+    ExceptionType,
+    (
+      exceptionId: string,
+      action: string,
+      remarks: string,
+      counterJson?: object,
+    ) => Promise<void>
+  >();
 
   constructor(
     @InjectKnex() private readonly knex: Knex,
@@ -45,7 +61,9 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.logger.log('ExceptionService initialized (EXCEPTION_PORT → real implementation)');
+    this.logger.log(
+      'ExceptionService initialized (EXCEPTION_PORT → real implementation)',
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -95,21 +113,33 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
         .first('id');
 
       if (existing) {
-        this.logger.debug(`Exception ${type}:${referenceTable}:${referenceId} already PENDING — returning existing card`);
+        this.logger.debug(
+          `Exception ${type}:${referenceTable}:${referenceId} already PENDING — returning existing card`,
+        );
         return String(existing.id);
       }
 
       // 2 — Look up the approval policy
       const policy = await trx('approval_policies')
         .where({ exception_type: type })
-        .first('escalation_wait_minutes', 'primary_approver_role', 'delegate_user_id');
+        .first(
+          'escalation_wait_minutes',
+          'primary_approver_role',
+          'delegate_user_id',
+        );
 
       if (!policy) {
-        throw new BadRequestException(`No approval_policy configured for exception type ${type}`);
+        throw new BadRequestException(
+          `No approval_policy configured for exception type ${type}`,
+        );
       }
 
       // 3 — Resolve the approver user
-      const approverUserId = await this.resolveApprover(policy.primary_approver_role, siteIdFinal, trx);
+      const approverUserId = await this.resolveApprover(
+        policy.primary_approver_role,
+        siteIdFinal,
+        trx,
+      );
 
       // 4 — Compute expiry time from policy's escalation_wait_minutes
       const autoExpireMinutes = Number(policy.escalation_wait_minutes);
@@ -162,10 +192,18 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
 
       // 8 — Queue a notification to the approver's device
       if (approverUserId) {
-        await this.enqueueNotification(trx, approverUserId, exceptionId, type, payload);
+        await this.enqueueNotification(
+          trx,
+          approverUserId,
+          exceptionId,
+          type,
+          payload,
+        );
       }
 
-      this.logger.debug(`Raised exception ${type}:${exceptionId} — expires ${expiresAt.toISOString()}`);
+      this.logger.debug(
+        `Raised exception ${type}:${exceptionId} — expires ${expiresAt.toISOString()}`,
+      );
       return exceptionId;
     });
   }
@@ -183,7 +221,12 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
    */
   onResolved(
     type: ExceptionType,
-    handler: (exceptionId: string, action: string, remarks: string, counterJson?: object) => Promise<void>,
+    handler: (
+      exceptionId: string,
+      action: string,
+      remarks: string,
+      counterJson?: object,
+    ) => Promise<void>,
   ): void {
     this.handlers.set(type, handler);
     this.logger.debug(`onResolved handler registered for ${type}`);
@@ -218,7 +261,14 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
       const card = await trx('exception_approvals')
         .where({ id: exceptionId })
         .forUpdate()
-        .first('id', 'status', 'exception_type', 'reference_id', 'reference_table', 'requested_by');
+        .first(
+          'id',
+          'status',
+          'exception_type',
+          'reference_id',
+          'reference_table',
+          'requested_by',
+        );
 
       if (!card) {
         throw new NotFoundException(`Exception ${exceptionId} not found`);
@@ -226,31 +276,44 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
 
       // Idempotency / single-resolution: only PENDING cards can be resolved
       if (card.status !== 'PENDING') {
-        return { status: card.status, type: card.exception_type, refId: card.reference_id, tableName: card.reference_table };
+        return {
+          status: card.status,
+          type: card.exception_type,
+          refId: card.reference_id,
+          tableName: card.reference_table,
+        };
       }
 
       const now = new Date();
       const resolvedBy = userId ?? card.requested_by;
 
       // Update the card
-      await trx('exception_approvals')
-        .where({ id: exceptionId })
-        .update({
-          status: action,
-          resolved_by: resolvedBy,
-          resolved_at: now,
-          owner_remarks: remarks,
-        });
+      await trx('exception_approvals').where({ id: exceptionId }).update({
+        status: action,
+        resolved_by: resolvedBy,
+        resolved_at: now,
+        owner_remarks: remarks,
+      });
 
       // Write the audit event
       await trx('exception_events').insert({
         exception_id: exceptionId,
         event: 'RESOLVED',
         by_user: resolvedBy,
-        metadata_json: JSON.stringify({ action, remarks, counter: counterJson ?? null }),
+        metadata_json: JSON.stringify({
+          action,
+          remarks,
+          counter: counterJson ?? null,
+        }),
       });
 
-      return { status: action, type: card.exception_type, refId: card.reference_id, tableName: card.reference_table, resolvedBy };
+      return {
+        status: action,
+        type: card.exception_type,
+        refId: card.reference_id,
+        tableName: card.reference_table,
+        resolvedBy,
+      };
     });
 
     // Emit domain event (outside the trx so it fires after commit)
@@ -274,8 +337,11 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
     // Fire onResolved handlers (async, fire-and-forget from the DB perspective)
     const handler = this.handlers.get(result.type as ExceptionType);
     if (handler) {
-      void handler(exceptionId, result.status, remarks, counterJson).catch((err) =>
-        this.logger.error(`onResolved handler failed for ${result.type}: ${(err as Error).message}`),
+      void handler(exceptionId, result.status, remarks, counterJson).catch(
+        (err) =>
+          this.logger.error(
+            `onResolved handler failed for ${result.type}: ${(err as Error).message}`,
+          ),
       );
     }
 
@@ -306,7 +372,10 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
   }
 
   /** @internal */
-  private async expireOrEscalate(exceptionId: string, valueAtRisk: number): Promise<void> {
+  private async expireOrEscalate(
+    exceptionId: string,
+    valueAtRisk: number,
+  ): Promise<void> {
     return this.knex.transaction(async (trx) => {
       const card = await trx('exception_approvals')
         .where({ id: exceptionId, status: 'PENDING' })
@@ -317,18 +386,29 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
 
       const policy = await trx('approval_policies')
         .where({ exception_type: card.exception_type })
-        .first('can_delegate', 'delegate_user_id', 'delegate_value_cap_inr', 'second_escalation_user_id', 'escalation_wait_minutes');
+        .first(
+          'can_delegate',
+          'delegate_user_id',
+          'delegate_value_cap_inr',
+          'second_escalation_user_id',
+          'escalation_wait_minutes',
+        );
 
       // Decision: escalate or reject
       const shouldEscalate =
         card.escalated_to !== null || // already escalated once → escalate again to second
         (policy?.can_delegate &&
           policy?.delegate_user_id !== null &&
-          (policy?.delegate_value_cap_inr === null || Number(policy.delegate_value_cap_inr) >= valueAtRisk));
+          (policy?.delegate_value_cap_inr === null ||
+            Number(policy.delegate_value_cap_inr) >= valueAtRisk));
 
-      const targetStatus: 'EXPIRED' | 'COUNTERED' = shouldEscalate ? 'COUNTERED' : 'EXPIRED';
+      const targetStatus: 'EXPIRED' | 'COUNTERED' = shouldEscalate
+        ? 'COUNTERED'
+        : 'EXPIRED';
       const newEscalatedTo = shouldEscalate
-        ? (card.escalated_to ? policy.second_escalation_user_id : policy.delegate_user_id)
+        ? card.escalated_to
+          ? policy.second_escalation_user_id
+          : policy.delegate_user_id
         : null;
 
       await trx('exception_approvals')
@@ -394,7 +474,10 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
       if (!template) {
         await this.knex('notification_outbox')
           .where({ id: row.id })
-          .update({ status: 'FAILED', error: `Template ${row.template_code} not found` });
+          .update({
+            status: 'FAILED',
+            error: `Template ${row.template_code} not found`,
+          });
         continue;
       }
 
@@ -432,7 +515,11 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
    * For other roles, we find a user matching that role at the given site
    * (or across all sites if siteId is null).
    */
-  private async resolveApprover(role: string, siteId: string | null, trx: Knex.Transaction): Promise<string | null> {
+  private async resolveApprover(
+    role: string,
+    siteId: string | null,
+    trx: Knex.Transaction,
+  ): Promise<string | null> {
     // OWNER always resolves to the single OWNER user
     const query = trx('users')
       .where({ role })
@@ -442,7 +529,8 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
     if (siteId) {
       query.andWhere((qb) => {
         qb.where('assigned_site_id', siteId).orWhereExists((sub) => {
-          sub.select('*')
+          sub
+            .select('*')
             .from('user_site_access')
             .whereRaw('user_site_access.user_id = users.id')
             .andWhere('user_site_access.site_id', siteId);
@@ -508,7 +596,9 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
    * audit events and resolutions are attributed to the real caller.
    */
   private async currentUserId(): Promise<string | null> {
-    const row = await this.knex.raw("SELECT current_setting('app.user_id', true) AS uid");
+    const row = await this.knex.raw(
+      "SELECT current_setting('app.user_id', true) AS uid",
+    );
     const uid = row.rows?.[0]?.uid ?? row[0]?.uid;
     return uid && uid !== '' ? String(uid) : null;
   }

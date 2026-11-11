@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
@@ -101,7 +107,9 @@ export class GRNService {
    * Create a blind GRN - storekeeper only sees item name + qty box
    * Does NOT show expected qty or price
    */
-  async createBlindGRN(input: GRNCreateInput): Promise<{ id: string; grnNo: string; shortfalls: any[] }> {
+  async createBlindGRN(
+    input: GRNCreateInput,
+  ): Promise<{ id: string; grnNo: string; shortfalls: any[] }> {
     // Get PO details if linked
     let po = null;
     let supplierId = null;
@@ -117,9 +125,13 @@ export class GRNService {
     } else {
       // Direct GRN without PO - need supplier from first line's supplier_items
       const firstLine = input.lines[0];
-      const suppliers = await this.supplierService.getApprovedSuppliersForItem(firstLine.itemId);
+      const suppliers = await this.supplierService.getApprovedSuppliersForItem(
+        firstLine.itemId,
+      );
       if (suppliers.length === 0) {
-        throw new BadRequestException(`No approved supplier found for item ${firstLine.itemId}`);
+        throw new BadRequestException(
+          `No approved supplier found for item ${firstLine.itemId}`,
+        );
       }
       supplierId = suppliers[0].id;
     }
@@ -158,7 +170,9 @@ export class GRNService {
             .where('item_id', line.itemId)
             .first();
           if (lineInfo) {
-            const itemInfo = await trx('items').where('id', line.itemId).first('sku_code', 'name');
+            const itemInfo = await trx('items')
+              .where('id', line.itemId)
+              .first('sku_code', 'name');
             poLines.set(line.itemId, {
               id: String(lineInfo.id),
               itemId: String(lineInfo.item_id),
@@ -170,7 +184,9 @@ export class GRNService {
         }
 
         // Get item UoM for Qty operations
-        const item = await trx('items').where('id', line.itemId).first('primary_uom');
+        const item = await trx('items')
+          .where('id', line.itemId)
+          .first('primary_uom');
         const uom = item?.primary_uom ?? 'EA';
 
         await trx('goods_receipt_lines').insert({
@@ -225,7 +241,9 @@ export class GRNService {
               status: 'OPEN',
             });
 
-            this.logger.warn(`BR-05: Shortfall detected on GRN ${grnNo}, item ${effectivePoLine.itemSku}: received ${receivedQty.toStorageString()} < confirmed ${confirmedQty.toStorageString()} * (1 - ${this.SHORTFALL_TOLERANCE_PCT * 100}%)`);
+            this.logger.warn(
+              `BR-05: Shortfall detected on GRN ${grnNo}, item ${effectivePoLine.itemSku}: received ${receivedQty.toStorageString()} < confirmed ${confirmedQty.toStorageString()} * (1 - ${this.SHORTFALL_TOLERANCE_PCT * 100}%)`,
+            );
 
             // Raise SUPPLIER_SHORTFALL exception (closest matching type)
             // Reference the PO line so backup PO creation can update it
@@ -239,16 +257,22 @@ export class GRNService {
                 summary: `Received quantity below confirmed - 2% threshold`,
                 facts: [
                   { label: 'Item', value: effectivePoLine.itemSku },
-                  { label: 'Confirmed Qty', value: effectivePoLine.confirmedQty },
+                  {
+                    label: 'Confirmed Qty',
+                    value: effectivePoLine.confirmedQty,
+                  },
                   { label: 'Received Qty', value: line.receivedQty },
                   { label: 'Deficit Qty', value: deficitQtyStr },
                 ],
                 impact: `Supplier ${supplierId} delivered less than confirmed quantity`,
-                actions: [{ code: 'APPROVE', label: 'Accept Shortfall' }, { code: 'REJECT', label: 'Request Replacement' }],
+                actions: [
+                  { code: 'APPROVE', label: 'Accept Shortfall' },
+                  { code: 'REJECT', label: 'Request Replacement' },
+                ],
                 deepLink: `/procurement/grns/${grn.id}`,
                 valueAtRisk: deficitQtyStr,
               },
-              input.siteId
+              input.siteId,
             );
           }
         }
@@ -260,24 +284,32 @@ export class GRNService {
       }
 
       // Emit grn.posted event for M3 inventory
-      await this.outbox.raise(trx, 'grn.posted', String(grn.id), {
-        grnId: String(grn.id),
-        grnNo: grnNo,
-        poId: input.poId,
-        supplierId: supplierId,
-        siteId: input.siteId,
-        lines: input.lines.map(l => ({
-          itemId: l.itemId,
-          receivedQty: l.receivedQty,
-          receivedQtySecondary: l.receivedQtySecondary ?? '0.000',
-          batchLotNo: l.batchLotNo,
-          mfgDate: l.mfgDate,
-          expiryDate: l.expiryDate,
-        })),
-      }, 'm2-procurement');
+      await this.outbox.raise(
+        trx,
+        'grn.posted',
+        String(grn.id),
+        {
+          grnId: String(grn.id),
+          grnNo: grnNo,
+          poId: input.poId,
+          supplierId: supplierId,
+          siteId: input.siteId,
+          lines: input.lines.map((l) => ({
+            itemId: l.itemId,
+            receivedQty: l.receivedQty,
+            receivedQtySecondary: l.receivedQtySecondary ?? '0.000',
+            batchLotNo: l.batchLotNo,
+            mfgDate: l.mfgDate,
+            expiryDate: l.expiryDate,
+          })),
+        },
+        'm2-procurement',
+      );
     });
 
-    this.logger.log(`Created blind GRN: ${grnNo} (${input.lines.length} lines, ${shortfalls.length} shortfalls)`);
+    this.logger.log(
+      `Created blind GRN: ${grnNo} (${input.lines.length} lines, ${shortfalls.length} shortfalls)`,
+    );
     return { id: grnId, grnNo, shortfalls };
   }
 
@@ -292,17 +324,25 @@ export class GRNService {
     const grnLines = await trx('goods_receipt_lines')
       .join('goods_receipts', 'goods_receipts.id', 'goods_receipt_lines.grn_id')
       .where('goods_receipts.po_id', poId)
-      .select('goods_receipt_lines.item_id', 'goods_receipt_lines.received_qty');
+      .select(
+        'goods_receipt_lines.item_id',
+        'goods_receipt_lines.received_qty',
+      );
 
     // Aggregate received qty by item
     const receivedMap = new Map<string, string>();
     for (const line of grnLines) {
       const existing = receivedMap.get(String(line.item_id)) ?? '0.000';
-      const item = await trx('items').where('id', line.item_id).first('primary_uom');
+      const item = await trx('items')
+        .where('id', line.item_id)
+        .first('primary_uom');
       const uom = item?.primary_uom ?? 'EA';
       const existingQty = Qty.of(existing, uom);
       const receivedQty = Qty.of(String(line.received_qty), uom);
-      receivedMap.set(String(line.item_id), existingQty.add(receivedQty).toStorageString());
+      receivedMap.set(
+        String(line.item_id),
+        existingQty.add(receivedQty).toStorageString(),
+      );
     }
 
     let allFullyReceived = true;
@@ -310,7 +350,9 @@ export class GRNService {
 
     for (const poLine of poLines) {
       const received = receivedMap.get(String(poLine.item_id)) ?? '0.000';
-      const item = await trx('items').where('id', poLine.item_id).first('primary_uom');
+      const item = await trx('items')
+        .where('id', poLine.item_id)
+        .first('primary_uom');
       const uom = item?.primary_uom ?? 'EA';
       const confirmed = Qty.of(String(poLine.confirmed_qty), uom);
       const receivedQty = Qty.of(received, uom);
@@ -381,7 +423,7 @@ export class GRNService {
       )
       .orderBy('goods_receipt_lines.created_at');
 
-    return lines.map(line => ({
+    return lines.map((line) => ({
       id: String(line.id),
       grnId: String(line.grn_id),
       itemId: String(line.item_id),
@@ -420,7 +462,7 @@ export class GRNService {
       poId: po.id,
       poNo: po.po_no,
       supplierName: supplier.company_name,
-      lines: poLines.map(line => ({
+      lines: poLines.map((line) => ({
         itemId: line.itemId,
         itemSku: line.itemSku,
         itemName: line.itemName,
@@ -433,15 +475,17 @@ export class GRNService {
   /**
    * List GRNs with filters
    */
-  async list(filters: {
-    poId?: string;
-    supplierId?: string;
-    siteId?: string;
-    dateFrom?: Date;
-    dateTo?: Date;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<GRNSummary[]> {
+  async list(
+    filters: {
+      poId?: string;
+      supplierId?: string;
+      siteId?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<GRNSummary[]> {
     let query = this.knex('goods_receipts')
       .join('suppliers', 'suppliers.id', 'goods_receipts.supplier_id')
       .leftJoin('purchase_orders', 'purchase_orders.id', 'goods_receipts.po_id')
@@ -476,7 +520,7 @@ export class GRNService {
 
     const grns = await query.orderBy('goods_receipts.received_at', 'desc');
 
-    return grns.map(grn => ({
+    return grns.map((grn) => ({
       id: String(grn.id),
       grnNo: grn.grn_no,
       poId: grn.po_id ? String(grn.po_id) : null,
@@ -497,7 +541,11 @@ export class GRNService {
    */
   async getShortfallsForPO(poId: string): Promise<any[]> {
     return this.knex('po_shortfalls')
-      .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
+      .join(
+        'purchase_order_lines',
+        'purchase_order_lines.id',
+        'po_shortfalls.po_line_id',
+      )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
       .where('purchase_order_lines.po_id', poId)
       .select(
@@ -515,8 +563,16 @@ export class GRNService {
    */
   async getOpenShortfallsForSupplier(supplierId: string): Promise<any[]> {
     return this.knex('po_shortfalls')
-      .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_order_lines',
+        'purchase_order_lines.id',
+        'po_shortfalls.po_line_id',
+      )
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
       .where('purchase_orders.supplier_id', supplierId)
       .where('po_shortfalls.status', 'OPEN')

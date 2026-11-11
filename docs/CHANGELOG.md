@@ -37,6 +37,11 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - Restored missing migration `20261026_008_m6_add_simple_missing_tables.sql` (`cashbook_entries`, `vehicles`, `delivery_trips`, `delivery_stops`)
 - Made M3 baseline migration RLS policies idempotent (`IF NOT EXISTS`) to prevent parallel test worker collisions
 - Updated `m6-acceptance.spec.ts` test fixtures to use UUIDs preventing millisecond constraint collisions
+- **Code Review Remediation (07_CODE_REVIEW_FINDINGS_REMEDIATION_PLAN.md)**:
+  - **Workstream A (Supplier Bills & Tax Invoices)**: Aligned `supplier_bills`, `supplier_bill_items`, and `tax_invoices` inserts with the canonical database schema (UUIDv7 generation, required audit columns `created_by`/`updated_by`, `site_id`, `subtotal`, `tax_total`, `amount`, and `total_amount`). Applied migration `20261111_027_m2_supplier_bill_status_and_ar_aging.sql` to support full status lifecycles (`PENDING_APPROVAL`, `APPROVED`, etc.). Implemented tax invoice creation during bill approval using `DocNumberService.next('TAX_INVOICE')`.
+  - **Workstream B (Outbox Event Persistence)**: Restored durable, transactional domain-event persistence for supplier bill lifecycle (`bill.created`, `bill.approved`, `bill.rejected`) using `OutboxService.raise(trx, ...)` writing to `outbox_events`. Removed non-canonical un-awaited writes to nonexistent `outbox` table and removed invalid `flushOutbox` pattern.
+  - **Workstream C (Dashboard Event Queue & MV Refreshes)**: Connected `DashboardEventHandler` to BullMQ `dashboard-events` worker queue dispatched by `OutboxRelay`. Implemented concurrency-safe, coalesced PostgreSQL materialized view refreshes (`mv_pulse_today`, `mv_ops_status`, `mv_inventory_alerts`, `mv_customer_profitability`, `mv_supplier_scorecard`) and resolved concurrent refresh index requirement via migration `20261111_028_fix_mv_inventory_alerts_concurrent_refresh.sql`.
+  - **Workstream D (AR Aging Aggregation)**: Corrected AR aging aggregation in `AnalyticsService.getARAging` and `mv_ar_aging` view to prevent cumulative snapshot double-counting from customer ledger rows by querying invoice `balance_due` grouped into aging buckets (0–7, 8–15, 16–30, 30+ days overdue).
 
 ### Decisions Made (Proposed defaults — pending business owner confirmation)
 - Modular monolith architecture; no microservices (ADR-001)
@@ -348,6 +353,59 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 - **OD-001**: 10% gross margin default, overridable per item category
 - **OD-003**: Invoice generation timing confirmed (dispatch event triggers)
 - **OD-019**: Delegated approval with escalation (silent auto-approval never permitted)
+
+---
+
+## [0.5.4] — 2026-11-11 — P0.4: Inbound PO Qty, Outbox Events, Test Fixes
+
+### Added
+- **ProcurementPort.getInboundQty()**: Real implementation in M2 that queries PO ordered quantities minus GRN received quantities for a given item at a site
+- **M4 RequisitionService.generateRequisitionFromDemand()**: Updated to calculate `inboundQty` via ProcurementPort, computing `netQty = required - available - inbound` for accurate requisition planning
+- **M6 CollectionService transactional outbox event**: `this.outbox.raise(trx, 'collection.logged', {...})` emitted atomically during `logCollection()`
+- **M6 EodService transactional outbox event**: `this.outbox.raise(trx, 'eod.closed', {...})` emitted atomically during `signOff()`
+- **M4 Test Fixtures**: Enhanced TC-M4-011/TC-M4-012 with proper supplier/PO creation including explicit UUID IDs, correct PO status values (ISSUED/PARTIALLY_RECEIVED/CLOSED), and FK-safe cleanup
+
+### Fixed
+- M4 shortage detection tests now use valid PO status values (ISSUED not OPEN)
+- Test inserts include all required fields (id UUIDs, created_by/updated_by, timestamps)
+- TRUNCATE in M4 `beforeEach` now includes M2 tables for proper test isolation
+- FK cleanup order fixed in test `afterEach` hooks (children before parents)
+
+### Module Status Updated
+- M4 Production: ✅ Complete (requisition planner with inbound PO calculation verified)
+- M6 Finance: ✅ Complete (collection.logged and eod.closed events verified)
+
+---
+
+## [0.5.3] — 2026-11-11 — M1 BR-02 Overdue Calculation Integration
+
+### Added
+
+#### CreditService Overdue Integration (BR-02 Enhancement)
+- **Overdue invoice tracking**: Credit evaluation now queries `invoices` table for unpaid invoices (balance_due > 0) and calculates oldest overdue days
+- **Date calculation**: Uses `due_date < today` to identify overdue invoices, computes days overdue as `CEIL((today - due_date) / 1 day)`
+- **Max overdue days threshold**: Customer's `max_overdue_days` setting (default 15) defines tolerance; invoices overdue beyond this trigger HOLD status
+- **Multi-invoice support**: Correctly identifies oldest overdue invoice across multiple outstanding invoices
+- **PARTIAL status support**: Invoices with remaining balance (PARTIAL status) are included in overdue calculation
+
+#### CreditService Test Suite
+- **10 comprehensive tests** covering all BR-02 scenarios:
+  1. No overdue invoices → OK
+  2. Overdue within tolerance (≤ max_overdue_days) → OK
+  3. Overdue beyond max_overdue_days → HOLD
+  4. Multiple invoices: oldest overdue days correctly identified
+  5. Inactive customer → HOLD (precedence over credit/overdue checks)
+  6. Credit limit breach + overdue combined
+  7. Paid invoices only (zero balance due) → OK
+  8. Partially paid invoices correctly tracked
+- All tests include proper cleanup and FK constraint handling
+
+### Fixed
+- Updated CHANGELOG to reflect completed module status
+
+### Module Status Updated
+- M1 Credit: ✅ Complete (BR-02 with overdue integration)
+- Next: M2 Procurement final polish and frontend screens
 
 ---
 

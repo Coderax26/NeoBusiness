@@ -106,9 +106,7 @@ export class InventoryController {
   @RequirePermission('inventory.reserve')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create stock reservation' })
-  async createReservation(
-    @Body() body: CreateReservationDto,
-  ) {
+  async createReservation(@Body() body: CreateReservationDto) {
     return this.inventoryService.reserveStock(
       body.siteId,
       body.itemId,
@@ -140,9 +138,7 @@ export class InventoryController {
   @RequirePermission('inventory.transfer')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create inter-site transfer' })
-  async createTransfer(
-    @Body() body: CreateTransferDto,
-  ) {
+  async createTransfer(@Body() body: CreateTransferDto) {
     const result = await this.inventoryService.transferStock(
       body.fromSiteId,
       body.toSiteId,
@@ -201,9 +197,7 @@ export class InventoryController {
   @RequirePermission('inventory.grn')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Post GRN' })
-  async postGRN(
-    @Body() body: PostGrnDto,
-  ) {
+  async postGRN(@Body() body: PostGrnDto) {
     return this.inventoryService.receiveGRN(
       body.siteId,
       body.poId,
@@ -220,10 +214,7 @@ export class InventoryController {
   @RequirePermission('inventory.adjust')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create stock adjustment' })
-  async createAdjustment(
-    @Body() body: CreateAdjustmentDto,
-    @Req() req: any,
-  ) {
+  async createAdjustment(@Body() body: CreateAdjustmentDto, @Req() req: any) {
     return this.inventoryService.createAdjustment(
       body.siteId,
       body.itemId,

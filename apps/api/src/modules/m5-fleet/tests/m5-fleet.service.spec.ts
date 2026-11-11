@@ -2,7 +2,12 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { v4 as uuidv4 } from 'uuid';
 import { FleetService } from '../fleet.service.js';
 import { setupTestDB } from '../../m3-inventory/tests/test-setup.js';
-import type { CreditPort, InventoryPort, LedgerPort, NotifyPort } from '../../../shared/ports/ports.interface.js';
+import type {
+  CreditPort,
+  InventoryPort,
+  LedgerPort,
+  NotifyPort,
+} from '../../../shared/ports/ports.interface.js';
 import type { OutboxService } from '../../../shared/events/outbox.service.js';
 import type { DocNumberService } from '../../m0-platform/doc-number.service.js';
 import type { ConfigService } from '../../m0-platform/config.service.js';
@@ -26,7 +31,9 @@ describe('M5 FleetService', () => {
       oldestOverdueDays: null,
     }),
     canDispatch: async () =>
-      allowDispatch ? { allowed: true } : { allowed: false, reason: 'CREDIT_HOLD' },
+      allowDispatch
+        ? { allowed: true }
+        : { allowed: false, reason: 'CREDIT_HOLD' },
   };
   const inventory: InventoryPort = {
     checkATP: async () => ({
@@ -104,16 +111,19 @@ describe('M5 FleetService', () => {
     await context.knex('delivery_trips').where('site_id', context.siteId).del();
     await context.knex('vehicles').where('site_id', context.siteId).del();
     allowDispatch = true;
-    const [vehicle] = await context.knex('vehicles').insert({
-      id: uuidv4(),
-      site_id: context.siteId,
-      registration_no: `M5-${uuidv4().slice(0, 6)}`,
-      vehicle_type: 'TRUCK',
-      capacity_kg: '100',
-      is_active: true,
-      created_at: new Date(),
-      updated_at: new Date(),
-    }).returning('*');
+    const [vehicle] = await context
+      .knex('vehicles')
+      .insert({
+        id: uuidv4(),
+        site_id: context.siteId,
+        registration_no: `M5-${uuidv4().slice(0, 6)}`,
+        vehicle_type: 'TRUCK',
+        capacity_kg: '100',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning('*');
     vehicleId = String(vehicle.id);
   });
 
@@ -127,110 +137,191 @@ describe('M5 FleetService', () => {
 
   it('rejects a trip whose load exceeds vehicle capacity', async () => {
     await expect(
-      fleet.createTrip({
-        siteId: context.siteId,
-        tripDate: context.today,
-        vehicleId,
-        driverId,
-        stops: [{
-          customerId,
-          sequenceNo: 1,
-          lines: [{ itemId: context.itemRiceId, loadedQty: 101 }],
-        }],
-      }, context.ownerId),
+      fleet.createTrip(
+        {
+          siteId: context.siteId,
+          tripDate: context.today,
+          vehicleId,
+          driverId,
+          stops: [
+            {
+              customerId,
+              sequenceNo: 1,
+              lines: [{ itemId: context.itemRiceId, loadedQty: 101 }],
+            },
+          ],
+        },
+        context.ownerId,
+      ),
     ).rejects.toThrow('Trip load exceeds vehicle capacity');
   });
 
   it('blocks dispatch when CreditPort rejects an order', async () => {
-    const trip = await fleet.createTrip({
-      siteId: context.siteId,
-      tripDate: context.today,
-      vehicleId,
-      driverId,
-      stops: [{
-        customerId,
-        salesOrderId: uuidv4(),
-        sequenceNo: 1,
-        lines: [{ itemId: context.itemRiceId, loadedQty: 10, batchId: context.batchRice1Id }],
-      }],
-    }, context.ownerId);
+    const trip = await fleet.createTrip(
+      {
+        siteId: context.siteId,
+        tripDate: context.today,
+        vehicleId,
+        driverId,
+        stops: [
+          {
+            customerId,
+            salesOrderId: uuidv4(),
+            sequenceNo: 1,
+            lines: [
+              {
+                itemId: context.itemRiceId,
+                loadedQty: 10,
+                batchId: context.batchRice1Id,
+              },
+            ],
+          },
+        ],
+      },
+      context.ownerId,
+    );
     tripId = String(trip.id);
     allowDispatch = false;
-    await expect(fleet.dispatchTrip(tripId, [{
-      stopId: String(trip.stops[0].id),
-      itemId: context.itemRiceId,
-      batchId: context.batchRice1Id,
-      qty: 10,
-    }], context.storekeeperId)).rejects.toThrow('CREDIT_HOLD');
+    await expect(
+      fleet.dispatchTrip(
+        tripId,
+        [
+          {
+            stopId: String(trip.stops[0].id),
+            itemId: context.itemRiceId,
+            batchId: context.batchRice1Id,
+            qty: 10,
+          },
+        ],
+        context.storekeeperId,
+      ),
+    ).rejects.toThrow('CREDIT_HOLD');
   });
 
   it('requires returned quantity for partial delivery and blocks incomplete trip closure', async () => {
-    const trip = await fleet.createTrip({
-      siteId: context.siteId,
-      tripDate: context.today,
-      vehicleId,
-      driverId,
-      stops: [{
-        customerId,
-        sequenceNo: 1,
-        lines: [{ itemId: context.itemRiceId, loadedQty: 10, batchId: context.batchRice1Id }],
-      }],
-    }, context.ownerId);
+    const trip = await fleet.createTrip(
+      {
+        siteId: context.siteId,
+        tripDate: context.today,
+        vehicleId,
+        driverId,
+        stops: [
+          {
+            customerId,
+            sequenceNo: 1,
+            lines: [
+              {
+                itemId: context.itemRiceId,
+                loadedQty: 10,
+                batchId: context.batchRice1Id,
+              },
+            ],
+          },
+        ],
+      },
+      context.ownerId,
+    );
     tripId = String(trip.id);
     stopId = String(trip.stops[0].id);
-    await fleet.dispatchTrip(tripId, [{
-      stopId,
-      itemId: context.itemRiceId,
-      batchId: context.batchRice1Id,
-      qty: 10,
-    }], context.storekeeperId);
-    await expect(fleet.closeTrip(tripId, driverId)).rejects.toThrow('still pending');
+    await fleet.dispatchTrip(
+      tripId,
+      [
+        {
+          stopId,
+          itemId: context.itemRiceId,
+          batchId: context.batchRice1Id,
+          qty: 10,
+        },
+      ],
+      context.storekeeperId,
+    );
+    await expect(fleet.closeTrip(tripId, driverId)).rejects.toThrow(
+      'still pending',
+    );
 
-    await fleet.deliverStop(stopId, {
-      epodMethod: 'PHOTO',
-      epodPhotoUrl: 's3://photo',
-      capturedAt: new Date().toISOString(),
-      gpsLat: 19.07,
-      gpsLng: 72.87,
-      lines: [{ itemId: context.itemRiceId, deliveredQty: 8, returnedQty: 2, batchId: context.batchRice1Id }],
-    }, driverId, `m5-${uuidv4()}`);
+    await fleet.deliverStop(
+      stopId,
+      {
+        epodMethod: 'PHOTO',
+        epodPhotoUrl: 's3://photo',
+        capturedAt: new Date().toISOString(),
+        gpsLat: 19.07,
+        gpsLng: 72.87,
+        lines: [
+          {
+            itemId: context.itemRiceId,
+            deliveredQty: 8,
+            returnedQty: 2,
+            batchId: context.batchRice1Id,
+          },
+        ],
+      },
+      driverId,
+      `m5-${uuidv4()}`,
+    );
     const closed = await fleet.closeTrip(tripId, driverId);
     expect(closed.status).toBe('COMPLETED');
   });
 
   it('replays an idempotent delivery without creating a second outcome', async () => {
-    const trip = await fleet.createTrip({
-      siteId: context.siteId,
-      tripDate: context.today,
-      vehicleId,
-      driverId,
-      stops: [{
-        customerId,
-        sequenceNo: 1,
-        lines: [{ itemId: context.itemRiceId, loadedQty: 5, batchId: context.batchRice1Id }],
-      }],
-    }, context.ownerId);
+    const trip = await fleet.createTrip(
+      {
+        siteId: context.siteId,
+        tripDate: context.today,
+        vehicleId,
+        driverId,
+        stops: [
+          {
+            customerId,
+            sequenceNo: 1,
+            lines: [
+              {
+                itemId: context.itemRiceId,
+                loadedQty: 5,
+                batchId: context.batchRice1Id,
+              },
+            ],
+          },
+        ],
+      },
+      context.ownerId,
+    );
     tripId = String(trip.id);
     stopId = String(trip.stops[0].id);
-    await fleet.dispatchTrip(tripId, [{
-      stopId,
-      itemId: context.itemRiceId,
-      batchId: context.batchRice1Id,
-      qty: 5,
-    }], context.storekeeperId);
+    await fleet.dispatchTrip(
+      tripId,
+      [
+        {
+          stopId,
+          itemId: context.itemRiceId,
+          batchId: context.batchRice1Id,
+          qty: 5,
+        },
+      ],
+      context.storekeeperId,
+    );
     const request = {
       epodMethod: 'SIGNATURE' as const,
       epodSignatureUrl: 's3://signature',
       capturedAt: new Date().toISOString(),
       gpsLat: 19.07,
       gpsLng: 72.87,
-      lines: [{ itemId: context.itemRiceId, deliveredQty: 5, returnedQty: 0, batchId: context.batchRice1Id }],
+      lines: [
+        {
+          itemId: context.itemRiceId,
+          deliveredQty: 5,
+          returnedQty: 0,
+          batchId: context.batchRice1Id,
+        },
+      ],
     };
     const key = `m5-replay-${uuidv4()}`;
     const first = await fleet.deliverStop(stopId, request, driverId, key);
     const second = await fleet.deliverStop(stopId, request, driverId, key);
     expect(first.stops[0].status).toBe('DELIVERED_FULL');
     expect(second.stops[0].status).toBe('DELIVERED_FULL');
-    expect(await context.knex('delivery_stops').where('id', stopId)).toHaveLength(1);
+    expect(
+      await context.knex('delivery_stops').where('id', stopId),
+    ).toHaveLength(1);
   });
 });

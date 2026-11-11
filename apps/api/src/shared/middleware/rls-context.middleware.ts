@@ -1,4 +1,8 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -53,7 +57,10 @@ export class RlsContextMiddleware implements NestMiddleware {
    * Resolve the set of site IDs the user can access.
    * OWNER sees all sites; everyone else sees their assigned sites.
    */
-  private async resolveSiteIds(userId: string, role: string): Promise<string[]> {
+  private async resolveSiteIds(
+    userId: string,
+    role: string,
+  ): Promise<string[]> {
     if (role === 'OWNER') {
       const rows = await this.knex('sites').select('id');
       return rows.map((r) => String(r.id));

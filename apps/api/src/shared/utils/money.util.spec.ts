@@ -4,7 +4,7 @@ import { Money } from './money.util';
 describe('Money utility', () => {
   describe('basic arithmetic', () => {
     it('adds two money values correctly', () => {
-      const a = Money.of(100.50);
+      const a = Money.of(100.5);
       const b = Money.of(200.75);
       expect(a.add(b).toStorageString()).toBe('301.25');
     });
@@ -39,8 +39,8 @@ describe('Money utility', () => {
     });
 
     it('rounds UP to nearest 0.50 correctly', () => {
-      expect(Money.of(91.10).roundUpTo(0.5).toStorageString()).toBe('91.50');
-      expect(Money.of(91.50).roundUpTo(0.5).toStorageString()).toBe('91.50');
+      expect(Money.of(91.1).roundUpTo(0.5).toStorageString()).toBe('91.50');
+      expect(Money.of(91.5).roundUpTo(0.5).toStorageString()).toBe('91.50');
       expect(Money.of(91.51).roundUpTo(0.5).toStorageString()).toBe('92.00');
     });
   });
@@ -64,7 +64,7 @@ describe('Money utility', () => {
     it('calculates floor = landed_cost / (1 - min_margin_pct), rounded up to 0.50', () => {
       // Blueprint example: cost=82, floor should be >= 82/(1-0.10) = 91.11 → rounds up to 91.50
       const landedCost = Money.of(82);
-      const minMarginPct = 0.10;
+      const minMarginPct = 0.1;
       const floor = Money.autoFloor(landedCost, minMarginPct);
       // 82 / 0.90 = 91.111... → rounds up to 91.50
       expect(floor.toStorageString()).toBe('91.50');

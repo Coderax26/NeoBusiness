@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "apps/api/package.json": {
-    "mtime": 1793692927.0997381,
-    "seen": 1793890732.88511,
-    "ast_hash": "4320a60f223820bf7927128aedcf3ebf",
+    "mtime": 1794069418.146139,
+    "seen": 1794071097.7904027,
+    "ast_hash": "db0c8a71d46ecd9c9f1c4e2524271a86",
     "semantic_hash": ""
   },
   "apps/api/src/app.controller.spec.ts": {
@@ -366,9 +366,9 @@
     "semantic_hash": ""
   },
   "apps/api/src/modules/m6-finance/m6-financials.module.ts": {
-    "mtime": 1793692528.1506338,
-    "seen": 1793890732.9227877,
-    "ast_hash": "2169fe7e342adcafe78b5dff03184c20",
+    "mtime": 1793942544.5195777,
+    "seen": 1794071097.920045,
+    "ast_hash": "c733bf2e881d4fad68bef85af7e588c5",
     "semantic_hash": ""
   },
   "apps/api/src/modules/m6-finance/ptp.service.ts": {
@@ -498,9 +498,9 @@
     "semantic_hash": ""
   },
   "apps/api/src/shared/ports/port-stubs.ts": {
-    "mtime": 1793933610.378591,
-    "seen": 1793935946.5644546,
-    "ast_hash": "004c9f44569f5580b4db4abaad8dd692",
+    "mtime": 1793937417.6842191,
+    "seen": 1794071097.9372447,
+    "ast_hash": "4c1fda0bd681f5c3b0dcb3d75644af02",
     "semantic_hash": ""
   },
   "apps/api/src/shared/ports/ports.interface.ts": {
@@ -660,9 +660,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1793695949.8629937,
-    "seen": 1793890732.9553645,
-    "ast_hash": "7701dd9f7bc56a78eaf0fdeb8be81237",
+    "mtime": 1793941927.9926414,
+    "seen": 1794071097.967137,
+    "ast_hash": "456ced06e55358fb056e68a91fc7c70f",
     "semantic_hash": ""
   },
   "README.md": {
@@ -690,9 +690,9 @@
     "semantic_hash": ""
   },
   "docs/CHANGELOG.md": {
-    "mtime": 1793934147.4497573,
-    "seen": 1793935946.5937512,
-    "ast_hash": "3d7f4f1a380ed12f4825e2795990144b",
+    "mtime": 1794069620.2501307,
+    "seen": 1794071097.9701352,
+    "ast_hash": "555656b367c91b710296a655bd9cde14",
     "semantic_hash": ""
   },
   "docs/DEVELOPMENT_GUIDE.md": {
@@ -1044,9 +1044,9 @@
     "semantic_hash": ""
   },
   "apps/api/src/modules/m6-finance/tests/m5-m6-integration.spec.ts": {
-    "mtime": 1793701943.1800404,
-    "seen": 1793890732.9227877,
-    "ast_hash": "26c23c29fb34ee5bdfa44ed2391ff314",
+    "mtime": 1793938205.6042356,
+    "seen": 1794071097.9210625,
+    "ast_hash": "d116ca4aead4d9b17e6a0730a3cabdb9",
     "semantic_hash": ""
   },
   "apps/api/src/shared/services/pdf-generator.service.ts": {
@@ -1115,10 +1115,52 @@
     "ast_hash": "595ab883f69046afafb30eaa408699de",
     "semantic_hash": ""
   },
+  "apps/api/src/modules/m2-procurement/tests/m2-acceptance.spec.ts": {
+    "mtime": 1794070996.1429698,
+    "seen": 1794071097.8615606,
+    "ast_hash": "0b6bb96d57b1b9773a69b5eb6b1bafc7",
+    "semantic_hash": ""
+  },
+  "apps/api/src/modules/m6-finance/cheque.service.ts": {
+    "mtime": 1793942545.1726508,
+    "seen": 1794071097.9130661,
+    "ast_hash": "201f656a50591f753f875df9791ca2c6",
+    "semantic_hash": ""
+  },
+  "apps/api/src/modules/m6-finance/cod-settlement.service.ts": {
+    "mtime": 1793942544.8151128,
+    "seen": 1794071097.9130661,
+    "ast_hash": "8b4df1e29d6c301d472891f85b7a03f3",
+    "semantic_hash": ""
+  },
+  "apps/api/src/modules/m6-finance/credit-port.service.ts": {
+    "mtime": 1793942544.3573773,
+    "seen": 1794071097.9165056,
+    "ast_hash": "d5857d3dd3dc409ecf180f5311033551",
+    "semantic_hash": ""
+  },
+  "apps/api/src/modules/m6-finance/tally-export.service.ts": {
+    "mtime": 1793942544.9842527,
+    "seen": 1794071097.9210625,
+    "ast_hash": "d8df0d796fc8bff66068b25be2196dc1",
+    "semantic_hash": ""
+  },
+  ".claude/plans/m2-procurement.plan.md": {
+    "mtime": 1794070188.0243185,
+    "seen": 1794071097.9589474,
+    "ast_hash": "4f144c21ebbdf82183d5a2a31618b723",
+    "semantic_hash": ""
+  },
+  ".claude/plans/m6-part2-integration.plan.md": {
+    "mtime": 1793936294.1863768,
+    "seen": 1794071097.9636095,
+    "ast_hash": "089918b7643e55b018739be708adf57e",
+    "semantic_hash": ""
+  },
   "apps/api/package-lock.json": {
-    "mtime": 1793692927.7686753,
-    "seen": 1793890732.991484,
-    "ast_hash": "fddee7231eb135d7b9c05388d77986df",
+    "mtime": 1794069418.4762251,
+    "seen": 1794071097.9999475,
+    "ast_hash": "0c6acd40637b5961636a08f7681728d0",
     "semantic_hash": ""
   }
 }

@@ -1,4 +1,9 @@
-import { Injectable, NestMiddleware, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -55,7 +60,10 @@ export class IdempotencyMiddleware implements NestMiddleware {
         );
       }
       // Replay: return the stored response
-      const stored = existing.response_json as { status?: number; body?: unknown } | null;
+      const stored = existing.response_json as {
+        status?: number;
+        body?: unknown;
+      } | null;
       res.status(stored?.status ?? 200).json(stored?.body ?? { ok: true });
       return;
     }
@@ -90,7 +98,11 @@ export class IdempotencyMiddleware implements NestMiddleware {
       this.knex('idempotency_keys')
         .where('key', key)
         .update({ response_json: { status: statusCode, body: responseBody } })
-        .catch((err) => this.logger.warn(`Failed to store idempotency response: ${(err as Error).message}`));
+        .catch((err) =>
+          this.logger.warn(
+            `Failed to store idempotency response: ${(err as Error).message}`,
+          ),
+        );
     });
 
     next();

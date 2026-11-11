@@ -1,4 +1,15 @@
-import { Controller, Get, Put, Body, Param, Query, UseGuards, Req, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { PricingService } from './pricing.service.js';
@@ -17,7 +28,9 @@ export class PricingController {
   @RequirePermission('price.set_daily')
   async getTodayPrices(@Query() q: GetPricesQueryDto) {
     const date = q.date ?? new Date().toISOString().split('T')[0];
-    return this.pricingSvc.getPricesForDate(date, { itemCategory: q.itemCategory });
+    return this.pricingSvc.getPricesForDate(date, {
+      itemCategory: q.itemCategory,
+    });
   }
 
   /**
@@ -25,8 +38,13 @@ export class PricingController {
    */
   @Get(':date')
   @RequirePermission('price.set_daily')
-  async getPricesForDate(@Param('date') date: string, @Query() q: GetPricesQueryDto) {
-    return this.pricingSvc.getPricesForDate(date, { itemCategory: q.itemCategory });
+  async getPricesForDate(
+    @Param('date') date: string,
+    @Query() q: GetPricesQueryDto,
+  ) {
+    return this.pricingSvc.getPricesForDate(date, {
+      itemCategory: q.itemCategory,
+    });
   }
 
   /**
@@ -36,10 +54,14 @@ export class PricingController {
    */
   @Put(':date')
   @RequirePermission('price.set_daily')
-  async upsertPrices(@Param('date') date: string, @Body() dto: PublishPricesDto, @Req() req: any) {
+  async upsertPrices(
+    @Param('date') date: string,
+    @Body() dto: PublishPricesDto,
+    @Req() req: any,
+  ) {
     const updatedItemIds = await this.pricingSvc.upsertDailyPrices(
       date,
-      dto.items.map(i => ({
+      dto.items.map((i) => ({
         itemId: i.itemId,
         landedCost: i.latestLandedCost,
         floorPrice: i.floorPrice,
@@ -60,7 +82,10 @@ export class PricingController {
    */
   @Get('missing/:date')
   @RequirePermission('price.set_daily')
-  async getMissingPrices(@Param('date') date: string, @Query('itemCategory') itemCategory?: string) {
+  async getMissingPrices(
+    @Param('date') date: string,
+    @Query('itemCategory') itemCategory?: string,
+  ) {
     return this.pricingSvc.getItemsMissingPrices(date, { itemCategory });
   }
 }

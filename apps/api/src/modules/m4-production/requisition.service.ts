@@ -327,7 +327,17 @@ export class RequisitionService {
       const availableQty = atpResult?.availableQty ?? '0';
       const totalQty = Qty.of(exp.totalQty, exp.uom);
       const availQty = Qty.of(availableQty, exp.uom);
-      const netQty = totalQty.sub(availQty).toStorageString();
+
+      // Get inbound PO quantity from ProcurementPort
+      const inboundQtyStr = await this.procurementPort.getInboundQty(
+        itemId,
+        siteId,
+      );
+      const inboundQty = Qty.of(inboundQtyStr, exp.uom);
+
+      // Net = required - available - inbound (POs not yet received)
+      const totalCovered = availQty.add(inboundQty);
+      const netQty = totalQty.sub(totalCovered).toStorageString();
 
       if (Qty.of(netQty, exp.uom).isGreaterThan(Qty.zero(exp.uom))) {
         netRequirements.push({
@@ -337,7 +347,7 @@ export class RequisitionService {
           requiredQty: exp.totalQty,
           uom: exp.uom,
           availableQty,
-          inboundQty: '0', // placeholder
+          inboundQty: inboundQty.toStorageString(),
           netQty,
         });
       }
@@ -514,10 +524,10 @@ export class RequisitionService {
     const lines = await this.reqRepo.getLinesWithItems(reqId);
     const poIds: string[] = [];
 
-    // For each line, create a back-to-back PO via ProcurementPort
+    // For each line, create a back-to-batch PO via ProcurementPort
     for (const line of lines) {
       // In real implementation, this would create a PO draft
-      const poId = await this.procurementPort.createBackToBackPO(line.id);
+      const poId = await this.procurementPort.createBackToBatchPO(line.id);
       poIds.push(poId);
     }
 

@@ -54,12 +54,16 @@ export class NotificationService implements NotifyPort {
       .first('body', 'title', 'channel', 'wa_template_id');
 
     if (!template) {
-      this.logger.warn(`Template ${templateCode} not found or inactive — skipping notification`);
+      this.logger.warn(
+        `Template ${templateCode} not found or inactive — skipping notification`,
+      );
       return;
     }
 
     const renderedBody = this.renderTemplate(template.body, payload);
-    const renderedTitle = template.title ? this.renderTemplate(template.title, payload) : undefined;
+    const renderedTitle = template.title
+      ? this.renderTemplate(template.title, payload)
+      : undefined;
 
     switch (channel) {
       case 'FCM':
@@ -75,7 +79,9 @@ export class NotificationService implements NotifyPort {
         break;
 
       case 'WHATSAPP':
-        this.logger.log(`[WHATSAPP] to=${recipientRef} template=${template.wa_template_id ?? 'default'} body=${renderedBody}`);
+        this.logger.log(
+          `[WHATSAPP] to=${recipientRef} template=${template.wa_template_id ?? 'default'} body=${renderedBody}`,
+        );
         break;
 
       default:
@@ -106,7 +112,9 @@ export class NotificationService implements NotifyPort {
       .first('fcm_token');
 
     if (!device?.fcm_token) {
-      this.logger.warn(`User ${userId} has no registered FCM token — skipping push`);
+      this.logger.warn(
+        `User ${userId} has no registered FCM token — skipping push`,
+      );
       // Fallback: log as if sent (the in-app variant is queued separately)
       return;
     }
@@ -118,7 +126,9 @@ export class NotificationService implements NotifyPort {
     };
 
     // M7b TODO: call admin.messaging().send(fcmMessage)
-    this.logger.log(`[FCM] dispatching to token=${device.fcm_token} title="${title ?? ''}" body="${body}"`);
+    this.logger.log(
+      `[FCM] dispatching to token=${device.fcm_token} title="${title ?? ''}" body="${body}"`,
+    );
   }
 
   /**
@@ -139,7 +149,9 @@ export class NotificationService implements NotifyPort {
       status: 'QUEUED',
     });
 
-    this.logger.debug(`[IN_APP] enqueued for user=${userId} template=${payload.templateCode ?? 'generic'}`);
+    this.logger.debug(
+      `[IN_APP] enqueued for user=${userId} template=${payload.templateCode ?? 'generic'}`,
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -150,7 +162,10 @@ export class NotificationService implements NotifyPort {
    * Render a template string by replacing {key} placeholders
    * with values from the payload object.
    */
-  private renderTemplate(template: string, payload: Record<string, unknown>): string {
+  private renderTemplate(
+    template: string,
+    payload: Record<string, unknown>,
+  ): string {
     return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
       const val = payload[key];
       return val !== undefined ? String(val) : `{${key}}`;

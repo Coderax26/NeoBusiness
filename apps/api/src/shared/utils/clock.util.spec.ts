@@ -31,7 +31,9 @@ describe('Clock utility', () => {
   describe('isTimestampAcceptable()', () => {
     beforeEach(() => {
       // Fix server "now" to 12:00:00 UTC
-      vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-21T12:00:00Z').getTime());
+      vi.spyOn(Date, 'now').mockReturnValue(
+        new Date('2026-10-21T12:00:00Z').getTime(),
+      );
     });
     afterEach(() => {
       vi.restoreAllMocks();
@@ -60,7 +62,9 @@ describe('Clock utility', () => {
 
   describe('skewMinutes()', () => {
     beforeEach(() => {
-      vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-21T12:00:00Z').getTime());
+      vi.spyOn(Date, 'now').mockReturnValue(
+        new Date('2026-10-21T12:00:00Z').getTime(),
+      );
     });
     afterEach(() => {
       vi.restoreAllMocks();

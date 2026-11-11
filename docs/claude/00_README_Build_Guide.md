@@ -24,8 +24,9 @@ Reconstructed from the Neo business blueprint. One file per module so you can bu
 | `07_M5_Fleet_Dispatch_Delivery.md` | Trips, driver app, ePOD, returns, issue reports | M5 |
 | `08_M6_Collections_Financials.md` | Invoicing, AR/AP, receipts, custody wallets, EOD, accounting bridge | M6 |
 | `09_M7_Control_Tower_Exceptions.md` | Exception engine, notification hub, owner dashboards, analytics | M7 |
+| `10_FE_Web_Frontend.md` | **ADD** — web frontend: office desk, owner web dashboard, tablet PWA; app shell, design system, routes, state, offline UI, FE build sprints | §5.2, 6.x screens, 7.1 |
 
-Every module file has the same 13 sections:
+Every module file (and the frontend file, with headings adapted to UI work) has the same 13 sections:
 1 Purpose & scope · 2 Roles & permissions · 3 Data model · 4 Business rules · 5 Workflows & state machines · 6 Screens · 7 API · 8 Events & ports · 9 Integrations, jobs & instrumentation · 10 Acceptance criteria · 11 MVP vs Phase 2+ · 12 Open questions · 13 Build checklist.
 
 ---
@@ -120,6 +121,8 @@ Modules **never read each other's tables**. They call each other through *ports*
 | 9 | **M2** Procurement (PO, price spike, shortfall, GRN↔PO link) | 3 | Replaces manual landed cost |
 | 10 | **M7b** Owner dashboards & analytics | 3 | Reads everything; build the *Pulse Header* earlier if Mr. X wants it sooner |
 
+**Frontend runs in parallel:** `10_FE_Web_Frontend.md` §13 defines FE sprints F0–F7 that pair with the steps above; each module's screens are built against mocks first and switched on with a per-module feature flag.
+
 **Per-module definition of done:** schema migrated → services + ports implemented → API documented → screens working for each role → acceptance criteria (§10 of the module file) passing → audit-log entries verified → offline path tested where the module has a mobile screen.
 
 ---
@@ -161,11 +164,8 @@ Seed these defaults; **none are hard-coded** (resolves G8).
 | `collection_worklist_time` | `08:00` | Scenario E |
 | `trip_close_deadline` | `20:00` | KPI 6 |
 | `dispatch_buffer_hours` | 3 | Scenario F (delivery 2 PM → required by 11 AM) |
-| `owner_escalation_value_inr` | 5000 | Scenario D "high-value disputes" — **AWAITING OD-002** |
-| `min_margin_pct_default` | 0.10 | BR-01 — **CONFIRMED OD-001** (10% gross margin, global) |
-| `escalation_wait_minutes` | 60 | OD-019 — **CONFIRMED** (minutes before escalating to delegate) |
-
-**Per-category margin overrides** (OD-001): `min_margin_pct_<CATEGORY>` e.g. `min_margin_pct_PROCESSED_FG` = 0.12. Read by `ConfigService.get(key, scope='ITEM_CATEGORY')` when the pricing engine evaluates a line.
+| `owner_escalation_value_inr` | *[DECISION]* | Scenario D "high-value disputes" |
+| `min_margin_pct_default` | *[DECISION]* | BR-01 |
 
 ---
 
@@ -194,7 +194,7 @@ Seed these defaults; **none are hard-coded** (resolves G8).
     /src/shared    # ports, event bus, outbox, money/qty utils
   /mobile         # owner + driver + collector (offline-first)
   /tablet         # factory + warehouse PWA
-  /web            # office desk
+  /web            # office desk + owner web dashboard (see 10_FE_Web_Frontend.md §3.2)
 /db/migrations    # one migration folder per module
 /docs/modules     # these files
 ```

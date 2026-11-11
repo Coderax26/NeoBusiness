@@ -828,20 +828,18 @@ export async function setupTestDB() {
     site_id: siteAId,
     customer_id: customerWithArId,
     invoice_no: `INV-AR-${timeSuffix}-01`,
-    invoice_date: new Date(new Date().setDate(new Date().getDate() - 3))
+    invoice_date: new Date(Date.now() - 18 * 86400000)
       .toISOString()
-      .split('T')[0], // 3 days ago
-    due_date: new Date(new Date().setDate(new Date().getDate() - 3 + 15))
-      .toISOString()
-      .split('T')[0], // 3+15 = 18 days ago (16-30 bucket)
+      .split('T')[0],
+    due_date: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0], // 3 days overdue (0-7 bucket)
     total_amount: '50000.00',
-    paid_amount: '0.00',
-    balance_due: '50000.00',
+    paid_amount: '10000.00',
+    balance_due: '40000.00',
     taxable_amount: '50000.00',
     cgst: '0.00',
     sgst: '0.00',
     igst: '0.00',
-    status: 'UNPAID',
+    status: 'PARTIALLY_PAID',
     is_cod: false,
     created_at: new Date(),
     updated_at: new Date(),
@@ -854,12 +852,10 @@ export async function setupTestDB() {
     site_id: siteAId,
     customer_id: customerWithArId,
     invoice_no: `INV-AR-${timeSuffix}-02`,
-    invoice_date: new Date(new Date().setDate(new Date().getDate() - 10))
+    invoice_date: new Date(Date.now() - 25 * 86400000)
       .toISOString()
-      .split('T')[0], // 10 days ago
-    due_date: new Date(new Date().setDate(new Date().getDate() - 10 + 15))
-      .toISOString()
-      .split('T')[0], // 10+15 = 25 days ago (16-30 bucket)
+      .split('T')[0],
+    due_date: new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0], // 10 days overdue (8-15 bucket)
     total_amount: '100000.00',
     paid_amount: '0.00',
     balance_due: '100000.00',

@@ -29,9 +29,11 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly inventory: InventoryService,
-    @Optional() @Inject(EXCEPTION_PORT)
+    @Optional()
+    @Inject(EXCEPTION_PORT)
     private readonly exceptionPort?: ExceptionPort,
-    @Optional() @Inject(PRODUCTION_PORT)
+    @Optional()
+    @Inject(PRODUCTION_PORT)
     private readonly productionPort?: ProductionPort,
   ) {}
 
@@ -81,7 +83,9 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
               this.stringValue(line.orderLineId),
               this.stringValue(line.itemId),
               result.deficit,
-              Clock.parseKolkataDate(this.stringValue(payload.deliveryDate)).toJSDate(),
+              Clock.parseKolkataDate(
+                this.stringValue(payload.deliveryDate),
+              ).toJSDate(),
             );
           }
         }
@@ -109,17 +113,21 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
         return;
       }
       case 'delivery.completed': {
-        const delivered = this.arrayPayload(payload.deliveredLines).map((line) => ({
-          itemId: this.stringValue(line.itemId),
-          batchId: this.stringValue(line.batchId),
-          qty: this.stringValue(line.deliveredQty),
-        }));
-        const returned = this.arrayPayload(payload.returnedLines).map((line) => ({
-          itemId: this.stringValue(line.itemId),
-          batchId: this.stringValue(line.batchId),
-          qty: this.stringValue(line.returnedQty),
-          damaged: Boolean(line.damaged),
-        }));
+        const delivered = this.arrayPayload(payload.deliveredLines).map(
+          (line) => ({
+            itemId: this.stringValue(line.itemId),
+            batchId: this.stringValue(line.batchId),
+            qty: this.stringValue(line.deliveredQty),
+          }),
+        );
+        const returned = this.arrayPayload(payload.returnedLines).map(
+          (line) => ({
+            itemId: this.stringValue(line.itemId),
+            batchId: this.stringValue(line.batchId),
+            qty: this.stringValue(line.returnedQty),
+            damaged: Boolean(line.damaged),
+          }),
+        );
         if (delivered.length > 0) {
           await this.inventory.postDispatch(event.aggregate_id, delivered);
         }

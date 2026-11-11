@@ -137,25 +137,35 @@ describe('ExceptionService', () => {
       .ignore();
 
     // Load test users
-    const owner = await knex('users').where('role', 'OWNER').first('id');
+    // Use the factory site where the seeded OWNER has assigned_site_id access
+    const factorySite = await knex('sites')
+      .where('site_type', 'FACTORY')
+      .first('id');
+
+    if (!factorySite) throw new Error('Factory site not found in database');
+
+    const owner = await knex('users')
+      .where('role', 'OWNER')
+      .andWhere('assigned_site_id', factorySite.id)
+      .first('id');
     const opsCoord = await knex('users').where('role', 'OPS_COORD').first('id');
     const storekeeper = await knex('users')
       .where('role', 'STOREKEEPER')
       .first('id');
-    const site = await knex('sites').first('id');
 
-    if (!owner) throw new Error('OWNER user not found in database');
+    if (!owner)
+      throw new Error('OWNER user not found in database at factory site');
     if (!opsCoord) throw new Error('OPS_COORD user not found in database');
     // STOREKEEPER may not exist in seed; use coordinator as fallback
     if (!storekeeper) {
       console.warn('STOREKEEPER user not found, using OPS_COORD as fallback');
     }
-    if (!site) throw new Error('Site not found in database');
 
     ownerId = String(owner.id);
     opsCoordId = String(opsCoord.id);
     storekeeperId = storekeeper ? String(storekeeper.id) : opsCoordId;
-    siteId = String(site.id);
+    // Use the factory site where OWNER has access
+    siteId = String(factorySite.id);
 
     // Initialize services
     configSvc = new ConfigService(knex);

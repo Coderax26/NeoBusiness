@@ -1,5 +1,22 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { GRNService } from './grn.service.js';
@@ -15,7 +32,10 @@ export class GRNController {
   @Post()
   @RequirePermission('grn.create')
   @ApiOperation({ summary: 'Create a blind GRN (storekeeper view)' })
-  @ApiResponse({ status: 201, description: 'GRN created with shortfalls if any' })
+  @ApiResponse({
+    status: 201,
+    description: 'GRN created with shortfalls if any',
+  })
   async create(@Body() dto: CreateGRNDto, @Query('userId') userId: string) {
     return this.grnService.createBlindGRN({ ...dto, userId });
   }
@@ -54,7 +74,9 @@ export class GRNController {
 
   @Get(':id/lines')
   @RequirePermission('grn.read')
-  @ApiOperation({ summary: 'Get GRN lines (blind view - no expected qty or price)' })
+  @ApiOperation({
+    summary: 'Get GRN lines (blind view - no expected qty or price)',
+  })
   @ApiResponse({ status: 200, description: 'GRN lines' })
   async getLines(@Param('id') id: string) {
     return this.grnService.getLines(id);
@@ -62,7 +84,9 @@ export class GRNController {
 
   @Get('po/:poId/blind-view')
   @RequirePermission('grn.read')
-  @ApiOperation({ summary: 'Get blind receive view for PO (item name + qty box only)' })
+  @ApiOperation({
+    summary: 'Get blind receive view for PO (item name + qty box only)',
+  })
   @ApiResponse({ status: 200, description: 'Blind receive view' })
   async getBlindView(@Param('poId') poId: string) {
     return this.grnService.getBlindReceiveView(poId);

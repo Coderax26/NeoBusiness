@@ -48,11 +48,16 @@ export class DeviceController {
    */
   @Post('register')
   @RequirePermission('device.register')
-  async register(@Req() req: any, @Body() dto: RegisterDeviceDto): Promise<{ ok: boolean; deviceId: string }> {
+  async register(
+    @Req() req: any,
+    @Body() dto: RegisterDeviceDto,
+  ): Promise<{ ok: boolean; deviceId: string }> {
     const userId = req.user.sub;
     const { fcmToken, deviceId, platform } = dto;
 
-    this.logger.debug(`Device registration: user=${userId} device=${deviceId} platform=${platform}`);
+    this.logger.debug(
+      `Device registration: user=${userId} device=${deviceId} platform=${platform}`,
+    );
 
     // Delete-and-readd pattern: the table has a UNIQUE(user_id, device_id)
     // PK constraint, so we upsert by deleting the old row then inserting.

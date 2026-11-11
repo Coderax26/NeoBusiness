@@ -129,7 +129,7 @@ describe('M7b Dashboards & Analytics — Blueprint §10', () => {
     await knex.raw('REFRESH MATERIALIZED VIEW mv_supplier_scorecard');
     await knex.raw('REFRESH MATERIALIZED VIEW mv_yield_trend');
     await knex.raw('REFRESH MATERIALIZED VIEW mv_ar_aging');
-  });
+  }, 60000);
 
   afterAll(async () => {
     await knex?.destroy();
@@ -313,28 +313,35 @@ describe('M7b Dashboards & Analytics — Blueprint §10', () => {
 
   describe('AC6: AR Aging', () => {
     it('TC-M7b-016: Returns 4 aging buckets: 0-7, 8-15, 16-30, 30+', async () => {
-      // Note: This test will fail until AnalyticsService exists
       expect(analyticsSvc).toBeDefined();
       const aging = await analyticsSvc.getARAging(siteId);
-      // expect(aging[0]).toHaveProperty('aging_0_7');
-      // expect(aging[0]).toHaveProperty('aging_8_15');
-      // expect(aging[0]).toHaveProperty('aging_16_30');
-      // expect(aging[0]).toHaveProperty('aging_30_plus');
+      expect(aging.length).toBeGreaterThan(0);
+      expect(aging[0]).toHaveProperty('aging_0_7');
+      expect(aging[0]).toHaveProperty('aging_8_15');
+      expect(aging[0]).toHaveProperty('aging_16_30');
+      expect(aging[0]).toHaveProperty('aging_30_plus');
     });
 
     it('TC-M7b-017: Bucket sums equal total outstanding', async () => {
       // Customer with AR:
       // - 50000 - 10000 = 40000 outstanding (due 3 days ago → 0-7 bucket)
-      // - 100000 outstanding (due 15 days ago → 8-15 bucket)
+      // - 100000 outstanding (due 10 days ago → 8-15 bucket)
       // Total: 140000
       // 0-7: 40000, 8-15: 100000, 16-30: 0, 30+: 0
       // Sum = 140000
-      // Note: This test will fail until AnalyticsService exists
       expect(analyticsSvc).toBeDefined();
       const aging = await analyticsSvc.getARAging(siteId);
-      // const row = aging[0];
-      // const sum = Number(row.aging_0_7) + Number(row.aging_8_15) + Number(row.aging_16_30) + Number(row.aging_30_plus);
-      // expect(sum).toBeCloseTo(Number(row.totalOutstanding), 2);
+      const row =
+        aging.find((r: any) => r.customerId === _customerWithArId) ?? aging[0];
+      const sum =
+        Number(row.aging_0_7) +
+        Number(row.aging_8_15) +
+        Number(row.aging_16_30) +
+        Number(row.aging_30_plus);
+      expect(sum).toBeCloseTo(Number(row.totalOutstanding), 2);
+      expect(Number(row.totalOutstanding)).toBe(140000);
+      expect(Number(row.aging_0_7)).toBe(40000);
+      expect(Number(row.aging_8_15)).toBe(100000);
     });
   });
 

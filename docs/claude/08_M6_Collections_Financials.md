@@ -33,7 +33,6 @@ Out of scope: full general ledger and statutory filings — NeoCore is the **ope
 | **`invoices`** | `id` PK · `invoice_no` · `sales_order_id` FK · `customer_id` FK · `invoice_date` · `due_date` · `total_amount` · `paid_amount` · `balance_due` · `status` (`UNPAID` \| `PARTIAL` \| `PAID` \| `OVERDUE`) | BP |
 | ↳ added | `trip_id` · `place_of_supply_state` · `taxable_amount` · `cgst` · `sgst` · `igst` · `eway_bill_no` · `irn` (if e-invoicing applies) · `pdf_attachment_id` · `is_cod` · `CANCELLED` status | ADD |
 | **`invoice_lines`** | `invoice_id` · `item_id` · `hsn_code` · `qty` · `unit_price` · `tax_rate_pct` · `line_total` | ADD (G4) |
-| ↳ added | `tax_treatment` (`TAXABLE` \| `EXEMPT` \| `NIL_RATED` \| `NON_GST`) — **CONFIRMED OD-003**. `tax_amount` = 0 for EXEMPT/NIL_RATED/NON_GST; HSN split only for TAXABLE. Mixed lines allowed on one invoice. |
 | **`collection_receipts`** *(append-only)* | `id` PK · `receipt_no` · `customer_id` FK · `collected_by_user_id` FK · `payment_mode` (`CASH` \| `UPI` \| `BANK_TRANSFER` \| `CHEQUE`) · `amount` · `reference_utr_or_cheque_no` · `handover_status` · `verified_by_owner_id` · `collected_at` | BP |
 | ↳ added | `provisional_receipt_no` (offline) · `gps_lat_lng` · `device_id` · `idempotency_key` · `reverses_receipt_id` · `on_account_amount` | ADD |
 | **`receipt_allocations`** | `receipt_id` · `invoice_id` · `allocated_amount` | ADD |
@@ -221,13 +220,13 @@ When all green → owner taps **Sign-off** (`eod.closed` → accounting export, 
 
 ## 12. Open questions
 
-- `[CONFIRMED 2026-10-22 — OD-003]` Invoice generated **at dispatch** for all goods. Mixed taxable/exempt lines on same invoice; differences resolved via credit note (never edit original invoice). `tax_treatment` on `invoice_lines`: `TAXABLE` (compute CGST/SGST/IGST) vs `EXEMPT`/`NIL_RATED`/`NON_GST` (`tax_amount = 0`). `irn` nullable pending OD-004.
-- `[DECISION]` Does e-invoicing (IRN) apply at Neo's turnover? Affects invoice generation. (OD-004 — AWAITING ACCOUNTANT)
-- `[DECISION]` Does the custody wallet hold only cash + cheques, or also UPI collected on the agent's behalf? (OD-015 — AWAITING)
-- `[DECISION]` Who is "cashier": a coordinator, or only the owner? (OD-016 — AWAITING)
-- `[DECISION]` Rounding and part-payment policy for allocations (FIFO vs customer-specified). (OD-017 — AWAITING)
-- `[CONFIRMED 2026-10-22 — OD-023]` Opening balances: signed-off cut-off date + controlled CSV import template. `opening_balance_imports` table with `DRAFT → SIGNED_OFF → IMPORTED → REVERSED` lifecycle; idempotent preview → sign-off → import. Accountant to confirm cut-off date by end of Sprint 0.
-- Which accounting tool is the target: Tally Prime, Zoho Books or QuickBooks? (OD-018 — AWAITING)
+- `[DECISION]` Invoice at dispatch vs at delivery (G1) — confirm with the accountant.
+- `[DECISION]` Does e-invoicing (IRN) apply at Neo's turnover? Affects invoice generation.
+- `[DECISION]` Does the custody wallet hold only cash + cheques, or also UPI collected on the agent's behalf?
+- `[DECISION]` Who is "cashier": a coordinator, or only the owner?
+- `[DECISION]` Rounding and part-payment policy for allocations (FIFO vs customer-specified).
+- Opening balances: cut-off date and format for customer AR / supplier AP cleansing (Sprint 0).
+- Which accounting tool is the target: Tally Prime, Zoho Books or QuickBooks?
 
 ---
 

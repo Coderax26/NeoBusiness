@@ -22,9 +22,9 @@ async function bootstrap() {
   // ── Global validation pipe ────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,           // strip unknown properties
+      whitelist: true, // strip unknown properties
       forbidNonWhitelisted: true,
-      transform: true,           // auto-convert types
+      transform: true, // auto-convert types
       transformOptions: { enableImplicitConversion: true },
     }),
   );
@@ -41,7 +41,10 @@ async function bootstrap() {
           'See /docs for module specifications.',
       )
       .setVersion('0.1.0')
-      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'access-token',
+      )
       .addTag('health', 'System health and readiness')
       .addTag('auth', 'Authentication and session management (M0)')
       .addTag('customers', 'Customer master and credit (M1)')

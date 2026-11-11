@@ -9,6 +9,7 @@ import { GRNService } from './grn.service.js';
 import { ShortfallService } from './shortfall.service.js';
 import { BackToBackService } from './back-to-back.service.js';
 import { RequisitionService } from './requisition.service.js';
+import { SupplierBillService } from './supplier-bill.service.js';
 import { ProcurementPortService } from './procurement-port.service.js';
 import { SupplierController } from './supplier.controller.js';
 import { POController } from './po.controller.js';
@@ -31,6 +32,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
  * - Backup supplier ranking
  * - Back-to-back trading POs
  * - Purchase requisitions
+ * - Supplier bills with 3-way matching
  * - ProcurementPort implementation for M1 integration
  *
  * Exports: PROCUREMENT_PORT (real implementation replaces stub)
@@ -38,7 +40,13 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
 @Global()
 @Module({
   imports: [ConfigModule, DatabaseModule, AuthModule, M7aExceptionsModule],
-  controllers: [SupplierController, POController, GRNController, RequisitionController, ShortfallController],
+  controllers: [
+    SupplierController,
+    POController,
+    GRNController,
+    RequisitionController,
+    ShortfallController,
+  ],
   providers: [
     SupplierService,
     POService,
@@ -46,6 +54,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     ShortfallService,
     BackToBackService,
     RequisitionService,
+    SupplierBillService,
     ProcurementPortService,
     {
       provide: PROCUREMENT_PORT,
@@ -64,6 +73,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     ShortfallService,
     BackToBackService,
     RequisitionService,
+    SupplierBillService,
     ProcurementPortService,
   ],
 })

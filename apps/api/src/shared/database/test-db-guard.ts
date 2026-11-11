@@ -11,7 +11,7 @@ export async function assertTestDatabase(knex: Knex): Promise<void> {
   if (!currentDb.endsWith('_test')) {
     throw new Error(
       `[CRITICAL SAFETY GUARD] Refusing to run destructive test setup on non-test database "${currentDb}". ` +
-      `Ensure DATABASE_URL or DATABASE_URL_TEST points to a database ending with "_test" (e.g. neobus_test).`
+        `Ensure DATABASE_URL or DATABASE_URL_TEST points to a database ending with "_test" (e.g. neobus_test).`,
     );
   }
 }

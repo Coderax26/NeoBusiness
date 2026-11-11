@@ -1,8 +1,11 @@
-import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
-import { CreditEvaluation } from '../../shared/ports/ports.interface.js';
+import {
+  CreditPort,
+  CreditEvaluation,
+} from '../../shared/ports/ports.interface.js';
 
 /**
  * CreditService — implements BR-02 credit evaluation.
@@ -15,13 +18,15 @@ import { CreditEvaluation } from '../../shared/ports/ports.interface.js';
  * - Block if any customer_invoice is > max_overdue_days overdue (TODO: M6 integration).
  */
 @Injectable()
-export class CreditService implements OnModuleInit {
+export class CreditService implements OnModuleInit, CreditPort {
   private readonly logger = new Logger(CreditService.name);
 
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
   onModuleInit(): void {
-    this.logger.log('CreditService initialized (CREDIT_PORT → real implementation)');
+    this.logger.log(
+      'CreditService initialized (CREDIT_PORT → real implementation)',
+    );
   }
 
   /**
@@ -31,7 +36,10 @@ export class CreditService implements OnModuleInit {
    * @param newOrderValue - The total value of the order in INR (as numeric string).
    * @returns CreditEvaluation result (status, current balance, limits, reasons).
    */
-  async evaluate(customerId: string, newOrderValue: string): Promise<CreditEvaluation> {
+  async evaluate(
+    customerId: string,
+    newOrderValue: string,
+  ): Promise<CreditEvaluation> {
     const customerRow = await this.knex('customers')
       .where('id', customerId)
       .first(
@@ -63,7 +71,8 @@ export class CreditService implements OnModuleInit {
     const maxOverdueDays = customerRow.max_overdue_days;
 
     // BR-02.1: Check if new order exceeds credit limit
-    const wouldExceedLimit = currentArBalance.add(newOrderVal).isLessThan(creditLimit) === false;
+    const wouldExceedLimit =
+      currentArBalance.add(newOrderVal).isLessThan(creditLimit) === false;
 
     this.logger.debug(
       `Customer credit check: ${customerId} AR ${currentArBalance.toStorageString()} + order ${newOrderVal.toStorageString()} <= limit ${creditLimit.toStorageString()}? ${!wouldExceedLimit}`,
@@ -80,16 +89,44 @@ export class CreditService implements OnModuleInit {
       };
     }
 
-    // BR-02.2: Check for overdue invoices (blocked pending M6 integration)
-    // TODO: Query customer_ledger_entries for oldestOverdueDays and block if any invoice > max_overdue_days
-    // For now, we only check credit limits.
+    // BR-02.2: Check for overdue invoices
+    // Query invoices with outstanding balance and calculate oldest overdue days
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Get oldest overdue days from invoices with remaining balance (UNPAID or PARTIAL)
+    const overdueInvoice = await this.knex('invoices')
+      .where('customer_id', customerId)
+      .where('balance_due', '>', 0) // Has outstanding balance (UNPAID or PARTIAL)
+      .andWhere('due_date', '<', todayStr) // Due date is in the past
+      .orderBy('due_date', 'asc') // Oldest first
+      .first('due_date');
+
+    let oldestOverdueDays = null;
+    if (overdueInvoice) {
+      const dueDate = new Date(overdueInvoice.due_date);
+      const diffTime = Math.abs(today.getTime() - dueDate.getTime());
+      oldestOverdueDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // Check if any invoice exceeds max_overdue_days tolerance
+    if (oldestOverdueDays !== null && oldestOverdueDays > maxOverdueDays) {
+      return {
+        status: 'HOLD',
+        currentArBalance: customerRow.current_ar_balance,
+        creditLimit: customerRow.credit_limit,
+        maxOverdueDays,
+        oldestOverdueDays,
+        reason: `Customer has overdue invoices (oldest: ${oldestOverdueDays} days) exceeding tolerance of ${maxOverdueDays} days`,
+      };
+    }
 
     return {
       status: 'OK',
       currentArBalance: customerRow.current_ar_balance,
       creditLimit: customerRow.credit_limit,
       maxOverdueDays,
-      oldestOverdueDays: null,
+      oldestOverdueDays,
     };
   }
 
@@ -100,7 +137,9 @@ export class CreditService implements OnModuleInit {
    * @param orderId - The sales order ID.
    * @returns { allowed, reason } result.
    */
-  async canDispatch(orderId: string): Promise<{ allowed: boolean; reason?: string }> {
+  async canDispatch(
+    orderId: string,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     const orderRow = await this.knex('sales_orders')
       .where('id', orderId)
       .first('customer_id', 'order_status');
@@ -110,7 +149,10 @@ export class CreditService implements OnModuleInit {
     }
 
     if (orderRow.order_status !== 'CONFIRMED') {
-      return { allowed: false, reason: 'Order must be CONFIRMED before dispatch' };
+      return {
+        allowed: false,
+        reason: 'Order must be CONFIRMED before dispatch',
+      };
     }
 
     // Compute total order value from order lines
@@ -119,7 +161,8 @@ export class CreditService implements OnModuleInit {
       .select('quoted_unit_price', 'ordered_qty');
 
     const totalValue = lines.reduce(
-      (sum, line) => sum + parseFloat(line.quoted_unit_price) * parseFloat(line.ordered_qty),
+      (sum, line) =>
+        sum + parseFloat(line.quoted_unit_price) * parseFloat(line.ordered_qty),
       0,
     );
     const newOrderVal = Money.of(totalValue.toString()).toStorageString();

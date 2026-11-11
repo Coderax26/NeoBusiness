@@ -24,6 +24,16 @@ import {
   ExceptionPayload,
   NotifyPort,
   NotifyChannel,
+  DashboardPort,
+  PulseResponse,
+  StatusMatrixResponse,
+  EODViewResponse,
+  KPIResponse,
+  AnalyticsPort,
+  CustomerProfitabilityResponse,
+  SupplierScorecardResponse,
+  YieldTrendResponse,
+  ARAgingResponse,
 } from './ports.interface.js';
 
 // ─── CreditPort Stub (DEPRECATED: replaced by M6 CreditPortService shipped 2026-11-06) ────────
@@ -156,11 +166,15 @@ export class ProcurementPortStub implements ProcurementPort {
     return null;
   }
 
-  async createBackToBackPO(orderLineId: string): Promise<string> {
+  async createBackToBatchPO(orderLineId: string): Promise<string> {
     console.warn(
-      `[STUB] ProcurementPort.createBackToBackPO(${orderLineId}) — no-op, returning stub ID`,
+      `[STUB] ProcurementPort.createBackToBatchPO(${orderLineId}) — no-op, returning stub ID`,
     );
     return 'stub-po-id';
+  }
+
+  async createBackToBackPO(orderLineId: string): Promise<string> {
+    return this.createBackToBatchPO(orderLineId);
   }
 
   async suggestBackups(
@@ -177,6 +191,16 @@ export class ProcurementPortStub implements ProcurementPort {
       '[STUB] ProcurementPort.suggestBackups — returning empty list',
     );
     return [];
+  }
+
+  async getInboundQty(
+    _itemId: string,
+    _siteId: string,
+  ): Promise<string> {
+    console.warn(
+      '[STUB] ProcurementPort.getInboundQty — returning 0 (no inbound POs)',
+    );
+    return '0.000';
   }
 }
 
@@ -281,5 +305,115 @@ export class NotifyPortStub implements NotifyPort {
       '\nPayload:',
       JSON.stringify(payload, null, 2),
     );
+  }
+}
+
+// ─── DashboardPort Stub (replaced when M7b is built in Sprint 3) ──────────────────
+
+export class DashboardPortStub implements DashboardPort {
+  async getPulse(
+    siteId: string,
+    _options?: { role?: string },
+  ): Promise<PulseResponse> {
+    console.warn(`[STUB] DashboardPort.getPulse(${siteId}) — returning zeros`);
+    return {
+      siteId,
+      todaysSales: '0.00',
+      grossMarginPct: '0.00',
+      cashCollectedToday: '0.00',
+      pendingExceptions: 0,
+    };
+  }
+
+  async getStatusMatrix(
+    siteId: string,
+    _options?: { role?: string },
+  ): Promise<StatusMatrixResponse> {
+    console.warn(
+      `[STUB] DashboardPort.getStatusMatrix(${siteId}) — returning zeros`,
+    );
+    return {
+      siteId,
+      ordersPendingDispatch: 0,
+      batchesRunning: 0,
+      trucksOnRoad: 0,
+      supplierShortfalls: 0,
+    };
+  }
+
+  async getEODView(siteId: string, date: string): Promise<EODViewResponse> {
+    console.warn(
+      `[STUB] DashboardPort.getEODView(${siteId}, ${date}) — returning empty`,
+    );
+    return {
+      siteId,
+      date,
+      wallets: [],
+      handovers: [],
+      depositSlip: {
+        totalCash: '0.00',
+        totalCheque: '0.00',
+        totalOnline: '0.00',
+        total: '0.00',
+      },
+      signedOff: false,
+    };
+  }
+
+  async getKPIs(siteId: string, date: string): Promise<KPIResponse> {
+    console.warn(
+      `[STUB] DashboardPort.getKPIs(${siteId}, ${date}) — returning zeros`,
+    );
+    return {
+      siteId,
+      date,
+      ownerCallVolume: 0,
+      eodTimeMinutes: 0,
+      missedEntriesPct: '0.00',
+      marginErosionVisibilityPct: '0.00',
+      epodVisibilityPct: '0.00',
+      routineOrderConfirmationMinutes: 0,
+    };
+  }
+}
+
+// ─── AnalyticsPort Stub (replaced when M7b is built in Sprint 3) ──────────────────
+
+export class AnalyticsPortStub implements AnalyticsPort {
+  async getCustomerProfitability(
+    siteId: string,
+    _dateRange: { from: string; to: string },
+  ): Promise<CustomerProfitabilityResponse[]> {
+    console.warn(
+      `[STUB] AnalyticsPort.getCustomerProfitability(${siteId}) — returning empty`,
+    );
+    return [];
+  }
+
+  async getSupplierScorecard(
+    siteId: string,
+    _dateRange: { from: string; to: string },
+  ): Promise<SupplierScorecardResponse[]> {
+    console.warn(
+      `[STUB] AnalyticsPort.getSupplierScorecard(${siteId}) — returning empty`,
+    );
+    return [];
+  }
+
+  async getYieldTrend(
+    siteId: string,
+    _dateRange: { from: string; to: string },
+  ): Promise<YieldTrendResponse[]> {
+    console.warn(
+      `[STUB] AnalyticsPort.getYieldTrend(${siteId}) — returning empty`,
+    );
+    return [];
+  }
+
+  async getARAging(siteId: string): Promise<ARAgingResponse[]> {
+    console.warn(
+      `[STUB] AnalyticsPort.getARAging(${siteId}) — returning empty`,
+    );
+    return [];
   }
 }

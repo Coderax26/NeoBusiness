@@ -21,8 +21,10 @@ export const PRODUCTION_PORT = Symbol('PRODUCTION_PORT');
 export const LEDGER_PORT = Symbol('LEDGER_PORT');
 export const EXCEPTION_PORT = Symbol('EXCEPTION_PORT');
 export const NOTIFY_PORT = Symbol('NOTIFY_PORT');
+export const DASHBOARD_PORT = Symbol('DASHBOARD_PORT');
+export const ANALYTICS_PORT = Symbol('ANALYTICS_PORT');
 
-// ─── Pricing Port (owned by M1) ───────────────────────────────────────────────
+// ─── Pricing Port (owned by M1) ───────────────────────────────────────────────────
 
 export interface PriceBand {
   itemId: string;
@@ -169,7 +171,8 @@ export interface InventoryPort {
 
 export interface ProcurementPort {
   latestLandedCost(itemId: string): Promise<string | null>; // null = not available yet
-  createBackToBackPO(orderLineId: string): Promise<string>; // returns PO draft ID
+  createBackToBatchPO(orderLineId: string): Promise<string>; // returns PO draft ID
+  createBackToBackPO?(orderLineId: string): Promise<string>; // alias for back-to-back PO
   suggestBackups(
     itemId: string,
     deficitQty: string,
@@ -180,6 +183,11 @@ export interface ProcurementPort {
       availableQty: string | null;
     }>
   >;
+  /** Get inbound (unreceived) PO quantity for an item at a site */
+  getInboundQty(
+    itemId: string,
+    siteId: string,
+  ): Promise<string>;
 }
 
 // ─── Production Port (owned by M4) ────────────────────────────────────────────
@@ -253,7 +261,7 @@ export interface ExceptionPort {
   ): void;
 }
 
-// ─── Notify Port (owned by M7a) ───────────────────────────────────────────────
+// ─── Notify Port (owned by M7a) ────────────────────────────────────────────────
 
 export type NotifyChannel = 'FCM' | 'WHATSAPP' | 'SMS' | 'IN_APP';
 
@@ -264,4 +272,135 @@ export interface NotifyPort {
     recipientRef: string,
     payload: Record<string, unknown>,
   ): Promise<void>;
+}
+
+// ─── Dashboard Port (owned by M7b) ─────────────────────────────────────────────────
+
+export interface PulseResponse {
+  siteId: string;
+  todaysSales: string; // numeric string (Money)
+  grossMarginPct: string; // percentage with 2 decimals
+  cashCollectedToday: string; // numeric string (Money)
+  pendingExceptions: number;
+}
+
+export interface StatusMatrixResponse {
+  siteId: string;
+  ordersPendingDispatch: number;
+  batchesRunning: number;
+  trucksOnRoad: number;
+  supplierShortfalls: number;
+}
+
+export interface EODViewResponse {
+  siteId: string;
+  date: string; // YYYY-MM-DD
+  wallets: Array<{
+    userId: string;
+    userName: string;
+    openingBalance: string;
+    collections: string;
+    handoversOut: string;
+    handoversIn: string;
+    closingBalance: string;
+  }>;
+  handovers: Array<{
+    handoverId: string;
+    fromUserId: string;
+    toUserId: string;
+    amount: string;
+    status: 'PENDING' | 'VERIFIED' | 'DISPUTED';
+    verifiedAt?: string;
+  }>;
+  depositSlip: {
+    totalCash: string;
+    totalCheque: string;
+    totalOnline: string;
+    total: string;
+  };
+  signedOff: boolean;
+  signedOffBy?: string;
+  signedOffAt?: string;
+}
+
+export interface KPIResponse {
+  siteId: string;
+  date: string;
+  ownerCallVolume: number; // exceptions resolved per day
+  eodTimeMinutes: number; // initiated_at to signed_off_at
+  missedEntriesPct: string; // percentage
+  marginErosionVisibilityPct: string; // percentage
+  epodVisibilityPct: string; // percentage
+  routineOrderConfirmationMinutes: number;
+}
+
+export interface DashboardPort {
+  getPulse(siteId: string, options?: { role?: string }): Promise<PulseResponse>;
+  getStatusMatrix(
+    siteId: string,
+    options?: { role?: string },
+  ): Promise<StatusMatrixResponse>;
+  getEODView(siteId: string, date: string): Promise<EODViewResponse>;
+  getKPIs(siteId: string, date: string): Promise<KPIResponse>;
+}
+
+// ─── Analytics Port (owned by M7b) ────────────────────────────────────────────────
+
+export interface CustomerProfitabilityResponse {
+  customerId: string;
+  businessName: string;
+  customerCode: string;
+  orderCount: number;
+  revenue: string;
+  grossProfit: string;
+  grossMarginPct: string;
+  lastOrderDate: string;
+}
+
+export interface SupplierScorecardResponse {
+  supplierId: string;
+  companyName: string;
+  supplierCode: string;
+  poCount: number;
+  grnCount: number;
+  fillRate: number;
+  avgPriceVariancePct: number;
+  lastReceiptDate: string;
+}
+
+export interface YieldTrendResponse {
+  siteId: string;
+  weekStart: string;
+  totalPlanned: string;
+  totalOutput: string;
+  yieldPct: number;
+  totalWastage: string;
+  wastagePct: number;
+}
+
+export interface ARAgingResponse {
+  customerId: string;
+  businessName: string;
+  customerCode: string;
+  totalOutstanding: string;
+  aging_0_7: string;
+  aging_8_15: string;
+  aging_16_30: string;
+  aging_30_plus: string;
+}
+
+export interface AnalyticsPort {
+  getCustomerProfitability(
+    siteId: string,
+    dateRange: { from: string; to: string },
+  ): Promise<CustomerProfitabilityResponse[]>;
+  getSupplierScorecard(
+    siteId: string,
+    dateRange: { from: string; to: string },
+  ): Promise<SupplierScorecardResponse[]>;
+  getYieldTrend(
+    siteId: string,
+    dateRange: { from: string; to: string },
+  ): Promise<YieldTrendResponse[]>;
+  getARAging(siteId: string): Promise<ARAgingResponse[]>;
 }

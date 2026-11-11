@@ -55,9 +55,12 @@ describe('M3 Acceptance — Scenario C: Multi-site Inventory Flow', () => {
   });
 
   beforeEach(async () => {
+    // TRUNCATE M3 tables carefully - only those that don't have cross-module FK issues
+    // We don't truncate stock_adjustments, stock_transfers, stock_transfer_lines
+    // in beforeEach because they have dependencies on inventory_batches.
+    // Items and sites are shared across modules and must not be touched.
     await knex.raw(`
-      TRUNCATE TABLE stock_adjustments, stock_transfer_lines, stock_transfers,
-        stock_reservations, stock_ledger_txns, inventory_batches RESTART IDENTITY CASCADE;
+      TRUNCATE TABLE stock_reservations, stock_ledger_txns, inventory_batches RESTART IDENTITY CASCADE;
     `);
 
     const now = new Date();

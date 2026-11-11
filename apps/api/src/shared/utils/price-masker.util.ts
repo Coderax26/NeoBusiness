@@ -42,11 +42,7 @@ const SENSITIVE_FIELDS = [
 ];
 
 // Roles that are restricted from seeing financial data.
-const RESTRICTED_ROLES = new Set([
-  'PROD_MGR',
-  'DRIVER',
-  'STOREKEEPER',
-]);
+const RESTRICTED_ROLES = new Set(['PROD_MGR', 'DRIVER', 'STOREKEEPER']);
 
 /**
  * Deep-clone-safe field remover. Walks objects and arrays, deleting

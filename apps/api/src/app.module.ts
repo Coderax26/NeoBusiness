@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { HealthController } from './health.controller.js';
 import { M0PlatformModule } from './modules/m0-platform/m0-platform.module.js';
 import { M7aExceptionsModule } from './modules/m7a-exceptions/m7a-exceptions.module.js';
@@ -9,6 +10,7 @@ import { M6FinancialsModule } from './modules/m6-finance/m6-financials.module.js
 import { M3InventoryModule } from './modules/m3-inventory/m3-inventory.module.js';
 import { M5FleetModule } from './modules/m5-fleet/m5-fleet.module.js';
 import { M2ProcurementModule } from './modules/m2-procurement/m2-procurement.module.js';
+import { M7bDashboardsModule } from './modules/m7b-dashboards/m7b-dashboards.module.js';
 
 /**
  * Root application module for NeoBus.
@@ -62,7 +64,7 @@ import { M2ProcurementModule } from './modules/m2-procurement/m2-procurement.mod
     M2ProcurementModule,
 
     // Sprint 3: M7b Dashboards and Analytics
-    // M7bAnalyticsModule,
+    M7bDashboardsModule,
   ],
   controllers: [HealthController],
   providers: [],

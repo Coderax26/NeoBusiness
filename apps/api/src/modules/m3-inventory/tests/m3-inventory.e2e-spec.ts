@@ -30,7 +30,12 @@ describe('M3 Inventory & Warehouse — HTTP E2E', () => {
     await knex?.destroy();
   });
 
-  const request = (method: string, url: string, payload?: object, token = AUTH_TOKENS.OWNER) =>
+  const request = (
+    method: string,
+    url: string,
+    payload?: object,
+    token = AUTH_TOKENS.OWNER,
+  ) =>
     app.getHttpServer().inject({
       method,
       url,
@@ -135,7 +140,7 @@ describe('M3 Inventory & Warehouse — HTTP E2E', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(
       expect.arrayContaining([
-      expect.objectContaining({ batchId: batchRice1Id, itemId: itemRiceId }),
+        expect.objectContaining({ batchId: batchRice1Id, itemId: itemRiceId }),
       ]),
     );
   });

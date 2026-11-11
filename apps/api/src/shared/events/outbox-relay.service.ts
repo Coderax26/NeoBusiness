@@ -20,9 +20,7 @@ export class OutboxRelay implements OnModuleInit {
   private readonly logger = new Logger(OutboxRelay.name);
   private interval: NodeJS.Timeout | undefined;
 
-  constructor(
-    @InjectKnex() private readonly knex: Knex,
-  ) {}
+  constructor(@InjectKnex() private readonly knex: Knex) {}
 
   onModuleInit(): void {
     // Poll every 5 seconds in dev.
@@ -54,6 +52,9 @@ export class OutboxRelay implements OnModuleInit {
     const queue = new BullQueue('domain-events', {
       connection: { host: 'localhost', port: 6379 },
     });
+    const dashboardQueue = new BullQueue('dashboard-events', {
+      connection: { host: 'localhost', port: 6379 },
+    });
 
     let dispatched = 0;
     for (const event of events) {
@@ -67,13 +68,18 @@ export class OutboxRelay implements OnModuleInit {
         if (!row) return; // already dispatched by another worker
 
         try {
-          await queue.add('domain-event', {
+          const jobData = {
             id: row.id,
             event_type: row.event_type,
             aggregate_id: row.aggregate_id,
-            payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
+            payload:
+              typeof row.payload === 'string'
+                ? JSON.parse(row.payload)
+                : row.payload,
             module_source: row.module_source,
-          });
+          };
+          await queue.add('domain-event', jobData);
+          await dashboardQueue.add('dashboard-event', jobData);
           await trx('outbox_events')
             .where('id', row.id)
             .update({ processed_at: this.knex.fn.now() });

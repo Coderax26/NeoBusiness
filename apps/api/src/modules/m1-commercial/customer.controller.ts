@@ -1,8 +1,26 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { CustomerService } from './customer.service.js';
-import { CreateCustomerDto, UpdateCustomerDto, CreditOverrideDto, CreateCustomerContactDto, CreateCommunicationLogDto } from './dto/customer.dto.js';
+import {
+  CreateCustomerDto,
+  UpdateCustomerDto,
+  CreditOverrideDto,
+  CreateCustomerContactDto,
+  CreateCommunicationLogDto,
+} from './dto/customer.dto.js';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard)
@@ -41,10 +59,17 @@ export class CustomerController {
    */
   @Get()
   @RequirePermission('customer.view')
-  async list(@Query() q: { siteId?: string; isActive?: string; search?: string }) {
+  async list(
+    @Query() q: { siteId?: string; isActive?: string; search?: string },
+  ) {
     return this.customerSvc.findAll({
       siteId: q.siteId,
-      isActive: q.isActive === 'true' ? true : q.isActive === 'false' ? false : undefined,
+      isActive:
+        q.isActive === 'true'
+          ? true
+          : q.isActive === 'false'
+            ? false
+            : undefined,
       search: q.search,
     });
   }
@@ -63,7 +88,11 @@ export class CustomerController {
    */
   @Patch(':id')
   @RequirePermission('customer.modify')
-  async update(@Param('id') id: string, @Body() dto: UpdateCustomerDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerDto,
+    @Req() req: any,
+  ) {
     return this.customerSvc.update(id, {
       businessName: dto.businessName,
       contactPerson: dto.contactPerson,
@@ -86,7 +115,11 @@ export class CustomerController {
    */
   @Patch(':id/credit')
   @RequirePermission('customer.credit_override')
-  async overrideCredit(@Param('id') id: string, @Body() dto: CreditOverrideDto, @Req() req: any) {
+  async overrideCredit(
+    @Param('id') id: string,
+    @Body() dto: CreditOverrideDto,
+    @Req() req: any,
+  ) {
     return this.customerSvc.overrideCredit(id, {
       creditLimit: dto.creditLimit,
       creditDays: dto.creditDays,
@@ -101,7 +134,11 @@ export class CustomerController {
    */
   @Post(':id/contacts')
   @RequirePermission('customer.modify')
-  async addContact(@Param('id') id: string, @Body() dto: CreateCustomerContactDto, @Req() req: any) {
+  async addContact(
+    @Param('id') id: string,
+    @Body() dto: CreateCustomerContactDto,
+    @Req() req: any,
+  ) {
     return this.customerSvc.addContact(id, {
       name: dto.name,
       phone: dto.phone,
@@ -125,7 +162,11 @@ export class CustomerController {
    */
   @Post(':id/communication')
   @RequirePermission('customer.modify')
-  async logCommunication(@Param('id') id: string, @Body() dto: CreateCommunicationLogDto, @Req() req: any) {
+  async logCommunication(
+    @Param('id') id: string,
+    @Body() dto: CreateCommunicationLogDto,
+    @Req() req: any,
+  ) {
     return this.customerSvc.logCommunication(id, {
       channel: dto.channel,
       note: dto.note,
@@ -138,7 +179,10 @@ export class CustomerController {
    */
   @Get(':id/communication')
   @RequirePermission('customer.view')
-  async getCommunicationLog(@Param('id') id: string, @Query('limit') limit?: number) {
+  async getCommunicationLog(
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+  ) {
     return this.customerSvc.getCommunicationLog(id, limit);
   }
 
@@ -147,8 +191,13 @@ export class CustomerController {
    */
   @Get(':id/price-memory')
   @RequirePermission('customer.view')
-  async getPriceMemory(@Param('id') id: string, @Query('item_id') itemId: string, @Query('limit') limit?: number) {
-    if (!itemId) throw new BadRequestException('item_id query parameter required');
+  async getPriceMemory(
+    @Param('id') id: string,
+    @Query('item_id') itemId: string,
+    @Query('limit') limit?: number,
+  ) {
+    if (!itemId)
+      throw new BadRequestException('item_id query parameter required');
     return this.customerSvc.getPriceMemory(id, itemId, limit ?? 5);
   }
 }

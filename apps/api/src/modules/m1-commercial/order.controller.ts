@@ -1,8 +1,27 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { OrderService } from './order.service.js';
-import { CreateOrderDto, ConfirmOrderDto, RequestOverrideDto, AcceptCounterDto, CancelOrderDto } from './dto/order.dto.js';
+import {
+  CreateOrderDto,
+  ConfirmOrderDto,
+  RequestOverrideDto,
+  AcceptCounterDto,
+  CancelOrderDto,
+} from './dto/order.dto.js';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
@@ -18,7 +37,7 @@ export class OrderController {
     return this.orderSvc.createOrder(
       dto.customerId,
       dto.fulfillmentSiteId,
-      dto.lines.map(l => ({
+      dto.lines.map((l) => ({
         itemId: l.itemId,
         qty: l.qty.toString(),
         requestedPrice: l.requestedPrice.toString(),
@@ -33,7 +52,11 @@ export class OrderController {
    */
   @Post(':id/confirm')
   @RequirePermission('order.confirm_in_band')
-  async confirm(@Param('id') id: string, @Body() dto: ConfirmOrderDto, @Req() req: any) {
+  async confirm(
+    @Param('id') id: string,
+    @Body() dto: ConfirmOrderDto,
+    @Req() req: any,
+  ) {
     return this.orderSvc.confirm(id, dto.remarks, req.user.id);
   }
 
@@ -42,7 +65,11 @@ export class OrderController {
    */
   @Post(':id/request-override')
   @RequirePermission('order.request_override')
-  async requestOverride(@Param('id') id: string, @Body() dto: RequestOverrideDto, @Req() req: any) {
+  async requestOverride(
+    @Param('id') id: string,
+    @Body() dto: RequestOverrideDto,
+    @Req() req: any,
+  ) {
     return this.orderSvc.requestOverride(id, dto.reason, req.user.id);
   }
 
@@ -51,7 +78,11 @@ export class OrderController {
    */
   @Post(':id/accept-counter')
   @RequirePermission('order.confirm_in_band')
-  async acceptCounter(@Param('id') id: string, @Body() dto: AcceptCounterDto, @Req() req: any) {
+  async acceptCounter(
+    @Param('id') id: string,
+    @Body() dto: AcceptCounterDto,
+    @Req() req: any,
+  ) {
     return this.orderSvc.acceptCounter(id, dto.remarks, req.user.id);
   }
 
@@ -60,7 +91,11 @@ export class OrderController {
    */
   @Post(':id/cancel')
   @RequirePermission('order.manage')
-  async cancel(@Param('id') id: string, @Body() dto: CancelOrderDto, @Req() req: any) {
+  async cancel(
+    @Param('id') id: string,
+    @Body() dto: CancelOrderDto,
+    @Req() req: any,
+  ) {
     return this.orderSvc.cancel(id, dto.reason, req.user.id);
   }
 
@@ -69,11 +104,23 @@ export class OrderController {
    */
   @Get()
   @RequirePermission('order.view')
-  async list(@Query() q: { status?: string; siteId?: string; date?: string; limit?: number; offset?: number }) {
+  async list(
+    @Query()
+    q: {
+      status?: string;
+      siteId?: string;
+      date?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
     const limit = Math.min(q.limit ?? 50, 100);
     const offset = q.offset ?? 0;
 
-    const query = this.orderSvc['knex']('sales_orders').orderBy('created_at_idx', 'desc').limit(limit).offset(offset);
+    const query = this.orderSvc['knex']('sales_orders')
+      .orderBy('created_at_idx', 'desc')
+      .limit(limit)
+      .offset(offset);
 
     if (q.status) query.andWhere('order_status', q.status);
     if (q.siteId) query.andWhere('fulfillment_site_id', q.siteId);
@@ -93,11 +140,18 @@ export class OrderController {
   @Get(':id')
   @RequirePermission('order.view')
   async getOne(@Param('id') id: string) {
-    const order = await this.orderSvc['knex']('sales_orders').where('id', id).first();
+    const order = await this.orderSvc['knex']('sales_orders')
+      .where('id', id)
+      .first();
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
-    const lines = await this.orderSvc['knex']('sales_order_lines').where('order_id', id);
-    const statusLog = await this.orderSvc['knex']('order_status_log').where('order_id', id).orderBy('at', 'desc');
+    const lines = await this.orderSvc['knex']('sales_order_lines').where(
+      'order_id',
+      id,
+    );
+    const statusLog = await this.orderSvc['knex']('order_status_log')
+      .where('order_id', id)
+      .orderBy('at', 'desc');
 
     return { ...order, lines, statusLog };
   }

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { ExceptionService } from './exception.service.js';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
@@ -7,10 +18,10 @@ import { RequirePermission } from '../m0-platform/rbac.service.js';
  * Query DTO for listing exceptions.
  */
 interface ListExceptionsQuery {
-  status?: string;    // PENDING | APPROVED | REJECTED | COUNTERED | EXPIRED
-  type?: string;      // exception type filter
-  limit?: number;     // default 50
-  offset?: number;    // default 0
+  status?: string; // PENDING | APPROVED | REJECTED | COUNTERED | EXPIRED
+  type?: string; // exception type filter
+  limit?: number; // default 50
+  offset?: number; // default 0
 }
 
 /**
@@ -19,7 +30,7 @@ interface ListExceptionsQuery {
 interface ResolveExceptionDto {
   action: 'APPROVED' | 'REJECTED' | 'COUNTERED';
   remarks: string;
-  counter?: Record<string, unknown>;  // e.g. { proposedPrice: '89.50' } for COUNTERED
+  counter?: Record<string, unknown>; // e.g. { proposedPrice: '89.50' } for COUNTERED
 }
 
 /**

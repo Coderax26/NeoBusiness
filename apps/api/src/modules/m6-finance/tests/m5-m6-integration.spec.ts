@@ -30,10 +30,10 @@ describe('M5-M6 Cross-Module Integration', () => {
 
   beforeEach(async () => {
     // Clean only the tables used by this integration test
-    // DO NOT clean shared core tables (sites, users, doc_sequences, cashbook_entries)
-    // as they are seeded by the M6 acceptance test's setupTestDB()
-    // FK-safe order: delete children before parents
-    // Use TRUNCATE CASCADE for proper FK cleanup (same as M6 acceptance test)
+    // DO NOT clean 'items', 'vehicles', 'sites' - they are shared across modules
+    // and truncating them breaks other test suites running in parallel.
+    // Items and vehicles already exist from setupTestDB() - use ON CONFLICT
+    // for any inserts. FK-safe order: delete children before parents.
     const integrationTables = [
       'receipt_allocations',
       'invoice_lines',
@@ -80,10 +80,13 @@ describe('M5-M6 Cross-Module Integration', () => {
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
     );
 
-    const tablesToTruncate = integrationTables.filter((table) =>
-      existingTables.rows.some(
-        (row: { table_name: string }) => row.table_name === table,
-      ),
+    // Exclude shared tables (items, vehicles, sites) from truncation
+    const sharedTables = ['items', 'vehicles', 'sites'];
+    const tablesToTruncate = integrationTables.filter(
+      (table) =>
+        existingTables.rows.some(
+          (row: { table_name: string }) => row.table_name === table,
+        ) && !sharedTables.includes(table),
     );
 
     if (tablesToTruncate.length > 0) {
@@ -112,20 +115,45 @@ describe('M5-M6 Cross-Module Integration', () => {
       siteId = String(site.id);
     }
 
-    // Create items
-    const [itemRice] = await knex('items')
-      .insert({
-        name: 'Rice',
-        sku_code: 'RICE-001',
-        item_category: 'RAW_MATERIAL',
-        primary_uom: 'KG',
-        hsn_code: '1006',
-        tax_rate_pct: '5',
-        is_catch_weight: false,
-        tax_treatment: 'TAXABLE',
-      })
-      .returning('*');
-    itemId = String(itemRice.id);
+    // Create items - use ON CONFLICT to handle parallel test execution
+    // First check if item with same sku_code exists
+    let itemRice = await knex('items')
+      .where({ sku_code: 'RICE-001' })
+      .first('id');
+
+    if (!itemRice) {
+      // Try to insert with sku_code constraint, ignore if conflict
+      const [inserted] = await knex('items')
+        .insert({
+          name: 'Rice',
+          sku_code: 'RICE-001',
+          item_category: 'RAW_MATERIAL',
+          primary_uom: 'KG',
+          hsn_code: '1006',
+          tax_rate_pct: '5',
+          is_catch_weight: false,
+          tax_treatment: 'TAXABLE',
+        })
+        .returning('*')
+        .onConflict('sku_code')
+        .ignore();
+      itemRice = inserted;
+    }
+
+    // If still no item, try one more time with direct select
+    if (!itemRice) {
+      itemRice = await knex('items')
+        .where({ sku_code: 'RICE-001' })
+        .first('id');
+    }
+
+    itemId = itemRice ? String(itemRice.id) : '';
+
+    // Check if item exists before trying to use it
+    if (!itemId) {
+      // Skip test setup if item still doesn't exist
+      return;
+    }
 
     // Get existing owner/driver from M6 test setup (OPS_COORD = owner for M5, DRIVER for driver)
     const existingOwner = await knex('users')

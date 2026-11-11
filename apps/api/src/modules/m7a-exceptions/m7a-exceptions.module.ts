@@ -3,7 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../m0-platform/database.module.js';
 import { AuthModule } from '../m0-platform/auth.module.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
-import { EXCEPTION_PORT, NOTIFY_PORT } from '../../shared/ports/ports.interface.js';
+import {
+  EXCEPTION_PORT,
+  NOTIFY_PORT,
+} from '../../shared/ports/ports.interface.js';
 import { ExceptionService } from './exception.service.js';
 import { NotificationService } from './notification.service.js';
 import { ExceptionController } from './exception.controller.js';
@@ -20,11 +23,7 @@ import { DeviceController } from './device.controller.js';
  */
 @Global()
 @Module({
-  imports: [
-    ConfigModule,
-    DatabaseModule,
-    AuthModule,
-  ],
+  imports: [ConfigModule, DatabaseModule, AuthModule],
   providers: [
     ExceptionService,
     NotificationService,
@@ -40,10 +39,7 @@ import { DeviceController } from './device.controller.js';
     },
     OutboxService,
   ],
-  controllers: [
-    ExceptionController,
-    DeviceController,
-  ],
+  controllers: [ExceptionController, DeviceController],
   exports: [
     ExceptionService,
     NotificationService,

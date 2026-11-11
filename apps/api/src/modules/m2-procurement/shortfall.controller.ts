@@ -1,9 +1,29 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { ShortfallService } from './shortfall.service.js';
-import { CreateBackupPODto, UpdateShortfallStatusDto } from './dto/shortfall.dto.js';
+import {
+  CreateBackupPODto,
+  UpdateShortfallStatusDto,
+} from './dto/shortfall.dto.js';
 
 @ApiTags('Procurement - Shortfalls & Backup POs')
 @ApiBearerAuth()
@@ -23,8 +43,13 @@ export class ShortfallController {
   @Get('supplier/:supplierId/coverable')
   @RequirePermission('po.create')
   @ApiOperation({ summary: 'Get shortfalls that can be covered by a supplier' })
-  @ApiResponse({ status: 200, description: 'Coverable shortfalls for supplier' })
-  async getCoverableShortfallsForSupplier(@Param('supplierId') supplierId: string) {
+  @ApiResponse({
+    status: 200,
+    description: 'Coverable shortfalls for supplier',
+  })
+  async getCoverableShortfallsForSupplier(
+    @Param('supplierId') supplierId: string,
+  ) {
     return this.shortfallService.getCoverableShortfallsForSupplier(supplierId);
   }
 
@@ -45,14 +70,22 @@ export class ShortfallController {
     @Query('referencePrice') referencePrice: string,
     @Query('excludeSupplierId') excludeSupplierId?: string,
   ) {
-    return this.shortfallService.getRankedBackups(itemId, referencePrice, excludeSupplierId);
+    return this.shortfallService.getRankedBackups(
+      itemId,
+      referencePrice,
+      excludeSupplierId,
+    );
   }
 
   @Post('create-backup-po')
   @RequirePermission('po.create')
   @ApiOperation({ summary: 'Create a backup PO for a shortfall' })
   @ApiResponse({ status: 201, description: 'Backup PO created' })
-  async createBackupPO(@Body() dto: CreateBackupPODto, @Query('userId') userId: string, @Query('originalPoId') originalPoId: string) {
+  async createBackupPO(
+    @Body() dto: CreateBackupPODto,
+    @Query('userId') userId: string,
+    @Query('originalPoId') originalPoId: string,
+  ) {
     return this.shortfallService.createBackupPO({
       originalPoId,
       shortfallId: dto.shortfallId,
@@ -63,9 +96,14 @@ export class ShortfallController {
 
   @Post('auto-resolve/:poId')
   @RequirePermission('po.create')
-  @ApiOperation({ summary: 'Auto-resolve all open shortfalls for a PO using ranked backups' })
+  @ApiOperation({
+    summary: 'Auto-resolve all open shortfalls for a PO using ranked backups',
+  })
   @ApiResponse({ status: 200, description: 'Auto-resolution result' })
-  async autoResolveShortfalls(@Param('poId') poId: string, @Query('userId') userId: string) {
+  async autoResolveShortfalls(
+    @Param('poId') poId: string,
+    @Query('userId') userId: string,
+  ) {
     return this.shortfallService.autoResolveShortfalls(poId, userId);
   }
 
@@ -78,6 +116,10 @@ export class ShortfallController {
     @Body() dto: UpdateShortfallStatusDto,
     @Query('userId') userId: string,
   ) {
-    return this.shortfallService.updateShortfallStatus(shortfallId, dto.status, userId);
+    return this.shortfallService.updateShortfallStatus(
+      shortfallId,
+      dto.status,
+      userId,
+    );
   }
 }

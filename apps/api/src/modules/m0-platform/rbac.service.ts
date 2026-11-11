@@ -1,4 +1,11 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Logger,
+  Inject,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Knex } from 'knex';
 import { InjectKnex } from 'nestjs-knex';
@@ -10,7 +17,11 @@ export const PERMISSIONS_METADATA = 'permissions';
  * Usage: @RequirePermission('order.create', 'order.confirm_in_band')
  */
 export function RequirePermission(...permissions: string[]) {
-  return (target: object, key: string | symbol, descriptor: PropertyDescriptor) => {
+  return (
+    target: object,
+    key: string | symbol,
+    descriptor: PropertyDescriptor,
+  ) => {
     Reflect.defineMetadata(PERMISSIONS_METADATA, permissions, descriptor.value);
   };
 }
@@ -95,7 +106,10 @@ export class RbacGuard implements CanActivate {
       return true; // no permissions required
     }
 
-    const hasAll = await this.permissionService.hasPermissions(user.role, requiredPermissions);
+    const hasAll = await this.permissionService.hasPermissions(
+      user.role,
+      requiredPermissions,
+    );
     if (!hasAll) {
       throw new ForbiddenException(
         `Insufficient permissions. Required: ${requiredPermissions.join(', ')}`,

@@ -95,7 +95,10 @@ const SITE_ACCESS: { phone: string; site_index: number }[] = [
   { phone: '+919876543211', site_index: 1 },
 ];
 
-async function upsertSite(knex: Knex, site: (typeof SITES)[number]): Promise<string> {
+async function upsertSite(
+  knex: Knex,
+  site: (typeof SITES)[number],
+): Promise<string> {
   const existing = await knex('sites').where('name', site.name).first();
   if (existing) return String(existing.id);
 
@@ -137,7 +140,10 @@ async function upsertSiteAccess(
   userId: string,
   siteId: string,
 ): Promise<void> {
-  await knex('user_site_access').insert({ user_id: userId, site_id: siteId }).onConflict(['user_id', 'site_id']).ignore();
+  await knex('user_site_access')
+    .insert({ user_id: userId, site_id: siteId })
+    .onConflict(['user_id', 'site_id'])
+    .ignore();
 }
 
 async function main(): Promise<void> {
@@ -154,7 +160,11 @@ async function main(): Promise<void> {
     // 2. Users
     const userIds: Record<string, string> = {};
     for (const user of USERS) {
-      const id = await upsertUser(knex, user, siteIds[user.assigned_site_index]);
+      const id = await upsertUser(
+        knex,
+        user,
+        siteIds[user.assigned_site_index],
+      );
       userIds[user.phone] = id;
       console.log(`[seed] user: ${user.phone} (${user.role}) -> ${id}`);
     }
@@ -164,7 +174,9 @@ async function main(): Promise<void> {
       const userId = userIds[access.phone];
       if (!userId) continue;
       await upsertSiteAccess(knex, userId, siteIds[access.site_index]);
-      console.log(`[seed] site-access: ${access.phone} -> site ${access.site_index}`);
+      console.log(
+        `[seed] site-access: ${access.phone} -> site ${access.site_index}`,
+      );
     }
 
     // 4. Verify counts

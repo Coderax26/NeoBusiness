@@ -31,7 +31,9 @@ export class Clock {
   /** Convert a UTC Date to the application timezone for display */
   static toKolkata(date: Date | string): DateTime {
     const dt =
-      typeof date === 'string' ? DateTime.fromISO(date, { zone: 'utc' }) : DateTime.fromJSDate(date, { zone: 'utc' });
+      typeof date === 'string'
+        ? DateTime.fromISO(date, { zone: 'utc' })
+        : DateTime.fromJSDate(date, { zone: 'utc' });
     return dt.setZone(Clock.APP_TZ);
   }
 
@@ -41,7 +43,9 @@ export class Clock {
    */
   static isTimestampAcceptable(deviceTimestamp: Date | string): boolean {
     const device =
-      typeof deviceTimestamp === 'string' ? new Date(deviceTimestamp).getTime() : deviceTimestamp.getTime();
+      typeof deviceTimestamp === 'string'
+        ? new Date(deviceTimestamp).getTime()
+        : deviceTimestamp.getTime();
     const server = Date.now();
     const skewMs = Math.abs(server - device);
     return skewMs <= Clock.MAX_SKEW_MINUTES * 60 * 1000;
@@ -53,7 +57,9 @@ export class Clock {
    */
   static skewMinutes(deviceTimestamp: Date | string): number {
     const device =
-      typeof deviceTimestamp === 'string' ? new Date(deviceTimestamp).getTime() : deviceTimestamp.getTime();
+      typeof deviceTimestamp === 'string'
+        ? new Date(deviceTimestamp).getTime()
+        : deviceTimestamp.getTime();
     return (device - Date.now()) / 60000;
   }
 

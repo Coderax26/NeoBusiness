@@ -11,6 +11,7 @@ import { Money } from '../../shared/utils/money.util.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { LedgerService } from './ledger.service.js';
 import { Clock } from '../../shared/utils/clock.util.js';
+import { OutboxService } from '../../shared/events/outbox.service.js';
 import {
   NOTIFY_PORT,
   EXCEPTION_PORT,
@@ -36,6 +37,7 @@ export class EodService {
     @InjectKnex() private readonly knex: Knex,
     private readonly docNumber: DocNumberService,
     private readonly ledger: LedgerService,
+    private readonly outbox: OutboxService,
     @Inject(NOTIFY_PORT) private readonly notify: any,
     @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
   ) {}
@@ -290,8 +292,20 @@ export class EodService {
         `EOD SIGNED OFF: ${eodId} by ${ownerId}, duration ${new Date().getTime() - new Date(eod.initiated_at).getTime()}ms`,
       );
 
-      // TODO: Emit eod.closed domain event via OutboxService (to be added)
-      // OutboxService.raise(trx, 'eod.closed', eodId, { siteId: eod.site_id, date: eod.date });
+      // Emit eod.closed domain event transactionally (via Outbox)
+      await this.outbox.raise(
+        trx,
+        'eod.closed',
+        eodId,
+        {
+          eodId: eodId,
+          siteId: String(eod.site_id),
+          date: correctDateStr,
+          signedOffBy: ownerId,
+          signedOffAt: new Date().toISOString(),
+        },
+        'm6',
+      );
 
       return { success: true, signedOffAt: new Date() };
     });

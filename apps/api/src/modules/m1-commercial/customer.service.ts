@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
@@ -39,26 +45,28 @@ export class CustomerService {
   }) {
     const code = await this.docNumber.next('CUSTOMER', null, null);
 
-    const [customer] = await this.knex('customers').insert({
-      customer_code: code,
-      business_name: data.businessName,
-      contact_person: data.contactPerson,
-      phone: data.phone,
-      whatsapp_no: data.whatsappNo,
-      billing_address: data.billingAddress,
-      default_site_id: data.defaultSiteId,
-      gstin: data.gstin,
-      state_code: data.stateCode,
-      credit_limit: data.creditLimit ?? 100000,
-      credit_days: data.creditDays ?? 15,
-      max_overdue_days: data.maxOverdueDays ?? 15,
-      preferred_delivery_window: data.preferredDeliveryWindow,
-      price_tier: data.priceTier ?? 'STANDARD',
-      is_active: data.isActive ?? true,
-      gps_lat_lng: data.gpsLatLng ? JSON.parse(data.gpsLatLng) : null,
-      created_by: data.userId,
-      updated_by: data.userId,
-    }).returning('*');
+    const [customer] = await this.knex('customers')
+      .insert({
+        customer_code: code,
+        business_name: data.businessName,
+        contact_person: data.contactPerson,
+        phone: data.phone,
+        whatsapp_no: data.whatsappNo,
+        billing_address: data.billingAddress,
+        default_site_id: data.defaultSiteId,
+        gstin: data.gstin,
+        state_code: data.stateCode,
+        credit_limit: data.creditLimit ?? 100000,
+        credit_days: data.creditDays ?? 15,
+        max_overdue_days: data.maxOverdueDays ?? 15,
+        preferred_delivery_window: data.preferredDeliveryWindow,
+        price_tier: data.priceTier ?? 'STANDARD',
+        is_active: data.isActive ?? true,
+        gps_lat_lng: data.gpsLatLng ? JSON.parse(data.gpsLatLng) : null,
+        created_by: data.userId,
+        updated_by: data.userId,
+      })
+      .returning('*');
 
     this.logger.log(`Created customer ${code}: ${data.businessName}`);
     return customer;
@@ -67,7 +75,11 @@ export class CustomerService {
   /**
    * List customers with optional site scoping.
    */
-  async findAll(filters: { siteId?: string; isActive?: boolean; search?: string }) {
+  async findAll(filters: {
+    siteId?: string;
+    isActive?: boolean;
+    search?: string;
+  }) {
     const query = this.knex('customers').select('*');
 
     if (filters.siteId) {
@@ -99,21 +111,24 @@ export class CustomerService {
   /**
    * Update customer profile (OPS_COORD or OWNER).
    */
-  async update(id: string, data: Partial<{
-    businessName: string;
-    contactPerson: string;
-    phone: string;
-    whatsappNo: string;
-    billingAddress: string;
-    defaultSiteId: string;
-    gstin: string;
-    stateCode: string;
-    preferredDeliveryWindow: string;
-    priceTier: string;
-    isActive: boolean;
-    gpsLatLng: string;
-    userId: string;
-  }>) {
+  async update(
+    id: string,
+    data: Partial<{
+      businessName: string;
+      contactPerson: string;
+      phone: string;
+      whatsappNo: string;
+      billingAddress: string;
+      defaultSiteId: string;
+      gstin: string;
+      stateCode: string;
+      preferredDeliveryWindow: string;
+      priceTier: string;
+      isActive: boolean;
+      gpsLatLng: string;
+      userId: string;
+    }>,
+  ) {
     const updateData: any = { updated_by: data.userId, updated_at: new Date() };
 
     if (data.businessName) updateData.business_name = data.businessName;
@@ -124,10 +139,14 @@ export class CustomerService {
     if (data.defaultSiteId) updateData.default_site_id = data.defaultSiteId;
     if (data.gstin !== undefined) updateData.gstin = data.gstin;
     if (data.stateCode) updateData.state_code = data.stateCode;
-    if (data.preferredDeliveryWindow !== undefined) updateData.preferred_delivery_window = data.preferredDeliveryWindow;
+    if (data.preferredDeliveryWindow !== undefined)
+      updateData.preferred_delivery_window = data.preferredDeliveryWindow;
     if (data.priceTier) updateData.price_tier = data.priceTier;
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
-    if (data.gpsLatLng !== undefined) updateData.gps_lat_lng = data.gpsLatLng ? JSON.parse(data.gpsLatLng) : null;
+    if (data.gpsLatLng !== undefined)
+      updateData.gps_lat_lng = data.gpsLatLng
+        ? JSON.parse(data.gpsLatLng)
+        : null;
 
     const [customer] = await this.knex('customers')
       .where('id', id)
@@ -141,13 +160,16 @@ export class CustomerService {
   /**
    * Credit override (OWNER only) - update credit limit, days, hold flag.
    */
-  async overrideCredit(id: string, data: {
-    creditLimit: number;
-    creditDays: number;
-    maxOverdueDays?: number;
-    creditHold?: boolean;
-    userId: string;
-  }) {
+  async overrideCredit(
+    id: string,
+    data: {
+      creditLimit: number;
+      creditDays: number;
+      maxOverdueDays?: number;
+      creditHold?: boolean;
+      userId: string;
+    },
+  ) {
     const [customer] = await this.knex('customers')
       .where('id', id)
       .update({
@@ -168,13 +190,16 @@ export class CustomerService {
   /**
    * Add a contact to customer.
    */
-  async addContact(customerId: string, data: {
-    name: string;
-    phone: string;
-    role: string;
-    isPrimary?: boolean;
-    userId: string;
-  }) {
+  async addContact(
+    customerId: string,
+    data: {
+      name: string;
+      phone: string;
+      role: string;
+      isPrimary?: boolean;
+      userId: string;
+    },
+  ) {
     await this.findById(customerId);
 
     // If this is primary, unset other primaries
@@ -184,15 +209,17 @@ export class CustomerService {
         .update({ is_primary: false });
     }
 
-    const [contact] = await this.knex('customer_contacts').insert({
-      customer_id: customerId,
-      name: data.name,
-      phone: data.phone,
-      role: data.role,
-      is_primary: data.isPrimary ?? false,
-      created_by: data.userId,
-      updated_by: data.userId,
-    }).returning('*');
+    const [contact] = await this.knex('customer_contacts')
+      .insert({
+        customer_id: customerId,
+        name: data.name,
+        phone: data.phone,
+        role: data.role,
+        is_primary: data.isPrimary ?? false,
+        created_by: data.userId,
+        updated_by: data.userId,
+      })
+      .returning('*');
 
     return contact;
   }
@@ -211,25 +238,30 @@ export class CustomerService {
   /**
    * Log communication.
    */
-  async logCommunication(customerId: string, data: {
-    channel: string;
-    note: string;
-    userId: string;
-  }) {
+  async logCommunication(
+    customerId: string,
+    data: {
+      channel: string;
+      note: string;
+      userId: string;
+    },
+  ) {
     await this.findById(customerId);
 
     if (!['CALL', 'WHATSAPP', 'VISIT'].includes(data.channel)) {
       throw new BadRequestException(`Invalid channel: ${data.channel}`);
     }
 
-    const [log] = await this.knex('communication_log').insert({
-      customer_id: customerId,
-      channel: data.channel,
-      note: data.note,
-      user_id: data.userId,
-      created_by: data.userId,
-      updated_by: data.userId,
-    }).returning('*');
+    const [log] = await this.knex('communication_log')
+      .insert({
+        customer_id: customerId,
+        channel: data.channel,
+        note: data.note,
+        user_id: data.userId,
+        created_by: data.userId,
+        updated_by: data.userId,
+      })
+      .returning('*');
 
     return log;
   }
@@ -263,7 +295,7 @@ export class CustomerService {
         'sol.quoted_unit_price as unitPrice',
       );
 
-    return rows.map(r => ({
+    return rows.map((r) => ({
       date: r.date,
       qty: r.qty,
       unitPrice: r.unitPrice,

@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS items (
   is_catch_weight    BOOLEAN NOT NULL DEFAULT FALSE,
   standard_weight_per_secondary_kg NUMERIC(14,3) CHECK (standard_weight_per_secondary_kg >= 0),
   min_margin_pct     NUMERIC(3,2) NOT NULL DEFAULT 0.10,     -- 10% global default per OD-001 CONFIRMED
+  min_stock_qty      NUMERIC(14,3) NOT NULL DEFAULT 0.000,   -- Minimum stock threshold for low-stock alerts (M7b dashboards)
   tax_treatment      TEXT NOT NULL CHECK (tax_treatment IN ('TAXABLE', 'EXEMPT', 'NIL_RATED', 'NON_GST')),
   is_active          BOOLEAN NOT NULL DEFAULT TRUE,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),

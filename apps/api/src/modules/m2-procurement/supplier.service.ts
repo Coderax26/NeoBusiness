@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
@@ -89,7 +94,9 @@ export class SupplierService {
   /**
    * Create a new supplier
    */
-  async create(input: SupplierCreateInput): Promise<{ id: string; supplierCode: string }> {
+  async create(
+    input: SupplierCreateInput,
+  ): Promise<{ id: string; supplierCode: string }> {
     const supplierCode = await this.docNumber.next('SUP', null, input.userId);
 
     const [supplier] = await this.knex('suppliers')
@@ -112,7 +119,10 @@ export class SupplierService {
       .returning(['id', 'supplier_code']);
 
     this.logger.log(`Created supplier: ${supplierCode} (${input.companyName})`);
-    return { id: String(supplier.id), supplierCode: String(supplier.supplier_code) };
+    return {
+      id: String(supplier.id),
+      supplierCode: String(supplier.supplier_code),
+    };
   }
 
   /**
@@ -136,13 +146,15 @@ export class SupplierService {
   /**
    * List suppliers with filters
    */
-  async list(filters: {
-    isActive?: boolean;
-    isApproved?: boolean;
-    siteId?: string;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<any[]> {
+  async list(
+    filters: {
+      isActive?: boolean;
+      isApproved?: boolean;
+      siteId?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<any[]> {
     let query = this.knex('suppliers').select('*');
 
     if (filters.isActive !== undefined) {
@@ -270,14 +282,20 @@ export class SupplierService {
       updated_by: input.userId,
     });
 
-    this.logger.debug(`Added rate quote for supplier ${input.supplierId}, item ${input.itemId}: ${input.quotedPrice}`);
+    this.logger.debug(
+      `Added rate quote for supplier ${input.supplierId}, item ${input.itemId}: ${input.quotedPrice}`,
+    );
     return { id };
   }
 
   /**
    * Get rate history for supplier-item
    */
-  async getRateHistory(supplierId: string, itemId: string, limit = 50): Promise<RateHistoryEntry[]> {
+  async getRateHistory(
+    supplierId: string,
+    itemId: string,
+    limit = 50,
+  ): Promise<RateHistoryEntry[]> {
     const quotes = await this.knex('supplier_rate_quotes')
       .where('supplier_id', supplierId)
       .where('item_id', itemId)
@@ -285,7 +303,7 @@ export class SupplierService {
       .limit(limit)
       .select('id', 'quoted_price', 'quoted_at', 'valid_until', 'source');
 
-    return quotes.map(q => ({
+    return quotes.map((q) => ({
       id: String(q.id),
       quotedPrice: String(q.quoted_price),
       quotedAt: q.quoted_at.toISOString(),
@@ -297,12 +315,17 @@ export class SupplierService {
   /**
    * Get latest rate quote for supplier-item
    */
-  async getLatestRate(supplierId: string, itemId: string): Promise<string | null> {
+  async getLatestRate(
+    supplierId: string,
+    itemId: string,
+  ): Promise<string | null> {
     const quote = await this.knex('supplier_rate_quotes')
       .where('supplier_id', supplierId)
       .where('item_id', itemId)
       .where((builder) => {
-        builder.whereNull('valid_until').orWhere('valid_until', '>=', new Date());
+        builder
+          .whereNull('valid_until')
+          .orWhere('valid_until', '>=', new Date());
       })
       .orderBy('quoted_at', 'desc')
       .first('quoted_price');
@@ -313,7 +336,10 @@ export class SupplierService {
   /**
    * Calculate price inflation (30/90 day delta)
    */
-  async getPriceInflation(supplierId: string, itemId: string): Promise<PriceInflation> {
+  async getPriceInflation(
+    supplierId: string,
+    itemId: string,
+  ): Promise<PriceInflation> {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
@@ -337,7 +363,10 @@ export class SupplierService {
     // Get latest price
     const latestPrice = await this.getLatestRate(supplierId, itemId);
 
-    const calcInflation = (oldPrice: string | null, newPrice: string | null): number => {
+    const calcInflation = (
+      oldPrice: string | null,
+      newPrice: string | null,
+    ): number => {
       if (!oldPrice || !newPrice) return 0;
       const oldVal = parseFloat(oldPrice);
       const newVal = parseFloat(newPrice);
@@ -359,9 +388,17 @@ export class SupplierService {
 
     // Get confirmed quantities from PO lines
     const confirmedResult = await this.knex('purchase_order_lines')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .where('purchase_orders.supplier_id', supplierId)
-      .whereIn('purchase_orders.po_status', ['ISSUED', 'PARTIALLY_RECEIVED', 'CLOSED'])
+      .whereIn('purchase_orders.po_status', [
+        'ISSUED',
+        'PARTIALLY_RECEIVED',
+        'CLOSED',
+      ])
       .sum('purchase_order_lines.confirmed_qty as total_confirmed')
       .first();
 
@@ -379,15 +416,18 @@ export class SupplierService {
       .whereNotNull('goods_receipts.po_id')
       .whereNotNull('purchase_orders.expected_delivery')
       .select(
-        this.knex.raw(`AVG(EXTRACT(EPOCH FROM (goods_receipts.received_at - purchase_orders.expected_delivery)) / 86400) as avg_lead_time`)
+        this.knex.raw(
+          `AVG(EXTRACT(EPOCH FROM (goods_receipts.received_at - purchase_orders.expected_delivery)) / 86400) as avg_lead_time`,
+        ),
       )
       .first();
 
     const totalConfirmed = confirmedResult?.total_confirmed ?? '0';
     const totalReceived = receivedResult?.total_received ?? '0';
-    const fillRate = parseFloat(totalConfirmed) > 0
-      ? parseFloat(totalReceived) / parseFloat(totalConfirmed)
-      : 0;
+    const fillRate =
+      parseFloat(totalConfirmed) > 0
+        ? parseFloat(totalReceived) / parseFloat(totalConfirmed)
+        : 0;
 
     const priceInflation = await this.getPriceInflationForAllItems(supplierId);
 
@@ -407,7 +447,9 @@ export class SupplierService {
   /**
    * Calculate aggregate price inflation across all items for a supplier
    */
-  private async getPriceInflationForAllItems(supplierId: string): Promise<PriceInflation> {
+  private async getPriceInflationForAllItems(
+    supplierId: string,
+  ): Promise<PriceInflation> {
     const items = await this.knex('supplier_items')
       .where('supplier_id', supplierId)
       .select('item_id');
@@ -417,11 +459,15 @@ export class SupplierService {
     }
 
     const inflations = await Promise.all(
-      items.map(item => this.getPriceInflation(supplierId, String(item.item_id)))
+      items.map((item) =>
+        this.getPriceInflation(supplierId, String(item.item_id)),
+      ),
     );
 
-    const avg30d = inflations.reduce((sum, i) => sum + i.period30d, 0) / inflations.length;
-    const avg90d = inflations.reduce((sum, i) => sum + i.period90d, 0) / inflations.length;
+    const avg30d =
+      inflations.reduce((sum, i) => sum + i.period30d, 0) / inflations.length;
+    const avg90d =
+      inflations.reduce((sum, i) => sum + i.period90d, 0) / inflations.length;
 
     return { period30d: avg30d, period90d: avg90d };
   }
@@ -429,27 +475,33 @@ export class SupplierService {
   /**
    * Update supplier reliability score based on performance
    */
-  async updateReliabilityScore(supplierId: string, userId: string): Promise<void> {
+  async updateReliabilityScore(
+    supplierId: string,
+    userId: string,
+  ): Promise<void> {
     const performance = await this.getPerformance(supplierId);
 
     // Reliability score = weighted average of fill rate (60%) and on-time delivery (40%)
     // For now, simplified: just fill rate * 100
     const reliabilityScore = Math.round(performance.fillRate * 100);
 
-    await this.knex('suppliers')
-      .where('id', supplierId)
-      .update({
-        reliability_score_pct: reliabilityScore,
-        updated_by: userId,
-      });
+    await this.knex('suppliers').where('id', supplierId).update({
+      reliability_score_pct: reliabilityScore,
+      updated_by: userId,
+    });
 
-    this.logger.log(`Updated reliability score for supplier ${supplierId}: ${reliabilityScore}%`);
+    this.logger.log(
+      `Updated reliability score for supplier ${supplierId}: ${reliabilityScore}%`,
+    );
   }
 
   /**
    * Get suppliers missing rate quotes (stale rate alert)
    */
-  async getSuppliersMissingRates(itemCategory?: string, daysThreshold = 30): Promise<any[]> {
+  async getSuppliersMissingRates(
+    itemCategory?: string,
+    daysThreshold = 30,
+  ): Promise<any[]> {
     const cutoff = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000);
 
     let query = this.knex('supplier_items')
@@ -459,9 +511,11 @@ export class SupplierService {
       .where('suppliers.is_active', true)
       .whereNotExists(
         this.knex('supplier_rate_quotes')
-          .whereRaw('supplier_rate_quotes.supplier_id = supplier_items.supplier_id')
+          .whereRaw(
+            'supplier_rate_quotes.supplier_id = supplier_items.supplier_id',
+          )
           .whereRaw('supplier_rate_quotes.item_id = supplier_items.item_id')
-          .where('quoted_at', '>=', cutoff)
+          .where('quoted_at', '>=', cutoff),
       )
       .select(
         'suppliers.id as supplier_id',

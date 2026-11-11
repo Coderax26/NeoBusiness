@@ -1,9 +1,18 @@
-import { Injectable, NotFoundException, Logger, Inject, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  Inject,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
 import { ConfigService } from '../m0-platform/config.service.js';
-import { EXCEPTION_PORT, type ExceptionPort } from '../../shared/ports/ports.interface.js';
+import {
+  EXCEPTION_PORT,
+  type ExceptionPort,
+} from '../../shared/ports/ports.interface.js';
 
 /**
  * PricingService — calculates dynamic pricing bands and returns price memory.
@@ -26,10 +35,15 @@ export class PricingService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.logger.log('PricingService initialized (PRICING_PORT → real implementation)');
+    this.logger.log(
+      'PricingService initialized (PRICING_PORT → real implementation)',
+    );
   }
 
-  async getBand(itemId: string, date: string): Promise<{
+  async getBand(
+    itemId: string,
+    date: string,
+  ): Promise<{
     itemId: string;
     date: string;
     latestLandedCost: string;
@@ -67,7 +81,10 @@ export class PricingService implements OnModuleInit {
    * Calculate auto floor price from landed cost and minimum margin.
    * Uses Money.autoFloor as defined in OD-001 CONFIRMED (10% gross margin default).
    */
-  async getAutoFloor(landedCost: string, minMarginPct: number): Promise<string> {
+  async getAutoFloor(
+    landedCost: string,
+    minMarginPct: number,
+  ): Promise<string> {
     const cost = Money.of(landedCost);
     const floor = Money.autoFloor(cost, minMarginPct);
     return floor.toStorageString();
@@ -142,7 +159,9 @@ export class PricingService implements OnModuleInit {
         siteId,
       );
 
-      this.logger.debug(`Raised PRICE_OVERRIDE for sales_order_line ${requestId}: ${exceptionId}`);
+      this.logger.debug(
+        `Raised PRICE_OVERRIDE for sales_order_line ${requestId}: ${exceptionId}`,
+      );
     }
 
     return {
@@ -156,7 +175,11 @@ export class PricingService implements OnModuleInit {
   /**
    * Price memory: last 5 confirmed sales for customer + item.
    */
-  async lastPrices(customerId: string, itemId: string, limit = 5): Promise<
+  async lastPrices(
+    customerId: string,
+    itemId: string,
+    limit = 5,
+  ): Promise<
     Array<{ date: string; qty: string; unitPrice: string; orderId: string }>
   > {
     const rows = await this.knex('sales_orders as so')
@@ -185,20 +208,26 @@ export class PricingService implements OnModuleInit {
    * Bulk upsert daily prices for a date.
    * If floorPrice/targetPrice not provided, they are auto-calculated using minMarginPct from config.
    */
-  async upsertDailyPrices(date: string, items: Array<{
-    itemId: string;
-    landedCost: number;
-    floorPrice?: number;
-    targetPrice?: number;
-    source?: 'AUTO' | 'MANUAL';
-  }>, userId: string): Promise<string[]> {
+  async upsertDailyPrices(
+    date: string,
+    items: Array<{
+      itemId: string;
+      landedCost: number;
+      floorPrice?: number;
+      targetPrice?: number;
+      source?: 'AUTO' | 'MANUAL';
+    }>,
+    userId: string,
+  ): Promise<string[]> {
     const updatedItemIds: string[] = [];
 
     for (const item of items) {
       // Get min margin pct from config (category-specific or global)
-      const itemRow = await this.knex('items').where('id', item.itemId).first('item_category', 'min_margin_pct');
+      const itemRow = await this.knex('items')
+        .where('id', item.itemId)
+        .first('item_category', 'min_margin_pct');
       const category = itemRow?.item_category;
-      const itemMinMargin = itemRow?.min_margin_pct ?? 0.10;
+      const itemMinMargin = itemRow?.min_margin_pct ?? 0.1;
 
       const minMarginPct = await this.configService.getMinMarginPct(category);
       const effectiveMargin = minMarginPct ?? itemMinMargin;
@@ -216,19 +245,22 @@ export class PricingService implements OnModuleInit {
         targetPrice = Money.of(floorPrice.toString()).mul(1.05).toNumber();
       }
 
-      const source = item.source ?? (item.floorPrice !== undefined ? 'MANUAL' : 'AUTO');
+      const source =
+        item.source ?? (item.floorPrice !== undefined ? 'MANUAL' : 'AUTO');
 
-      await this.knex('daily_price_lists').insert({
-        item_id: item.itemId,
-        effective_date: date,
-        latest_landed_cost: item.landedCost,
-        floor_price: floorPrice,
-        target_price: targetPrice,
-        min_margin_pct_used: effectiveMargin,
-        source,
-        published_at: new Date(),
-        updated_by: userId,
-      }).onConflict(['item_id', 'effective_date'])
+      await this.knex('daily_price_lists')
+        .insert({
+          item_id: item.itemId,
+          effective_date: date,
+          latest_landed_cost: item.landedCost,
+          floor_price: floorPrice,
+          target_price: targetPrice,
+          min_margin_pct_used: effectiveMargin,
+          source,
+          published_at: new Date(),
+          updated_by: userId,
+        })
+        .onConflict(['item_id', 'effective_date'])
         .merge({
           latest_landed_cost: item.landedCost,
           floor_price: floorPrice,
@@ -273,7 +305,7 @@ export class PricingService implements OnModuleInit {
 
     const rows = await query.orderBy('i.item_category').orderBy('i.name');
 
-    return rows.map(r => ({
+    return rows.map((r) => ({
       itemId: r.itemId,
       skuCode: r.skuCode,
       itemName: r.itemName,
@@ -291,13 +323,16 @@ export class PricingService implements OnModuleInit {
   /**
    * Get items missing prices for a date (for owner alert).
    */
-  async getItemsMissingPrices(date: string, filters?: { itemCategory?: string }) {
+  async getItemsMissingPrices(
+    date: string,
+    filters?: { itemCategory?: string },
+  ) {
     let query = this.knex('items')
       .where('is_active', true)
       .whereNotExists(
         this.knex('daily_price_lists')
           .whereRaw('daily_price_lists.item_id = items.id')
-          .andWhere('effective_date', date)
+          .andWhere('effective_date', date),
       )
       .select('id', 'sku_code', 'name', 'item_category', 'primary_uom');
 
@@ -311,13 +346,21 @@ export class PricingService implements OnModuleInit {
   /**
    * Publish daily price to outbox (called when prices are updated via API).
    */
-  async publishPrices(updatedItemIds: string[], updatedBy: string): Promise<void> {
+  async publishPrices(
+    updatedItemIds: string[],
+    updatedBy: string,
+  ): Promise<void> {
     await this.knex.transaction(async (trx) => {
       for (const itemId of updatedItemIds) {
         const row = await trx('daily_price_lists')
           .where('item_id', itemId)
           .where('effective_date', new Date().toISOString().split('T')[0])
-          .first('item_id', 'floor_price', 'target_price', 'latest_landed_cost');
+          .first(
+            'item_id',
+            'floor_price',
+            'target_price',
+            'latest_landed_cost',
+          );
 
         if (row) {
           // Note: Domain event type name matches domain-events.ts (price.updated)
@@ -343,6 +386,8 @@ export class PricingService implements OnModuleInit {
         .update('updated_by', updatedBy);
     });
 
-    this.logger.log(`Published price.updated events for ${updatedItemIds.length} items`);
+    this.logger.log(
+      `Published price.updated events for ${updatedItemIds.length} items`,
+    );
   }
 }

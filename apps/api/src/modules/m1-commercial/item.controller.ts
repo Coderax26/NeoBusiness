@@ -1,8 +1,24 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { ItemService } from './item.service.js';
-import { CreateItemDto, UpdateItemDto, CreateUomConversionDto } from './dto/item.dto.js';
+import {
+  CreateItemDto,
+  UpdateItemDto,
+  CreateUomConversionDto,
+} from './dto/item.dto.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -38,10 +54,17 @@ export class ItemController {
    */
   @Get()
   @RequirePermission('item.view')
-  async list(@Query() q: { itemCategory?: string; isActive?: string; search?: string }) {
+  async list(
+    @Query() q: { itemCategory?: string; isActive?: string; search?: string },
+  ) {
     return this.itemSvc.findAll({
       itemCategory: q.itemCategory,
-      isActive: q.isActive === 'true' ? true : q.isActive === 'false' ? false : undefined,
+      isActive:
+        q.isActive === 'true'
+          ? true
+          : q.isActive === 'false'
+            ? false
+            : undefined,
       search: q.search,
     });
   }
@@ -62,7 +85,8 @@ export class ItemController {
   @RequirePermission('item.view')
   async getBySku(@Param('skuCode') skuCode: string) {
     const item = await this.itemSvc.findBySku(skuCode);
-    if (!item) throw new NotFoundException(`Item with SKU ${skuCode} not found`);
+    if (!item)
+      throw new NotFoundException(`Item with SKU ${skuCode} not found`);
     return item;
   }
 
@@ -71,7 +95,11 @@ export class ItemController {
    */
   @Patch(':id')
   @RequirePermission('item.modify')
-  async update(@Param('id') id: string, @Body() dto: UpdateItemDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateItemDto,
+    @Req() req: any,
+  ) {
     return this.itemSvc.update(id, {
       name: dto.name,
       itemCategory: dto.itemCategory,
@@ -94,7 +122,11 @@ export class ItemController {
    */
   @Post(':id/uom')
   @RequirePermission('item.modify')
-  async addUomConversion(@Param('id') id: string, @Body() dto: CreateUomConversionDto, @Req() req: any) {
+  async addUomConversion(
+    @Param('id') id: string,
+    @Body() dto: CreateUomConversionDto,
+    @Req() req: any,
+  ) {
     return this.itemSvc.addUomConversion({
       itemId: id,
       fromUom: dto.fromUom,

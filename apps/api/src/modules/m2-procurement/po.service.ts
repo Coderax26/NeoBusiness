@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
@@ -98,40 +105,54 @@ export class POService implements OnModuleInit {
 
   onModuleInit(): void {
     // Register exception resolution handler for price spikes
-    this.exceptionService.onResolved('SUPPLIER_PRICE_SPIKE', async (exceptionId, action, remarks, counterJson) => {
-      // Find and update the PO
-      const exception = await this.knex('exception_approvals')
-        .where('id', exceptionId)
-        .first();
+    this.exceptionService.onResolved(
+      'SUPPLIER_PRICE_SPIKE',
+      async (exceptionId, action, remarks, counterJson) => {
+        // Find and update the PO
+        const exception = await this.knex('exception_approvals')
+          .where('id', exceptionId)
+          .first();
 
-      if (!exception) return;
+        if (!exception) return;
 
-      const poLineId = exception.reference_id;
+        const poLineId = exception.reference_id;
 
-      // Check if this refers to a PO line
-      const poLine = await this.knex('purchase_order_lines')
-        .where('id', poLineId)
-        .first('po_id');
-
-      if (!poLine) return;
-
-      if (action === 'APPROVED') {
-        // Update the PO line first
-        await this.knex('purchase_order_lines')
+        // Check if this refers to a PO line
+        const poLine = await this.knex('purchase_order_lines')
           .where('id', poLineId)
-          .update({ updated_by: exception.requested_by ?? null, updated_at: new Date() });
+          .first('po_id');
 
-        // Then update the PO status to ISSUED
-        await this.knex('purchase_orders')
-          .where('id', poLine.po_id)
-          .update({ po_status: 'ISSUED', updated_by: exception.requested_by ?? null, updated_at: new Date() });
-      } else if (action === 'REJECTED') {
-        // Update the PO status to CANCELLED
-        await this.knex('purchase_orders')
-          .where('id', poLine.po_id)
-          .update({ po_status: 'CANCELLED', updated_by: exception.requested_by ?? null, updated_at: new Date() });
-      }
-    });
+        if (!poLine) return;
+
+        if (action === 'APPROVED') {
+          // Update the PO line first
+          await this.knex('purchase_order_lines')
+            .where('id', poLineId)
+            .update({
+              updated_by: exception.requested_by ?? null,
+              updated_at: new Date(),
+            });
+
+          // Then update the PO status to ISSUED
+          await this.knex('purchase_orders')
+            .where('id', poLine.po_id)
+            .update({
+              po_status: 'ISSUED',
+              updated_by: exception.requested_by ?? null,
+              updated_at: new Date(),
+            });
+        } else if (action === 'REJECTED') {
+          // Update the PO status to CANCELLED
+          await this.knex('purchase_orders')
+            .where('id', poLine.po_id)
+            .update({
+              po_status: 'CANCELLED',
+              updated_by: exception.requested_by ?? null,
+              updated_at: new Date(),
+            });
+        }
+      },
+    );
 
     this.logger.log('POService initialized with exception handlers');
   }
@@ -140,7 +161,11 @@ export class POService implements OnModuleInit {
    * Create a new purchase order (DRAFT state)
    */
   async create(input: POCreateInput): Promise<{ id: string; poNo: string }> {
-    const poNo = await this.docNumber.next('PO', input.receivingSiteId, input.userId);
+    const poNo = await this.docNumber.next(
+      'PO',
+      input.receivingSiteId,
+      input.userId,
+    );
 
     // Calculate total amount using Money utilities
     const totalAmount = input.lines.reduce((sum, line) => {
@@ -169,11 +194,17 @@ export class POService implements OnModuleInit {
       // Insert PO lines with price variance snapshot
       for (const line of input.lines) {
         // Get item UoM
-        const item = await trx('items').where('id', line.itemId).first('primary_uom');
+        const item = await trx('items')
+          .where('id', line.itemId)
+          .first('primary_uom');
         const uom = item?.primary_uom ?? 'EA';
 
         // Get last purchase price for this item from this supplier
-        const lastPrice = await this.getLastPurchasePrice(trx, input.supplierId, line.itemId);
+        const lastPrice = await this.getLastPurchasePrice(
+          trx,
+          input.supplierId,
+          line.itemId,
+        );
 
         await trx('purchase_order_lines').insert({
           id: uuidv4(),
@@ -202,11 +233,15 @@ export class POService implements OnModuleInit {
    * This is the critical business rule: if confirmed price > last purchase price + 2%
    * -> PENDING_APPROVAL + SUPPLIER_PRICE_SPIKE exception
    */
-  async confirmQuantities(input: POConfirmQuantitiesInput): Promise<{ poStatus: string; exceptionsRaised: string[] }> {
+  async confirmQuantities(
+    input: POConfirmQuantitiesInput,
+  ): Promise<{ poStatus: string; exceptionsRaised: string[] }> {
     const po = await this.getById(input.poId);
 
     if (po.po_status !== 'DRAFT') {
-      throw new BadRequestException(`Can only confirm quantities for DRAFT POs. Current: ${po.po_status}`);
+      throw new BadRequestException(
+        `Can only confirm quantities for DRAFT POs. Current: ${po.po_status}`,
+      );
     }
 
     const exceptionsRaised: string[] = [];
@@ -220,18 +255,24 @@ export class POService implements OnModuleInit {
           .first();
 
         if (!line) {
-          throw new NotFoundException(`PO line ${confirmation.lineId} not found`);
+          throw new NotFoundException(
+            `PO line ${confirmation.lineId} not found`,
+          );
         }
 
         // Get item UoM
-        const item = await trx('items').where('id', line.item_id).first('primary_uom');
+        const item = await trx('items')
+          .where('id', line.item_id)
+          .first('primary_uom');
         const uom = item?.primary_uom ?? 'EA';
 
         const confirmedQty = Qty.of(confirmation.confirmedQty, uom);
         const orderedQty = Qty.of(line.ordered_qty, uom);
 
         if (confirmedQty.isGreaterThan(orderedQty)) {
-          throw new BadRequestException(`Confirmed qty ${confirmedQty.toStorageString()} exceeds ordered qty ${orderedQty.toStorageString()}`);
+          throw new BadRequestException(
+            `Confirmed qty ${confirmedQty.toStorageString()} exceeds ordered qty ${orderedQty.toStorageString()}`,
+          );
         }
 
         // BR-03: Price spike detection
@@ -264,18 +305,30 @@ export class POService implements OnModuleInit {
                   facts: [
                     { label: 'Last Price', value: lastPrice.toStorageString() },
                     { label: 'New Price', value: newPrice.toStorageString() },
-                    { label: 'Variance', value: `${(variance.toNumber() * 100).toFixed(2)}%` },
-                    { label: 'Threshold', value: `${(this.PRICE_SPIKE_THRESHOLD_PCT * 100).toFixed(2)}%` },
+                    {
+                      label: 'Variance',
+                      value: `${(variance.toNumber() * 100).toFixed(2)}%`,
+                    },
+                    {
+                      label: 'Threshold',
+                      value: `${(this.PRICE_SPIKE_THRESHOLD_PCT * 100).toFixed(2)}%`,
+                    },
                   ],
-                  impact: 'Price increase requires approval before PO can be issued',
-                  actions: [{ code: 'APPROVE', label: 'Approve Price' }, { code: 'REJECT', label: 'Revert Price' }],
+                  impact:
+                    'Price increase requires approval before PO can be issued',
+                  actions: [
+                    { code: 'APPROVE', label: 'Approve Price' },
+                    { code: 'REJECT', label: 'Revert Price' },
+                  ],
                   deepLink: `/procurement/purchase-orders/${input.poId}`,
                   valueAtRisk: newPrice.sub(lastPrice).toStorageString(),
-                }
+                },
               );
 
               exceptionsRaised.push(exceptionId);
-              this.logger.warn(`BR-03: Price spike detected on PO ${input.poId}, line ${confirmation.lineId}: ${variance.toNumber() * 100}% > ${this.PRICE_SPIKE_THRESHOLD_PCT * 100}%`);
+              this.logger.warn(
+                `BR-03: Price spike detected on PO ${input.poId}, line ${confirmation.lineId}: ${variance.toNumber() * 100}% > ${this.PRICE_SPIKE_THRESHOLD_PCT * 100}%`,
+              );
             }
           }
         }
@@ -293,24 +346,31 @@ export class POService implements OnModuleInit {
       // Determine new PO status
       const newStatus = hasPriceSpike ? 'PENDING_APPROVAL' : 'DRAFT';
 
-      await trx('purchase_orders')
-        .where('id', input.poId)
-        .update({
-          po_status: newStatus,
-          updated_by: input.confirmations[0].userId,
-        });
+      await trx('purchase_orders').where('id', input.poId).update({
+        po_status: newStatus,
+        updated_by: input.confirmations[0].userId,
+      });
 
       // Emit po.confirmed event
-      await this.outbox.raise(trx, 'po.confirmed', input.poId, {
-        poId: input.poId,
-        poNo: po.po_no,
-        supplierId: po.supplier_id,
-        status: newStatus,
-        exceptionsRaised,
-      }, 'm2-procurement');
+      await this.outbox.raise(
+        trx,
+        'po.confirmed',
+        input.poId,
+        {
+          poId: input.poId,
+          poNo: po.po_no,
+          supplierId: po.supplier_id,
+          status: newStatus,
+          exceptionsRaised,
+        },
+        'm2-procurement',
+      );
     });
 
-    return { poStatus: hasPriceSpike ? 'PENDING_APPROVAL' : 'DRAFT', exceptionsRaised };
+    return {
+      poStatus: hasPriceSpike ? 'PENDING_APPROVAL' : 'DRAFT',
+      exceptionsRaised,
+    };
   }
 
   /**
@@ -318,7 +378,9 @@ export class POService implements OnModuleInit {
    * Requires OWNER or OPS_COORD permission
    * Performs BR-03 price spike validation
    */
-  async issuePO(input: POIssueInput): Promise<{ poId: string; poNo: string; status: string }> {
+  async issuePO(
+    input: POIssueInput,
+  ): Promise<{ poId: string; poNo: string; status: string }> {
     const po = await this.getById(input.poId);
 
     let newState = 'ISSUED';
@@ -338,10 +400,15 @@ export class POService implements OnModuleInit {
       if (!lastPrice.isGreaterThanOrEqual(Money.zero())) continue;
 
       const variance = Money.marginPct(newPrice, lastPrice);
-      if (variance !== null && variance.toNumber() > this.PRICE_SPIKE_THRESHOLD_PCT) {
+      if (
+        variance !== null &&
+        variance.toNumber() > this.PRICE_SPIKE_THRESHOLD_PCT
+      ) {
         hasSpike = true;
         spikeLineIds.push(line.id);
-        this.logger.warn(`BR-03: Price spike detected on PO line ${line.id}: ${variance.toNumber() * 100}%`);
+        this.logger.warn(
+          `BR-03: Price spike detected on PO line ${line.id}: ${variance.toNumber() * 100}%`,
+        );
       }
     }
 
@@ -351,7 +418,7 @@ export class POService implements OnModuleInit {
       // If there's a spike, raise exception inside transaction
       if (hasSpike) {
         for (const lineId of spikeLineIds) {
-          const line = lines.find(l => l.id === lineId);
+          const line = lines.find((l) => l.id === lineId);
           if (!line) continue;
 
           const lastPrice = Money.of(line.last_purchase_price_snapshot);
@@ -370,17 +437,21 @@ export class POService implements OnModuleInit {
               facts: [
                 { label: 'Last Price', value: lastPrice.toStorageString() },
                 { label: 'New Price', value: newPrice.toStorageString() },
-                { label: 'Variance', value: `${varianceForException!.toNumber() * 100}%` },
+                {
+                  label: 'Variance',
+                  value: `${varianceForException!.toNumber() * 100}%`,
+                },
               ],
-              impact: 'Price increase requires approval before PO can be issued',
+              impact:
+                'Price increase requires approval before PO can be issued',
               actions: [
                 { code: 'APPROVE', label: 'Approve Price' },
-                { code: 'REJECT', label: 'Revert Price' }
+                { code: 'REJECT', label: 'Revert Price' },
               ],
               deepLink: `/procurement/purchase-orders/${input.poId}`,
               valueAtRisk: newPrice.sub(lastPrice).toStorageString(),
             },
-            po.receiving_site_id
+            po.receiving_site_id,
           );
         }
       }
@@ -394,15 +465,21 @@ export class POService implements OnModuleInit {
         });
 
       // Emit po.issued event for M1 integration
-      await this.outbox.raise(trx, 'po.issued', input.poId, {
-        poId: input.poId,
-        poNo: po.po_no,
-        supplierId: po.supplier_id,
-        receivingSiteId: po.receiving_site_id,
-        totalAmount: po.total_amount,
-        expectedDelivery: po.expected_delivery,
-        status: newState,
-      }, 'm2-procurement');
+      await this.outbox.raise(
+        trx,
+        'po.issued',
+        input.poId,
+        {
+          poId: input.poId,
+          poNo: po.po_no,
+          supplierId: po.supplier_id,
+          receivingSiteId: po.receiving_site_id,
+          totalAmount: po.total_amount,
+          expectedDelivery: po.expected_delivery,
+          status: newState,
+        },
+        'm2-procurement',
+      );
     });
 
     this.logger.log(`PO ${po.po_no} issued with status: ${newState}`);
@@ -416,15 +493,15 @@ export class POService implements OnModuleInit {
     const po = await this.getById(poId);
 
     if (!this.stateMachine.canCancel(po.po_status)) {
-      throw new BadRequestException(`Cannot cancel PO in status: ${po.po_status}`);
+      throw new BadRequestException(
+        `Cannot cancel PO in status: ${po.po_status}`,
+      );
     }
 
-    await this.knex('purchase_orders')
-      .where('id', poId)
-      .update({
-        po_status: 'CANCELLED',
-        updated_by: userId,
-      });
+    await this.knex('purchase_orders').where('id', poId).update({
+      po_status: 'CANCELLED',
+      updated_by: userId,
+    });
 
     this.logger.log(`PO cancelled: ${po.po_no} (reason: ${reason ?? 'none'})`);
   }
@@ -455,7 +532,7 @@ export class POService implements OnModuleInit {
       )
       .orderBy('purchase_order_lines.created_at');
 
-    return lines.map(line => ({
+    return lines.map((line) => ({
       id: String(line.id),
       poId: String(line.po_id),
       itemId: String(line.item_id),
@@ -473,13 +550,15 @@ export class POService implements OnModuleInit {
   /**
    * List POs with filters
    */
-  async list(filters: {
-    status?: string;
-    supplierId?: string;
-    siteId?: string;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<POSummary[]> {
+  async list(
+    filters: {
+      status?: string;
+      supplierId?: string;
+      siteId?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<POSummary[]> {
     let query = this.knex('purchase_orders')
       .join('suppliers', 'suppliers.id', 'purchase_orders.supplier_id')
       .select(
@@ -506,7 +585,7 @@ export class POService implements OnModuleInit {
 
     const pos = await query.orderBy('purchase_orders.created_at', 'desc');
 
-    return pos.map(po => ({
+    return pos.map((po) => ({
       id: String(po.id),
       poNo: po.po_no,
       supplierId: String(po.supplier_id),
@@ -515,8 +594,11 @@ export class POService implements OnModuleInit {
       receivingSiteId: String(po.receiving_site_id),
       poStatus: po.po_status,
       totalAmount: String(po.total_amount),
-      expectedDelivery: po.expected_delivery?.toISOString().split('T')[0] ?? null,
-      linkedSalesOrderId: po.linked_sales_order_id ? String(po.linked_sales_order_id) : null,
+      expectedDelivery:
+        po.expected_delivery?.toISOString().split('T')[0] ?? null,
+      linkedSalesOrderId: po.linked_sales_order_id
+        ? String(po.linked_sales_order_id)
+        : null,
       createdAt: po.created_at.toISOString(),
       createdBy: String(po.created_by),
     }));
@@ -525,13 +607,25 @@ export class POService implements OnModuleInit {
   /**
    * Get last purchase price for supplier-item combination
    */
-  private async getLastPurchasePrice(trx: Knex, supplierId: string, itemId: string): Promise<string> {
+  private async getLastPurchasePrice(
+    trx: Knex,
+    supplierId: string,
+    itemId: string,
+  ): Promise<string> {
     // Get from most recent confirmed PO line
     const lastLine = await trx('purchase_order_lines')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .where('purchase_orders.supplier_id', supplierId)
       .where('purchase_order_lines.item_id', itemId)
-      .whereIn('purchase_orders.po_status', ['ISSUED', 'PARTIALLY_RECEIVED', 'CLOSED'])
+      .whereIn('purchase_orders.po_status', [
+        'ISSUED',
+        'PARTIALLY_RECEIVED',
+        'CLOSED',
+      ])
       .orderBy('purchase_orders.created_at', 'desc')
       .first('purchase_order_lines.unit_price');
 
@@ -570,7 +664,9 @@ export class POService implements OnModuleInit {
    * Get PO summary for a sales order (for back-to-back)
    */
   async getPOsForSalesOrder(salesOrderId: string): Promise<POSummary[]> {
-    return this.list({ limit: 100 }).then(pos => pos.filter(p => p.linkedSalesOrderId === salesOrderId));
+    return this.list({ limit: 100 }).then((pos) =>
+      pos.filter((p) => p.linkedSalesOrderId === salesOrderId),
+    );
   }
 
   /**
@@ -589,6 +685,8 @@ export class POService implements OnModuleInit {
    * Check if PO can receive GRN
    */
   canReceive(poId: string): Promise<boolean> {
-    return this.getById(poId).then(po => this.stateMachine.canReceive(po.po_status));
+    return this.getById(poId).then((po) =>
+      this.stateMachine.canReceive(po.po_status),
+    );
   }
 }

@@ -11,6 +11,7 @@ import { Money } from '../../shared/utils/money.util.js';
 import { LedgerService } from './ledger.service.js';
 import { PTPService } from './ptp.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
+import { OutboxService } from '../../shared/events/outbox.service.js';
 import { EXCEPTION_PORT } from '../../shared/ports/ports.interface.js';
 import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
 
@@ -32,6 +33,7 @@ export class CollectionService {
     private readonly ledger: LedgerService,
     private readonly ptpService: PTPService,
     private readonly config: ConfigService,
+    private readonly outbox: OutboxService,
     @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
   ) {}
 
@@ -56,9 +58,20 @@ export class CollectionService {
     return this.knex.transaction(async (trx) => {
       const result = await this.ledger.logCollection(cmd, trx);
 
-      // Note: after-commit notification handled by transactional outbox pattern
-      // For now, we'll emit domain event via outbox which M7a will relay
-      // TODO: Add outbox event emission here
+      // Emit collection.logged domain event transactionally (via Outbox)
+      await this.outbox.raise(
+        trx,
+        'collection.logged',
+        result.receiptId,
+        {
+          receiptId: result.receiptId,
+          customerId: cmd.customerId,
+          collectedByUserId: cmd.collectedByUserId,
+          amount: cmd.amount,
+          paymentMode: cmd.paymentMode,
+        },
+        'm6',
+      );
 
       return {
         success: true,

@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Knex } from 'knex';
-import { v4 as uuidv4 } from 'uuid'; // Fix #1 — missing import
+import { v4 as uuidv4 } from 'uuid';
 import { setupTestDB } from './test-setup.js';
 import { InventoryService } from '../inventory.service.js';
+import { withTestIsolation } from '../../../shared/database/test-isolation.js';
 
 describe('M3 Inventory & Warehouse — Service', () => {
   let knex: Knex;
   let inventorySvc: InventoryService;
   let siteId: string;
-  let siteBId: string; // Fix #2a — was never declared
+  let siteBId: string;
   let itemRiceId: string;
   let itemWheatId: string;
-  let itemSugarId: string; // Fix #2b — was never declared
+  let itemSugarId: string;
   let ownerId: string;
   let coordinatorId: string;
   let storekeeperId: string;
@@ -21,10 +22,10 @@ describe('M3 Inventory & Warehouse — Service', () => {
     const setup = await setupTestDB();
     knex = setup.knex;
     siteId = setup.siteId;
-    siteBId = setup.siteBId; // Fix #2a — now assigned
+    siteBId = setup.siteBId;
     itemRiceId = setup.itemRiceId;
     itemWheatId = setup.itemWheatId;
-    itemSugarId = setup.itemSugarId; // Fix #2b — now assigned
+    itemSugarId = setup.itemSugarId;
     ownerId = setup.ownerId;
     coordinatorId = setup.coordinatorId;
     storekeeperId = setup.storekeeperId;
@@ -38,19 +39,8 @@ describe('M3 Inventory & Warehouse — Service', () => {
   });
 
   beforeEach(async () => {
-    await knex.raw(`
-      TRUNCATE TABLE
-        stock_reservations,
-        stock_transfer_lines,
-        stock_transfers,
-        stock_adjustments,
-        stock_ledger_txns,
-        inventory_batches
-      RESTART IDENTITY CASCADE;
-    `);
-
-    // Re-seed baseline batches so every test begins from the same state.
-    // Only M3 tables are touched — shared tables (sites, users, items) are left intact.
+    // Use advisory lock to prevent deadlocks and race conditions when multiple workers
+    // truncate and seed the same tables concurrently.
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const nextWeek = new Date();
@@ -60,72 +50,95 @@ describe('M3 Inventory & Warehouse — Service', () => {
     const thisYear = new Date().getFullYear();
     const thisMonth = new Date().getMonth();
 
-    await knex('inventory_batches').insert([
-      // Rice batch 1 — expires tomorrow (FEFO first)
-      {
-        id: uuidv4(),
-        site_id: siteId,
-        item_id: itemRiceId,
-        batch_number: 'BATCH-RICE-2026-001',
-        status: 'AVAILABLE',
-        qty_on_hand: '1000.000',
-        qty_committed: '0.000',
-        expiry_date: tomorrow.toISOString().split('T')[0],
-        mfg_date: new Date(thisYear, thisMonth, 1).toISOString().split('T')[0],
-        received_date: today,
-        landed_cost_per_unit: '65.00',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Rice batch 2 — expires next week (FEFO second)
-      {
-        id: uuidv4(),
-        site_id: siteId,
-        item_id: itemRiceId,
-        batch_number: 'BATCH-RICE-2026-002',
-        status: 'AVAILABLE',
-        qty_on_hand: '500.000',
-        qty_committed: '0.000',
-        expiry_date: nextWeek.toISOString().split('T')[0],
-        mfg_date: new Date(thisYear, thisMonth, 15).toISOString().split('T')[0],
-        received_date: today,
-        landed_cost_per_unit: '68.00',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Wheat — single batch at Site A
-      {
-        id: uuidv4(),
-        site_id: siteId,
-        item_id: itemWheatId,
-        batch_number: 'BATCH-WHEAT-2026-001',
-        status: 'AVAILABLE',
-        qty_on_hand: '2000.000',
-        qty_committed: '0.000',
-        expiry_date: nextMonth.toISOString().split('T')[0],
-        mfg_date: new Date(thisYear, thisMonth, 10).toISOString().split('T')[0],
-        received_date: today,
-        landed_cost_per_unit: '28.00',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      // Sugar — at Site B for transfer tests
-      {
-        id: uuidv4(),
-        site_id: siteBId,
-        item_id: itemSugarId,
-        batch_number: 'BATCH-SUGAR-2026-001',
-        status: 'AVAILABLE',
-        qty_on_hand: '1500.000',
-        qty_committed: '0.000',
-        expiry_date: nextMonth.toISOString().split('T')[0],
-        mfg_date: new Date(thisYear, thisMonth, 5).toISOString().split('T')[0],
-        received_date: today,
-        landed_cost_per_unit: '42.00',
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-    ]);
+    await withTestIsolation(knex, async () => {
+      // TRUNCATE then seed in the same atomic block
+      await knex.raw(`
+        TRUNCATE TABLE
+          stock_reservations,
+          stock_transfer_lines,
+          stock_transfers,
+          stock_adjustments,
+          stock_ledger_txns,
+          inventory_batches
+        RESTART IDENTITY CASCADE;
+      `);
+
+      // Re-seed baseline batches so every test begins from the same state.
+      await knex('inventory_batches').insert([
+        // Rice batch 1 — expires tomorrow (FEFO first)
+        {
+          id: uuidv4(),
+          site_id: siteId,
+          item_id: itemRiceId,
+          batch_number: 'BATCH-RICE-2026-001',
+          status: 'AVAILABLE',
+          qty_on_hand: '1000.000',
+          qty_committed: '0.000',
+          expiry_date: tomorrow.toISOString().split('T')[0],
+          mfg_date: new Date(thisYear, thisMonth, 1)
+            .toISOString()
+            .split('T')[0],
+          received_date: today,
+          landed_cost_per_unit: '65.00',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        // Rice batch 2 — expires next week (FEFO second)
+        {
+          id: uuidv4(),
+          site_id: siteId,
+          item_id: itemRiceId,
+          batch_number: 'BATCH-RICE-2026-002',
+          status: 'AVAILABLE',
+          qty_on_hand: '500.000',
+          qty_committed: '0.000',
+          expiry_date: nextWeek.toISOString().split('T')[0],
+          mfg_date: new Date(thisYear, thisMonth, 15)
+            .toISOString()
+            .split('T')[0],
+          received_date: today,
+          landed_cost_per_unit: '68.00',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        // Wheat — single batch at Site A
+        {
+          id: uuidv4(),
+          site_id: siteId,
+          item_id: itemWheatId,
+          batch_number: 'BATCH-WHEAT-2026-001',
+          status: 'AVAILABLE',
+          qty_on_hand: '2000.000',
+          qty_committed: '0.000',
+          expiry_date: nextMonth.toISOString().split('T')[0],
+          mfg_date: new Date(thisYear, thisMonth, 10)
+            .toISOString()
+            .split('T')[0],
+          received_date: today,
+          landed_cost_per_unit: '28.00',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        // Sugar — at Site B for transfer tests
+        {
+          id: uuidv4(),
+          site_id: siteBId,
+          item_id: itemSugarId,
+          batch_number: 'BATCH-SUGAR-2026-001',
+          status: 'AVAILABLE',
+          qty_on_hand: '1500.000',
+          qty_committed: '0.000',
+          expiry_date: nextMonth.toISOString().split('T')[0],
+          mfg_date: new Date(thisYear, thisMonth, 5)
+            .toISOString()
+            .split('T')[0],
+          received_date: today,
+          landed_cost_per_unit: '42.00',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      ]);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

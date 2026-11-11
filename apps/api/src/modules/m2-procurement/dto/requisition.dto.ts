@@ -1,4 +1,14 @@
-import { IsString, IsNumber, IsOptional, IsUUID, IsEnum, IsDate, IsArray, ValidateNested, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+  IsDate,
+  IsArray,
+  ValidateNested,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -16,7 +26,10 @@ export class CreateRequisitionDto {
   @Type(() => Date)
   neededBy: Date;
 
-  @ApiProperty({ enum: ['PRODUCTION', 'SALES_ORDER', 'MANUAL'], example: 'PRODUCTION' })
+  @ApiProperty({
+    enum: ['PRODUCTION', 'SALES_ORDER', 'MANUAL'],
+    example: 'PRODUCTION',
+  })
   @IsEnum(['PRODUCTION', 'SALES_ORDER', 'MANUAL'])
   source: 'PRODUCTION' | 'SALES_ORDER' | 'MANUAL';
 

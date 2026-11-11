@@ -1,14 +1,11 @@
 import {
-  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
 import { Worker } from 'bullmq';
 import { InvoiceService } from '../m6-finance/invoice.service.js';
-import { NOTIFY_PORT } from '../../shared/ports/ports.interface.js';
 
 interface DomainJob {
   event_type: string;
@@ -21,12 +18,7 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TripListenerService.name);
   private worker: Worker | undefined;
 
-  constructor(
-    private readonly invoiceService: InvoiceService,
-    @Optional()
-    @Inject(NOTIFY_PORT)
-    private readonly notify?: any,
-  ) {}
+  constructor(private readonly invoiceService: InvoiceService) {}
 
   onModuleInit(): void {
     this.worker = new Worker(
@@ -103,8 +95,8 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
           `Invoice ${invoice.invoiceNo} generated for order ${salesOrderId}`,
         );
 
-        // Send invoice notification to customer
-        await this.sendInvoiceNotification(
+        // Send invoice notification to customer via InvoiceService
+        await this.invoiceService.sendInvoiceNotification(
           customerId,
           invoice.invoiceNo,
           invoice.totalAmount,
@@ -115,63 +107,6 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
         );
         // Continue with other stops - don't block trip dispatch on invoice failure
       }
-    }
-  }
-
-  private async sendInvoiceNotification(
-    customerId: string,
-    invoiceNo: string,
-    amount: string,
-  ): Promise<void> {
-    if (!this.notify) {
-      this.logger.warn(
-        'NotifyPort not available - skipping invoice notification',
-      );
-      return;
-    }
-
-    try {
-      const customer = await this.invoiceService['knex']('customers')
-        .where('id', customerId)
-        .first('name', 'phone', 'whatsapp_opt_in');
-
-      if (!customer) {
-        this.logger.warn(
-          `Customer ${customerId} not found for invoice notification`,
-        );
-        return;
-      }
-
-      const notificationPayload = {
-        customerName: customer.name,
-        invoiceNo,
-        amount,
-        date: new Date().toLocaleDateString('en-IN'),
-      };
-
-      if (customer.whatsapp_opt_in) {
-        await this.notify.send(
-          'WHATSAPP',
-          'invoice_issued',
-          customer.phone,
-          notificationPayload,
-        );
-        this.logger.log(
-          `WhatsApp invoice notification sent to ${customer.phone}`,
-        );
-      } else {
-        await this.notify.send(
-          'SMS',
-          'invoice_issued',
-          customer.phone,
-          notificationPayload,
-        );
-        this.logger.log(`SMS invoice notification sent to ${customer.phone}`);
-      }
-    } catch (err) {
-      this.logger.error(
-        `Failed to send invoice notification for ${invoiceNo}: ${(err as Error).message}`,
-      );
     }
   }
 

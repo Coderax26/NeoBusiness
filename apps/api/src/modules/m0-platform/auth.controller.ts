@@ -1,6 +1,20 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Get,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService, JwtPayload } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
@@ -13,12 +27,25 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with phone and password/PIN' })
-  @ApiResponse({ status: 200, description: 'Login successful', schema: { example: { user: { id: 'uuid', phone: '+91...', role: 'OWNER' }, accessToken: 'eyJ...', refreshToken: 'eyJ...' } } })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    schema: {
+      example: {
+        user: { id: 'uuid', phone: '+91...', role: 'OWNER' },
+        accessToken: 'eyJ...',
+        refreshToken: 'eyJ...',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
     @Body() body: { phone: string; password: string },
   ): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-    const result = await this.authService.validateUser(body.phone, body.password);
+    const result = await this.authService.validateUser(
+      body.phone,
+      body.password,
+    );
     if (!result) {
       throw new Error('Invalid credentials');
     }

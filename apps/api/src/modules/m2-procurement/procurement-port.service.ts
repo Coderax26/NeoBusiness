@@ -87,14 +87,18 @@ export class ProcurementPortService implements ProcurementPort {
   }
 
   /**
-   * Create back-to-back PO from sales order line
-   * Interface: ProcurementPort.createBackToBackPO(orderLineId: string): Promise<string>
+   * Create back-to-BACK PO from sales order line
+   * Interface: ProcurementPort.createBackToBatchPO(orderLineId: string): Promise<string>
    * Returns PO draft ID
    *
-   * For back-to-back POs, the supplier is determined from the supplier_items
+   * For back-to-BACK POs, the supplier is determined from the supplier_items
    * linking to the item (using the primary supplier for that item)
    */
   async createBackToBackPO(orderLineId: string): Promise<string> {
+    return this.createBackToBatchPO(orderLineId);
+  }
+
+  async createBackToBatchPO(orderLineId: string): Promise<string> {
     // Find the sales order line
     const soLine = await this.knex('sales_order_lines')
       .where('id', orderLineId)
@@ -213,5 +217,47 @@ export class ProcurementPortService implements ProcurementPort {
       unitPrice: b.quotedPrice,
       availableQty: totalAvailable,
     }));
+  }
+
+  /**
+   * Get inbound (unreceived) PO quantity for an item at a site
+   * This sums: PO lines for OPEN/PENDING_APPROVAL/PENDING POs - GRN lines already received
+   * Interface: ProcurementPort.getInboundQty(itemId, siteId): Promise<string>
+   */
+  async getInboundQty(itemId: string, siteId: string): Promise<string> {
+    // Get total ordered from active POs (OPEN, PENDING_APPROVAL, PARTIALLY_RECEIVED)
+    const orderedResult = await this.knex('purchase_order_lines as pol')
+      .join('purchase_orders as po', 'po.id', 'pol.po_id')
+      .where('pol.item_id', itemId)
+      .where('po.receiving_site_id', siteId)
+      .whereIn('po.po_status', [
+        'OPEN',
+        'PENDING_APPROVAL',
+        'PARTIALLY_RECEIVED',
+        'ISSUED',
+      ])
+      .sum('pol.ordered_qty as total_ordered')
+      .first();
+
+    const totalOrdered = orderedResult?.total_ordered
+      ? parseFloat(orderedResult.total_ordered)
+      : 0;
+
+    // Get total received via GRN
+    const receivedResult = await this.knex('goods_receipt_lines as grn')
+      .join('goods_receipts as g', 'g.id', 'grn.grn_id')
+      .where('grn.item_id', itemId)
+      .where('g.site_id', siteId)
+      .sum('grn.received_qty as total_received')
+      .first();
+
+    const totalReceived = receivedResult?.total_received
+      ? parseFloat(receivedResult.total_received)
+      : 0;
+
+    // Inbound = ordered - received (qty still awaiting GRN)
+    const inboundQty = Math.max(0, totalOrdered - totalReceived);
+
+    return inboundQty.toFixed(3);
   }
 }

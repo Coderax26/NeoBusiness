@@ -57,7 +57,10 @@ export class ConfigService implements OnModuleInit {
     }
 
     // Parse JSON value
-    const value = typeof row.value_json === 'string' ? JSON.parse(row.value_json) : row.value_json;
+    const value =
+      typeof row.value_json === 'string'
+        ? JSON.parse(row.value_json)
+        : row.value_json;
 
     // Cache it
     this.cache.set(cacheKey, {
@@ -101,17 +104,25 @@ export class ConfigService implements OnModuleInit {
    */
   async getMinMarginPct(category?: string): Promise<number> {
     if (category) {
-      const override = await this.getNumber(`min_margin_pct_${category}`, 'ITEM_CATEGORY', category);
+      const override = await this.getNumber(
+        `min_margin_pct_${category}`,
+        'ITEM_CATEGORY',
+        category,
+      );
       if (override !== null) return override;
     }
     const global = await this.getNumber('min_margin_pct_default', 'GLOBAL');
-    return global ?? 0.10; // default 10%
+    return global ?? 0.1; // default 10%
   }
 
   /**
    * Invalidate cache for a specific key (called after config update).
    */
-  invalidate(key: string, scope?: 'GLOBAL' | 'SITE' | 'ITEM_CATEGORY', scopeRef?: string): void {
+  invalidate(
+    key: string,
+    scope?: 'GLOBAL' | 'SITE' | 'ITEM_CATEGORY',
+    scopeRef?: string,
+  ): void {
     if (!scope) {
       // Invalidate all keys starting with this prefix
       for (const k of this.cache.keys()) {
@@ -128,10 +139,21 @@ export class ConfigService implements OnModuleInit {
    */
   async refreshCache(): Promise<void> {
     this.cache.clear();
-    const rows = await this.knex('business_rule_config').select('key', 'value_json', 'scope', 'scope_ref');
+    const rows = await this.knex('business_rule_config').select(
+      'key',
+      'value_json',
+      'scope',
+      'scope_ref',
+    );
     for (const row of rows) {
-      const cacheKey = row.scope === 'GLOBAL' ? row.key : `${row.key}:${row.scope}:${row.scope_ref}`;
-      const value = typeof row.value_json === 'string' ? JSON.parse(row.value_json) : row.value_json;
+      const cacheKey =
+        row.scope === 'GLOBAL'
+          ? row.key
+          : `${row.key}:${row.scope}:${row.scope_ref}`;
+      const value =
+        typeof row.value_json === 'string'
+          ? JSON.parse(row.value_json)
+          : row.value_json;
       this.cache.set(cacheKey, {
         value,
         expiresAt: Date.now() + this.defaultTtlMs,

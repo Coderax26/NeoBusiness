@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,7 +76,7 @@ export class ShortfallService {
   async getShortfallsForPO(poId: string): Promise<ShortfallResolution[]> {
     const shortfalls = await this.grnService.getShortfallsForPO(poId);
 
-    return shortfalls.map(s => ({
+    return shortfalls.map((s) => ({
       shortfallId: String(s.id),
       poLineId: String(s.po_line_id),
       itemId: String(s.item_id),
@@ -86,7 +91,11 @@ export class ShortfallService {
    * Get ranked backup suppliers for an item
    * Ranking: price within tolerance → reliability_score_pct desc → lead_time_days_avg asc
    */
-  async getRankedBackups(itemId: string, referencePrice: string, excludeSupplierId?: string): Promise<RankedBackup[]> {
+  async getRankedBackups(
+    itemId: string,
+    referencePrice: string,
+    excludeSupplierId?: string,
+  ): Promise<RankedBackup[]> {
     // Get approved suppliers for this item who have rate quotes
     const suppliers = await this.knex('supplier_items as si')
       .where('si.item_id', itemId)
@@ -105,7 +114,9 @@ export class ShortfallService {
       .distinct();
 
     if (excludeSupplierId) {
-      const filtered = suppliers.filter(s => String(s.supplier_id) !== excludeSupplierId);
+      const filtered = suppliers.filter(
+        (s) => String(s.supplier_id) !== excludeSupplierId,
+      );
       return this.rankSuppliers(filtered, itemId, referencePrice);
     }
 
@@ -115,13 +126,20 @@ export class ShortfallService {
   /**
    * Rank suppliers by: price within tolerance → reliability desc → lead time asc
    */
-  private async rankSuppliers(suppliers: any[], itemId: string, referencePrice: string): Promise<RankedBackup[]> {
+  private async rankSuppliers(
+    suppliers: any[],
+    itemId: string,
+    referencePrice: string,
+  ): Promise<RankedBackup[]> {
     const refPrice = Money.of(referencePrice);
 
     const ranked = await Promise.all(
       suppliers.map(async (supplier) => {
         const supplierId = String(supplier.supplier_id);
-        const latestRate = await this.supplierService.getLatestRate(supplierId, itemId);
+        const latestRate = await this.supplierService.getLatestRate(
+          supplierId,
+          itemId,
+        );
 
         const quotedPrice = latestRate ? Money.of(latestRate) : Money.zero();
         const marginPct = Money.marginPct(refPrice, quotedPrice);
@@ -141,9 +159,13 @@ export class ShortfallService {
           leadTimeDaysAvg: supplier.lead_time_days_avg,
           withinTolerance: withinFivePct,
           // Rank score: within 2% (10000) + within 5% (1000) + reliability * 10 - lead_time
-          rankScore: (withinTwoPct ? 10000 : 0) + (withinFivePct ? 1000 : 0) + supplier.reliability_score_pct * 10 - supplier.lead_time_days_avg,
+          rankScore:
+            (withinTwoPct ? 10000 : 0) +
+            (withinFivePct ? 1000 : 0) +
+            supplier.reliability_score_pct * 10 -
+            supplier.lead_time_days_avg,
         };
-      })
+      }),
     );
 
     // Sort by rank score descending
@@ -154,11 +176,21 @@ export class ShortfallService {
    * Create a backup PO for a shortfall
    * Links to original PO via parent_po_id
    */
-  async createBackupPO(input: BackupPOInput): Promise<{ poId: string; poNo: string }> {
+  async createBackupPO(
+    input: BackupPOInput,
+  ): Promise<{ poId: string; poNo: string }> {
     // Get shortfall details
     const shortfall = await this.knex('po_shortfalls')
-      .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_order_lines',
+        'purchase_order_lines.id',
+        'po_shortfalls.po_line_id',
+      )
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
       .where('po_shortfalls.id', input.shortfallId)
       .select(
@@ -180,38 +212,47 @@ export class ShortfallService {
     }
 
     if (shortfall.status !== 'OPEN') {
-      throw new BadRequestException(`Shortfall is not OPEN: ${shortfall.status}`);
+      throw new BadRequestException(
+        `Shortfall is not OPEN: ${shortfall.status}`,
+      );
     }
 
     // Get backup supplier
-    const backupSupplier = await this.supplierService.getById(input.backupSupplierId);
+    const backupSupplier = await this.supplierService.getById(
+      input.backupSupplierId,
+    );
 
     // Get latest rate from backup supplier
-    const quotedPrice = await this.supplierService.getLatestRate(input.backupSupplierId, shortfall.item_id);
+    const quotedPrice = await this.supplierService.getLatestRate(
+      input.backupSupplierId,
+      shortfall.item_id,
+    );
     const unitPrice = quotedPrice ?? shortfall.original_unit_price;
 
     // Create backup PO
     const result = await this.poService.create({
       supplierId: input.backupSupplierId,
       receivingSiteId: shortfall.receiving_site_id,
-      lines: [{
-        itemId: shortfall.item_id,
-        orderedQty: shortfall.deficit_qty,
-        unitPrice: unitPrice,
-        userId: input.userId,
-      }],
-      expectedDelivery: new Date(Date.now() + backupSupplier.lead_time_days_avg * 24 * 60 * 60 * 1000),
+      lines: [
+        {
+          itemId: shortfall.item_id,
+          orderedQty: shortfall.deficit_qty,
+          unitPrice: unitPrice,
+          userId: input.userId,
+        },
+      ],
+      expectedDelivery: new Date(
+        Date.now() + backupSupplier.lead_time_days_avg * 24 * 60 * 60 * 1000,
+      ),
       userId: input.userId,
     });
 
     // Update shortfall status
-    await this.knex('po_shortfalls')
-      .where('id', input.shortfallId)
-      .update({
-        status: 'COVERED_BY_BACKUP',
-        resolution_po_id: result.id,
-        updated_by: input.userId,
-      });
+    await this.knex('po_shortfalls').where('id', input.shortfallId).update({
+      status: 'COVERED_BY_BACKUP',
+      resolution_po_id: result.id,
+      updated_by: input.userId,
+    });
 
     // Update original PO line to track backup
     await this.knex('purchase_order_lines')
@@ -221,19 +262,27 @@ export class ShortfallService {
         updated_by: input.userId,
       });
 
-    this.logger.log(`Created backup PO ${result.poNo} for shortfall ${input.shortfallId} from supplier ${backupSupplier.company_name}`);
+    this.logger.log(
+      `Created backup PO ${result.poNo} for shortfall ${input.shortfallId} from supplier ${backupSupplier.company_name}`,
+    );
 
     // Emit event
     await this.knex.transaction(async (trx) => {
-      await this.outbox.raise(trx, 'po.backup_created', result.id, {
-        backupPoId: result.id,
-        backupPoNo: result.poNo,
-        originalPoId: input.originalPoId,
-        shortfallId: input.shortfallId,
-        itemId: shortfall.item_id,
-        deficitQty: shortfall.deficit_qty,
-        backupSupplierId: input.backupSupplierId,
-      }, 'm2-procurement');
+      await this.outbox.raise(
+        trx,
+        'po.backup_created',
+        result.id,
+        {
+          backupPoId: result.id,
+          backupPoNo: result.poNo,
+          originalPoId: input.originalPoId,
+          shortfallId: input.shortfallId,
+          itemId: shortfall.item_id,
+          deficitQty: shortfall.deficit_qty,
+          backupSupplierId: input.backupSupplierId,
+        },
+        'm2-procurement',
+      );
     });
 
     return { poId: result.id, poNo: result.poNo };
@@ -243,9 +292,12 @@ export class ShortfallService {
    * Auto-resolve shortfalls by creating backup POs for all open shortfalls
    * Uses ranked backups
    */
-  async autoResolveShortfalls(poId: string, userId: string): Promise<{ resolved: number; failed: string[] }> {
+  async autoResolveShortfalls(
+    poId: string,
+    userId: string,
+  ): Promise<{ resolved: number; failed: string[] }> {
     const shortfalls = await this.getShortfallsForPO(poId);
-    const openShortfalls = shortfalls.filter(s => s.status === 'OPEN');
+    const openShortfalls = shortfalls.filter((s) => s.status === 'OPEN');
 
     let resolved = 0;
     const failed: string[] = [];
@@ -264,7 +316,11 @@ export class ShortfallService {
           .where('id', poId)
           .first('supplier_id');
 
-        const ranked = await this.getRankedBackups(shortfall.itemId, referencePrice, originalSupplierId?.supplier_id);
+        const ranked = await this.getRankedBackups(
+          shortfall.itemId,
+          referencePrice,
+          originalSupplierId?.supplier_id,
+        );
 
         if (ranked.length === 0) {
           failed.push(`No backup suppliers for item ${shortfall.itemId}`);
@@ -294,13 +350,15 @@ export class ShortfallService {
   /**
    * Update shortfall status
    */
-  async updateShortfallStatus(shortfallId: string, status: 'OPEN' | 'COVERED_BY_BACKUP' | 'ALLOCATED' | 'WRITTEN_OFF', userId: string): Promise<void> {
-    await this.knex('po_shortfalls')
-      .where('id', shortfallId)
-      .update({
-        status,
-        updated_by: userId,
-      });
+  async updateShortfallStatus(
+    shortfallId: string,
+    status: 'OPEN' | 'COVERED_BY_BACKUP' | 'ALLOCATED' | 'WRITTEN_OFF',
+    userId: string,
+  ): Promise<void> {
+    await this.knex('po_shortfalls').where('id', shortfallId).update({
+      status,
+      updated_by: userId,
+    });
   }
 
   /**
@@ -308,8 +366,16 @@ export class ShortfallService {
    */
   async getAllOpenShortfalls(siteId?: string): Promise<any[]> {
     let query = this.knex('po_shortfalls')
-      .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_order_lines',
+        'purchase_order_lines.id',
+        'po_shortfalls.po_line_id',
+      )
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
       .where('po_shortfalls.status', 'OPEN')
       .select(
@@ -335,14 +401,23 @@ export class ShortfallService {
    * Get shortfalls that can be covered by a specific backup supplier
    */
   async getCoverableShortfallsForSupplier(supplierId: string): Promise<any[]> {
-    const supplierItems = await this.supplierService.getSupplierItems(supplierId);
-    const itemIds = supplierItems.map(si => si.item_id);
+    const supplierItems =
+      await this.supplierService.getSupplierItems(supplierId);
+    const itemIds = supplierItems.map((si) => si.item_id);
 
     if (itemIds.length === 0) return [];
 
     return this.knex('po_shortfalls')
-      .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
-      .join('purchase_orders', 'purchase_orders.id', 'purchase_order_lines.po_id')
+      .join(
+        'purchase_order_lines',
+        'purchase_order_lines.id',
+        'po_shortfalls.po_line_id',
+      )
+      .join(
+        'purchase_orders',
+        'purchase_orders.id',
+        'purchase_order_lines.po_id',
+      )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
       .where('po_shortfalls.status', 'OPEN')
       .whereIn('purchase_order_lines.item_id', itemIds)

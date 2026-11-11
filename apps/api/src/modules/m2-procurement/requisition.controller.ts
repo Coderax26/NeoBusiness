@@ -1,5 +1,22 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { RequisitionService } from './requisition.service.js';
@@ -16,7 +33,11 @@ export class RequisitionController {
   @RequirePermission('requisition.create')
   @ApiOperation({ summary: 'Create a purchase requisition' })
   @ApiResponse({ status: 201, description: 'Requisition created' })
-  async create(@Body() dto: CreateRequisitionDto, @Query('userId') userId: string, @Query('requestedBy') requestedBy: string) {
+  async create(
+    @Body() dto: CreateRequisitionDto,
+    @Query('userId') userId: string,
+    @Query('requestedBy') requestedBy: string,
+  ) {
     return this.requisitionService.create({ ...dto, requestedBy, userId });
   }
 
@@ -66,8 +87,15 @@ export class RequisitionController {
   @RequirePermission('po.create')
   @ApiOperation({ summary: 'Convert requisitions to a PO for a supplier' })
   @ApiResponse({ status: 201, description: 'PO created from requisitions' })
-  async convertToPO(@Body() dto: ConvertToPODto, @Query('userId') userId: string) {
-    return this.requisitionService.convertToPO(dto.supplierId, dto.requisitionIds, userId);
+  async convertToPO(
+    @Body() dto: ConvertToPODto,
+    @Query('userId') userId: string,
+  ) {
+    return this.requisitionService.convertToPO(
+      dto.supplierId,
+      dto.requisitionIds,
+      userId,
+    );
   }
 
   @Post(':id/cancel')
@@ -80,7 +108,9 @@ export class RequisitionController {
 
   @Get('source/:source/:sourceRefId')
   @RequirePermission('requisition.read')
-  @ApiOperation({ summary: 'Get requisitions by source (production order or sales order)' })
+  @ApiOperation({
+    summary: 'Get requisitions by source (production order or sales order)',
+  })
   @ApiResponse({ status: 200, description: 'Requisitions for source' })
   async getBySource(
     @Param('source') source: 'PRODUCTION' | 'SALES_ORDER',

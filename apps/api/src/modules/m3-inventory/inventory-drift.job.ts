@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { ConfigService } from '@nestjs/config';
@@ -43,9 +48,7 @@ export class InventoryDriftJob implements OnModuleInit, OnModuleDestroy {
       const ledgerRows = await this.knex('stock_ledger_txns')
         .where({ batch_id: batch.id })
         .select('id', 'txn_type', 'qty', 'reverses_txn_id');
-      const byId = new Map(
-        ledgerRows.map((row) => [String(row.id), row]),
-      );
+      const byId = new Map(ledgerRows.map((row) => [String(row.id), row]));
       const expected = ledgerRows.reduce((total, row) => {
         const type = String(row.txn_type);
         const qty = Qty.of(String(row.qty), 'KG');

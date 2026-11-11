@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
@@ -28,19 +33,27 @@ export class QuoteService {
     userId: string;
   }) {
     return this.knex.transaction(async (trx) => {
-      const quoteNo = await this.docNumber.next('QUOTE', data.siteId, null, trx);
-      const validUntil = data.validUntil ?? new Date(Date.now() + 4 * 60 * 60 * 1000); // default 4h
+      const quoteNo = await this.docNumber.next(
+        'QUOTE',
+        data.siteId,
+        null,
+        trx,
+      );
+      const validUntil =
+        data.validUntil ?? new Date(Date.now() + 4 * 60 * 60 * 1000); // default 4h
 
-      const [quote] = await trx('quotes').insert({
-        quote_no: quoteNo,
-        customer_id: data.customerId,
-        site_id: data.siteId,
-        status: 'DRAFT',
-        total_amount: '0.00',
-        valid_until: validUntil,
-        created_by: data.userId,
-        updated_by: data.userId,
-      }).returning('*');
+      const [quote] = await trx('quotes')
+        .insert({
+          quote_no: quoteNo,
+          customer_id: data.customerId,
+          site_id: data.siteId,
+          status: 'DRAFT',
+          total_amount: '0.00',
+          valid_until: validUntil,
+          created_by: data.userId,
+          updated_by: data.userId,
+        })
+        .returning('*');
 
       let totalAmount = Money.zero();
       const lines = [];
@@ -49,8 +62,14 @@ export class QuoteService {
         const item = await this.items.getItemSummary(line.itemId);
         if (!item) throw new NotFoundException(`Item ${line.itemId} not found`);
 
-        const band = await this.pricing.getBand(line.itemId, new Date().toISOString().split('T')[0]);
-        if (!band) throw new BadRequestException(`Price band not set for item ${line.itemId} today`);
+        const band = await this.pricing.getBand(
+          line.itemId,
+          new Date().toISOString().split('T')[0],
+        );
+        if (!band)
+          throw new BadRequestException(
+            `Price band not set for item ${line.itemId} today`,
+          );
 
         const requested = Money.of(line.requestedPrice);
         const cost = Money.of(band.latestLandedCost);
@@ -58,16 +77,18 @@ export class QuoteService {
         const lineTotal = requested.mul(line.qty);
         totalAmount = totalAmount.add(lineTotal);
 
-        const [quoteLine] = await trx('quote_lines').insert({
-          quote_id: quote.id,
-          item_id: line.itemId,
-          qty: line.qty,
-          quoted_unit_price: requested.toStorageString(),
-          floor_price_snapshot: band.floorPrice,
-          target_price_snapshot: band.targetPrice,
-          landed_cost_snapshot: band.latestLandedCost,
-          margin_pct_snapshot: margin?.toNumber(),
-        }).returning('*');
+        const [quoteLine] = await trx('quote_lines')
+          .insert({
+            quote_id: quote.id,
+            item_id: line.itemId,
+            qty: line.qty,
+            quoted_unit_price: requested.toStorageString(),
+            floor_price_snapshot: band.floorPrice,
+            target_price_snapshot: band.targetPrice,
+            landed_cost_snapshot: band.latestLandedCost,
+            margin_pct_snapshot: margin?.toNumber(),
+          })
+          .returning('*');
 
         lines.push(quoteLine);
       }
@@ -77,7 +98,12 @@ export class QuoteService {
         status: 'SENT',
       });
 
-      return { ...quote, status: 'SENT', total_amount: totalAmount.toStorageString(), lines };
+      return {
+        ...quote,
+        status: 'SENT',
+        total_amount: totalAmount.toStorageString(),
+        lines,
+      };
     });
   }
 
@@ -113,7 +139,12 @@ export class QuoteService {
    * BR-01 applies: if any line is below floor, PRICE_OVERRIDE exception will be
    * raised later by OrderService.confirm().
    */
-  async convertToOrder(quoteId: string, siteId: string, userId: string, validationDate?: string): Promise<{
+  async convertToOrder(
+    quoteId: string,
+    siteId: string,
+    userId: string,
+    validationDate?: string,
+  ): Promise<{
     quoteId: string;
     quoteNo: string;
     status: string;
@@ -122,12 +153,19 @@ export class QuoteService {
     customer: string;
     site: string;
     conversionInstructions: string;
-    priceValidation: Array<{ itemId: string; inBand: boolean; floorPrice: string; quotedPrice: string }>;
+    priceValidation: Array<{
+      itemId: string;
+      inBand: boolean;
+      floorPrice: string;
+      quotedPrice: string;
+    }>;
   }> {
     const quote = await this.findById(quoteId);
 
     if (quote.status === 'EXPIRED') {
-      throw new BadRequestException('Expired quotes cannot be converted. Create a new quote.');
+      throw new BadRequestException(
+        'Expired quotes cannot be converted. Create a new quote.',
+      );
     }
     if (quote.status === 'CONVERTED') {
       throw new BadRequestException('Quote already converted to order.');

@@ -23,10 +23,7 @@ export interface LedgerPostEntry {
 
 @Injectable()
 export class LedgerPostingService {
-  async post(
-    trx: Knex.Transaction,
-    entry: LedgerPostEntry,
-  ): Promise<string> {
+  async post(trx: Knex.Transaction, entry: LedgerPostEntry): Promise<string> {
     const qty = Qty.of(entry.qty, 'KG');
     if (qty.isLessThan(Qty.zero('KG'))) {
       throw new BadRequestException('Ledger quantity cannot be negative');
@@ -44,19 +41,29 @@ export class LedgerPostingService {
             qty_on_hand: trx.raw('qty_on_hand + ?', [delta]),
             updated_at: now,
           });
-        if (updated === 0) throw new BadRequestException('Inventory batch not found');
+        if (updated === 0)
+          throw new BadRequestException('Inventory batch not found');
       }
     }
-    if (entry.applyCache !== false && entry.batchId && entry.txnType === 'RESERVATION') {
+    if (
+      entry.applyCache !== false &&
+      entry.batchId &&
+      entry.txnType === 'RESERVATION'
+    ) {
       const updated = await trx('inventory_batches')
         .where({ id: entry.batchId })
         .update({
           qty_committed: trx.raw('qty_committed + ?', [qty.toNumber()]),
           updated_at: now,
         });
-      if (updated === 0) throw new BadRequestException('Inventory batch not found');
+      if (updated === 0)
+        throw new BadRequestException('Inventory batch not found');
     }
-    if (entry.applyCache !== false && entry.batchId && entry.txnType === 'RELEASE') {
+    if (
+      entry.applyCache !== false &&
+      entry.batchId &&
+      entry.txnType === 'RELEASE'
+    ) {
       const updated = await trx('inventory_batches')
         .where({ id: entry.batchId })
         .update({
@@ -65,7 +72,8 @@ export class LedgerPostingService {
           ]),
           updated_at: now,
         });
-      if (updated === 0) throw new BadRequestException('Inventory batch not found');
+      if (updated === 0)
+        throw new BadRequestException('Inventory batch not found');
     }
     if (
       entry.applyCache !== false &&
@@ -80,7 +88,8 @@ export class LedgerPostingService {
           ]),
           updated_at: now,
         });
-      if (updated === 0) throw new BadRequestException('Inventory batch not found');
+      if (updated === 0)
+        throw new BadRequestException('Inventory batch not found');
     }
 
     await trx('stock_ledger_txns').insert({

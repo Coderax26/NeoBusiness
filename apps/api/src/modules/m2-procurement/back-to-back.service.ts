@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
@@ -49,7 +54,9 @@ export class BackToBackService {
    * Create a back-to-back PO from a sales order line
    * Calculates spread = sales_price - purchase_price
    */
-  async createBackToBackPO(input: BackToBackPOInput): Promise<BackToBackResult> {
+  async createBackToBackPO(
+    input: BackToBackPOInput,
+  ): Promise<BackToBackResult> {
     // Get sales order line details
     const soLine = await this.knex('sales_order_lines')
       .join('sales_orders', 'sales_orders.id', 'sales_order_lines.order_id')
@@ -70,27 +77,39 @@ export class BackToBackService {
       .first();
 
     if (!soLine) {
-      throw new NotFoundException(`Sales order line ${input.salesOrderLineId} not found`);
+      throw new NotFoundException(
+        `Sales order line ${input.salesOrderLineId} not found`,
+      );
     }
 
     // Check if back-to-back PO already exists for this line
     const existing = await this.knex('purchase_orders')
       .where('linked_sales_order_id', input.salesOrderId)
-      .whereRaw('EXISTS (SELECT 1 FROM purchase_order_lines WHERE po_id = purchase_orders.id AND item_id = ?)', [soLine.item_id])
+      .whereRaw(
+        'EXISTS (SELECT 1 FROM purchase_order_lines WHERE po_id = purchase_orders.id AND item_id = ?)',
+        [soLine.item_id],
+      )
       .first();
 
     if (existing) {
-      throw new BadRequestException(`Back-to-back PO already exists for this sales order line`);
+      throw new BadRequestException(
+        `Back-to-back PO already exists for this sales order line`,
+      );
     }
 
     // Get supplier details
     const supplier = await this.supplierService.getById(input.supplierId);
 
     // Get latest rate from supplier for this item
-    const supplierRate = await this.supplierService.getLatestRate(input.supplierId, soLine.item_id);
+    const supplierRate = await this.supplierService.getLatestRate(
+      input.supplierId,
+      soLine.item_id,
+    );
 
     if (!supplierRate) {
-      throw new BadRequestException(`No rate quote available from supplier ${supplier.company_name} for item ${soLine.item_sku}`);
+      throw new BadRequestException(
+        `No rate quote available from supplier ${supplier.company_name} for item ${soLine.item_sku}`,
+      );
     }
 
     // Calculate spread: sales unit_price - purchase unit_price
@@ -99,40 +118,52 @@ export class BackToBackService {
     const purchasePriceMoney = Money.of(supplierRate);
     const spread = salesPriceMoney.sub(purchasePriceMoney);
     // spreadPct = (salesPrice - purchasePrice) / salesPrice = marginPct
-    const spreadPct = salesPriceMoney.isZero() ? 0 : Money.marginPct(salesPriceMoney, purchasePriceMoney)?.toNumber() ?? 0;
+    const spreadPct = salesPriceMoney.isZero()
+      ? 0
+      : (Money.marginPct(salesPriceMoney, purchasePriceMoney)?.toNumber() ?? 0);
 
     // Create PO linked to sales order
     const result = await this.poService.create({
       supplierId: input.supplierId,
       receivingSiteId: soLine.fulfillment_site_id,
-      lines: [{
-        itemId: soLine.item_id,
-        orderedQty: soLine.ordered_qty,
-        unitPrice: supplierRate,
-        userId: input.userId,
-      }],
+      lines: [
+        {
+          itemId: soLine.item_id,
+          orderedQty: soLine.ordered_qty,
+          unitPrice: supplierRate,
+          userId: input.userId,
+        },
+      ],
       linkedSalesOrderId: input.salesOrderId,
       userId: input.userId,
     });
 
     // Emit back-to-back event
     await this.knex.transaction(async (trx) => {
-      await this.outbox.raise(trx, 'po.back_to_back_created', result.id, {
-        poId: result.id,
-        poNo: result.poNo,
-        salesOrderId: input.salesOrderId,
-        salesOrderLineId: input.salesOrderLineId,
-        supplierId: input.supplierId,
-        salesPrice: soLine.unit_price,
-        purchasePrice: supplierRate,
-        spread: spread.toStorageString(),
-        spreadPct,
-        itemId: soLine.item_id,
-        orderedQty: soLine.ordered_qty,
-      }, 'm2-procurement');
+      await this.outbox.raise(
+        trx,
+        'po.back_to_back_created',
+        result.id,
+        {
+          poId: result.id,
+          poNo: result.poNo,
+          salesOrderId: input.salesOrderId,
+          salesOrderLineId: input.salesOrderLineId,
+          supplierId: input.supplierId,
+          salesPrice: soLine.unit_price,
+          purchasePrice: supplierRate,
+          spread: spread.toStorageString(),
+          spreadPct,
+          itemId: soLine.item_id,
+          orderedQty: soLine.ordered_qty,
+        },
+        'm2-procurement',
+      );
     });
 
-    this.logger.log(`Created back-to-back PO ${result.poNo} for SO line ${input.salesOrderLineId}, spread: ${spread.toStorageString()} (${(spreadPct * 100).toFixed(2)}%)`);
+    this.logger.log(
+      `Created back-to-back PO ${result.poNo} for SO line ${input.salesOrderLineId}, spread: ${spread.toStorageString()} (${(spreadPct * 100).toFixed(2)}%)`,
+    );
 
     return {
       poId: result.id,
@@ -178,7 +209,9 @@ export class BackToBackService {
           const purchasePrice = Money.of(line.unit_price);
           const spread = salesPrice.sub(purchasePrice);
           line.spread = spread.toString();
-          line.spreadPct = salesPrice.isZero() ? 0 : Money.marginPct(salesPrice, purchasePrice)?.toNumber() ?? 0;
+          line.spreadPct = salesPrice.isZero()
+            ? 0
+            : (Money.marginPct(salesPrice, purchasePrice)?.toNumber() ?? 0);
         }
       }
 
@@ -194,18 +227,24 @@ export class BackToBackService {
   /**
    * Get all back-to-back POs across all sales orders
    */
-  async listBackToBackPOs(filters: {
-    siteId?: string;
-    supplierId?: string;
-    dateFrom?: Date;
-    dateTo?: Date;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<any[]> {
+  async listBackToBackPOs(
+    filters: {
+      siteId?: string;
+      supplierId?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<any[]> {
     let query = this.knex('purchase_orders')
       .whereNotNull('linked_sales_order_id')
       .join('suppliers', 'suppliers.id', 'purchase_orders.supplier_id')
-      .join('sales_orders', 'sales_orders.id', 'purchase_orders.linked_sales_order_id')
+      .join(
+        'sales_orders',
+        'sales_orders.id',
+        'purchase_orders.linked_sales_order_id',
+      )
       .join('customers', 'customers.id', 'sales_orders.customer_id')
       .select(
         'purchase_orders.*',
@@ -282,7 +321,9 @@ export class BackToBackService {
     }
 
     const totalSpread = totalSalesValue.sub(totalPurchaseValue);
-    const spreadPct = totalSalesValue.isZero() ? 0 : Money.marginPct(totalSalesValue, totalPurchaseValue)?.toNumber() ?? 0;
+    const spreadPct = totalSalesValue.isZero()
+      ? 0
+      : (Money.marginPct(totalSalesValue, totalPurchaseValue)?.toNumber() ?? 0);
 
     return {
       totalSalesValue: totalSalesValue.toString(),
@@ -296,16 +337,21 @@ export class BackToBackService {
   /**
    * Suggest best supplier for back-to-back based on spread optimization
    */
-  async suggestBestSupplier(salesOrderId: string, salesOrderLineId: string): Promise<{
-    supplierId: string;
-    supplierCode: string;
-    supplierName: string;
-    purchasePrice: string;
-    spread: string;
-    spreadPct: number;
-    reliabilityScorePct: number;
-    leadTimeDaysAvg: number;
-  }[]> {
+  async suggestBestSupplier(
+    salesOrderId: string,
+    salesOrderLineId: string,
+  ): Promise<
+    {
+      supplierId: string;
+      supplierCode: string;
+      supplierName: string;
+      purchasePrice: string;
+      spread: string;
+      spreadPct: number;
+      reliabilityScorePct: number;
+      leadTimeDaysAvg: number;
+    }[]
+  > {
     const soLine = await this.knex('sales_order_lines')
       .where('id', salesOrderLineId)
       .where('order_id', salesOrderId)
@@ -325,18 +371,25 @@ export class BackToBackService {
     }
 
     // Get approved suppliers for this item
-    const suppliers = await this.supplierService.getApprovedSuppliersForItem(soLine.item_id);
+    const suppliers = await this.supplierService.getApprovedSuppliersForItem(
+      soLine.item_id,
+    );
 
     const salesPrice = Money.of(soLine.unit_price);
 
     const suggestions = await Promise.all(
       suppliers.map(async (supplier) => {
-        const latestRate = await this.supplierService.getLatestRate(String(supplier.id), soLine.item_id);
+        const latestRate = await this.supplierService.getLatestRate(
+          String(supplier.id),
+          soLine.item_id,
+        );
         if (!latestRate) return null;
 
         const purchasePrice = Money.of(latestRate);
         const spread = salesPrice.sub(purchasePrice);
-        const spreadPct = salesPrice.isZero() ? 0 : Money.marginPct(salesPrice, purchasePrice)?.toNumber() ?? 0;
+        const spreadPct = salesPrice.isZero()
+          ? 0
+          : (Money.marginPct(salesPrice, purchasePrice)?.toNumber() ?? 0);
 
         return {
           supplierId: String(supplier.id),
@@ -348,7 +401,7 @@ export class BackToBackService {
           reliabilityScorePct: supplier.reliability_score_pct,
           leadTimeDaysAvg: supplier.lead_time_days_avg,
         };
-      })
+      }),
     );
 
     // Filter valid and sort by spread descending (best margin first)

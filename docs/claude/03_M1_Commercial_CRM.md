@@ -37,7 +37,6 @@ Out of scope here: stock reservation (M3), production (M4), invoicing/AR (M6), d
 | **`communication_log`** | `customer_id` · `channel` (`CALL` \| `WHATSAPP` \| `VISIT`) · `note` · `user_id` · `at` | ADD (§6.2) |
 | **`items`** | `id` PK · `sku_code` · `name` · `item_category` (`TRADED_GOOD` \| `RAW_MATERIAL` \| `PROCESSED_FG` \| `PACKAGING`) · `primary_uom` (`KG` \| `CRATE` \| `CARTON`) · `secondary_uom` · `shelf_life_days` · `tax_rate_pct` | BP |
 | ↳ added | `hsn_code` (A5) · `is_catch_weight` · `standard_weight_per_secondary_kg` · `min_margin_pct` · `is_active` | ADD (G6) |
-| ↳ added | `tax_treatment` (`TAXABLE` \| `EXEMPT` \| `NIL_RATED` \| `NON_GST`) — **CONFIRMED OD-003**. Taxable lines compute CGST/SGST or IGST; EXEMPT/NIL_RATED/NON_GST lines have `tax_amount = 0`. Both treatments may appear on the same invoice. |
 | **`uom_conversions`** | `item_id` · `from_uom` · `to_uom` · `factor` | ADD |
 | **`daily_price_lists`** | `id` PK · `item_id` FK · `effective_date` · `latest_landed_cost` · `floor_price` · `target_price` · `updated_by` FK | BP |
 | ↳ added | `min_margin_pct_used` · `source` (`AUTO` \| `MANUAL`) · `published_at` | ADD |
@@ -202,8 +201,8 @@ evaluateLine(item, qty, price):
 
 ## 12. Open questions
 
-- `[CONFIRMED 2026-10-22 — OD-001]` `min_margin_pct`: 10% gross margin global default (`business_rule_config.min_margin_pct_default = 0.10`); overridable per item category via `min_margin_pct_<CATEGORY>` (e.g. `min_margin_pct_PROCESSED_FG` = 0.12). Margin definition (G7): `margin_pct = (price − cost) / price`, gross margin not markup.
-- `[DECISION]` Does Neo give **standing negotiated prices** to some customers (§6.2 "price tiers")? If yes, they still cannot undercut the floor without approval. (OD-024 — AWAITING)
+- `[DECISION]` `min_margin_pct`: one global value, per category, or per item?
+- `[DECISION]` Does Neo give **standing negotiated prices** to some customers (§6.2 "price tiers")? If yes, they still cannot undercut the floor without approval.
 - `[DECISION]` Does a *still-valid* quote survive an owner re-pricing the floor mid-day?
 - `[DECISION]` Is credit evaluated per order or per customer-day (many small orders)?
 - Which sites can each customer be served from?

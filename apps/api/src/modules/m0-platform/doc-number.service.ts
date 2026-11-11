@@ -38,9 +38,12 @@ export class DocNumberService {
     const period = this.currentPeriod();
     const prefix = await this.resolvePrefix(docType, externalTrx);
 
-    const runner = (trx: Knex.Transaction) => this.incrementSequence(trx, docType, prefix, period, siteId, deviceId);
+    const runner = (trx: Knex.Transaction) =>
+      this.incrementSequence(trx, docType, prefix, period, siteId, deviceId);
 
-    const nextNo = externalTrx ? await runner(externalTrx) : await this.knex.transaction(runner);
+    const nextNo = externalTrx
+      ? await runner(externalTrx)
+      : await this.knex.transaction(runner);
 
     return this.formatNumber(prefix, period, nextNo);
   }
@@ -48,7 +51,11 @@ export class DocNumberService {
   /**
    * Peek at the next number without incrementing (for validation/preview).
    */
-  async peek(docType: string, siteId?: string | null, deviceId?: string | null): Promise<string> {
+  async peek(
+    docType: string,
+    siteId?: string | null,
+    deviceId?: string | null,
+  ): Promise<string> {
     const period = this.currentPeriod();
     const prefix = await this.resolvePrefix(docType);
 
@@ -119,7 +126,10 @@ export class DocNumberService {
     return 1;
   }
 
-  private async resolvePrefix(docType: string, trx?: Knex.Transaction): Promise<string> {
+  private async resolvePrefix(
+    docType: string,
+    trx?: Knex.Transaction,
+  ): Promise<string> {
     const query = (trx || this.knex)('doc_sequences')
       .where('doc_type', docType)
       .first('prefix');

@@ -299,20 +299,21 @@ export class InvoiceService {
   }
 
   /**
-   * Send invoice notification
+   * Public method to send invoice notification
+   * Extracted from private to allow M5 TripListenerService reuse
    */
-  private async sendInvoiceNotification(
+  public async sendInvoiceNotification(
     customerId: string,
     invoiceNo: string,
     amount: string,
   ): Promise<void> {
     const customer = await this.knex('customers')
       .where('id', customerId)
-      .first('name', 'phone', 'whatsapp_opt_in');
+      .first('business_name', 'phone', 'whatsapp_opt_in');
     if (!customer) return;
 
     const payload = {
-      customerName: customer.name,
+      customerName: customer.business_name,
       invoiceNo,
       amount,
       date: new Date().toLocaleDateString('en-IN'),
