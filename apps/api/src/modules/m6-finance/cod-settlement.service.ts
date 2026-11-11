@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
   Inject,
   Optional,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -146,6 +147,79 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
         `Failed to process COD settlement for trip ${tripId}: ${(err as Error).message}`,
       );
     }
+  }
+
+  /**
+   * List pending COD stops that have not been settled into receipts yet
+   */
+  async listPendingCodStops(siteId?: string) {
+    let query = this.knex('delivery_stops as ds')
+      .join('delivery_trips as dt', 'ds.trip_id', 'dt.id')
+      .join('customers as c', 'ds.customer_id', 'c.id')
+      .where('ds.is_cod', true)
+      .whereNotExists(function () {
+        this.select('id')
+          .from('collection_receipts')
+          .where('reference_type', 'TRIP_COD')
+          .whereRaw('reference_id = ds.id');
+      });
+
+    if (siteId) {
+      query = query.where('dt.site_id', siteId);
+    }
+
+    return query.select(
+      'ds.id as stopId',
+      'ds.trip_id as tripId',
+      'dt.trip_number as tripNumber',
+      'ds.customer_id as customerId',
+      'c.name as customerName',
+      'ds.sales_order_id as salesOrderId',
+      'ds.cod_amount as codAmount',
+      'ds.cod_collected_amount as codCollectedAmount',
+      'ds.status as stopStatus',
+      'dt.status as tripStatus',
+      'dt.site_id as siteId',
+    );
+  }
+
+  /**
+   * Settle a specific COD stop manually
+   */
+  async settleStopById(stopId: string, siteIdOverride?: string) {
+    const stop = await this.knex('delivery_stops as ds')
+      .join('delivery_trips as dt', 'ds.trip_id', 'dt.id')
+      .where('ds.id', stopId)
+      .first('ds.*', 'dt.site_id as tripSiteId');
+    if (!stop) throw new NotFoundException(`Delivery stop ${stopId} not found`);
+
+    const siteId = siteIdOverride || stop.tripSiteId;
+    await this.settleCodStop(
+      String(stop.id),
+      String(stop.customer_id),
+      String(stop.sales_order_id ?? ''),
+      String(stop.cod_amount ?? '0'),
+      String(stop.cod_collected_amount ?? stop.cod_amount ?? '0'),
+      String(stop.status),
+      String(siteId),
+      String(stop.trip_id),
+    );
+
+    return this.knex('collection_receipts')
+      .where('reference_type', 'TRIP_COD')
+      .where('reference_id', stopId)
+      .first('*');
+  }
+
+  /**
+   * Get settlement details by receipt ID
+   */
+  async getSettlement(receiptId: string) {
+    const receipt = await this.knex('collection_receipts')
+      .where('id', receiptId)
+      .first('*');
+    if (!receipt) throw new NotFoundException(`Receipt ${receiptId} not found`);
+    return receipt;
   }
 
   private async settleCodStop(

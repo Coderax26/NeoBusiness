@@ -270,13 +270,12 @@ export class CreditNoteService implements OnModuleInit, OnModuleDestroy {
     return { ...creditNote, lines };
   }
 
-  async listCreditNotes(customerId: string, siteId: string, status?: string) {
-    let query = this.knex('credit_notes')
-      .where('customer_id', customerId)
-      .andWhere('site_id', siteId)
-      .orderBy('created_at', 'desc');
+  async listCreditNotes(customerId?: string, siteId?: string, status?: string) {
+    let query = this.knex('credit_notes').orderBy('created_at', 'desc');
 
-    if (status) query = query.andWhere('status', status);
+    if (customerId) query = query.where('customer_id', customerId);
+    if (siteId) query = query.where('site_id', siteId);
+    if (status) query = query.where('status', status);
 
     return query.select('*');
   }

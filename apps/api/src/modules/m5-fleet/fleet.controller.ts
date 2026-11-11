@@ -7,9 +7,11 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { FleetService } from './fleet.service.js';
@@ -87,8 +89,29 @@ export class FleetController {
   generateChallan(
     @Param('tripId') tripId: string,
     @Param('stopId') stopId: string,
+    @Body() body?: { ewayBillNo?: string },
   ) {
-    return this.fleet.generateChallan(tripId, stopId);
+    return this.fleet.generateChallan(tripId, stopId, body?.ewayBillNo);
+  }
+
+  @Get('trips/:tripId/stops/:stopId/challan/pdf')
+  @RequirePermission('fleet.read')
+  @ApiOperation({ summary: 'Download delivery challan PDF' })
+  async getChallanPdf(
+    @Param('tripId') tripId: string,
+    @Param('stopId') stopId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, challanNo } = await this.fleet.getChallanPdf(
+      tripId,
+      stopId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="Challan-${challanNo}.pdf"`,
+    );
+    res.end(buffer);
   }
 
   @Get('me/trip')

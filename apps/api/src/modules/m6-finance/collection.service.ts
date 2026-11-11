@@ -143,6 +143,42 @@ export class CollectionService {
   }
 
   /**
+   * List receipts with filters and pagination
+   */
+  async listReceipts(options: {
+    siteId?: string;
+    customerId?: string;
+    paymentMode?: string;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    let query = this.knex('collection_receipts');
+    if (options.siteId) query = query.where('site_id', options.siteId);
+    if (options.customerId) query = query.where('customer_id', options.customerId);
+    if (options.paymentMode) query = query.where('payment_mode', options.paymentMode);
+    if (options.fromDate) query = query.where('collected_at', '>=', options.fromDate);
+    if (options.toDate) query = query.where('collected_at', '<=', options.toDate);
+
+    const countRow = await query.clone().count<{ count: string }>('id as count').first();
+    const limit = options.limit ?? 50;
+    const offset = options.offset ?? 0;
+    const items = await query
+      .orderBy('collected_at', 'desc')
+      .limit(limit)
+      .offset(offset)
+      .select('*');
+
+    return {
+      items,
+      total: Number(countRow?.count ?? 0),
+      limit,
+      offset,
+    };
+  }
+
+  /**
    * Get customer ledger (mobile AR view)
    */
   async getCustomerLedger(customerId: string, siteId: string, limit = 50) {

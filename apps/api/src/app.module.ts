@@ -9,6 +9,7 @@ import { M1CommercialModule } from './modules/m1-commercial/m1-commercial.module
 import { M6FinancialsModule } from './modules/m6-finance/m6-financials.module.js';
 import { M3InventoryModule } from './modules/m3-inventory/m3-inventory.module.js';
 import { M5FleetModule } from './modules/m5-fleet/m5-fleet.module.js';
+import { M4ProductionModule } from './modules/m4-production/m4-production.module.js';
 import { M2ProcurementModule } from './modules/m2-procurement/m2-procurement.module.js';
 import { M7bDashboardsModule } from './modules/m7b-dashboards/m7b-dashboards.module.js';
 
@@ -58,7 +59,7 @@ import { M7bDashboardsModule } from './modules/m7b-dashboards/m7b-dashboards.mod
     M5FleetModule,
 
     // Sprint 3: M4 Factory Production
-    // M4ProductionModule,
+    M4ProductionModule,
 
     // Sprint 3: M2 Procurement and Supplier
     M2ProcurementModule,

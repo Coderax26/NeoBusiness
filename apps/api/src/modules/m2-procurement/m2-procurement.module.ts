@@ -11,11 +11,13 @@ import { BackToBackService } from './back-to-back.service.js';
 import { RequisitionService } from './requisition.service.js';
 import { SupplierBillService } from './supplier-bill.service.js';
 import { ProcurementPortService } from './procurement-port.service.js';
+import { SupplierMaintenanceJob } from './supplier-maintenance.job.js';
 import { SupplierController } from './supplier.controller.js';
 import { POController } from './po.controller.js';
 import { GRNController } from './grn.controller.js';
 import { RequisitionController } from './requisition.controller.js';
 import { ShortfallController } from './shortfall.controller.js';
+import { SupplierBillController } from './supplier-bill.controller.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
@@ -46,6 +48,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     GRNController,
     RequisitionController,
     ShortfallController,
+    SupplierBillController,
   ],
   providers: [
     SupplierService,
@@ -55,6 +58,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     BackToBackService,
     RequisitionService,
     SupplierBillService,
+    SupplierMaintenanceJob,
     ProcurementPortService,
     {
       provide: PROCUREMENT_PORT,
@@ -74,6 +78,7 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     BackToBackService,
     RequisitionService,
     SupplierBillService,
+    SupplierMaintenanceJob,
     ProcurementPortService,
   ],
 })

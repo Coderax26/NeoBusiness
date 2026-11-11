@@ -556,7 +556,7 @@ export class FleetService {
     return trip ? this.getTrip(String(trip.id)) : null;
   }
 
-  async generateChallan(tripId: string, stopId: string) {
+  async generateChallan(tripId: string, stopId: string, ewayBillNo?: string) {
     const stop = await this.knex('delivery_stops')
       .where({ id: stopId, trip_id: tripId })
       .first('id');
@@ -564,7 +564,15 @@ export class FleetService {
     const existing = await this.knex('delivery_challans')
       .where({ trip_id: tripId, stop_id: stopId })
       .first();
-    if (existing) return existing;
+    if (existing) {
+      if (ewayBillNo && existing.eway_bill_no !== ewayBillNo) {
+        await this.knex('delivery_challans')
+          .where('id', existing.id)
+          .update({ eway_bill_no: ewayBillNo });
+        existing.eway_bill_no = ewayBillNo;
+      }
+      return existing;
+    }
 
     return this.knex.transaction(async (trx) => {
       const challanNo = await this.docNumber.next(
@@ -578,6 +586,7 @@ export class FleetService {
           challan_no: challanNo,
           trip_id: tripId,
           stop_id: stopId,
+          eway_bill_no: ewayBillNo || null,
         })
         .returning('*');
 
@@ -606,7 +615,20 @@ export class FleetService {
     });
   }
 
-  private async generateChallanPdf(
+  async getChallanPdf(
+    tripId: string,
+    stopId: string,
+  ): Promise<{ buffer: Buffer; challanNo: string }> {
+    const challan = await this.generateChallan(tripId, stopId);
+    const buffer = await this.generateChallanPdf(
+      tripId,
+      stopId,
+      challan.challan_no,
+    );
+    return { buffer, challanNo: challan.challan_no };
+  }
+
+  public async generateChallanPdf(
     tripId: string,
     stopId: string,
     challanNo: string,
@@ -649,6 +671,10 @@ export class FleetService {
       batchDetails = new Map(batches.map((b) => [b.id, b]));
     }
 
+    const challanRecord = await this.knex('delivery_challans')
+      .where({ trip_id: tripId, stop_id: stopId })
+      .first('eway_bill_no');
+
     const challanData = {
       challanNo,
       challanDate: new Date().toISOString().split('T')[0],
@@ -660,6 +686,7 @@ export class FleetService {
       customerAddress: customer?.billing_address || 'N/A',
       customerGstin: customer?.gstin || 'N/A',
       customerStateCode: customer?.state_code || 'N/A',
+      ewayBillNo: challanRecord?.eway_bill_no || undefined,
       siteName: site?.name || 'N/A',
       siteAddress: site?.address || 'N/A',
       siteGstin: site?.gstin || 'N/A',

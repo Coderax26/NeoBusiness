@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { Money } from '../../shared/utils/money.util.js';
@@ -347,6 +352,130 @@ export class LedgerService implements LedgerPort {
       balance: r.running_balance,
       receiptId: r.receipt_id,
     }));
+  }
+
+  /**
+   * Get open / unpaid invoices
+   */
+  async getOpenInvoices(customerId?: string, siteId?: string) {
+    let query = this.knex('invoices')
+      .whereIn('status', ['UNPAID', 'PARTIAL', 'OVERDUE'])
+      .orderBy('due_date', 'asc');
+
+    if (customerId) query = query.where('customer_id', customerId);
+    if (siteId) query = query.where('site_id', siteId);
+
+    return query.select('*');
+  }
+
+  /**
+   * Get AR aging breakdown (0-7, 8-15, 16-30, 30+ days)
+   */
+  async getArAging(siteId?: string, asOfDate?: string) {
+    const asOf = asOfDate ? new Date(asOfDate) : new Date();
+    let query = this.knex('invoices')
+      .whereIn('status', ['UNPAID', 'PARTIAL', 'OVERDUE']);
+
+    if (siteId) query = query.where('site_id', siteId);
+
+    const invoices = await query.select(
+      'id',
+      'customer_id',
+      'invoice_no',
+      'due_date',
+      'balance_due',
+    );
+
+    let bucket0to7 = Money.zero();
+    let bucket8to15 = Money.zero();
+    let bucket16to30 = Money.zero();
+    let bucket31plus = Money.zero();
+    let totalOutstanding = Money.zero();
+
+    for (const inv of invoices) {
+      const balance = Money.of(inv.balance_due);
+      if (balance.isZero()) continue;
+
+      totalOutstanding = totalOutstanding.add(balance);
+      const dueDate = new Date(inv.due_date);
+      const diffMs = asOf.getTime() - dueDate.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 7) {
+        bucket0to7 = bucket0to7.add(balance);
+      } else if (diffDays <= 15) {
+        bucket8to15 = bucket8to15.add(balance);
+      } else if (diffDays <= 30) {
+        bucket16to30 = bucket16to30.add(balance);
+      } else {
+        bucket31plus = bucket31plus.add(balance);
+      }
+    }
+
+    return {
+      asOfDate: asOf.toISOString().split('T')[0],
+      totalOutstanding: totalOutstanding.toStorageString(),
+      buckets: {
+        '0_to_7_days': bucket0to7.toStorageString(),
+        '8_to_15_days': bucket8to15.toStorageString(),
+        '16_to_30_days': bucket16to30.toStorageString(),
+        '31_plus_days': bucket31plus.toStorageString(),
+      },
+      invoiceCount: invoices.length,
+    };
+  }
+
+  /**
+   * Allocate an existing collection receipt to specific invoices
+   */
+  async allocateReceipt(
+    receiptId: string,
+    allocations: Array<{ invoiceId: string; amount: string }>,
+  ) {
+    return this.knex.transaction(async (trx) => {
+      const receipt = await trx('collection_receipts')
+        .where('id', receiptId)
+        .first('*');
+      if (!receipt) throw new NotFoundException(`Receipt ${receiptId} not found`);
+
+      const postedAllocations = [];
+      for (const alloc of allocations) {
+        const inv = await trx('invoices').where('id', alloc.invoiceId).first('*');
+        if (!inv) continue;
+
+        const allocAmt = Money.of(alloc.amount);
+        if (allocAmt.isZero()) continue;
+
+        await trx('receipt_allocations').insert({
+          receipt_id: receiptId,
+          invoice_id: alloc.invoiceId,
+          allocated_amount: allocAmt.toStorageString(),
+        });
+
+        const newPaid = Money.of(inv.paid_amount).add(allocAmt);
+        const newBalance = Money.of(inv.total_amount).sub(newPaid);
+        let newStatus = inv.status;
+        if (newBalance.isZero()) newStatus = 'PAID';
+        else if (!newPaid.isZero()) newStatus = 'PARTIAL';
+
+        await trx('invoices').where('id', alloc.invoiceId).update({
+          paid_amount: newPaid.toStorageString(),
+          balance_due: newBalance.toStorageString(),
+          status: newStatus,
+          updated_at: new Date(),
+        });
+
+        postedAllocations.push({
+          invoiceId: alloc.invoiceId,
+          invoiceNo: inv.invoice_no,
+          allocatedAmount: allocAmt.toStorageString(),
+          newBalance: newBalance.toStorageString(),
+          status: newStatus,
+        });
+      }
+
+      return postedAllocations;
+    });
   }
 
   // ─── LedgerPort Implementation ─────────────────────────────────────────────

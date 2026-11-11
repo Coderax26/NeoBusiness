@@ -18,6 +18,7 @@ import { WastageController } from './wastage.controller.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceRepository } from './repositories/attendance.repository.js';
 import { AttendanceController } from './attendance.controller.js';
+import { ProductionPortService } from './production-port.service.js';
 import {
   PRODUCTION_PORT,
   type ProductionPort,
@@ -50,10 +51,11 @@ import {
     WastageService,
     AttendanceRepository,
     AttendanceService,
+    ProductionPortService,
     // Wire ProductionPort to real implementation
     {
       provide: PRODUCTION_PORT,
-      useExisting: WorkOrderService,
+      useExisting: ProductionPortService,
     },
   ],
   controllers: [

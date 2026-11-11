@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -17,6 +18,7 @@ import {
   EXCEPTION_PORT,
 } from '../../shared/ports/ports.interface.js';
 import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 
 /**
  * EodService — End of Day closing checklist (10-minute target)
@@ -40,6 +42,7 @@ export class EodService {
     private readonly outbox: OutboxService,
     @Inject(NOTIFY_PORT) private readonly notify: any,
     @Inject(EXCEPTION_PORT) private readonly exceptionPort: ExceptionPort,
+    @Optional() private readonly pdfGenerator?: PdfGeneratorService,
   ) {}
 
   /**
@@ -355,6 +358,35 @@ export class EodService {
         amount: c.amount,
       })),
     };
+  }
+
+  /**
+   * Generate Bank Deposit Slip PDF buffer
+   */
+  async generateDepositSlipPdf(siteId: string, date: string): Promise<Buffer> {
+    const slip = await this.generateDepositSlip(siteId, date);
+    const site = await this.knex('sites').where('id', siteId).first('*');
+
+    const totalCash = Money.of(slip.totalCash);
+    const totalCheques = Money.of(slip.totalCheques);
+    const totalDeposit = totalCash.add(totalCheques);
+
+    const pdfGen = this.pdfGenerator ?? new PdfGeneratorService();
+    return pdfGen.generateDepositSlip({
+      date,
+      siteName: site?.name || 'NeoBus Depot',
+      siteAddress: site?.address,
+      cashAmount: slip.totalCash,
+      chequeTotal: slip.totalCheques,
+      totalDeposit: totalDeposit.toStorageString(),
+      handoversCount: slip.chequeCount,
+      cheques: slip.cheques.map((c) => ({
+        chequeNo: c.chequeNo,
+        bank: c.bank,
+        chequeDate: date,
+        amount: String(c.amount),
+      })),
+    });
   }
 
   /**

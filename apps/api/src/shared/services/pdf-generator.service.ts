@@ -13,6 +13,7 @@ export interface ChallanData {
   customerAddress: string;
   customerGstin: string;
   customerStateCode: string;
+  ewayBillNo?: string;
   lines: Array<{
     itemName: string;
     hsnCode: string;
@@ -25,6 +26,53 @@ export interface ChallanData {
   siteAddress: string;
   siteGstin: string;
   siteStateCode: string;
+}
+
+export interface InvoicePdfData {
+  invoiceNo: string;
+  invoiceDate: string;
+  dueDate: string;
+  customerName: string;
+  customerAddress?: string;
+  customerGstin?: string;
+  customerStateCode?: string;
+  placeOfSupplyStateCode?: string;
+  siteName: string;
+  siteAddress?: string;
+  siteGstin?: string;
+  siteStateCode?: string;
+  lines: Array<{
+    itemName: string;
+    hsnCode?: string;
+    qty: string;
+    unitPrice: string;
+    lineTotal: string;
+    taxRatePct?: string;
+    taxAmount?: string;
+  }>;
+  taxableAmount: string;
+  cgst: string;
+  sgst: string;
+  igst: string;
+  totalAmount: string;
+  isCOD?: boolean;
+}
+
+export interface DepositSlipData {
+  date: string;
+  siteName: string;
+  siteAddress?: string;
+  cashAmount: string;
+  chequeTotal: string;
+  totalDeposit: string;
+  handoversCount: number;
+  cheques: Array<{
+    chequeNo: string;
+    bank: string;
+    chequeDate: string;
+    amount: string;
+    customerName?: string;
+  }>;
 }
 
 @Injectable()
@@ -108,6 +156,14 @@ export class PdfGeneratorService {
       .fontSize(9)
       .font('Helvetica')
       .text(data.tripNo, infoStartX + 70, y);
+    if (data.ewayBillNo) {
+      y += 14;
+      doc.fontSize(9).font('Helvetica-Bold').text('E-Way Bill:', infoStartX, y);
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .text(data.ewayBillNo, infoStartX + 70, y);
+    }
 
     // Right column - Trip details
     let rightX = infoStartX + infoColWidth;
@@ -292,5 +348,225 @@ export class PdfGeneratorService {
       doc.page.height - 30,
       { width: pageWidth, align: 'center' },
     );
+  }
+
+  /**
+   * Generate a Tax Invoice PDF buffer
+   */
+  async generateInvoice(data: InvoicePdfData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margin: 40,
+          info: {
+            Title: `Tax Invoice - ${data.invoiceNo}`,
+            Author: 'NeoBus ERP',
+            Creator: 'NeoBus ERP',
+          },
+        });
+
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+
+        // Header
+        doc.fontSize(18).font('Helvetica-Bold').text('TAX INVOICE', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.siteName, 40, y);
+        y += 14;
+        if (data.siteAddress) {
+          doc.fontSize(9).font('Helvetica').text(data.siteAddress, 40, y);
+          y += 12;
+        }
+        doc.fontSize(9).text(`GSTIN: ${data.siteGstin || 'N/A'} | State: ${data.siteStateCode || 'N/A'}`, 40, y);
+        y += 20;
+
+        // Invoice Meta
+        const colW = pageWidth / 2;
+        doc.fontSize(9).font('Helvetica-Bold').text('Invoice No:', 40, y);
+        doc.font('Helvetica').text(data.invoiceNo, 110, y);
+        doc.font('Helvetica-Bold').text('Invoice Date:', 40 + colW, y);
+        doc.font('Helvetica').text(data.invoiceDate, 40 + colW + 80, y);
+        y += 14;
+
+        doc.font('Helvetica-Bold').text('Due Date:', 40, y);
+        doc.font('Helvetica').text(data.dueDate, 110, y);
+        doc.font('Helvetica-Bold').text('Place of Supply:', 40 + colW, y);
+        doc.font('Helvetica').text(data.placeOfSupplyStateCode || data.customerStateCode || 'N/A', 40 + colW + 80, y);
+        y += 20;
+
+        // Customer details
+        doc.font('Helvetica-Bold').text('Billed To:', 40, y);
+        y += 12;
+        doc.font('Helvetica-Bold').text(data.customerName, 40, y);
+        y += 12;
+        if (data.customerAddress) {
+          doc.font('Helvetica').text(data.customerAddress, 40, y);
+          y += 12;
+        }
+        doc.font('Helvetica').text(`GSTIN: ${data.customerGstin || 'Unregistered'} | State: ${data.customerStateCode || 'N/A'}`, 40, y);
+        y += 20;
+
+        // Lines table
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Sr.', 42, y + 5, { width: 25 });
+        doc.text('Item Description', 70, y + 5, { width: 170 });
+        doc.text('HSN', 245, y + 5, { width: 45 });
+        doc.text('Qty', 295, y + 5, { width: 40, align: 'right' });
+        doc.text('Unit Price', 340, y + 5, { width: 55, align: 'right' });
+        doc.text('Tax %', 400, y + 5, { width: 40, align: 'right' });
+        doc.text('Total', 445, y + 5, { width: 65, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        data.lines.forEach((l, idx) => {
+          if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+          doc.fillColor('#000000');
+          doc.text(String(idx + 1), 42, y + 4, { width: 25 });
+          doc.text(l.itemName, 70, y + 4, { width: 170 });
+          doc.text(l.hsnCode || '-', 245, y + 4, { width: 45 });
+          doc.text(l.qty, 295, y + 4, { width: 40, align: 'right' });
+          doc.text(l.unitPrice, 340, y + 4, { width: 55, align: 'right' });
+          doc.text(l.taxRatePct || '0', 400, y + 4, { width: 40, align: 'right' });
+          doc.text(l.lineTotal, 445, y + 4, { width: 65, align: 'right' });
+          y += 16;
+        });
+
+        // Totals
+        y += 10;
+        doc.moveTo(40, y).lineTo(40 + pageWidth, y).stroke('#cccccc');
+        y += 8;
+
+        const sumX = 40 + pageWidth - 160;
+        doc.font('Helvetica').fontSize(9);
+        doc.text('Taxable Amount:', sumX, y, { width: 90 });
+        doc.text(data.taxableAmount, sumX + 90, y, { width: 70, align: 'right' });
+        y += 14;
+
+        if (data.cgst && data.cgst !== '0.00') {
+          doc.text('CGST:', sumX, y, { width: 90 });
+          doc.text(data.cgst, sumX + 90, y, { width: 70, align: 'right' });
+          y += 14;
+          doc.text('SGST:', sumX, y, { width: 90 });
+          doc.text(data.sgst, sumX + 90, y, { width: 70, align: 'right' });
+          y += 14;
+        }
+        if (data.igst && data.igst !== '0.00') {
+          doc.text('IGST:', sumX, y, { width: 90 });
+          doc.text(data.igst, sumX + 90, y, { width: 70, align: 'right' });
+          y += 14;
+        }
+
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('Total Amount:', sumX, y, { width: 90 });
+        doc.text(data.totalAmount, sumX + 90, y, { width: 70, align: 'right' });
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  /**
+   * Generate an EOD Bank Deposit Slip PDF buffer
+   */
+  async generateDepositSlip(data: DepositSlipData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margin: 40,
+          info: {
+            Title: `Bank Deposit Slip - ${data.date}`,
+            Author: 'NeoBus ERP',
+            Creator: 'NeoBus ERP',
+          },
+        });
+
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+
+        doc.fontSize(18).font('Helvetica-Bold').text('DAILY BANK DEPOSIT SLIP', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.siteName, 40, y);
+        y += 14;
+        doc.fontSize(9).font('Helvetica').text(`Deposit Date: ${data.date} | Handovers Reconciled: ${data.handoversCount}`, 40, y);
+        y += 20;
+
+        // Cash summary
+        doc.rect(40, y, pageWidth, 40).fill('#f8f9fa');
+        doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
+        doc.text('Cash Deposit Summary', 50, y + 8);
+        doc.font('Helvetica').fontSize(9);
+        doc.text(`Total Physical Cash Collected: INR ${data.cashAmount}`, 50, y + 24);
+        y += 50;
+
+        // Cheques
+        doc.font('Helvetica-Bold').fontSize(11).text('Cheques Included in Deposit', 40, y);
+        y += 16;
+
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Sr.', 42, y + 5, { width: 25 });
+        doc.text('Cheque No.', 70, y + 5, { width: 80 });
+        doc.text('Bank Name', 155, y + 5, { width: 140 });
+        doc.text('Cheque Date', 300, y + 5, { width: 80 });
+        doc.text('Amount (INR)', 385, y + 5, { width: 125, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        if (data.cheques.length === 0) {
+          doc.text('No cheques deposited for this date.', 42, y + 4);
+          y += 18;
+        } else {
+          data.cheques.forEach((c, idx) => {
+            if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+            doc.fillColor('#000000');
+            doc.text(String(idx + 1), 42, y + 4, { width: 25 });
+            doc.text(c.chequeNo, 70, y + 4, { width: 80 });
+            doc.text(c.bank, 155, y + 4, { width: 140 });
+            doc.text(c.chequeDate, 300, y + 4, { width: 80 });
+            doc.text(c.amount, 385, y + 4, { width: 125, align: 'right' });
+            y += 16;
+          });
+        }
+
+        y += 15;
+        doc.moveTo(40, y).lineTo(40 + pageWidth, y).stroke('#cccccc');
+        y += 10;
+
+        const sumX = 40 + pageWidth - 180;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('Cheque Total:', sumX, y, { width: 90 });
+        doc.text(`INR ${data.chequeTotal}`, sumX + 90, y, { width: 90, align: 'right' });
+        y += 16;
+        doc.text('Grand Total Deposit:', sumX, y, { width: 90 });
+        doc.text(`INR ${data.totalDeposit}`, sumX + 90, y, { width: 90, align: 'right' });
+        y += 40;
+
+        // Signatures
+        doc.font('Helvetica').fontSize(9).text('Cashier / Depositor Signature', 40, y);
+        doc.text('Bank Teller Signature & Stamp', 40 + pageWidth - 160, y);
+        y += 35;
+        doc.moveTo(40, y).lineTo(180, y).stroke('#000000');
+        doc.moveTo(40 + pageWidth - 160, y).lineTo(40 + pageWidth, y).stroke('#000000');
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 }

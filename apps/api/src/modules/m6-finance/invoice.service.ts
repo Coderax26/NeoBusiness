@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -11,6 +12,7 @@ import { Money } from '../../shared/utils/money.util.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
 import { NOTIFY_PORT } from '../../shared/ports/ports.interface.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 
 /**
  * InvoiceService — Tax invoice generation at dispatch
@@ -28,6 +30,7 @@ export class InvoiceService {
     private readonly docNumber: DocNumberService,
     private readonly config: ConfigService,
     @Inject(NOTIFY_PORT) private readonly notify: any,
+    @Optional() private readonly pdfGenerator?: PdfGeneratorService,
   ) {}
 
   /**
@@ -281,6 +284,82 @@ export class InvoiceService {
     if (status) query = query.andWhere('status', status);
 
     return query.select('*');
+  }
+
+  /**
+   * List invoices with filters and pagination
+   */
+  async listInvoices(options: {
+    siteId?: string;
+    customerId?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    let query = this.knex('invoices');
+    if (options.siteId) query = query.where('site_id', options.siteId);
+    if (options.customerId) query = query.where('customer_id', options.customerId);
+    if (options.status) query = query.where('status', options.status);
+    if (options.fromDate) query = query.where('invoice_date', '>=', options.fromDate);
+    if (options.toDate) query = query.where('invoice_date', '<=', options.toDate);
+
+    const countRow = await query.clone().count<{ count: string }>('id as count').first();
+    const limit = options.limit ?? 50;
+    const offset = options.offset ?? 0;
+    const items = await query
+      .orderBy('invoice_date', 'desc')
+      .limit(limit)
+      .offset(offset)
+      .select('*');
+
+    return {
+      items,
+      total: Number(countRow?.count ?? 0),
+      limit,
+      offset,
+    };
+  }
+
+  /**
+   * Generate Invoice PDF
+   */
+  async getInvoicePdf(invoiceId: string): Promise<Buffer> {
+    const inv = await this.getInvoice(invoiceId);
+    const customer = await this.knex('customers').where('id', inv.customer_id).first('*');
+    const site = await this.knex('sites').where('id', inv.site_id).first('*');
+
+    const pdfGen = this.pdfGenerator ?? new PdfGeneratorService();
+    return pdfGen.generateInvoice({
+      invoiceNo: inv.invoice_no,
+      invoiceDate: new Date(inv.invoice_date).toLocaleDateString('en-IN'),
+      dueDate: new Date(inv.due_date).toLocaleDateString('en-IN'),
+      customerName: customer?.name || customer?.business_name || 'Customer',
+      customerAddress: customer?.billing_address,
+      customerGstin: customer?.gstin,
+      customerStateCode: customer?.state_code,
+      placeOfSupplyStateCode: inv.place_of_supply_state_code,
+      siteName: site?.name || 'NeoBus Depot',
+      siteAddress: site?.address,
+      siteGstin: site?.gstin,
+      siteStateCode: site?.site_type,
+      lines: (inv.lines || []).map((l: any) => ({
+        itemName: l.itemName || l.item_id,
+        hsnCode: l.hsn_code,
+        qty: String(l.qty),
+        unitPrice: String(l.unit_price),
+        lineTotal: String(l.line_total),
+        taxRatePct: String(l.tax_rate_pct || '0'),
+        taxAmount: String(l.tax_amount || '0'),
+      })),
+      taxableAmount: String(inv.taxable_amount || inv.total_amount),
+      cgst: String(inv.cgst || '0.00'),
+      sgst: String(inv.sgst || '0.00'),
+      igst: String(inv.igst || '0.00'),
+      totalAmount: String(inv.total_amount),
+      isCOD: Boolean(inv.is_cod),
+    });
   }
 
   /**

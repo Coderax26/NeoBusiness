@@ -22,6 +22,7 @@ import {
   TallyExportProvider,
 } from './tally-export.service.js';
 import { ChequeService, ChequeProvider } from './cheque.service.js';
+import { OpeningBalanceService } from './opening-balance.service.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import {
   LEDGER_PORT,
@@ -32,9 +33,34 @@ import type { ExceptionPort } from '../../shared/ports/ports.interface.js';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 
+import { InvoiceController } from './invoice.controller.js';
+import { CollectionController } from './collection.controller.js';
+import { CustomerLedgerController } from './customer-ledger.controller.js';
+import { HandoverController } from './handover.controller.js';
+import { ChequeController } from './cheque.controller.js';
+import { PtpController } from './ptp.controller.js';
+import { EodController } from './eod.controller.js';
+import { CreditNoteController } from './credit-note.controller.js';
+import { CodSettlementController } from './cod-settlement.controller.js';
+import { TallyExportController } from './tally-export.controller.js';
+import { OpeningBalanceController } from './opening-balance.controller.js';
+
 @Global()
 @Module({
   imports: [ScheduleModule.forRoot(), KnexModule],
+  controllers: [
+    InvoiceController,
+    CollectionController,
+    CustomerLedgerController,
+    HandoverController,
+    ChequeController,
+    PtpController,
+    EodController,
+    CreditNoteController,
+    CodSettlementController,
+    TallyExportController,
+    OpeningBalanceController,
+  ],
   providers: [
     InvoiceService,
     CollectionService,
@@ -48,6 +74,7 @@ import type { Knex } from 'knex';
     CodSettlementService,
     TallyExportService,
     ChequeService,
+    OpeningBalanceService,
     DocNumberService,
     {
       provide: LEDGER_PORT,
@@ -72,6 +99,7 @@ import type { Knex } from 'knex';
     CodSettlementService,
     TallyExportService,
     ChequeService,
+    OpeningBalanceService,
     LEDGER_PORT,
     CREDIT_PORT,
   ],

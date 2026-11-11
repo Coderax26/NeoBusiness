@@ -295,6 +295,41 @@ export class HandoverService {
   }
 
   /**
+   * List handovers with filters and pagination
+   */
+  async listHandovers(options: {
+    siteId?: string;
+    status?: string;
+    handedByUserId?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    let query = this.knex('cash_handovers')
+      .leftJoin('users as h', 'cash_handovers.handed_by_user_id', 'h.id')
+      .leftJoin('users as r', 'cash_handovers.received_by_user_id', 'r.id');
+
+    if (options.siteId) query = query.where('cash_handovers.site_id', options.siteId);
+    if (options.status) query = query.where('cash_handovers.status', options.status);
+    if (options.handedByUserId) query = query.where('cash_handovers.handed_by_user_id', options.handedByUserId);
+
+    const countRow = await query.clone().count<{ count: string }>('cash_handovers.id as count').first();
+    const limit = options.limit ?? 50;
+    const offset = options.offset ?? 0;
+    const items = await query
+      .select('cash_handovers.*', 'h.name as handedByName', 'r.name as receivedByName')
+      .orderBy('cash_handovers.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items,
+      total: Number(countRow?.count ?? 0),
+      limit,
+      offset,
+    };
+  }
+
+  /**
    * Get agent's wallet balance (for mobile My Wallet screen)
    */
   async getAgentWallet(userId: string, siteId: string) {
