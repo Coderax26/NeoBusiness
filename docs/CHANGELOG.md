@@ -409,6 +409,95 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.6.0] — 2026-11-11 — Phase P1 Complete: Backend Contract Completion & Cross-Module Stabilization
+
+### Added
+
+#### Workstream P1.1: M6 Financials HTTP API Layer
+- **Response Envelope**: Standardized `{ data, meta?, error? }` response envelope utility (`wrapResponse`) with pagination metadata.
+- **DTO Suite (11 files)**: Type-safe, validated request DTOs under `modules/m6-finance/dto/` for invoices, collections, customer ledger/AR, handovers, cheques, PTP promises, EOD checklists, credit notes, COD settlements, Tally batches, and opening balances.
+- **Controller Layer (11 controllers)**:
+  - `InvoiceController` (`/invoices`): List invoices, get details, download generated Tax Invoice PDF.
+  - `CollectionController` (`/collections`, `/me/collections`): Record cash/cheque receipt, allocate to invoices, idempotent replay.
+  - `CustomerLedgerController` (`/customers/:id/ledger`, `/customers/:id/ar-balance`, `/finance/ar/*`, `/me/worklist`): Balance retrieval, AR aging breakdown, open invoices, worklist outcomes.
+  - `HandoverController` (`/me/wallet`, `/custody/*`, `/handovers/*`): Driver wallet balance, initiate handover, cashier verify/dispute, variance escalation.
+  - `ChequeController` (`/cheques/*`): Register, deposit, mark cleared, bounce with follow-up, list cheques by status.
+  - `PtpController` (`/ptp/*`): Create promise, record follow-up, query due and broken promises.
+  - `EodController` (`/eod/*`): Start EOD, evaluate 4-point checklist, owner sign-off, download deposit slip PDF.
+  - `CreditNoteController` (`/credit-notes/*`): Request, approve, reject, post to customer ledger, list credit notes.
+  - `CodSettlementController` (`/cod-settlements/*`): List pending COD stops, settle driver wallet, get settlement status.
+  - `TallyExportController` (`/tally/*`): Create XML export batch, inspect status, download Tally Prime XML.
+  - `OpeningBalanceController` (`/finance/opening-balances/*`): Download CSV template, draft import validation, accountant sign-off, commit, and reversal.
+- **Services & Enhancements**:
+  - `OpeningBalanceService`: Full lifecycle implementation (`DRAFT → SIGNED_OFF → IMPORTED → REVERSED`).
+  - `LedgerService`: Added `allocateReceipt`, `getOpenInvoices`, and `getArAging` methods.
+  - `InvoiceService`: Added `listInvoices` and `getInvoicePdf` methods.
+  - `CollectionService`: Added `listReceipts` method.
+  - `HandoverService`: Added `listHandovers` method.
+  - `CodSettlementService`: Added `listPendingCodStops`, `settleStopById`, and `getSettlement` methods.
+  - `CreditNoteService`: Added customer-filtered listing support.
+- **Security & Auditing**:
+  - Added `@RequirePermission(...)` and `@UseGuards(JwtAuthGuard, RbacGuard)` across all endpoints.
+  - Added `@UseInterceptors(AuditInterceptor)` on all state mutations.
+
+#### Workstream P1.2: M2 Procurement Completion
+- **Supplier Bill DTO & Controller**:
+  - Created `SupplierBillDto` (`create`, `approve`, `reject`, `query`).
+  - Created `SupplierBillController` (`/procurement/supplier-bills`): Submit bills, 3-way match validation (PO vs. GRN vs. Bill), approval, rejection, and queries.
+- **Supplier Maintenance Scheduled Job**:
+  - Created `SupplierMaintenanceJob` running nightly for supplier fill rate and reliability score updates, plus daily stale rate quote alerts.
+- **ProcurementPort Verification**: Verified real `ProcurementPort` implementation in all consumer modules.
+
+#### Workstream P1.4: M4 Production Completion
+- **ProductionPort Implementation**:
+  - Implemented `ProductionPortService` binding `createRequisition` (via `RequisitionService`) and `workOrderStatus` (via `WorkOrderService`).
+  - Registered `PRODUCTION_PORT` provider in `m4-production.module.ts`.
+  - Enabled `M4ProductionModule` in `app.module.ts`.
+
+#### Workstream P1.5: M5 Operational Artifacts
+- **Delivery Challan PDF Generation**:
+  - Added `generateChallanPdf` and `getChallanPdf` in `FleetService`.
+  - Added `GET trips/:tripId/stops/:stopId/challan/pdf` endpoint in `FleetController`.
+  - Enhanced `PdfGeneratorService.generateChallan` with optional `ewayBillNo` rendering.
+- **E-Way Bill Handling**: Supported `ewayBillNo` persistence in `delivery_challans` and inclusion on PDF documents.
+
+#### Workstream P1.6: M6 Operational Artifacts & Cross-Module Integration
+- **Tax Invoice PDF**: Implemented `generateInvoice` in `PdfGeneratorService` and exposed `GET invoices/:id/pdf`.
+- **EOD Deposit Slip PDF**: Implemented `generateDepositSlip` in `PdfGeneratorService` and exposed `GET eod/closings/:id/deposit-slip/pdf`.
+- **Cross-Module Events**:
+  - Verified `trip.dispatched` triggers automatic tax invoice generation for all loaded orders.
+  - Verified `trip.closed` triggers COD driver wallet settlement.
+  - Verified partial delivery creates DRAFT credit notes with line returned quantities.
+
+#### Workstream P1.7: M7b Dashboards & Integrations
+- Verified materialized view refresh schedules and concurrent refresh safety (`CONCURRENTLY`).
+- Verified AR aging bucket logic and event synchronization (`order.confirmed`, `grn.posted`).
+- Verified KPI query endpoints and dashboard status matrices.
+
+### Fixed
+- **Test Database Concurrency**: Added `fileParallelism: false` in `vitest.config.ts` to execute test suites sequentially against `neobus_test`, eliminating PostgreSQL table truncation deadlocks between parallel worker threads.
+- **Knex Outbox Transactions**: Ensured background scheduled jobs wrap event emissions in explicit database transactions (`knex.transaction(async (trx) => ...)`).
+
+### Verification
+- **Full Test Suite Passing**: 22/22 test files passed, 279/279 tests passed (0 failures).
+- **TypeScript Compilation**: `npm --prefix apps/api run build` compiles with 0 errors.
+- **End-to-End Scenarios**: Scenarios A, B, C, D, E, F verified against real services and domain events.
+- **Port Contracts**: All 9 ports (`PricingPort`, `ItemPort`, `CreditPort`, `ExceptionPort`, `NotifyPort`, `LedgerPort`, `InventoryPort`, `ProcurementPort`, `ProductionPort`) are now backed by real module implementations.
+
+### Module Status Updated
+- M0 Platform Foundation: ✅ Complete
+- M1 Commercial & CRM: ✅ Complete
+- M2 Procurement: ✅ Complete (Full bill lifecycle, API, maintenance job, ProcurementPort)
+- M3 Inventory: ✅ Complete (ATP/FEFO, transfers, append-only reversals, isolated tests)
+- M4 Production: ✅ Complete (BOM, work orders, wastage, ProductionPort wired)
+- M5 Fleet & Delivery: ✅ Complete (Trips, ePOD, challan PDF, e-way bill reference)
+- M6 Finance & Collections: ✅ Complete (11 HTTP controllers, DTOs, PDFs, opening balances, event integration)
+- M7a Exception Engine: ✅ Complete
+- M7b Dashboards & Analytics: ✅ Complete
+- Next Phase: Phase P2 (Business Decisions and Requirements Closure)
+
+---
+
 ## [0.5.2] — 2026-11-10 — M7b Dashboards & Analytics Complete
 
 ### Added

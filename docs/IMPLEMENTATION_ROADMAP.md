@@ -219,27 +219,28 @@
 - [x] M4 acceptance tests (items 1–9 from M4 §10) including Scenario F end-to-end
 
 #### M2 Procurement and Supplier
-- [ ] Migration: all M2 tables
-- [ ] PO service with BR-03 (price spike detection)
-- [ ] Link GRN to PO; update received_qty; shortfall detection (BR-05)
-- [ ] Backup supplier ranking service
-- [ ] Back-to-back PO generator with trading spread
-- [ ] Supplier performance job (fill rate, lead time, reliability score)
-- [ ] ProcurementPort (replaces manual landed cost in M1)
-- [ ] M2 acceptance tests (items 1–8 from M2 §10) including Scenarios B and C end-to-end
+- [x] Migration: all M2 tables (021, 026, 027)
+- [x] PO service with BR-03 (price spike detection)
+- [x] Link GRN to PO; update received_qty; shortfall detection (BR-05)
+- [x] Backup supplier ranking service
+- [x] Back-to-back PO generator with trading spread
+- [x] Supplier performance job (fill rate, lead time, reliability score)
+- [x] ProcurementPort (replaces manual landed cost in M1)
+- [x] Supplier bill lifecycle, DTO, and controller (`/procurement/supplier-bills`)
+- [x] M2 acceptance tests (items 1–8 from M2 §10) including Scenarios B and C end-to-end
 
 #### M7b Dashboards and Analytics
-- [ ] Materialised views: mv_pulse_today, mv_ops_status, mv_customer_profitability, mv_supplier_scorecard, mv_yield_trend, mv_ar_aging
-- [ ] Refresh jobs (pulse every 30-60s via SSE; analytics nightly)
-- [ ] Live Pulse Header API + SSE channel
-- [ ] Operational Status Matrix API
-- [ ] Strategic analytics endpoints (customer profitability, supplier fill-rate, yield trend, AR aging)
-- [ ] EOD reconciliation view for owner
+- [x] Materialised views: mv_pulse_today, mv_ops_status, mv_customer_profitability, mv_supplier_scorecard, mv_yield_trend, mv_ar_aging
+- [x] Refresh jobs (pulse every 30-60s; analytics nightly)
+- [x] Live Pulse Header API
+- [x] Operational Status Matrix API
+- [x] Strategic analytics endpoints (customer profitability, supplier fill-rate, yield trend, AR aging)
+- [x] EOD reconciliation view for owner
 - [ ] WhatsApp BSP integration (templates, opt-ins, SMS fallback)
-- [ ] Audit trail viewer
+- [ ] Audit trail viewer UI
 - [ ] Policy and threshold settings UI
-- [ ] KPI query endpoints + weekly audit job
-- [ ] M7b acceptance tests (items 5–10 from M7 §10) including Scenarios A, B, C end-to-end
+- [x] KPI query endpoints + weekly audit job
+- [x] M7b acceptance tests (items 5–10 from M7 §10) including Scenarios A, B, C end-to-end
 
 **Sprint 3 completion criteria:**
 - Factory Production Manager works entirely from the tablet with no phone calls to Mr. X for routine batches

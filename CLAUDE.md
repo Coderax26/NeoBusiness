@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Last synced with:** `CHANGELOG.md` through **v0.5.0 (2026-11-06)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
-> Updated **2026-11-06** with M6 Part 2 completion (Accounting bridge, M5 integration).  
+> **Last synced with:** `CHANGELOG.md` through **v0.6.0 (2026-11-11)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
+> Updated **2026-11-11** with Phase P1 completion (M6 HTTP API layer, M2/M4 port integration, operational artifacts, full test pass).  
 > When a module ships, a migration lands or a convention changes, update the matching section here in the same PR.
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
@@ -113,14 +113,14 @@ NeoBusinessSolution/
 | M0 — Platform Foundation | ✅ Complete | Auth (JWT), RBAC, RLS, audit, config, doc-seq, idempotency, outbox |
 | M7a — Exception Engine | ✅ Complete | Exception approvals (12 types, delegation + escalation) + notification hub |
 | M1 — Commercial & CRM | ✅ Complete | Customers, items, pricing (BR-01), credit (BR-02), quotes, orders. Scenario A verified |
-| M6 — Finance & Collections | ✅ Complete (part 2) | Invoices (BR-03), collections + custody (BR-07), ledger, handover, PTP, EOD, worklist, credit notes, COD settlement, Tally export, cheque lifecycle. Scenario E verified |
-| M2 — Procurement | ✅ Complete | Suppliers, POs, GRN, shortfall, requisitions, price tracking, back-to-back, 26 acceptance tests passing |
-| M3 — Inventory | ✅ Complete (backend) | Unified transactional ledger/cache posting, append-only reversals, ATP/FEFO/reservations, GRN, transfers, adjustments, expiry/drift/stale jobs, typed event adapters, DTO/API surfaces, RLS-ready HTTP fixtures, and service/acceptance/e2e/concurrency coverage are implemented and passing. M5 vehicle-location behavior and frontend screens remain deferred to their owning modules. |
-| M4 — Production | ✅ Complete | BOM, work orders, yield, wastage, attendance |
-| M5 — Fleet & Delivery | ✅ Complete | Full backend with event integration (trips.dispatched/closed), COD settlement, credit notes, ePOD, BR-08 closure |
-| M7b — Dashboards | ✅ Complete (part 3) | Pulse, Status Matrix, EOD, KPIs, Analytics (40 acceptance tests, materialized views) |
+| M6 — Finance & Collections | ✅ Complete | Invoices (BR-03), collections + custody (BR-07), ledger, handover, PTP, EOD, worklist, credit notes, COD settlement, Tally export, cheque lifecycle, 11 HTTP controllers & DTOs, Tax Invoice & Deposit Slip PDFs, Opening Balance CSV import. Scenario E verified |
+| M2 — Procurement | ✅ Complete | Suppliers, POs, GRN, shortfall, requisitions, price tracking, back-to-back, supplier bill lifecycle & controller, nightly maintenance jobs, ProcurementPort real |
+| M3 — Inventory | ✅ Complete | Unified transactional ledger/cache posting, append-only reversals, ATP/FEFO/reservations, GRN, transfers, adjustments, expiry/drift/stale jobs, typed event adapters, DTO/API surfaces, RLS-ready HTTP fixtures, sequential test isolation (37 tests passing) |
+| M4 — Production | ✅ Complete | BOM, work orders, yield, wastage, attendance, ProductionPortService real provider enabled in app.module.ts |
+| M5 — Fleet & Delivery | ✅ Complete | Full backend with event integration (trips.dispatched/closed), COD settlement, credit notes, ePOD, BR-08 closure, challan PDF generation & endpoint, e-way bill reference |
+| M7b — Dashboards | ✅ Complete | Pulse, Status Matrix, EOD, KPIs, Analytics (40 acceptance tests, 7 materialized views, event-driven refresh) |
 
-**Next module:** M2 Procurement — per `docs/IMPLEMENTATION_ROADMAP.md` Sprint 3
+**Next phase:** Phase P2 — Business Decisions and Requirements Closure (`docs/Copilot/03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md`)
 
 **Known follow-up:** M1's `CreditService` BR-02 overdue check was wired to M6's ledger in v0.5.0.
 
@@ -130,13 +130,13 @@ NeoBusinessSolution/
 |--------|-----------|
 | M0 | 001–004 (e.g. `20261021_001_m0_platform_foundation.sql`) |
 | M7a | 005 |
-| M1 | 006 (11 tables) |
-| M6 | 007, 008, 019, 020 (includes `cashbook_entries`, `tally_export_batches`, `tally_export_items`) |
-| M3 | 009 (`20261027_008_m3_inventory_baseline.sql` — `inventory_batches`, `stock_ledger_txns`, `stock_reservations`, `stock_transfers`, `stock_transfer_lines`, `stock_adjustments`) |
-| M4 | 018 |
-| M5 | 014–015, 017, 019 (includes `delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_command_queue`) |
-| M2 | 021 (`20261107_021_m2_procurement_baseline.sql` — `suppliers`, `supplier_items`, `supplier_rate_quotes`, `rate_contracts`, `purchase_requisitions`, `purchase_orders`, `purchase_order_lines`, `goods_receipts`, `goods_receipt_lines`, `po_shortfalls`, `supplier_bills`) |
-| M7b | 022, 023, 024 (materialized views, dashboard permissions, AR aging fix) |
+| M1 | 006, 021 (`20261110_021_m1_add_min_stock_qty.sql`) |
+| M6 | 007, 008, 009, 016, 019, 020 (includes `cashbook_entries`, `worklist`, `credit_notes`, `tally_export_batches`, `cheques`) |
+| M3 | 008, 010, 011, 012, 013 (`inventory_batches`, `stock_ledger_txns`, `stock_reservations`, `stock_transfers`, `stock_adjustments`, append-only ledger) |
+| M4 | 018 (`20261103_018_m4_production_baseline.sql`) |
+| M5 | 014, 015, 017 (`delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_command_queue`) |
+| M2 | 021, 026, 027 (`20261107_021_m2_procurement_baseline.sql`, `20261111_026_m2_supplier_bill_full_schema.sql`, `20261111_027_m2_supplier_bill_status_and_ar_aging.sql`) |
+| M7b | 022, 023, 024, 028 (materialized views, dashboard permissions, AR aging fix, concurrent refresh fix) |
 
 Always list `db/migrations/` to find the latest sequence number before creating a new migration.
 
@@ -148,14 +148,16 @@ Always list `db/migrations/` to find the latest sequence number before creating 
 
 Modules **never import each other's services directly**. Cross-module communication goes strictly through port interfaces defined in `apps/api/src/shared/ports/ports.interface.ts`, injected via NestJS DI symbols.
 
-There are 9 ports. Stubs live in `port-stubs.ts` and return safe/permissive defaults. When a module is built, replace its stub with the real implementation in the module's `providers` array — consumers only know the token, so they keep working unchanged.
+All 9 ports are backed by **real module implementations** (no stubs used in production paths):
 
-| Port | Status |
-|------|--------|
-| `PricingPort`, `ItemPort`, `CreditPort` | Real — M1 (exported globally via `@Global() M1CommercialModule`) |
-| `ExceptionPort`, `NotifyPort` | Real — M7a |
-| `LedgerPort` | Real — M6 (`LedgerService`) |
-| `InventoryPort`, `ProcurementPort`, `ProductionPort` | Stub — until M3, M2, M4 ship |
+| Port | Status | Implementation |
+|------|--------|----------------|
+| `PricingPort`, `ItemPort`, `CreditPort` | Real — M1 | Exported globally via `@Global() M1CommercialModule` |
+| `ExceptionPort`, `NotifyPort` | Real — M7a | `ExceptionService`, `NotificationService` |
+| `LedgerPort` | Real — M6 | `LedgerService` |
+| `InventoryPort` | Real — M3 | `InventoryService` |
+| `ProcurementPort` | Real — M2 | `ProcurementService` |
+| `ProductionPort` | Real — M4 | `ProductionPortService` |
 
 ```typescript
 // CORRECT — module uses a port token

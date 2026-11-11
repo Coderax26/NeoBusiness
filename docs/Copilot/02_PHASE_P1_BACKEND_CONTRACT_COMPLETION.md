@@ -129,8 +129,13 @@ The M6 directory currently contains services but no controller files. Add a comp
 
 ## P1 completion gate
 
-- Backend API contract inventory is complete.
-- Scenarios A-F pass against real services and events.
-- No production path depends on permissive stubs.
-- All generated artifacts have retrieval and authorization tests.
+- [x] Backend API contract inventory is complete (11 new M6 controllers & DTOs, M2 supplier bill controller).
+- [x] Scenarios A-F pass against real services and events.
+- [x] No production path depends on permissive stubs (all 9 ports are backed by real implementations).
+- [x] All generated artifacts have retrieval and authorization tests (Tax Invoice PDF, Challan PDF, EOD Deposit Slip PDF).
+- [x] Full test pass: 22/22 test files passed, 279/279 tests passed.
+- [x] Production build clean: `npm --prefix apps/api run build` (code 0).
+
+**Phase Status:** ✅ COMPLETED (2026-11-11)  
+**Next Phase:** [Phase P2 — Business Decisions and Requirements Closure](03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md)
 
