@@ -57,10 +57,14 @@ export class ConfigService implements OnModuleInit {
     }
 
     // Parse JSON value
-    const value =
-      typeof row.value_json === 'string'
-        ? JSON.parse(row.value_json)
-        : row.value_json;
+    let value = row.value_json;
+    if (typeof value === 'string') {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        // Value is already a raw string
+      }
+    }
 
     // Cache it
     this.cache.set(cacheKey, {

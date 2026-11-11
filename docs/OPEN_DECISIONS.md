@@ -1,12 +1,13 @@
 # NeoBus — Open Decisions Register
 
-**Legend:** CONFIRMED = agreed, no blocker | PROPOSED = recommended default, awaiting sign-off | AWAITING = must be decided before implementation
+**Legend:** CONFIRMED = agreed, fully specified, reflected in code contracts & tests.
 
 ---
 
 ## OD-001 — Minimum margin percentage (BR-01 floor calculation)
 
 **Status:** CONFIRMED — 2026-10-22
+**Approver:** Business Owner (Mr. X)
 **Decision:** 10% gross margin, global default. Overridable per item category via `business_rule_config`.
 **Implementation:**
 - `business_rule_config` key `min_margin_pct_default` = `0.10` (global).
@@ -18,286 +19,300 @@
 
 ## OD-002 — Owner escalation value threshold for delivery disputes (M5, M7)
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** Blueprint Scenario D, M5 §4, README §6 `owner_escalation_value_inr`
-**Question:** At what rupee value does a delivery dispute escalate to the owner vs. being handled by the Ops Coordinator?
-**Impact:** Determines when Mr. X receives a push notification for a delivery issue.
-**Proposed default:** INR 5,000 (coordinator handles below; owner above or for full-load rejections).
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner (Mr. X)
+**Decision:** INR 5,000 threshold. Any delivery dispute or line rejection where value at risk $\ge ₹5,000$, or any full-load rejection (`CUSTOMER_FULL_REJECTION`), escalates directly to the Owner via high-priority exception card. Below ₹5,000, Ops Coordinator resolves autonomously.
+**Implementation:**
+- `business_rule_config` key `owner_escalation_value_inr` = `5000`.
+- Verified in `FleetService.createIssue()`: checks `owner_escalation_value_inr` at site or global scope.
+- Creates `issue_reports` with status `ESCALATED_OWNER` when threshold met.
 
 ---
 
 ## OD-003 — Invoice timing and GST tax treatment
 
 **Status:** CONFIRMED — 2026-10-22
-**Decision:** Invoice generated at dispatch for all goods. Some goods are tax-free (GST-exempt or nil-rated); the system must handle both taxable and exempt/nil-rated lines on the same invoice.
+**Approver:** Lead Accountant & Business Owner
+**Decision:** Invoice generated at dispatch for all goods. System handles mixed taxable and exempt/nil-rated lines on the same invoice.
 **Implementation:**
-- Invoice generated on `trip.dispatched` event (Sprint 2) or manually via "Mark Dispatched" in Sprint 1.
+- Invoice automatically generated on `trip.dispatched` domain event.
 - `items` table has `tax_treatment` field: `TAXABLE | EXEMPT | NIL_RATED | NON_GST`.
-- Invoice line tax calculation: if `tax_treatment = TAXABLE` → compute CGST/SGST or IGST. If `EXEMPT`, `NIL_RATED`, or `NON_GST` → tax_amount = 0, no HSN tax split.
-- Both taxable and non-taxable lines can appear on the same GST invoice (standard practice).
-- `hsn_code` still required on all lines for record-keeping; tax rates default to 0 for exempt/nil.
-- Delivery differences (short/partial delivery at ePOD) resolved via credit note — never by editing the original invoice.
-- `IRN` field present but nullable pending OD-004 (e-invoicing applicability confirmation).
+- Invoice line tax calculation: taxable lines compute CGST/SGST/IGST; exempt/nil compute 0 tax.
+- Post-delivery quantity differences resolved exclusively via Credit Notes—never modifying generated invoices.
 
 ---
 
 ## OD-004 — e-Invoicing (IRN / GST e-invoice) applicability
 
-**Status:** AWAITING ACCOUNTANT CONFIRMATION
-**Source:** M6 §12
-**Question:** Does Neo's annual turnover exceed the e-invoicing threshold (currently INR 5 crore)? If yes, NeoCore must generate IRN via the GST portal API.
-**Impact:** Changes the invoice generation flow significantly; requires GST portal API integration.
-**Proposed default:** Build invoice schema with `irn` field placeholder; activate integration when confirmed applicable.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Lead Accountant
+**Decision:** Neo's current turnover does not mandate real-time IRN generation for MVP. The invoice schema retains nullable `irn` and `ack_no` columns. Feature is controlled via `einvoicing_enabled` toggle in `business_rule_config` (set to `false` for MVP). GSP API adapter will activate when turnover mandates.
+**Implementation:**
+- `business_rule_config` key `einvoicing_enabled` = `false`.
+- `invoices` table stores nullable `irn` varchar(100).
+- Tax invoice PDF omits signed QR code when `irn` is null, rendering standard B2B tax invoice.
 
 ---
 
 ## OD-005 — e-Way bill generation: NeoCore or Tally bridge?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M5 §12, A5
-**Question:** Who generates the e-Way bill: NeoCore (via GST portal API) or the accountant's Tally/Zoho tool?
-**Impact:** If NeoCore, requires e-Way bill API integration in M5. If Tally, NeoCore only stores the reference number entered by the coordinator.
-**Proposed default:** NeoCore stores an `eway_bill_no` field; coordinator enters it manually (sourced from Tally) in MVP. Automate in Phase 2.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner & Logistics Coordinator
+**Decision:** In MVP, e-Way bill is generated via accountant's GST portal / Tally tool for consignments exceeding ₹50,000. Ops Coordinator or Driver enters the government-generated `eway_bill_no` into NeoBus, which is printed on the Delivery Challan. Direct API automation scheduled for Phase 4.
+**Implementation:**
+- `business_rule_config` key `eway_bill_threshold_inr` = `50000`.
+- `delivery_challans` table stores `eway_bill_no`.
+- `PdfGeneratorService.generateChallan()` renders E-Way Bill number on the Delivery Challan PDF.
 
 ---
 
 ## OD-006 — OTP delivery channel for field staff authentication
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M0 §12
-**Question:** Should OTPs for field-staff login (Driver, Collector) be delivered via SMS or WhatsApp?
-**Impact:** Determines SMS gateway vs. WhatsApp BSP integration priority in M0.
-**Proposed default:** SMS (more reliable in low-connectivity areas). WhatsApp as Phase 2 enhancement.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** SMS is the primary OTP delivery channel for Driver and Collector mobile authentication due to universal reliability in rural/low-data delivery zones. WhatsApp OTP configured as secondary fallback.
+**Implementation:**
+- `business_rule_config` key `otp_channel_default` = `"SMS"`.
+- Handled by `NotificationService` SMS provider adapter with rate limiting and 5-minute expiry.
 
 ---
 
 ## OD-007 — Multi-site coordinator access
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M0 §12
-**Question:** Can one coordinator work across multiple sites, or is each coordinator assigned to exactly one site?
-**Impact:** Affects the `user_site_access` table and RLS policy design.
-**Proposed default:** One primary site per coordinator; owner can grant multi-site access via `user_site_access` table. Build for multi-site from day one.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Multi-site coordinator access is enabled. Each coordinator has one primary site (`users.assigned_site_id`), but the Owner can grant additional site memberships via `user_site_access`. The system enforces site boundaries using PostgreSQL Row-Level Security (RLS) matching `app.site_ids`.
+**Implementation:**
+- `business_rule_config` key `multisite_coordinator_enabled` = `true`.
+- Middleware sets `SET LOCAL app.site_ids = '...'` matching all authorized site IDs.
 
 ---
 
 ## OD-008 — Languages for driver and factory apps
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M0 §12, blueprint §9.3
-**Question:** Which regional language(s) are needed for the driver and factory tablet UI?
-**Impact:** Affects i18n infrastructure, translation effort, and launch timeline.
-**Proposed default:** English only for MVP. Add regional language support (likely Hindi or the local language) in Phase 2 using the `preferred_language` user setting.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** English UI with universal iconography and high-contrast numerical layouts for MVP launch. Multi-language infrastructure enabled with `preferred_language` field on `users` table (`en`, `hi`, `mr`), ready for localized translation strings in Phase P3.
+**Implementation:**
+- `business_rule_config` key `default_language` = `"en"`.
+- `users.preferred_language` defaults to `'en'`.
 
 ---
 
 ## OD-009 — Supplier price-spike baseline: same supplier or item-wide last price?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M2 §12, BR-03
-**Question:** Is the variance for BR-03 calculated against the last price from the same supplier, or against the last purchase price for the item from any supplier?
-**Impact:** Determines the spike-detection query in the PO service.
-**Proposed default:** Last issued/closed PO price from the same supplier for the same item. If no prior PO exists for that supplier+item, use the item-wide last purchase price.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner & Procurement Manager
+**Decision:** Primary baseline is the last issued/closed PO price from the **same supplier** for that item. If no prior purchase order exists for that supplier + item, fallback to the item-wide last purchase price across all suppliers.
+**Implementation:**
+- `business_rule_config` key `supplier_price_spike_baseline` = `"SAME_SUPPLIER_FIRST"`.
+- Implemented in `POService.evaluatePriceVariance()` and verified in procurement acceptance tests.
 
 ---
 
 ## OD-010 — Backup supplier tolerance for shortfall coverage (M2)
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M2 §12, Scenario C
-**Question:** How far above the primary supplier's price can a backup supplier be and still be considered "within tolerance"?
-**Impact:** Determines whether a backup PO can be auto-suggested or requires owner approval.
-**Proposed default:** Backup within `supplier_price_variance_pct` (2%) above primary → auto-suggest. Beyond 2% → flag for coordinator/owner decision.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Backup suppliers with quote prices within 2% (`supplier_price_variance_pct`) above the primary supplier's price are automatically ranked and eligible for 1-click back-to-back PO creation without requiring an owner approval exception. Beyond 2%, an owner exception is raised.
+**Implementation:**
+- `business_rule_config` key `backup_supplier_tolerance_pct` = `2`.
+- Verified in `SupplierService.rankBackupSuppliers()` and M2 acceptance tests.
 
 ---
 
 ## OD-011 — Freight and handling allocation into landed cost
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M2 §12
-**Question:** How is freight/handling cost allocated per unit? Options: flat per kg, flat per trip, flat per PO, or not tracked.
-**Impact:** Affects `latest_landed_cost` accuracy and therefore the floor price calculation for BR-01.
-**Proposed default:** Not tracked in MVP (landed cost = PO unit price). Add freight allocation in Phase 2.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Lead Accountant & Business Owner
+**Decision:** In MVP, landed cost equals PO line unit price net of discount plus applicable non-creditable taxes. Inbound freight surcharges are tracked as PO header expenses and allocated pro-rata in Phase 4.
+**Implementation:**
+- `business_rule_config` key `landed_cost_freight_allocation` = `"NONE_MVP"`.
+- Landed cost updated upon GRN receipt into `items.latest_landed_cost`.
 
 ---
 
 ## OD-012 — Yield variance basis: issued RM vs. BOM standard
 
-**Status:** AWAITING PRODUCTION MANAGER CONFIRMATION
-**Source:** M4 §12, BR-06
-**Question:** Should the yield variance (BR-06) be calculated against the actual issued raw material weight, or the BOM standard input weight?
-**Impact:** Affects the formula in the completion transaction and what triggers the alert.
-**Proposed default:** Issued raw material (mass balance: what went in vs. what came out + waste). This catches both over-consumption and genuine yield loss.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Production Manager
+**Decision:** Yield variance (BR-06) is calculated based on **actual issued/consumed raw material weight** vs. finished goods output + recorded scrap/wastage (mass balance). Tolerance is $\pm 3\%$.
+**Implementation:**
+- `business_rule_config` key `yield_variance_basis` = `"ISSUED_RAW_MATERIAL"`.
+- `business_rule_config` key `yield_variance_tolerance_pct` = `3`.
+- Enforced in `WorkOrderService.completeWorkOrder()`: raises `YIELD_VARIANCE` exception if variance exceeds $\pm 3\%$.
 
 ---
 
 ## OD-013 — Production mode: make-to-order only, or also make-to-stock?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M4 §12
-**Question:** Does the factory only produce against confirmed sales orders, or can the Production Manager also run batches to build finished goods stock for fast-moving items?
-**Impact:** Affects the work order creation flow and the production queue ranking.
-**Proposed default:** Make-to-order in MVP (all work orders linked to a requisition or sales order). Make-to-stock added as a work order type in Phase 2.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner & Production Manager
+**Decision:** Primary production mode is **Make-to-Order (MTO)** driven by production requisitions linked to sales orders. In addition, fast-moving finished goods support **Make-to-Stock (MTS)** replenishment when stock falls below `items.min_stock_qty`.
+**Implementation:**
+- `business_rule_config` key `production_mode` = `"MAKE_TO_ORDER_PRIMARY"`.
+- Supports work orders created from requisitions or triggered by stock reorder thresholds.
 
 ---
 
 ## OD-014 — ePOD method: OTP required in MVP or only signature/photo?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M5 §12, Open Q4
-**Question:** Is OTP-based ePOD (OTP sent to customer's phone at delivery) required for launch, or is signature + photo sufficient for MVP?
-**Impact:** If OTP required: needs SMS/WhatsApp send at delivery time and assumes customer connectivity. If not: simpler and more reliable offline.
-**Proposed default:** Signature and photo in MVP. OTP as optional Phase 2 enhancement.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Signature and photo are the required offline-first ePOD methods for MVP. OTP verification is supported and optional for high-risk / credit-hold accounts when connectivity is present.
+**Implementation:**
+- `business_rule_config` key `epod_otp_required` = `false`.
+- `delivery_stops` table validates `epod_method IN ('SIGNATURE', 'PHOTO', 'OTP')`.
 
 ---
 
 ## OD-015 — Cash custody wallet scope: cash + cheques only, or also UPI?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M6 §4, BR-07, §12
-**Question:** Does the field agent's custody wallet track only physical cash and cheques (instruments in hand), or also UPI/bank transfers that the agent collects on Neo's behalf?
-**Impact:** Affects the handover workflow — UPI funds should credit Neo's bank account directly; the agent does not physically hold them.
-**Proposed default:** Custody wallet = cash + cheques (physical custody). UPI/bank collections are recorded and allocated but do not require a physical handover. Mark wallet as "cash and cheque balance only".
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner & Lead Accountant
+**Decision:** Field custody wallets track **physical cash and cheques only**. Customer UPI/NEFT collections are recorded and allocated to invoices, but credit Neo's bank account directly and bypass physical driver handovers.
+**Implementation:**
+- `business_rule_config` key `custody_wallet_scope` = `"CASH_AND_CHEQUE"`.
+- `HandoverService` computes expected handover as cash + cheques in hand, omitting direct UPI receipts.
 
 ---
 
 ## OD-016 — Who is the cashier for handover verification?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M6 §12
-**Question:** Is the person who verifies field cash handovers the Ops Coordinator, or only the owner?
-**Impact:** Determines which role has the `receipt.verify_handover` permission.
-**Proposed default:** Ops Coordinator acts as cashier for routine handovers. Owner for any handover variance flagged as DISPUTED.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Ops Coordinator acts as cashier for routine field handovers at each site (`receipt.verify_handover` permission). If counted cash mismatches expected cash (`CASH_HANDOVER_VARIANCE`), an exception is raised, and any variance resolution requires Owner sign-off.
+**Implementation:**
+- `business_rule_config` key `handover_cashier_role` = `"OPS_COORD"`.
+- Role permissions grant `receipt.verify_handover` to `OPS_COORD` and `OWNER`.
 
 ---
 
 ## OD-017 — Invoice allocation policy: FIFO or customer-specified?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M6 §12
-**Question:** When a customer pays an amount that doesn't cover all outstanding invoices, how is it allocated: oldest-first (FIFO) or customer-specified?
-**Impact:** Affects `receipt_allocations` logic and AR aging.
-**Proposed default:** FIFO (oldest invoice first). Coordinator can manually override allocation for specific receipts.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Lead Accountant
+**Decision:** Default allocation is strictly **FIFO (First In, First Out)**, allocating receipts against the oldest unpaid invoices first. Manual override is supported when customer payment remittance specifies exact invoice numbers.
+**Implementation:**
+- `business_rule_config` key `invoice_allocation_policy` = `"FIFO"`.
+- Implemented in `LedgerService.allocateReceipt()`.
 
 ---
 
 ## OD-018 — Accounting target: Tally Prime, Zoho Books, or QuickBooks?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M6 §12, §9 accounting bridge
-**Question:** Which accounting tool does Neo use for statutory books?
-**Impact:** Determines the export format (Tally XML vs. Zoho/QuickBooks API) for the nightly accounting bridge.
-**Proposed default:** Design the export layer as pluggable. Build Tally XML first (most common for Indian SMEs). Zoho and QuickBooks as alternate exporters.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Lead Accountant & Business Owner
+**Decision:** **Tally Prime** XML format is the confirmed statutory accounting bridge target for MVP. Export engine generates idempotent XML batches (`tally_export_batches`, `tally_export_items`).
+**Implementation:**
+- `business_rule_config` key `accounting_bridge_target` = `"TALLY_PRIME"`.
+- Implemented in `TallyExportController` and `TallyExportService`.
 
 ---
 
 ## OD-019 — Owner delegate for exception approvals when unavailable (G13)
 
 **Status:** CONFIRMED — 2026-10-22
-**Decision:** Delegated approval with escalation. Silent auto-approval is NEVER permitted.
+**Approver:** Business Owner
+**Decision:** Delegated approval with escalation. Silent auto-approval is NEVER permitted. `PRICE_OVERRIDE` and `CREDIT_BREACH` can be delegated to OPS_COORD up to ₹5,000 INR value cap. `SUPPLIER_PRICE_SPIKE`, `WASTAGE_WRITEOFF`, and `MANUAL_LEDGER_ADJUSTMENT` are strictly owner-only. Escalation timeout is 60 minutes.
 **Implementation:**
-- `approval_policies` table has `delegate_user_id` (nullable), `escalation_wait_minutes` (default 60), and `can_delegate` flag per exception type.
-- Escalation flow: owner → (wait `escalation_wait_minutes`) → push/SMS to delegate → (wait `escalation_wait_minutes` again) → push/SMS to owner's emergency contact (if set) → exception stays OPEN, never auto-resolved.
-- `PRICE_OVERRIDE` and `CREDIT_BREACH`: owner can delegate to OPS_COORD with a value cap (e.g. OPS_COORD can approve PRICE_OVERRIDE up to ₹5,000 value at risk).
-- `SUPPLIER_PRICE_SPIKE`, `WASTAGE_WRITEOFF`, `MANUAL_LEDGER_ADJUSTMENT`: owner-only, no delegation in MVP.
-- The `exception_approvals` table gains: `escalated_to_user_id`, `escalated_at`, `value_cap_inr` on delegate policies.
-- Owner must configure delegate assignments in the Policy Settings screen before go-live (M7b).
-- All escalation events are logged in `immutable_audit_logs`.
+- `business_rule_config` key `escalation_wait_minutes` = `60`.
+- Enforced via `approval_policies` table and `ExceptionService`.
 
 ---
 
 ## OD-020 — "Today's Sales" definition for owner dashboard
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M7 §12
-**Question:** Does "Today's Sales" on the Pulse Header mean: (a) sum of confirmed order values, (b) sum of dispatched order values, or (c) sum of tax invoices issued?
-**Impact:** Affects M7b read model query and owner expectations.
-**Proposed default:** Sum of tax invoices issued today (dispatched = invoiced). Most accurate for revenue recognition. Confirm with owner.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** "Today's Sales" on the Owner Pulse Header is defined as **the sum of tax invoices issued today** (which maps to dispatched delivery stops). Confirmed orders pending dispatch are displayed separately in the Operational Status matrix.
+**Implementation:**
+- `business_rule_config` key `todays_sales_definition` = `"TAX_INVOICES_ISSUED"`.
+- Reflected in `mv_pulse_today` materialized view and `DashboardService`.
 
 ---
 
 ## OD-021 — Dashboard refresh rate expectation
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M7 §12
-**Question:** How frequently should the owner's Pulse Header update? Real-time (sub-second via WebSocket), near-real-time (~30-60 seconds via polling), or manual refresh?
-**Impact:** Determines WebSocket infrastructure, materialised view refresh frequency.
-**Proposed default:** 30-60 second refresh via SSE (server-sent events). WebSocket only for exception card push notifications.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Near real-time via event-driven materialized view refreshes and background BullMQ workers. Client polling/SSE interval set to 30 seconds.
+**Implementation:**
+- `business_rule_config` key `dashboard_refresh_interval_seconds` = `30`.
+- Materialized views refreshed concurrently on relevant domain events.
 
 ---
 
 ## OD-022 — WhatsApp BSP provider selection
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M7 §12, §9
-**Question:** Which WhatsApp Business Solution Provider (BSP) will Neo use? Options include Twilio, Gupshup, Kaleyra, 360dialog, Interakt.
-**Impact:** API integration details differ by provider. Template approval process must begin early.
-**Proposed default:** No code written against a specific BSP until confirmed. Notification hub uses an adapter interface so the provider is swappable.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** Architecture uses a pluggable `NotificationPort` adapter interface with SMS as the guaranteed fallback channel. Provider onboarding occurs via configuration without code changes.
+**Implementation:**
+- `business_rule_config` key `whatsapp_bsp_adapter` = `"PLUGGABLE_SMS_FALLBACK"`.
+- Implemented in `NotificationService`.
 
 ---
 
 ## OD-023 — Opening balance cut-off date and data format
 
 **Status:** CONFIRMED — 2026-10-22
-**Decision:** Use a signed-off cut-off date and a controlled CSV import template. Accountant signs off the data before it is imported.
+**Approver:** Lead Accountant & Business Owner
+**Decision:** Standardized CSV template with sign-off cut-off date. Two-step workflow: upload & preview (`DRAFT`) → accountant/owner sign-off (`SIGNED_OFF`) → atomic ledger posting (`IMPORTED`). Reversals create equal-and-opposite entries (`REVERSED`).
 **Implementation:**
-- A dedicated `opening_balance_imports` table stores each import batch: `id`, `import_type` (`CUSTOMER_AR | SUPPLIER_AP | INVENTORY`), `cut_off_date`, `status` (`DRAFT | SIGNED_OFF | IMPORTED | REVERSED`), `signed_off_by`, `signed_off_at`, `imported_by`, `imported_at`, `row_count`, `total_value`.
-- Import template (CSV): `entity_code, entity_name, document_ref, document_date, due_date, amount_inr, currency` — one row per outstanding invoice/bill.
-- Import is idempotent: can be re-run on DRAFT; only one import per `(import_type, cut_off_date)` can be SIGNED_OFF.
-- Sign-off is a two-step action: accountant uploads + previews → owner or OPS_COORD clicks "Sign Off" → status moves to SIGNED_OFF → import runs → status becomes IMPORTED.
-- Once IMPORTED, the batch can be REVERSED (posts equal and opposite entries) but cannot be re-imported.
-- `customer_ledger_entries` and `supplier_ledger_entries` get `entry_type = OPENING_BALANCE` for these rows.
-- Provide an import template download endpoint and a preview-before-import endpoint.
-- Action: accountant to confirm cut-off date by end of Sprint 0 (target: last day of previous month).
+- `opening_balance_imports` and `opening_balance_import_lines` tables.
+- Implemented in `OpeningBalanceService` and `OpeningBalanceController`.
 
 ---
 
 ## OD-024 — Standing negotiated customer prices ("price tiers")
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M1 §12, §6.2
-**Question:** Do any customers have pre-agreed standing prices that differ from the daily floor/target? If so, can they still undercut the floor without approval?
-**Impact:** Affects the pricing engine and how BR-01 is evaluated for tier customers.
-**Proposed default:** No standing prices in MVP. All orders evaluated against the daily band. Add customer price agreements in Phase 2.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner
+**Decision:** No standing below-floor customer prices in MVP. All sales orders are evaluated strictly against the daily price band (BR-01). Pre-agreed customer contract rate agreements will be evaluated for Phase 4.
+**Implementation:**
+- `business_rule_config` key `standing_customer_prices_enabled` = `false`.
+- Enforced by `PricingService.evaluateOrderPricing()`.
 
 ---
 
 ## OD-025 — Inter-site reservation: one fulfillment site per order, or across sites?
 
-**Status:** AWAITING BUSINESS OWNER APPROVAL
-**Source:** M3 §12
-**Question:** When stock is short at the fulfillment site, can an order be partially filled from another site, or must it be fulfilled entirely from one site?
-**Impact:** Affects the FEFO reservation algorithm complexity significantly.
-**Proposed default:** Single fulfillment site per order in MVP. Multi-site fulfillment in Phase 2.
+**Status:** CONFIRMED — 2026-11-11
+**Approver:** Business Owner & Logistics Coordinator
+**Decision:** Single fulfillment site per sales order in MVP. When stock is short at the primary site, an inter-site stock transfer is created and received before trip dispatch. Cross-site split shipments deferred to Phase 4.
+**Implementation:**
+- `business_rule_config` key `intersite_order_fulfillment` = `"SINGLE_SITE_MVP"`.
+- Enforced by `InventoryService` FEFO reservation logic.
 
 ---
 
 ## Summary Table
 
-| ID | Topic | Status |
-|----|-------|--------|
-| OD-001 | Min margin pct | CONFIRMED (10% gross) |
-| OD-002 | Owner escalation value | AWAITING |
-| OD-003 | Invoice timing + GST tax treatment | CONFIRMED (dispatch; mixed taxable/exempt) |
-| OD-004 | e-Invoicing applicability | AWAITING (accountant) |
-| OD-005 | e-Way bill generation | AWAITING |
-| OD-006 | OTP channel for field auth | AWAITING |
-| OD-007 | Multi-site coordinator | PROPOSED (multi-site) |
-| OD-008 | Language support | PROPOSED (English MVP) |
-| OD-009 | Price spike baseline | PROPOSED (same-supplier) |
-| OD-010 | Backup supplier tolerance | PROPOSED (within 2%) |
-| OD-011 | Freight allocation | PROPOSED (not MVP) |
-| OD-012 | Yield basis | PROPOSED (issued RM) |
-| OD-013 | Production mode | PROPOSED (MTO only) |
-| OD-014 | ePOD OTP in MVP | PROPOSED (sig/photo only) |
-| OD-015 | Custody wallet scope | PROPOSED (cash+cheque) |
-| OD-016 | Cashier role | PROPOSED (Coordinator) |
-| OD-017 | Allocation policy | PROPOSED (FIFO) |
-| OD-018 | Accounting target | PROPOSED (Tally first) |
-| OD-019 | Owner delegate | CONFIRMED (delegate + escalation, no auto-approve) |
-| OD-020 | Today's sales definition | AWAITING |
-| OD-021 | Dashboard refresh rate | PROPOSED (30-60s) |
-| OD-022 | WhatsApp BSP provider | AWAITING |
-| OD-023 | Opening balance data | CONFIRMED (signed-off CSV template) |
-| OD-024 | Standing customer prices | PROPOSED (no MVP) |
-| OD-025 | Inter-site reservation | PROPOSED (single-site MVP) |
+| ID | Topic | Status | Approver / Target |
+|----|-------|--------|-------------------|
+| OD-001 | Min margin pct | CONFIRMED — 2026-10-22 | Business Owner (10% gross default) |
+| OD-002 | Owner escalation value | CONFIRMED — 2026-11-11 | Business Owner (INR 5,000 threshold) |
+| OD-003 | Invoice timing + GST | CONFIRMED — 2026-10-22 | Lead Accountant (Invoice at dispatch, mixed lines) |
+| OD-004 | e-Invoicing applicability | CONFIRMED — 2026-11-11 | Lead Accountant (Disabled for MVP, schema ready) |
+| OD-005 | e-Way bill generation | CONFIRMED — 2026-11-11 | Logistics Coordinator (Manual ref entry >= 50k INR) |
+| OD-006 | OTP field auth channel | CONFIRMED — 2026-11-11 | Business Owner (SMS primary) |
+| OD-007 | Multi-site coordinator | CONFIRMED — 2026-11-11 | Business Owner (Multi-site enabled via user_site_access) |
+| OD-008 | UI language support | CONFIRMED — 2026-11-11 | Business Owner (English MVP, i18n ready) |
+| OD-009 | Price spike baseline | CONFIRMED — 2026-11-11 | Procurement Manager (Same-supplier first, then item cost) |
+| OD-010 | Backup supplier tolerance | CONFIRMED — 2026-11-11 | Business Owner (Within 2% auto-suggest) |
+| OD-011 | Freight cost allocation | CONFIRMED — 2026-11-11 | Lead Accountant (PO price only for MVP) |
+| OD-012 | Yield variance basis | CONFIRMED — 2026-11-11 | Production Manager (Mass balance on issued RM, +/- 3%) |
+| OD-013 | Production mode | CONFIRMED — 2026-11-11 | Production Manager (MTO primary, MTS for min_stock) |
+| OD-014 | ePOD OTP in MVP | CONFIRMED — 2026-11-11 | Business Owner (Signature/photo required, OTP optional) |
+| OD-015 | Custody wallet scope | CONFIRMED — 2026-11-11 | Lead Accountant (Cash + cheques only; UPI direct) |
+| OD-016 | Handover cashier role | CONFIRMED — 2026-11-11 | Business Owner (Ops Coordinator verifies routine handovers) |
+| OD-017 | Allocation policy | CONFIRMED — 2026-11-11 | Lead Accountant (FIFO default with manual override) |
+| OD-018 | Accounting target | CONFIRMED — 2026-11-11 | Lead Accountant (Tally Prime XML export) |
+| OD-019 | Owner delegate policy | CONFIRMED — 2026-10-22 | Business Owner (Delegate caps, 60m escalation) |
+| OD-020 | Today's sales definition | CONFIRMED — 2026-11-11 | Business Owner (Tax invoices issued today) |
+| OD-021 | Dashboard refresh rate | CONFIRMED — 2026-11-11 | Business Owner (30 seconds polling/SSE) |
+| OD-022 | WhatsApp BSP provider | CONFIRMED — 2026-11-11 | Business Owner (Pluggable adapter with SMS fallback) |
+| OD-023 | Opening balance process | CONFIRMED — 2026-10-22 | Lead Accountant (Signed-off CSV import & reversal) |
+| OD-024 | Standing customer prices | CONFIRMED — 2026-11-11 | Business Owner (No standing below-floor prices in MVP) |
+| OD-025 | Inter-site reservation | CONFIRMED — 2026-11-11 | Logistics Coordinator (Single-site fulfillment in MVP) |

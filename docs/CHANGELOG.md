@@ -409,6 +409,35 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.6.1] — 2026-11-11 — Phase P2 Complete: Business Decisions & Requirements Closure
+
+### Added
+- **Complete Open Decisions Register (`docs/OPEN_DECISIONS.md`)**:
+  - Closed all 25 decisions with explicit business rules, implementation details, and approver sign-offs (0 `AWAITING` decisions remain).
+  - Confirmed OD-002: INR 5,000 threshold for delivery dispute escalation to owner.
+  - Confirmed OD-004 & OD-005: e-invoicing toggle disabled for MVP with schema placeholders retained; e-way bill threshold set at ₹50,000 with challan printout.
+  - Confirmed OD-006 & OD-008: SMS primary authentication OTP for field staff; English UI default with i18n infrastructure.
+  - Confirmed OD-007: Multi-site coordinator access enabled via `user_site_access`.
+  - Confirmed OD-009 & OD-010: Same-supplier price spike baseline with item-cost fallback; 2% backup supplier tolerance for auto-suggestion.
+  - Confirmed OD-011: PO unit price landed cost in MVP.
+  - Confirmed OD-012 & OD-013: Mass-balance yield variance ($\pm 3\%$ tolerance); Make-to-Order primary mode with Make-to-Stock reorder triggers.
+  - Confirmed OD-014: Signature & photo standard ePOD; OTP optional online.
+  - Confirmed OD-015 & OD-016: Custody wallet tracks physical cash/cheques only (direct UPI bypasses physical handover); Ops Coordinator verifies routine handovers.
+  - Confirmed OD-017 & OD-018: Strict FIFO invoice allocation default with manual override; Tally Prime XML export as primary accounting bridge.
+  - Confirmed OD-019 & OD-023: 60-minute escalation timeout with value caps; Opening balance import lifecycle (`DRAFT → SIGNED_OFF → IMPORTED → REVERSED`).
+  - Confirmed OD-020 & OD-021: Today's sales defined as tax invoices issued today; 30-second dashboard refresh.
+  - Confirmed OD-022, OD-024, OD-025: Pluggable notification adapter; no below-floor standing prices in MVP; single-site fulfillment in MVP.
+  - Confirmed Supplier Bill Auto-Approve Policy: 3-way match bills under ₹25,000 auto-approved.
+- **Migration `20261111_029_p2_business_decision_configs.sql`**:
+  - Seeded all confirmed configuration parameters into `business_rule_config`.
+- **Phase P2 Acceptance Test Suite**:
+  - Added `apps/api/src/modules/m0-platform/tests/p2-business-decisions.spec.ts` with 27 passing tests verifying all configuration keys, permission bindings, multi-site mapping, and opening balance lifecycles.
+
+### Fixed
+- **ConfigService Parsing**: Added safe fallback parsing in `ConfigService.get` to correctly deserialize both JSON strings and raw string tokens without throwing `SyntaxError`.
+
+---
+
 ## [0.6.0] — 2026-11-11 — Phase P1 Complete: Backend Contract Completion & Cross-Module Stabilization
 
 ### Added

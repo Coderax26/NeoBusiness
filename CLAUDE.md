@@ -1,9 +1,9 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Last synced with:** `CHANGELOG.md` through **v0.6.0 (2026-11-11)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
-> Updated **2026-11-11** with Phase P1 completion (M6 HTTP API layer, M2/M4 port integration, operational artifacts, full test pass).  
+> **Last synced with:** `CHANGELOG.md` through **v0.6.1 (2026-11-11)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
+> Updated **2026-11-11** with Phase P2 completion (All 25 Open Decisions confirmed, configuration seeds, acceptance tests).  
 > When a module ships, a migration lands or a convention changes, update the matching section here in the same PR.
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
@@ -120,7 +120,7 @@ NeoBusinessSolution/
 | M5 — Fleet & Delivery | ✅ Complete | Full backend with event integration (trips.dispatched/closed), COD settlement, credit notes, ePOD, BR-08 closure, challan PDF generation & endpoint, e-way bill reference |
 | M7b — Dashboards | ✅ Complete | Pulse, Status Matrix, EOD, KPIs, Analytics (40 acceptance tests, 7 materialized views, event-driven refresh) |
 
-**Next phase:** Phase P2 — Business Decisions and Requirements Closure (`docs/Copilot/03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md`)
+**Next phase:** Phase P3 — Frontend Product Delivery (`docs/Copilot/04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md`)
 
 **Known follow-up:** M1's `CreditService` BR-02 overdue check was wired to M6's ledger in v0.5.0.
 
@@ -128,7 +128,7 @@ NeoBusinessSolution/
 
 | Module | Migrations |
 |--------|-----------|
-| M0 | 001–004 (e.g. `20261021_001_m0_platform_foundation.sql`) |
+| M0 | 001–004, 029 (`20261021_001_m0_platform_foundation.sql`, `20261111_029_p2_business_decision_configs.sql`) |
 | M7a | 005 |
 | M1 | 006, 021 (`20261110_021_m1_add_min_stock_qty.sql`) |
 | M6 | 007, 008, 009, 016, 019, 020 (includes `cashbook_entries`, `worklist`, `credit_notes`, `tally_export_batches`, `cheques`) |
