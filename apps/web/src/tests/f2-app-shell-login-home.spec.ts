@@ -127,3 +127,4 @@ describe('Phase F2 — App Shell, Login & Role Home Pages', () => {
     expect(content).toContain('WhatsApp Support');
   });
 });
+

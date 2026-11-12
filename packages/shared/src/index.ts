@@ -2,4 +2,6 @@ export * from './permissions.js';
 export * from './formatters.js';
 export * from './money.js';
 export * from './business-rules.js';
+export * from './duplicate-detection.js';
+export * from './setup-wizard.js';
 

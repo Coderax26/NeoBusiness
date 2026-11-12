@@ -1,0 +1,1126 @@
+'use client';
+
+import React, { useState } from 'react';
+import {
+  DataTable,
+  type ColumnDef,
+  Button,
+  KpiCard,
+  Badge,
+  StatusPill,
+  Dialog,
+  CsvImportModal,
+  exportToCsv,
+} from '@neo/ui';
+import { validateGSTIN, checkDuplicateRecord, formatINR } from '@neo/shared';
+
+export interface CustomerContact {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  isPrimary: boolean;
+}
+
+export interface CustomerRecord {
+  id: string;
+  code: string;
+  businessName: string;
+  gstin: string;
+  stateCode: string;
+  stateName: string;
+  billingAddress: string;
+  gpsCoords?: string;
+  primaryContact: string;
+  phone: string;
+  whatsappPhone: string;
+  whatsappOptIn: boolean;
+  defaultSite: string;
+  deliveryWindow: 'MORNING' | 'AFTERNOON' | 'EVENING';
+  creditLimitRupees: number;
+  creditDays: number;
+  maxOverdueDays: number;
+  creditHold: boolean;
+  creditOverrideReason?: string;
+  outstandingRupees: number;
+  overdueDays: number;
+  creditStatus: 'OK' | 'NEAR_LIMIT' | 'HOLD';
+  lastOrderDate: string;
+  contacts: CustomerContact[];
+  active: boolean;
+}
+
+const INITIAL_CUSTOMERS: CustomerRecord[] = [
+  {
+    id: 'cust-1',
+    code: 'CUST-001',
+    businessName: 'Sharma Sweets & Dairy',
+    gstin: '27AABCS1429B1ZB',
+    stateCode: '27',
+    stateName: 'Maharashtra',
+    billingAddress: 'Shop 4, MG Road, Pune 411001',
+    gpsCoords: '18.5204,73.8567',
+    primaryContact: 'Ramesh Sharma',
+    phone: '9822012345',
+    whatsappPhone: '9822012345',
+    whatsappOptIn: true,
+    defaultSite: 'Pune Central Depot',
+    deliveryWindow: 'MORNING',
+    creditLimitRupees: 50000,
+    creditDays: 7,
+    maxOverdueDays: 15,
+    creditHold: false,
+    outstandingRupees: 28400,
+    overdueDays: 0,
+    creditStatus: 'OK',
+    lastOrderDate: '2026-11-11',
+    contacts: [
+      { id: 'c-1', name: 'Ramesh Sharma', phone: '9822012345', role: 'Owner', isPrimary: true },
+      { id: 'c-2', name: 'Vijay Sharma', phone: '9822098765', role: 'Manager', isPrimary: false },
+    ],
+    active: true,
+  },
+  {
+    id: 'cust-2',
+    code: 'CUST-002',
+    businessName: 'Hotel Royal Palace Catering',
+    gstin: '27AAACH2849C1ZA',
+    stateCode: '27',
+    stateName: 'Maharashtra',
+    billingAddress: 'Plot 12, Senapati Bapat Marg, Pune',
+    gpsCoords: '18.5312,73.8299',
+    primaryContact: 'Anand Kulkarni',
+    phone: '9823055443',
+    whatsappPhone: '9823055443',
+    whatsappOptIn: true,
+    defaultSite: 'Pune Central Depot',
+    deliveryWindow: 'MORNING',
+    creditLimitRupees: 100000,
+    creditDays: 14,
+    maxOverdueDays: 21,
+    creditHold: false,
+    outstandingRupees: 94000,
+    overdueDays: 12,
+    creditStatus: 'NEAR_LIMIT',
+    lastOrderDate: '2026-11-10',
+    contacts: [
+      { id: 'c-3', name: 'Anand Kulkarni', phone: '9823055443', role: 'Purchase Head', isPrimary: true },
+    ],
+    active: true,
+  },
+  {
+    id: 'cust-3',
+    code: 'CUST-003',
+    businessName: 'Modern Grocers Supermarket',
+    gstin: '27AABCM9988D1Z8',
+    stateCode: '27',
+    stateName: 'Maharashtra',
+    billingAddress: 'Commercial Complex, Baner, Pune',
+    gpsCoords: '18.5590,73.7868',
+    primaryContact: 'Pooja Patil',
+    phone: '9823199887',
+    whatsappPhone: '9823199887',
+    whatsappOptIn: false,
+    defaultSite: 'Baner Transit Depot',
+    deliveryWindow: 'AFTERNOON',
+    creditLimitRupees: 40000,
+    creditDays: 7,
+    maxOverdueDays: 14,
+    creditHold: true,
+    creditOverrideReason: 'Cheque bounce on 02-Nov; hold until RTGS clears.',
+    outstandingRupees: 48500,
+    overdueDays: 34,
+    creditStatus: 'HOLD',
+    lastOrderDate: '2026-10-28',
+    contacts: [
+      { id: 'c-4', name: 'Pooja Patil', phone: '9823199887', role: 'Store Owner', isPrimary: true },
+    ],
+    active: true,
+  },
+  {
+    id: 'cust-4',
+    code: 'CUST-004',
+    businessName: 'Krishna Dairy Parlour',
+    gstin: '27AABCK5544E1ZY',
+    stateCode: '27',
+    stateName: 'Maharashtra',
+    billingAddress: 'Station Road, Hadapsar, Pune',
+    primaryContact: 'Sachin Jagtap',
+    phone: '9822477665',
+    whatsappPhone: '9822477665',
+    whatsappOptIn: true,
+    defaultSite: 'Hadapsar Warehouse',
+    deliveryWindow: 'MORNING',
+    creditLimitRupees: 30000,
+    creditDays: 3,
+    maxOverdueDays: 7,
+    creditHold: false,
+    outstandingRupees: 12000,
+    overdueDays: 0,
+    creditStatus: 'OK',
+    lastOrderDate: '2026-11-12',
+    contacts: [
+      { id: 'c-5', name: 'Sachin Jagtap', phone: '9822477665', role: 'Proprietor', isPrimary: true },
+    ],
+    active: true,
+  },
+];
+
+export default function CustomerMasterPage() {
+  const [customers, setCustomers] = useState<CustomerRecord[]>(INITIAL_CUSTOMERS);
+  const [search, setSearch] = useState('');
+  const [creditStatusFilter, setCreditStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
+  // Form modal state
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null);
+  const [activeTab, setActiveTab] = useState<'business' | 'contact' | 'credit' | 'contacts'>('business');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Credit limit override tracking
+  const [creditOverrideReason, setCreditOverrideReason] = useState('');
+  const [originalCreditLimit, setOriginalCreditLimit] = useState(0);
+
+  // Import modal
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Form fields
+  const [code, setCode] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [gstin, setGstin] = useState('');
+  const [stateCode, setStateCode] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [primaryContact, setPrimaryContact] = useState('');
+  const [phone, setPhone] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappOptIn, setWhatsappOptIn] = useState(true);
+  const [defaultSite, setDefaultSite] = useState('Pune Central Depot');
+  const [deliveryWindow, setDeliveryWindow] = useState<CustomerRecord['deliveryWindow']>('MORNING');
+  const [creditLimitRupees, setCreditLimitRupees] = useState('50000');
+  const [creditDays, setCreditDays] = useState('7');
+  const [maxOverdueDays, setMaxOverdueDays] = useState('15');
+  const [creditHold, setCreditHold] = useState(false);
+  const [contacts, setContacts] = useState<CustomerContact[]>([]);
+
+  // New subcontact inputs
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactRole, setNewContactRole] = useState('Manager');
+
+  const openNewForm = () => {
+    setEditingCustomer(null);
+    setCode(`CUST-${String(customers.length + 1).padStart(3, '0')}`);
+    setBusinessName('');
+    setGstin('');
+    setStateCode('');
+    setStateName('');
+    setBillingAddress('');
+    setPrimaryContact('');
+    setPhone('');
+    setWhatsappPhone('');
+    setWhatsappOptIn(true);
+    setDefaultSite('Pune Central Depot');
+    setDeliveryWindow('MORNING');
+    setCreditLimitRupees('50000');
+    setOriginalCreditLimit(50000);
+    setCreditOverrideReason('');
+    setCreditDays('7');
+    setMaxOverdueDays('15');
+    setCreditHold(false);
+    setContacts([]);
+    setFormErrors({});
+    setActiveTab('business');
+    setFormOpen(true);
+  };
+
+  const openEditForm = (cust: CustomerRecord) => {
+    setEditingCustomer(cust);
+    setCode(cust.code);
+    setBusinessName(cust.businessName);
+    setGstin(cust.gstin);
+    setStateCode(cust.stateCode);
+    setStateName(cust.stateName);
+    setBillingAddress(cust.billingAddress);
+    setPrimaryContact(cust.primaryContact);
+    setPhone(cust.phone);
+    setWhatsappPhone(cust.whatsappPhone);
+    setWhatsappOptIn(cust.whatsappOptIn);
+    setDefaultSite(cust.defaultSite);
+    setDeliveryWindow(cust.deliveryWindow);
+    setCreditLimitRupees(String(cust.creditLimitRupees));
+    setOriginalCreditLimit(cust.creditLimitRupees);
+    setCreditOverrideReason(cust.creditOverrideReason || '');
+    setCreditDays(String(cust.creditDays));
+    setMaxOverdueDays(String(cust.maxOverdueDays));
+    setCreditHold(cust.creditHold);
+    setContacts(cust.contacts || []);
+    setFormErrors({});
+    setActiveTab('business');
+    setFormOpen(true);
+  };
+
+  const handleGstinChange = (val: string) => {
+    const clean = val.trim().toUpperCase();
+    setGstin(clean);
+    if (clean.length === 15) {
+      const gstinVal = validateGSTIN(clean);
+      if (gstinVal.valid) {
+        setStateCode(gstinVal.stateCode || '');
+        setStateName(gstinVal.stateName || '');
+        setFormErrors((prev) => {
+          const next = { ...prev };
+          delete next.gstin;
+          return next;
+        });
+      } else {
+        setFormErrors((prev) => ({ ...prev, gstin: gstinVal.error || 'Invalid GSTIN format' }));
+      }
+    } else {
+      setStateCode('');
+      setStateName('');
+    }
+  };
+
+  const handleAddContact = () => {
+    if (!newContactName.trim() || !newContactPhone.trim()) return;
+    setContacts((prev) => [
+      ...prev,
+      {
+        id: `c-${Date.now()}`,
+        name: newContactName.trim(),
+        phone: newContactPhone.trim(),
+        role: newContactRole,
+        isPrimary: prev.length === 0,
+      },
+    ]);
+    setNewContactName('');
+    setNewContactPhone('');
+  };
+
+  const handleRemoveContact = (id: string) => {
+    setContacts((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleSaveCustomer = () => {
+    const errors: Record<string, string> = {};
+    if (!code.trim()) errors.code = 'Customer Code is required.';
+    if (!businessName.trim()) errors.businessName = 'Business Name is required.';
+    if (!phone.trim()) errors.phone = 'Primary phone number is required.';
+
+    // GSTIN check if provided
+    if (gstin.trim()) {
+      const gstinVal = validateGSTIN(gstin);
+      if (!gstinVal.valid) {
+        errors.gstin = gstinVal.error || 'Invalid GSTIN.';
+      }
+    }
+
+    // Phone duplicate check
+    const phoneDup = checkDuplicateRecord(customers, 'phone', phone, editingCustomer?.id);
+    if (phoneDup.isDuplicate) {
+      errors.phone = `Phone "${phone}" already registered with customer "${phoneDup.matchedRecord?.businessName}".`;
+    }
+
+    // Credit limit change reason requirement (OD-024)
+    const newLimit = parseFloat(creditLimitRupees) || 0;
+    if (editingCustomer && newLimit !== originalCreditLimit && !creditOverrideReason.trim()) {
+      errors.creditReason = 'A reason is required to modify credit limit (permission: customer.credit_override).';
+      setActiveTab('credit');
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      if (errors.code || errors.businessName || errors.gstin) {
+        setActiveTab('business');
+      } else if (errors.phone) {
+        setActiveTab('contact');
+      }
+      return;
+    }
+
+    const newRecord: CustomerRecord = {
+      id: editingCustomer ? editingCustomer.id : `cust-${Date.now()}`,
+      code: code.trim().toUpperCase(),
+      businessName: businessName.trim(),
+      gstin: gstin.trim().toUpperCase(),
+      stateCode: stateCode || '27',
+      stateName: stateName || 'Maharashtra',
+      billingAddress: billingAddress.trim(),
+      primaryContact: primaryContact.trim() || businessName.trim(),
+      phone: phone.trim(),
+      whatsappPhone: whatsappPhone.trim() || phone.trim(),
+      whatsappOptIn,
+      defaultSite,
+      deliveryWindow,
+      creditLimitRupees: newLimit,
+      creditDays: parseInt(creditDays, 10) || 7,
+      maxOverdueDays: parseInt(maxOverdueDays, 10) || 15,
+      creditHold,
+      creditOverrideReason: newLimit !== originalCreditLimit ? creditOverrideReason.trim() : editingCustomer?.creditOverrideReason,
+      outstandingRupees: editingCustomer ? editingCustomer.outstandingRupees : 0,
+      overdueDays: editingCustomer ? editingCustomer.overdueDays : 0,
+      creditStatus: creditHold ? 'HOLD' : newLimit > 0 && (editingCustomer?.outstandingRupees || 0) >= newLimit * 0.9 ? 'NEAR_LIMIT' : 'OK',
+      lastOrderDate: editingCustomer ? editingCustomer.lastOrderDate : new Date().toISOString().split('T')[0],
+      contacts: contacts.length > 0 ? contacts : [
+        { id: `c-${Date.now()}`, name: primaryContact || businessName, phone, role: 'Primary', isPrimary: true },
+      ],
+      active: editingCustomer ? editingCustomer.active : true,
+    };
+
+    if (editingCustomer) {
+      setCustomers((prev) => prev.map((c) => (c.id === editingCustomer.id ? newRecord : c)));
+    } else {
+      setCustomers((prev) => [newRecord, ...prev]);
+    }
+    setFormOpen(false);
+  };
+
+  const toggleCustomerActive = (id: string) => {
+    setCustomers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
+    );
+  };
+
+  // KPIs
+  const activeCount = customers.filter((c) => c.active).length;
+  const holdCount = customers.filter((c) => c.active && (c.creditHold || c.creditStatus === 'HOLD')).length;
+  const overLimitCount = customers.filter((c) => c.active && c.outstandingRupees > c.creditLimitRupees).length;
+  const overdue30Count = customers.filter((c) => c.active && c.overdueDays > 30).length;
+
+  const filteredCustomers = customers.filter((cust) => {
+    if (creditStatusFilter !== 'ALL' && cust.creditStatus !== creditStatusFilter) return false;
+    if (statusFilter === 'ACTIVE' && !cust.active) return false;
+    if (statusFilter === 'INACTIVE' && cust.active) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        cust.businessName.toLowerCase().includes(q) ||
+        cust.code.toLowerCase().includes(q) ||
+        cust.phone.includes(q)
+      );
+    }
+    return true;
+  });
+
+  const columns: ColumnDef<CustomerRecord>[] = [
+    {
+      id: 'code',
+      header: 'Code',
+      accessorKey: 'code',
+      cell: (info) => (
+        <span className="font-mono text-xs font-bold text-teal-400">
+          {info.getValue() as string}
+        </span>
+      ),
+    },
+    {
+      id: 'businessName',
+      header: 'Business & Contact',
+      accessorKey: 'businessName',
+      cell: (info) => {
+        const cust = info.row.original;
+        return (
+          <div>
+            <div className="font-bold text-white text-xs">{cust.businessName}</div>
+            <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
+              <span>{cust.primaryContact}</span>
+              <span>•</span>
+              <a
+                href={`tel:${cust.phone}`}
+                className="text-teal-400 hover:underline flex items-center gap-1"
+              >
+                📞 {cust.phone}
+              </a>
+              {cust.whatsappOptIn && (
+                <a
+                  href={`https://wa.me/91${cust.whatsappPhone}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-400 hover:underline"
+                >
+                  💬 WA
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'area',
+      header: 'Site / Area',
+      accessorKey: 'defaultSite',
+      cell: (info) => <span className="text-xs text-zinc-300">{info.getValue() as string}</span>,
+    },
+    {
+      id: 'creditLimit',
+      header: 'Credit Limit',
+      accessorKey: 'creditLimitRupees',
+      cell: (info) => (
+        <span className="text-xs font-mono font-semibold text-zinc-200">
+          {formatINR(info.getValue() as number)}
+        </span>
+      ),
+    },
+    {
+      id: 'outstanding',
+      header: 'Outstanding / Overdue',
+      cell: (info) => {
+        const cust = info.row.original;
+        const isOver = cust.outstandingRupees > cust.creditLimitRupees;
+        return (
+          <div className="text-xs">
+            <span className={`font-mono font-bold ${isOver ? 'text-rose-400' : 'text-zinc-200'}`}>
+              {formatINR(cust.outstandingRupees)}
+            </span>
+            {cust.overdueDays > 0 && (
+              <span className="block text-[11px] text-amber-400 font-medium">
+                {cust.overdueDays}d overdue
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'creditStatus',
+      header: 'Credit Status',
+      accessorKey: 'creditStatus',
+      cell: (info) => {
+        const status = info.getValue() as CustomerRecord['creditStatus'];
+        const tone = status === 'OK' ? 'success' : status === 'NEAR_LIMIT' ? 'warning' : 'danger';
+        return <Badge tone={tone}>{status === 'NEAR_LIMIT' ? 'Near Limit' : status}</Badge>;
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: (info) => {
+        const cust = info.row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openEditForm(cust)}
+              className="text-xs text-teal-400 hover:text-teal-300 font-medium"
+            >
+              Edit
+            </button>
+            <span className="text-zinc-700">|</span>
+            <button
+              onClick={() => toggleCustomerActive(cust.id)}
+              className={`text-xs font-medium ${
+                cust.active ? 'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+            >
+              {cust.active ? 'Deactivate' : 'Activate'}
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const handleExportCsv = () => {
+    exportToCsv(
+      'customers-list.csv',
+      filteredCustomers,
+      [
+        { key: 'code', label: 'Customer Code' },
+        { key: 'businessName', label: 'Business Name' },
+        { key: 'gstin', label: 'GSTIN' },
+        { key: 'primaryContact', label: 'Primary Contact' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'defaultSite', label: 'Site' },
+        { key: (c) => `₹${c.creditLimitRupees}`, label: 'Credit Limit' },
+        { key: (c) => `₹${c.outstandingRupees}`, label: 'Outstanding' },
+        { key: (c) => `${c.overdueDays} days`, label: 'Overdue Days' },
+        { key: 'creditStatus', label: 'Credit Status' },
+        { key: (c) => (c.active ? 'Active' : 'Inactive'), label: 'Status' },
+      ],
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* 1. Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div>
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/30 mb-1.5">
+            <span>👥 Buyer Accounts</span>
+          </div>
+          <h1 className="text-2xl font-black text-white">Customer Master Directory</h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Maintain customer business profiles, verified GSTINs, credit limits, contacts, and delivery terms.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+            📥 Import Customers (CSV)
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleExportCsv}>
+            📤 Export CSV
+          </Button>
+          <Button variant="primary" size="sm" onClick={openNewForm}>
+            + Add New Customer
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. KPI Strip (§4.1) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Active Customers"
+          value={String(activeCount)}
+          subtitle="Ready to place orders"
+          tone="default"
+        />
+        <KpiCard
+          title="On Credit Hold"
+          value={String(holdCount)}
+          subtitle="Orders require credit release"
+          tone={holdCount > 0 ? 'danger' : 'success'}
+        />
+        <KpiCard
+          title="Over Credit Limit"
+          value={String(overLimitCount)}
+          subtitle="Outstanding > approved limit"
+          tone={overLimitCount > 0 ? 'warning' : 'success'}
+        />
+        <KpiCard
+          title="Overdue > 30 Days"
+          value={String(overdue30Count)}
+          subtitle="High collection priority"
+          tone={overdue30Count > 0 ? 'danger' : 'success'}
+        />
+      </div>
+
+      {/* 3. Filters & View Toggle */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl">
+        <div className="flex items-center gap-3 flex-1 flex-wrap">
+          <input
+            type="text"
+            placeholder="Search by name, code, or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full md:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+          />
+          <select
+            value={creditStatusFilter}
+            onChange={(e) => setCreditStatusFilter(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+          >
+            <option value="ALL">All Credit Status</option>
+            <option value="OK">OK (Within Limit)</option>
+            <option value="NEAR_LIMIT">Near Limit</option>
+            <option value="HOLD">Credit Hold</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+          >
+            <option value="ALL">All Status</option>
+            <option value="ACTIVE">Active Only</option>
+            <option value="INACTIVE">Inactive Only</option>
+          </select>
+        </div>
+
+        {/* Tablet / Owner View Toggle (§4.1) */}
+        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+              viewMode === 'table' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            📋 Table
+          </button>
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+              viewMode === 'cards' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            🗂️ Cards
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Display: Table or Card View */}
+      {viewMode === 'table' ? (
+        <DataTable columns={columns} data={filteredCustomers} pageSize={10} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCustomers.map((cust) => (
+            <div
+              key={cust.id}
+              className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 space-y-4 hover:border-zinc-700 transition-all shadow-md"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="font-mono text-xs font-bold text-teal-400">{cust.code}</span>
+                  <h3 className="text-sm font-bold text-white mt-0.5">{cust.businessName}</h3>
+                  <p className="text-xs text-zinc-400">{cust.primaryContact}</p>
+                </div>
+                <Badge
+                  tone={cust.creditStatus === 'OK' ? 'success' : cust.creditStatus === 'NEAR_LIMIT' ? 'warning' : 'danger'}
+                >
+                  {cust.creditStatus === 'NEAR_LIMIT' ? 'Near Limit' : cust.creditStatus}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-zinc-800/80">
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Credit Limit</span>
+                  <span className="font-mono font-bold text-zinc-200">
+                    ₹{cust.creditLimitRupees.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Outstanding</span>
+                  <span className={`font-mono font-bold ${cust.outstandingRupees > cust.creditLimitRupees ? 'text-rose-400' : 'text-zinc-200'}`}>
+                    ₹{cust.outstandingRupees.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-800/80 text-xs">
+                <a
+                  href={`tel:${cust.phone}`}
+                  className="text-teal-400 hover:underline flex items-center gap-1 font-medium"
+                >
+                  📞 {cust.phone}
+                </a>
+                <button
+                  onClick={() => openEditForm(cust)}
+                  className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold"
+                >
+                  Edit Profile →
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 5. Customer Form Modal (§4.2) */}
+      <Dialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editingCustomer ? `Edit Customer: ${editingCustomer.code}` : 'Add New Customer Profile'}
+        maxWidth="lg"
+      >
+        <div className="space-y-5 my-2">
+          {/* Tab Navigation */}
+          <div className="flex border-b border-zinc-800 text-xs font-semibold gap-4 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('business')}
+              className={`pb-2 border-b-2 transition-colors ${
+                activeTab === 'business' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              Business & GSTIN
+            </button>
+            <button
+              onClick={() => setActiveTab('contact')}
+              className={`pb-2 border-b-2 transition-colors ${
+                activeTab === 'contact' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              Contact & Delivery
+            </button>
+            <button
+              onClick={() => setActiveTab('credit')}
+              className={`pb-2 border-b-2 transition-colors ${
+                activeTab === 'credit' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              Credit & Payment Terms
+            </button>
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`pb-2 border-b-2 transition-colors ${
+                activeTab === 'contacts' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              Key Contacts ({contacts.length})
+            </button>
+          </div>
+
+          {/* Tab 1: Business & GSTIN */}
+          {activeTab === 'business' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Customer Code *</label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. CUST-005"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                  />
+                  {formErrors.code && <p className="text-xs text-rose-400 mt-1">{formErrors.code}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Business Name *</label>
+                  <input
+                    type="text"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="e.g. Krishna Dairy Parlour"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  />
+                  {formErrors.businessName && <p className="text-xs text-rose-400 mt-1">{formErrors.businessName}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">GSTIN (15 Characters)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gstin}
+                    onChange={(e) => handleGstinChange(e.target.value)}
+                    placeholder="e.g. 27AABCS1429B1ZB"
+                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                  />
+                  {stateName && (
+                    <div className="px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-xl text-xs text-teal-400 font-semibold flex items-center">
+                      State: {stateName} ({stateCode})
+                    </div>
+                  )}
+                </div>
+                {formErrors.gstin && <p className="text-xs text-rose-400 mt-1">{formErrors.gstin}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Billing Address</label>
+                <textarea
+                  value={billingAddress}
+                  onChange={(e) => setBillingAddress(e.target.value)}
+                  rows={2}
+                  placeholder="Street address, landmark, PIN code"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Tab 2: Contact & Delivery */}
+          {activeTab === 'contact' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Primary Contact Person</label>
+                  <input
+                    type="text"
+                    value={primaryContact}
+                    onChange={(e) => setPrimaryContact(e.target.value)}
+                    placeholder="e.g. Ramesh Sharma"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Phone Number (10 digits) *</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. 9822012345"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                  {formErrors.phone && <p className="text-xs text-rose-400 mt-1">{formErrors.phone}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">WhatsApp Number</label>
+                  <input
+                    type="text"
+                    value={whatsappPhone}
+                    onChange={(e) => setWhatsappPhone(e.target.value)}
+                    placeholder="Same as phone if empty"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex items-center pt-6">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={whatsappOptIn}
+                      onChange={(e) => setWhatsappOptIn(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span>Opt-in for automated WhatsApp invoices &amp; dispatch updates</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Default Fulfilment Site</label>
+                  <select
+                    value={defaultSite}
+                    onChange={(e) => setDefaultSite(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="Pune Central Depot">Pune Central Depot</option>
+                    <option value="Baner Transit Depot">Baner Transit Depot</option>
+                    <option value="Hadapsar Warehouse">Hadapsar Warehouse</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Preferred Delivery Window</label>
+                  <select
+                    value={deliveryWindow}
+                    onChange={(e) => setDeliveryWindow(e.target.value as CustomerRecord['deliveryWindow'])}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="MORNING">Morning Slot (4:00 AM - 8:00 AM)</option>
+                    <option value="AFTERNOON">Afternoon Slot (1:00 PM - 4:00 PM)</option>
+                    <option value="EVENING">Evening Slot (6:00 PM - 9:00 PM)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Credit & Payment Terms */}
+          {activeTab === 'credit' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Credit Limit (₹)</label>
+                  <input
+                    type="number"
+                    value={creditLimitRupees}
+                    onChange={(e) => setCreditLimitRupees(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Credit Days</label>
+                  <input
+                    type="number"
+                    value={creditDays}
+                    onChange={(e) => setCreditDays(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Max Overdue Days</label>
+                  <input
+                    type="number"
+                    value={maxOverdueDays}
+                    onChange={(e) => setMaxOverdueDays(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              {/* Credit Limit Override Reason (OD-024) */}
+              {editingCustomer && parseFloat(creditLimitRupees) !== originalCreditLimit && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 font-bold text-xs">⚠️ Credit Limit Modification Detected</span>
+                  </div>
+                  <p className="text-xs text-amber-200">
+                    Modifying credit limit from ₹{originalCreditLimit.toLocaleString('en-IN')} to ₹{parseFloat(creditLimitRupees).toLocaleString('en-IN')} requires permission <code>customer.credit_override</code> and a mandatory audit reason.
+                  </p>
+                  <textarea
+                    value={creditOverrideReason}
+                    onChange={(e) => {
+                      setCreditOverrideReason(e.target.value);
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.creditReason;
+                        return next;
+                      });
+                    }}
+                    rows={2}
+                    placeholder="Enter business reason for credit limit modification..."
+                    className="w-full bg-zinc-950 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                  {formErrors.creditReason && (
+                    <p className="text-xs text-rose-400 font-semibold">{formErrors.creditReason}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-white">Manual Credit Hold</div>
+                  <p className="text-[11px] text-zinc-400">
+                    When active, new orders are blocked from dispatch until released by Owner.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={creditHold}
+                    onChange={(e) => setCreditHold(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                </label>
+              </div>
+
+              {/* Price tier placeholder per OD-024 */}
+              <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-800 text-xs text-zinc-500">
+                🔒 Custom Price Tier Assignment (OD-024 deferred — default base category pricing applies).
+              </div>
+            </div>
+          )}
+
+          {/* Tab 4: Key Contacts */}
+          {activeTab === 'contacts' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-zinc-950/60 rounded-2xl border border-zinc-800 space-y-3">
+                <div className="text-xs font-bold text-white">Add Secondary Contact / Store Manager</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Contact Name"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={newContactPhone}
+                    onChange={(e) => setNewContactPhone(e.target.value)}
+                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={newContactRole}
+                      onChange={(e) => setNewContactRole(e.target.value)}
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+                    >
+                      <option value="Manager">Manager</option>
+                      <option value="Accountant">Accountant</option>
+                      <option value="Partner">Partner</option>
+                      <option value="Delivery Gate">Delivery Gate</option>
+                    </select>
+                    <Button variant="secondary" size="sm" onClick={handleAddContact}>
+                      + Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {contacts.length === 0 ? (
+                <p className="text-xs text-zinc-500 text-center py-4">No additional contacts configured.</p>
+              ) : (
+                <div className="space-y-2">
+                  {contacts.map((c) => (
+                    <div
+                      key={c.id}
+                      className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-bold text-white">{c.name}</span>
+                        <span className="text-zinc-500 ml-2">({c.role})</span>
+                        {c.isPrimary && (
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-teal-500/20 text-teal-400 font-semibold">
+                            Primary
+                          </span>
+                        )}
+                        <span className="block text-zinc-400 font-mono mt-0.5">📞 {c.phone}</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveContact(c.id)}
+                        className="text-xs text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Modal Footer */}
+          <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={() => setFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSaveCustomer}>
+              {editingCustomer ? 'Save Customer Profile' : 'Create Customer'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* 6. CSV Import Modal (§8, F3-06) */}
+      <CsvImportModal<Partial<CustomerRecord>>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import Customer Accounts via CSV"
+        entityName="Customer"
+        expectedHeaders={[
+          { key: 'code', label: 'Code', required: true, example: 'CUST-009' },
+          { key: 'businessName', label: 'Business Name', required: true, example: 'Royal Sweet Centre' },
+          { key: 'phone', label: 'Phone', required: true, example: '9822155443' },
+          { key: 'gstin', label: 'GSTIN', required: false, example: '27AABCS1429B1ZB' },
+          { key: 'creditLimitRupees', label: 'Credit Limit', required: false, example: '50000' },
+          { key: 'creditDays', label: 'Credit Days', required: false, example: '7' },
+        ]}
+        validator={(row) => {
+          const errors: string[] = [];
+          if (!row.code) errors.push('Missing Code');
+          if (!row.businessName) errors.push('Missing Business Name');
+          if (!row.phone) errors.push('Missing Phone Number');
+          if (row.gstin) {
+            const gstinVal = validateGSTIN(row.gstin);
+            if (!gstinVal.valid) {
+              errors.push(gstinVal.error || 'Invalid GSTIN');
+            }
+          }
+          const isValid = errors.length === 0;
+          return {
+            isValid,
+            errors,
+            parsed: {
+              id: `cust-csv-${Date.now()}-${Math.random()}`,
+              code: row.code?.toUpperCase(),
+              businessName: row.businessName,
+              phone: row.phone,
+              whatsappPhone: row.phone,
+              whatsappOptIn: true,
+              gstin: row.gstin?.toUpperCase() || '',
+              stateCode: row.gstin ? row.gstin.slice(0, 2) : '27',
+              stateName: 'Maharashtra',
+              billingAddress: '',
+              primaryContact: row.businessName,
+              defaultSite: 'Pune Central Depot',
+              deliveryWindow: 'MORNING',
+              creditLimitRupees: parseFloat(row.creditLimitRupees || '0') || 0,
+              creditDays: parseInt(row.creditDays || '7', 10) || 7,
+              maxOverdueDays: 15,
+              creditHold: false,
+              outstandingRupees: 0,
+              overdueDays: 0,
+              creditStatus: 'OK',
+              lastOrderDate: new Date().toISOString().split('T')[0],
+              contacts: [],
+              active: true,
+            },
+          };
+        }}
+        onImport={async (validRows) => {
+          setCustomers((prev) => [...(validRows as CustomerRecord[]), ...prev]);
+          return { importedCount: validRows.length, skippedCount: 0 };
+        }}
+      />
+    </div>
+  );
+}

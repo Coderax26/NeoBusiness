@@ -26,6 +26,7 @@ export * from './data-entry/DatePickers.js';
 export * from './data-entry/NumericKeypad.js';
 export * from './data-entry/Pickers.js';
 export * from './data-entry/LineItemGrid.js';
+export * from './data-entry/ImportExport.js';
 
 // Data Display (§5.3)
 export * from './data-display/DataTable.js';

@@ -124,3 +124,4 @@ export const NotificationsDrawer: React.FC<{
     </Drawer>
   );
 };
+

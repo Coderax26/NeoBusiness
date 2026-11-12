@@ -1,0 +1,552 @@
+'use client';
+
+import React, { useState } from 'react';
+import {
+  DataTable,
+  type ColumnDef,
+  Button,
+  KpiCard,
+  Badge,
+  StatusPill,
+  Dialog,
+  exportToCsv,
+} from '@neo/ui';
+
+export interface VehicleRecord {
+  id: string;
+  registrationNumber: string;
+  vehicleType: 'MINI_TRUCK' | '14FT_TRUCK' | 'REEFER' | '3_WHEELER';
+  capacityKg: number;
+  capacityCrates: number;
+  ownershipType: 'OWNED' | 'HIRED';
+  defaultDriverName?: string;
+  defaultDriverPhone?: string;
+  fitnessExpiryDate: string;
+  insuranceExpiryDate: string;
+  pucExpiryDate: string;
+  status: 'AVAILABLE' | 'ON_TRIP' | 'MAINTENANCE' | 'INACTIVE';
+  active: boolean;
+}
+
+const INITIAL_VEHICLES: VehicleRecord[] = [
+  {
+    id: 'veh-1',
+    registrationNumber: 'MH-12-RN-4821',
+    vehicleType: 'REEFER',
+    capacityKg: 1500,
+    capacityCrates: 75,
+    ownershipType: 'OWNED',
+    defaultDriverName: 'Ganesh Shinde',
+    defaultDriverPhone: '9822441100',
+    fitnessExpiryDate: '2027-04-15',
+    insuranceExpiryDate: '2027-01-20',
+    pucExpiryDate: '2026-12-10', // Expiry soon!
+    status: 'AVAILABLE',
+    active: true,
+  },
+  {
+    id: 'veh-2',
+    registrationNumber: 'MH-12-QW-8192',
+    vehicleType: 'MINI_TRUCK',
+    capacityKg: 900,
+    capacityCrates: 45,
+    ownershipType: 'OWNED',
+    defaultDriverName: 'Santosh Jadhav',
+    defaultDriverPhone: '9822558899',
+    fitnessExpiryDate: '2027-08-30',
+    insuranceExpiryDate: '2027-06-15',
+    pucExpiryDate: '2027-02-14',
+    status: 'ON_TRIP',
+    active: true,
+  },
+  {
+    id: 'veh-3',
+    registrationNumber: 'MH-14-GH-3341',
+    vehicleType: '14FT_TRUCK',
+    capacityKg: 3500,
+    capacityCrates: 180,
+    ownershipType: 'HIRED',
+    defaultDriverName: 'Anil Pawar',
+    defaultDriverPhone: '9823117766',
+    fitnessExpiryDate: '2026-11-20', // Expiring in 8 days!
+    insuranceExpiryDate: '2027-03-10',
+    pucExpiryDate: '2026-11-18', // Expiring in 6 days!
+    status: 'AVAILABLE',
+    active: true,
+  },
+  {
+    id: 'veh-4',
+    registrationNumber: 'MH-12-AB-1122',
+    vehicleType: '3_WHEELER',
+    capacityKg: 450,
+    capacityCrates: 20,
+    ownershipType: 'OWNED',
+    defaultDriverName: 'Sunil Gaikwad',
+    defaultDriverPhone: '9822990011',
+    fitnessExpiryDate: '2027-05-12',
+    insuranceExpiryDate: '2027-04-10',
+    pucExpiryDate: '2027-01-05',
+    status: 'MAINTENANCE',
+    active: true,
+  },
+];
+
+export default function VehiclesPage() {
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>(INITIAL_VEHICLES);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [ownershipFilter, setOwnershipFilter] = useState<string>('ALL');
+
+  // Form modal
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<VehicleRecord | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Form fields
+  const [regNo, setRegNo] = useState('');
+  const [vehicleType, setVehicleType] = useState<VehicleRecord['vehicleType']>('MINI_TRUCK');
+  const [capacityKg, setCapacityKg] = useState('1000');
+  const [capacityCrates, setCapacityCrates] = useState('50');
+  const [ownershipType, setOwnershipType] = useState<VehicleRecord['ownershipType']>('OWNED');
+  const [driverName, setDriverName] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [fitnessExpiry, setFitnessExpiry] = useState('');
+  const [insuranceExpiry, setInsuranceExpiry] = useState('');
+  const [pucExpiry, setPucExpiry] = useState('');
+
+  const openNewForm = () => {
+    setEditingVehicle(null);
+    setRegNo('MH-12-');
+    setVehicleType('MINI_TRUCK');
+    setCapacityKg('1000');
+    setCapacityCrates('50');
+    setOwnershipType('OWNED');
+    setDriverName('');
+    setDriverPhone('');
+    setFitnessExpiry('2027-12-31');
+    setInsuranceExpiry('2027-12-31');
+    setPucExpiry('2027-06-30');
+    setFormErrors({});
+    setFormOpen(true);
+  };
+
+  const openEditForm = (v: VehicleRecord) => {
+    setEditingVehicle(v);
+    setRegNo(v.registrationNumber);
+    setVehicleType(v.vehicleType);
+    setCapacityKg(String(v.capacityKg));
+    setCapacityCrates(String(v.capacityCrates));
+    setOwnershipType(v.ownershipType);
+    setDriverName(v.defaultDriverName || '');
+    setDriverPhone(v.defaultDriverPhone || '');
+    setFitnessExpiry(v.fitnessExpiryDate);
+    setInsuranceExpiry(v.insuranceExpiryDate);
+    setPucExpiry(v.pucExpiryDate);
+    setFormErrors({});
+    setFormOpen(true);
+  };
+
+  const handleSaveVehicle = () => {
+    const errors: Record<string, string> = {};
+    const cleanReg = regNo.trim().toUpperCase();
+    if (!cleanReg) errors.regNo = 'Registration number is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    const newRec: VehicleRecord = {
+      id: editingVehicle ? editingVehicle.id : `veh-${Date.now()}`,
+      registrationNumber: cleanReg,
+      vehicleType,
+      capacityKg: parseInt(capacityKg, 10) || 1000,
+      capacityCrates: parseInt(capacityCrates, 10) || 50,
+      ownershipType,
+      defaultDriverName: driverName.trim(),
+      defaultDriverPhone: driverPhone.trim(),
+      fitnessExpiryDate: fitnessExpiry,
+      insuranceExpiryDate: insuranceExpiry,
+      pucExpiryDate: pucExpiry,
+      status: editingVehicle ? editingVehicle.status : 'AVAILABLE',
+      active: editingVehicle ? editingVehicle.active : true,
+    };
+
+    if (editingVehicle) {
+      setVehicles((prev) => prev.map((v) => (v.id === editingVehicle.id ? newRec : v)));
+    } else {
+      setVehicles((prev) => [newRec, ...prev]);
+    }
+    setFormOpen(false);
+  };
+
+  // Helper for expiry check
+  const isExpiringSoon = (dateStr: string) => {
+    if (!dateStr) return false;
+    const diffDays = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+    return diffDays < 30; // within 30 days
+  };
+
+  // KPIs
+  const totalVehicles = vehicles.length;
+  const onTripCount = vehicles.filter((v) => v.status === 'ON_TRIP').length;
+  const maintenanceCount = vehicles.filter((v) => v.status === 'MAINTENANCE').length;
+  const totalCapacityKg = vehicles.reduce((sum, v) => sum + v.capacityKg, 0);
+
+  const filteredVehicles = vehicles.filter((v) => {
+    if (typeFilter !== 'ALL' && v.vehicleType !== typeFilter) return false;
+    if (ownershipFilter !== 'ALL' && v.ownershipType !== ownershipFilter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        v.registrationNumber.toLowerCase().includes(q) ||
+        (v.defaultDriverName && v.defaultDriverName.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
+
+  const columns: ColumnDef<VehicleRecord>[] = [
+    {
+      id: 'regNo',
+      header: 'Registration No.',
+      accessorKey: 'registrationNumber',
+      cell: (info) => (
+        <span className="font-mono text-xs font-bold text-teal-400">
+          {info.getValue() as string}
+        </span>
+      ),
+    },
+    {
+      id: 'type',
+      header: 'Vehicle Type & Ownership',
+      cell: (info) => {
+        const v = info.row.original;
+        return (
+          <div className="text-xs">
+            <div className="font-bold text-white">{v.vehicleType.replace('_', ' ')}</div>
+            <div className="text-[11px] text-zinc-400 mt-0.5">
+              <Badge tone={v.ownershipType === 'OWNED' ? 'brand' : 'neutral'}>
+                {v.ownershipType}
+              </Badge>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'capacity',
+      header: 'Payload Capacity',
+      cell: (info) => {
+        const v = info.row.original;
+        return (
+          <div className="text-xs font-mono">
+            <div className="font-bold text-zinc-200">{v.capacityKg} kg</div>
+            <div className="text-zinc-500 text-[11px]">{v.capacityCrates} crates</div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'driver',
+      header: 'Assigned Driver',
+      cell: (info) => {
+        const v = info.row.original;
+        return (
+          <div className="text-xs">
+            <div className="font-semibold text-white">{v.defaultDriverName || 'Unassigned'}</div>
+            {v.defaultDriverPhone && (
+              <a href={`tel:${v.defaultDriverPhone}`} className="text-teal-400 font-mono text-[11px] hover:underline">
+                📞 {v.defaultDriverPhone}
+              </a>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'documents',
+      header: 'Compliance & Expiries',
+      cell: (info) => {
+        const v = info.row.original;
+        const pucAlert = isExpiringSoon(v.pucExpiryDate);
+        const fitAlert = isExpiringSoon(v.fitnessExpiryDate);
+        return (
+          <div className="text-[11px] space-y-0.5">
+            <div className={fitAlert ? 'text-amber-400 font-semibold' : 'text-zinc-400'}>
+              Fitness: {v.fitnessExpiryDate} {fitAlert && '⚠️'}
+            </div>
+            <div className={pucAlert ? 'text-rose-400 font-semibold' : 'text-zinc-400'}>
+              PUC: {v.pucExpiryDate} {pucAlert && '⚠️'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      accessorKey: 'status',
+      cell: (info) => {
+        const status = info.getValue() as VehicleRecord['status'];
+        const tone =
+          status === 'AVAILABLE' ? 'success' : status === 'ON_TRIP' ? 'info' : status === 'MAINTENANCE' ? 'warning' : 'neutral';
+        return <StatusPill tone={tone} label={status.replace('_', ' ')} />;
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: (info) => {
+        const v = info.row.original;
+        return (
+          <button
+            onClick={() => openEditForm(v)}
+            className="text-xs text-teal-400 hover:text-teal-300 font-medium"
+          >
+            Edit
+          </button>
+        );
+      },
+    },
+  ];
+
+  const handleExportCsv = () => {
+    exportToCsv(
+      'vehicles-fleet.csv',
+      filteredVehicles,
+      [
+        { key: 'registrationNumber', label: 'Registration No' },
+        { key: 'vehicleType', label: 'Type' },
+        { key: 'ownershipType', label: 'Ownership' },
+        { key: (v) => `${v.capacityKg} kg`, label: 'Capacity (Kg)' },
+        { key: (v) => `${v.capacityCrates} crates`, label: 'Capacity (Crates)' },
+        { key: 'defaultDriverName', label: 'Driver' },
+        { key: 'fitnessExpiryDate', label: 'Fitness Expiry' },
+        { key: 'pucExpiryDate', label: 'PUC Expiry' },
+        { key: 'status', label: 'Status' },
+      ],
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* 1. Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div>
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/30 mb-1.5">
+            <span>🚛 Dispatch Logistics</span>
+          </div>
+          <h1 className="text-2xl font-black text-white">Vehicles & Fleet Master</h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Track owned and hired logistics delivery vehicles, crate capacities, driver defaults, and statutory document expiries.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button variant="secondary" size="sm" onClick={handleExportCsv}>
+            📤 Export Fleet CSV
+          </Button>
+          <Button variant="primary" size="sm" onClick={openNewForm}>
+            + Add New Vehicle
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. KPI Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Registered Fleet"
+          value={String(totalVehicles)}
+          subtitle="Owned & hired vehicles"
+          tone="default"
+        />
+        <KpiCard
+          title="Active On Trip"
+          value={String(onTripCount)}
+          subtitle="Currently on delivery runs"
+          tone="default"
+        />
+        <KpiCard
+          title="In Maintenance"
+          value={String(maintenanceCount)}
+          subtitle="Temporarily unavailable"
+          tone={maintenanceCount > 0 ? 'warning' : 'success'}
+        />
+        <KpiCard
+          title="Total Fleet Capacity"
+          value={`${(totalCapacityKg / 1000).toFixed(1)} MT`}
+          subtitle="Aggregate payload"
+          tone="brand"
+        />
+      </div>
+
+      {/* 3. Filters */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl">
+        <div className="flex items-center gap-3 flex-1">
+          <input
+            type="text"
+            placeholder="Search by registration number or driver..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full md:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+          />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+          >
+            <option value="ALL">All Types</option>
+            <option value="MINI_TRUCK">Mini Truck</option>
+            <option value="REEFER">Reefer (Cold Van)</option>
+            <option value="14FT_TRUCK">14ft Truck</option>
+            <option value="3_WHEELER">3-Wheeler</option>
+          </select>
+          <select
+            value={ownershipFilter}
+            onChange={(e) => setOwnershipFilter(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+          >
+            <option value="ALL">All Ownership</option>
+            <option value="OWNED">Owned Fleet</option>
+            <option value="HIRED">Hired / Third-Party</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 4. DataTable */}
+      <DataTable columns={columns} data={filteredVehicles} pageSize={10} />
+
+      {/* 5. Vehicle Form Dialog */}
+      <Dialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editingVehicle ? `Edit Vehicle: ${editingVehicle.registrationNumber}` : 'Register New Vehicle'}
+        maxWidth="md"
+      >
+        <div className="space-y-4 my-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Registration Number *</label>
+              <input
+                type="text"
+                value={regNo}
+                onChange={(e) => setRegNo(e.target.value.toUpperCase())}
+                placeholder="e.g. MH-12-RN-4821"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+              />
+              {formErrors.regNo && <p className="text-xs text-rose-400 mt-1">{formErrors.regNo}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Vehicle Type</label>
+              <select
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value as any)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              >
+                <option value="MINI_TRUCK">Mini Truck</option>
+                <option value="REEFER">Reefer (Insulated Cold Van)</option>
+                <option value="14FT_TRUCK">14ft Truck</option>
+                <option value="3_WHEELER">3-Wheeler Auto</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Payload Capacity (kg)</label>
+              <input
+                type="number"
+                value={capacityKg}
+                onChange={(e) => setCapacityKg(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Crate Capacity</label>
+              <input
+                type="number"
+                value={capacityCrates}
+                onChange={(e) => setCapacityCrates(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Ownership</label>
+              <select
+                value={ownershipType}
+                onChange={(e) => setOwnershipType(e.target.value as any)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              >
+                <option value="OWNED">Company Owned</option>
+                <option value="HIRED">Market Hired</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Default Assigned Driver</label>
+              <input
+                type="text"
+                value={driverName}
+                onChange={(e) => setDriverName(e.target.value)}
+                placeholder="Driver full name"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Driver Phone</label>
+              <input
+                type="text"
+                value={driverPhone}
+                onChange={(e) => setDriverPhone(e.target.value)}
+                placeholder="Driver mobile number"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Fitness Expiry</label>
+              <input
+                type="date"
+                value={fitnessExpiry}
+                onChange={(e) => setFitnessExpiry(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Insurance Expiry</label>
+              <input
+                type="date"
+                value={insuranceExpiry}
+                onChange={(e) => setInsuranceExpiry(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">PUC Expiry</label>
+              <input
+                type="date"
+                value={pucExpiry}
+                onChange={(e) => setPucExpiry(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSaveVehicle}>
+              {editingVehicle ? 'Save Vehicle' : 'Register Vehicle'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  );
+}

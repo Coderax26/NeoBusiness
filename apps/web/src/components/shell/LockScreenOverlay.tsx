@@ -115,3 +115,4 @@ export const LockScreenOverlay: React.FC<LockScreenOverlayProps> = ({
     </div>
   );
 };
+

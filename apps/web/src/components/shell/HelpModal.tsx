@@ -131,3 +131,4 @@ export const HelpModal: React.FC<HelpModalProps> = ({ open, onClose, onStartTour
     </Dialog>
   );
 };
+

@@ -71,6 +71,33 @@ export default function RoleHomePage() {
         </div>
       </div>
 
+      {/* Setup Wizard Progress Card (Owner only, F3-01) */}
+      {isOwner && (
+        <div className="p-4 rounded-2xl border border-teal-500/30 bg-teal-950/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/40 flex items-center justify-center text-lg font-bold">
+              🚀
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-white">
+                  Your business is 60% set up
+                </h2>
+                <Badge tone="brand">Setup in progress</Badge>
+              </div>
+              <p className="text-xs text-zinc-300 mt-0.5">
+                Complete Item Catalog, Suppliers, and Opening Balances to finish preparation.
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/setup-wizard">
+            <Button variant="primary" size="sm">
+              Continue Setup Wizard →
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {/* 2. Global Banners / Needs Attention First */}
       <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

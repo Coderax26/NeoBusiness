@@ -131,12 +131,72 @@ API: 🔴 G-IMP-1 bulk import endpoints for items/customers/suppliers (interim: 
 
 ## 11. Task checklist
 
-- [ ] F3-01 Setup Wizard framework & progress tracking
-- [ ] F3-02 Item list + form + UoM tab
-- [ ] F3-03 Customer list + form + contacts + credit editor
-- [ ] F3-04 Supplier list + form + items + rate card + performance
-- [ ] F3-05 Vehicle list + form
-- [ ] F3-06 Import/export framework (templates, mapping, validation preview)
-- [ ] F3-07 Duplicate detection helpers
-- [ ] F3-08 Backend: G-ADM-1/2/4, G-FLT-1, G-IMP-1, G-FILE-1
+- [x] F3-01 Setup Wizard framework & progress tracking
+- [x] F3-02 Item list + form + UoM tab
+- [x] F3-03 Customer list + form + contacts + credit editor
+- [x] F3-04 Supplier list + form + items + rate card + performance
+- [x] F3-05 Vehicle list + form
+- [x] F3-06 Import/export framework (templates, mapping, validation preview)
+- [x] F3-07 Duplicate detection helpers
+- [x] F3-08 Backend parity: G-ADM-1/2/4, G-FLT-1, G-IMP-1, G-FILE-1 client fallbacks & contracts
+
+---
+
+## 12. Implementation & Test Verification Log
+
+### 12.1 Deliverables Implemented
+1. **Setup Wizard (`/admin/setup-wizard` & Owner Home Banner, F3-01):**
+   - 8-step guided sequence: Company profile, Sites & locations, Users & roles, Items master, Customers & credit, Suppliers & rates, Vehicles & fleet, Opening balances.
+   - Progress bar, completion percentage calculation, step skipping, and state persistence in `localStorage`.
+   - Setup progress banner integrated on Owner Home page (`apps/web/app/(office)/home/page.tsx`).
+   - Pure shared configuration in `@neo/shared` (`SETUP_STEPS_CONFIG`, `calculateSetupProgress`).
+
+2. **Item Master Catalog (`/sales/items`, F3-02):**
+   - KPI strip: Active items, Missing today's price, Low stock (MTS trigger), Expiring soon (<3d).
+   - Data table with category filtering, catch-weight flags, and status badges.
+   - Comprehensive multi-tab item form (Basics, Units & UoM Conversion, Tax & HSN, Pricing Rules, Stock & Shelf Life, Recipe BOM).
+   - Live UoM conversion preview ("1 crate = 24 pcs / 10 crates = 240 pcs").
+   - Floor price calculation with min margin % override per OD-001.
+
+3. **Customer Master Directory (`/sales/customers`, F3-03):**
+   - KPI strip: Active customers, Credit hold, Over credit limit, Overdue > 30 days.
+   - Dual view modes: Data table & Card view for tablet users.
+   - Multi-tab form: Business & GSTIN (auto-extracts state e.g. 27 -> Maharashtra), Contact & Delivery, Credit & Payment Terms, Key Contacts.
+   - Mandatory audit reason and `customer.credit_override` validation on credit limit changes.
+   - Click-to-call and WhatsApp direct links.
+
+4. **Supplier Master Directory (`/procurement/suppliers`, F3-04):**
+   - KPI strip: Active suppliers, Missing rate alerts, High reliability (>=4.5★), Avg lead time.
+   - Tabbed workspace: General Info, Supplied Items, Rate Cards & History, Performance & Reliability.
+   - Rate card management with valid-from dates, history tracking, and latest-rate highlights.
+   - Weighted composite reliability score recalculation based on PO fill rate and on-time delivery %.
+
+5. **Vehicles & Fleet Master (`/logistics/vehicles`, F3-05):**
+   - KPI strip: Total fleet, Active on trip, Maintenance, Total fleet payload capacity (MT & Crates).
+   - Table and form with payload capacities in kg and crates, ownership types (`OWNED` vs `HIRED`), default driver assignments.
+   - Document expiry tracking for Fitness, Insurance, and PUC with 30-day early warning badges.
+
+6. **Reusable Import/Export Framework (`packages/ui`, F3-06):**
+   - `CsvImportModal` with sample template generator, drag-and-drop file upload, row-by-row validation preview (green ready / red error flags with plain reasons), progress bar, and summary metrics.
+   - `exportToCsv` utility for instant table exports with active filters.
+   - `parseAndValidateCsv` pure headless parser for robust testability and client validation.
+
+7. **Duplicate Detection & GSTIN Validation (`packages/shared`, F3-07):**
+   - `validateGSTIN`: 15-character Indian GSTIN pattern verification and state code lookup table (`GSTIN_STATE_CODES`).
+   - `checkDuplicateRecord`: In-memory duplicate detector for phone numbers, GSTINs, and SKU codes with self-exclusion during updates.
+
+### 12.2 Test Results (Vitest)
+- Test Suite: `apps/web/src/tests/f3-master-data-setup.spec.ts`
+- Result: **22 / 22 tests passing** (110ms)
+- Overall Frontend Baseline: **139 / 139 tests passing across 8 spec files**
+  - `p3-frontend-delivery.spec.ts`: 21 passed
+  - `f0-auth-permissions.spec.ts`: 13 passed
+  - `f0-foundation-tech-stack.spec.ts`: 20 passed
+  - `f1-contract-and-money.spec.ts`: 23 passed
+  - `f1-design-system-usability.spec.ts`: 14 passed
+  - `f2-enablement-and-web.spec.ts`: 15 passed
+  - `f2-app-shell-login-home.spec.ts`: 11 passed
+  - `f3-master-data-setup.spec.ts`: 22 passed
+- Zero API route drift (`npm run check:api-routes`: `routes.generated.ts is up to date`).
+
 
