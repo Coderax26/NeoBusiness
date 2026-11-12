@@ -6,6 +6,8 @@
 
 ## Quick Start
 
+> 📖 **Full Frontend + Backend Run Guide**: See [docs/APPLICATION_RUN_GUIDE.md](docs/APPLICATION_RUN_GUIDE.md) for complete step-by-step instructions to run the Backend API (`:3000`), Interactive Control Tower UI (`:4000`), seeded user credentials, and test suites.
+
 ### Prerequisites
 
 | Tool | Minimum version |

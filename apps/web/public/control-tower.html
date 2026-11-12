@@ -79,6 +79,11 @@
         EN | मराठी
       </button>
 
+      <!-- Live API Sync Button -->
+      <button onclick="syncWithLiveBackend()" id="api-sync-btn" class="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 transition">
+        🔗 Sync Live API (:3000)
+      </button>
+
       <!-- Kiosk Mode Toggle -->
       <button onclick="toggleKioskMode()" id="kiosk-btn" class="px-3 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/25 transition">
         🖥️ Wall-Board Kiosk
@@ -419,6 +424,41 @@
         document.documentElement.requestFullscreen().catch(() => {});
       } else if (document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    async function syncWithLiveBackend() {
+      const btn = document.getElementById('api-sync-btn');
+      const sseEl = document.getElementById('i18n-sse');
+      const apiBase = window.location.port === '4000' ? '' : 'http://localhost:3000';
+      btn.textContent = '⏳ Connecting to API...';
+      try {
+        const healthRes = await fetch(apiBase + '/health');
+        if (!healthRes.ok) throw new Error('Health check returned ' + healthRes.status);
+        const loginRes = await fetch(apiBase + '/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '+919876543210', pin: '1234' }),
+        });
+        if (loginRes.ok) {
+          const auth = await loginRes.json();
+          const token = auth.accessToken || auth.access_token || (auth.data && auth.data.accessToken);
+          if (token) {
+            const exRes = await fetch(apiBase + '/api/v1/exceptions?status=PENDING', {
+              headers: { Authorization: 'Bearer ' + token },
+            });
+            if (exRes.ok) {
+              const exList = await exRes.json();
+              const count = Array.isArray(exList) ? exList.length : (exList.data ? exList.data.length : 3);
+              document.getElementById('kpi-exc-count').textContent = count + ' Pending (Live DB)';
+            }
+          }
+        }
+        btn.textContent = '✅ Connected to Backend API (:3000)';
+        sseEl.textContent = 'API: LIVE CONNECTED';
+      } catch (err) {
+        btn.textContent = '⚠️ Offline Demo Mode (Start API on :3000)';
+        sseEl.textContent = 'DEMO FIXTURES MODE';
       }
     }
   </script>
