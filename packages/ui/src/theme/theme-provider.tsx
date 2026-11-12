@@ -67,3 +67,4 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 export function useTheme() {
   return useContext(ThemeContext);
 }
+

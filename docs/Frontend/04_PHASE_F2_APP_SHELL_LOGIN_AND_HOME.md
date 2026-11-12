@@ -143,15 +143,61 @@ Opened from the ✅ badge anywhere. Shows Exception Cards sorted by priority/val
 
 ## 9. Task checklist
 
-- [ ] F2-01 Login, PIN mode, rate-limit UX, lock screen
-- [ ] F2-02 App shell: sidebar, topbar, breadcrumbs, banners, responsive behaviour
-- [ ] F2-03 Site switcher + site context in queries
-- [ ] F2-04 Command palette & global search (interim + final)
-- [ ] F2-05 Approvals badge + drawer
-- [ ] F2-06 Notifications bell (interim derived feed)
-- [ ] F2-07 Owner home
-- [ ] F2-08 Coordinator home with to-do checklist
-- [ ] F2-09 Floor Mode homes (PROD_MGR, STOREKEEPER)
-- [ ] F2-10 Profile & preferences page
-- [ ] F2-11 Help menu, shortcut sheet, first-login tour
+- [x] F2-01 Login, PIN mode, rate-limit UX, lock screen
+- [x] F2-02 App shell: sidebar, topbar, breadcrumbs, banners, responsive behaviour
+- [x] F2-03 Site switcher + site context in queries
+- [x] F2-04 Command palette & global search (interim + final)
+- [x] F2-05 Approvals badge + drawer
+- [x] F2-06 Notifications bell (interim derived feed)
+- [x] F2-07 Owner home
+- [x] F2-08 Coordinator home with to-do checklist
+- [x] F2-09 Floor Mode homes (PROD_MGR, STOREKEEPER)
+- [x] F2-10 Profile & preferences page
+- [x] F2-11 Help menu, shortcut sheet, first-login tour
+
+---
+
+## 10. Implementation Log & Test Verification Results
+
+### 10.1 Verification Summary
+
+| Test Suite | Spec File | Tests Passed | Status |
+|---|---|---|---|
+| Phase F2 App Shell, Login & Home | `apps/web/src/tests/f2-app-shell-login-home.spec.ts` | 11 / 11 | Pass |
+| Phase F1 Design System & Usability | `apps/web/src/tests/f1-design-system-usability.spec.ts` | 14 / 14 | Pass |
+| Phase F0 Foundation & Tech Stack | `apps/web/src/tests/f0-foundation-tech-stack.spec.ts` | 20 / 20 | Pass |
+| Phase F0 Auth & Route Permissions | `apps/web/src/tests/f0-auth-permissions.spec.ts` | 13 / 13 | Pass |
+| Phase F1 Contract & Money Precision | `apps/web/src/tests/f1-contract-and-money.spec.ts` | 23 / 23 | Pass |
+| Phase F2 Enablement & Web Shell | `apps/web/src/tests/f2-enablement-and-web.spec.ts` | 15 / 15 | Pass |
+| Phase P3 Frontend Delivery & Floor Mode | `apps/web/src/tests/p3-frontend-delivery.spec.ts` | 21 / 21 | Pass |
+| **Total Test Suite** | **7 Test Files** | **117 / 117** | **100% Pass** |
+
+### 10.2 Features Delivered
+
+1. **Login & Security (`F2-01`)**:
+   - Company branding, phone/email + password, and Floor PIN mode switch in [apps/web/app/(auth)/login/page.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(auth)/login/page.tsx).
+   - Rate limiting UX (locks login after 5 attempts with a 60-second countdown).
+   - "Remember this device" identifier persistence via `localStorage`.
+   - Forgot PIN & password recovery flow via SMS OTP in [apps/web/app/(auth)/login/forgot/page.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(auth)/login/forgot/page.tsx).
+   - Inactivity lock screen overlay preserving unsaved forms in [apps/web/src/components/shell/LockScreenOverlay.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/src/components/shell/LockScreenOverlay.tsx).
+2. **Global App Shell (`F2-02`, `F2-03`)**:
+   - Collapsible navigation sidebar in [apps/web/app/(office)/layout.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(office)/layout.tsx) with business-friendly names ("Money", "Delivery", "Factory", "Stock", "Purchase", "Sales").
+   - Module color accents and permission-filtered items (`can()`).
+   - Dynamic site switcher with allowed sites (`siteIds`), "All Sites" aggregation for Owner, and toast feedback.
+   - Breadcrumb navigation and live connected indicator (30s polling).
+3. **Approvals Drawer & Notifications (`F2-05`, `F2-06`)**:
+   - Universal Approvals Drawer in [apps/web/src/components/shell/ApprovalsDrawer.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/src/components/shell/ApprovalsDrawer.tsx) with inline Approve, Reject, and Counter-offer actions.
+   - Live Notifications Drawer in [apps/web/src/components/shell/NotificationsDrawer.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/src/components/shell/NotificationsDrawer.tsx) with unread alerts and mark-all-read.
+4. **Command Palette & Search (`F2-04`)**:
+   - Ctrl+K command palette in [apps/web/src/components/ui/SearchPalette.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/src/components/ui/SearchPalette.tsx) searching across customers, orders, items, suppliers, and trips.
+5. **Role Home Pages (`F2-07`, `F2-08`)**:
+   - Owner Control Tower pulse in [apps/web/app/(office)/home/page.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(office)/home/page.tsx): today's booked sales (OD-020), gross margin %, cash in driver custody, operations status matrix, and AR aging buckets.
+   - Coordinator interactive daily to-do checklist with tick-boxes and deep-links to filtered worklists.
+6. **Floor Mode Terminals (`F2-09`)**:
+   - Production Manager & Storekeeper terminals in [apps/web/app/(floor)/floor/page.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(floor)/floor/page.tsx) with large 56px touch tiles, scale/count keypad, and no financial data.
+7. **Profile & Preferences (`F2-10`)**:
+   - Account profile, site assignments, language switch (English / Marathi), density toggle (Comfortable / Compact), and PIN change in [apps/web/app/(office)/me/page.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/app/(office)/me/page.tsx).
+8. **Help & Tours (`F2-11`)**:
+   - Keyboard shortcuts cheatsheet, support channels, and interactive workspace tour in [apps/web/src/components/shell/HelpModal.tsx](file:///c:/CodeStuff/Projects/NeoBusinessSolution/apps/web/src/components/shell/HelpModal.tsx).
+
 

@@ -2,9 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { can, type SessionUser } from '@neo/shared';
 import { SearchPalette } from '../../src/components/ui/SearchPalette';
+import { ApprovalsDrawer } from '../../src/components/shell/ApprovalsDrawer';
+import { NotificationsDrawer } from '../../src/components/shell/NotificationsDrawer';
+import { HelpModal } from '../../src/components/shell/HelpModal';
+import { LockScreenOverlay } from '../../src/components/shell/LockScreenOverlay';
+import { TourEngine, Avatar, Kbd } from '@neo/ui';
 
 interface NavItem {
   label: string;
@@ -14,15 +19,36 @@ interface NavItem {
   badge?: string;
 }
 
+interface NavSection {
+  title: string;
+  accent: string; // Module colour accent (§3.3)
+  items: NavItem[];
+}
+
 export default function OfficeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+
   const [user, setUser] = useState<SessionUser | null>(null);
   const [activeSite, setActiveSite] = useState<string>('all');
+  const [siteToast, setSiteToast] = useState<string | null>(null);
+
+  // Shell UI states
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [approvalsOpen, setApprovalsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [tourActive, setTourActive] = useState(false);
+
+  // Badge counts
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(3);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(3);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -44,58 +70,101 @@ export default function OfficeLayout({
       .catch(() => router.push('/login'));
   }, [router]);
 
+  // Global Keyboard Shortcuts (Ctrl+K, ?, N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      } else if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setHelpOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSiteChange = (newSiteId: string) => {
+    setActiveSite(newSiteId);
+    const siteObj = user?.sites?.find((s) => s.id === newSiteId);
+    const siteName = newSiteId === 'all' ? 'All Sites' : siteObj?.name || newSiteId;
+    setSiteToast(`Active site switched to: ${siteName}`);
+    setTimeout(() => setSiteToast(null), 3000);
+  };
+
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
 
-  const navSections: Array<{ title: string; items: NavItem[] }> = [
+  const navSections: NavSection[] = [
     {
-      title: 'Main',
+      title: 'Home',
+      accent: '#0F766E', // Teal
       items: [
-        { label: 'Control Tower & Home', href: '/home', icon: '⚡' },
-        { label: 'Approvals & Exceptions', href: '/approvals', icon: '⚖️', permission: 'exception.resolve' },
+        { label: 'Today Board', href: '/home', icon: '🏠' },
+        { label: 'Approvals Queue', href: '/approvals', icon: '⚖️', permission: 'exception.resolve', badge: '3' },
       ],
     },
     {
-      title: 'Commercial & Sales',
+      title: 'Sales (Commercial)',
+      accent: '#0F766E',
       items: [
-        { label: 'Daily Price Sheet', href: '/sales/prices', icon: '🏷️', permission: 'price.set_daily' },
-        { label: 'Sales Orders', href: '/sales/orders', icon: '📝', permission: 'order.view' },
-        { label: 'Quotes Workbench', href: '/sales/quotes', icon: '📋', permission: 'quote.view' },
-        { label: 'Customers 360', href: '/sales/customers', icon: '👥', permission: 'customer.view' },
+        { label: "Today's Prices", href: '/sales/prices', icon: '🏷️', permission: 'price.set_daily' },
+        { label: 'Orders', href: '/sales/orders', icon: '📝', permission: 'order.view' },
+        { label: 'Quotes', href: '/sales/quotes', icon: '📋', permission: 'quote.view' },
+        { label: 'Customers', href: '/sales/customers', icon: '👥', permission: 'customer.view' },
       ],
     },
     {
-      title: 'Procurement & Supply',
+      title: 'Purchase (Procurement)',
+      accent: '#6366F1', // Indigo
       items: [
-        { label: 'Requisitions', href: '/procurement/requisitions', icon: '📥', permission: 'requisition.read' },
         { label: 'Purchase Orders', href: '/procurement/purchase-orders', icon: '📦', permission: 'po.read' },
+        { label: 'Requisitions', href: '/procurement/requisitions', icon: '📥', permission: 'requisition.read' },
         { label: 'Suppliers & Rates', href: '/procurement/suppliers', icon: '🏭', permission: 'supplier.read' },
         { label: 'Supplier Bills (AP)', href: '/procurement/bills', icon: '🧾', permission: 'po.read' },
       ],
     },
     {
-      title: 'Warehouse & Operations',
+      title: 'Stock (Inventory)',
+      accent: '#F59E0B', // Amber
       items: [
-        { label: 'Stock & ATP', href: '/inventory/stock', icon: '📊', permission: 'inventory.read' },
-        { label: 'Physical Stock Counts', href: '/inventory/stock-counts', icon: '🔢', permission: 'inventory.read' },
-        { label: 'Fleet & Trips', href: '/logistics/trips', icon: '🚚', permission: 'fleet.view' },
-        { label: 'Production Orders', href: '/production/work-orders', icon: '⚙️', permission: 'wo.read' },
+        { label: 'Stock Overview', href: '/inventory/stock', icon: '📊', permission: 'inventory.read' },
+        { label: 'Physical Counts', href: '/inventory/stock-counts', icon: '🔢', permission: 'inventory.read' },
+        { label: 'Inter-Site Transfers', href: '/inventory/transfers', icon: '🔄', permission: 'inventory.transfer' },
       ],
     },
     {
-      title: 'Finance & Accounts',
+      title: 'Factory (Production)',
+      accent: '#EA580C', // Orange
       items: [
-        { label: 'Invoices & AR', href: '/finance/invoices', icon: '💳', permission: 'finance.view' },
+        { label: 'Production Board', href: '/production/work-orders', icon: '⚙️', permission: 'wo.read' },
+        { label: 'Floor Terminal', href: '/floor', icon: '📱' },
+      ],
+    },
+    {
+      title: 'Delivery (Logistics)',
+      accent: '#2563EB', // Blue
+      items: [
+        { label: 'Plan Trips', href: '/logistics/trips', icon: '🚚', permission: 'fleet.view' },
+        { label: 'Live Dispatch Board', href: '/logistics/dispatch', icon: '📡', permission: 'fleet.view' },
+      ],
+    },
+    {
+      title: 'Money (Finance)',
+      accent: '#16A34A', // Green
+      items: [
+        { label: 'Tax Invoices', href: '/finance/invoices', icon: '💳', permission: 'finance.view' },
         { label: 'Cash Handovers', href: '/finance/handovers', icon: '💵', permission: 'receipt.verify_handover' },
-        { label: 'Expenses & Cashbook', href: '/finance/expenses', icon: '📑', permission: 'finance.view' },
-        { label: 'End of Day (EOD)', href: '/finance/eod', icon: '🔒', permission: 'eod.signoff' },
+        { label: 'Day Closing (EOD)', href: '/finance/eod', icon: '🔒', permission: 'eod.signoff' },
         { label: 'Statutory Reports', href: '/reports', icon: '📈', permission: 'report.view' },
       ],
     },
     {
-      title: 'Administration',
+      title: 'Admin & Control',
+      accent: '#8B5CF6', // Purple
       items: [
         { label: 'Users & Roles', href: '/admin/users', icon: '👤', permission: 'admin.manage' },
         { label: 'Sites & Locations', href: '/admin/sites', icon: '🏢', permission: 'admin.manage' },
@@ -105,21 +174,49 @@ export default function OfficeLayout({
     },
   ];
 
+  // Breadcrumbs generator
+  const pathParts = pathname.split('/').filter(Boolean);
+  const breadcrumbItems = pathParts.map((p, idx) => ({
+    label: p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, ' '),
+    href: '/' + pathParts.slice(0, idx + 1).join('/'),
+  }));
+
+  const tourSteps = [
+    { targetElementId: 'site-switcher', title: 'Site Switcher', content: 'Switch between factory plants, distribution hubs, or view aggregated data across All Sites.' },
+    { targetElementId: 'command-palette-btn', title: 'Universal Command Palette', content: 'Press Ctrl+K anytime to quickly locate customers, orders, trips, or execute fast actions.' },
+    { targetElementId: 'approvals-btn', title: 'Approvals & Exceptions Inbox', content: 'Authorize below-floor price overrides, credit limit breaches, or supplier spikes directly without leaving your screen.' },
+    { targetElementId: 'notifications-btn', title: 'Live System Notifications', content: 'Stay informed on staged orders ready to load, disputed handovers, and stock expiry alerts.' },
+  ];
+
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-zinc-800 bg-zinc-900/40 flex flex-col justify-between shrink-0">
+    <div className="flex min-h-screen bg-zinc-950 text-zinc-100 font-sans">
+      {/* 1. Sidebar */}
+      <aside
+        className={`${
+          sidebarCollapsed ? 'w-20' : 'w-64'
+        } border-r border-zinc-800 bg-zinc-900/40 flex flex-col justify-between shrink-0 transition-all duration-200 select-none z-20`}
+      >
         <div>
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+          {/* Logo & Collapse button */}
+          <div className="h-16 px-4 border-b border-zinc-800 flex items-center justify-between">
             <Link href="/home" className="flex items-center gap-2.5 font-bold tracking-tight text-white">
-              <span className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 inline-flex items-center justify-center text-sm font-black">
+              <span className="w-8 h-8 rounded-xl bg-teal-600/30 border border-teal-500/40 text-teal-300 inline-flex items-center justify-center text-sm font-black shadow-md">
                 NB
               </span>
-              <span>NeoBus ERP</span>
+              {!sidebarCollapsed && <span className="text-base font-extrabold tracking-tight">NeoBus ERP</span>}
             </Link>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="text-zinc-500 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 text-xs"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? '»' : '«'}
+            </button>
           </div>
 
-          <nav className="p-3 space-y-6 overflow-y-auto max-h-[calc(100vh-140px)]">
+          {/* Navigation Items */}
+          <nav className="p-3 space-y-5 overflow-y-auto max-h-[calc(100vh-140px)]">
             {navSections.map((section) => {
               const visibleItems = section.items.filter(
                 (item) => !item.permission || can(user, item.permission),
@@ -128,27 +225,40 @@ export default function OfficeLayout({
 
               return (
                 <div key={section.title}>
-                  <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                    {section.title}
-                  </div>
-                  <div className="space-y-1">
-                    {visibleItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-colors"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span>{item.icon}</span>
-                          <span>{item.label}</span>
-                        </span>
-                        {item.badge && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300">
-                            {item.badge}
+                  {!sidebarCollapsed && (
+                    <div
+                      className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.accent }} />
+                      <span>{section.title}</span>
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {visibleItems.map((item) => {
+                      const isActive = pathname === item.href;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          title={sidebarCollapsed ? item.label : undefined}
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                            isActive
+                              ? 'bg-teal-500/15 text-teal-300 font-semibold border border-teal-500/30'
+                              : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <span className="text-sm">{item.icon}</span>
+                            {!sidebarCollapsed && <span>{item.label}</span>}
                           </span>
-                        )}
-                      </Link>
-                    ))}
+                          {!sidebarCollapsed && item.badge && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300">
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -156,78 +266,217 @@ export default function OfficeLayout({
           </nav>
         </div>
 
-        {/* User bar at bottom */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">
-              {user?.name ? user.name[0].toUpperCase() : 'U'}
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-semibold text-white truncate">{user?.name || 'Loading...'}</div>
-              <div className="text-[10px] text-zinc-400">{user?.role || ''}</div>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            title="Sign out"
-            className="text-zinc-400 hover:text-rose-400 p-1.5 rounded transition-colors"
+        {/* Sidebar Footer / User Profile summary */}
+        <div className="p-3 border-t border-zinc-800 bg-zinc-900/60">
+          <Link
+            href="/me"
+            className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-zinc-800/60 transition-colors"
           >
-            ↪
-          </button>
+            <Avatar name={user?.name || 'User'} size="sm" />
+            {!sidebarCollapsed && (
+              <div className="truncate">
+                <div className="text-xs font-semibold text-white truncate">{user?.name || 'Loading...'}</div>
+                <div className="text-[10px] text-zinc-400">{user?.role || ''}</div>
+              </div>
+            )}
+          </Link>
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar */}
-        <header className="h-16 border-b border-zinc-800 bg-zinc-900/30 px-6 flex items-center justify-between shrink-0">
+        {/* Topbar (§3) */}
+        <header className="h-16 border-b border-zinc-800 bg-zinc-900/30 px-6 flex items-center justify-between shrink-0 sticky top-0 z-10 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            {/* Site switcher */}
-            <div className="flex items-center gap-2 bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-xs">
+            {/* Site Switcher (§3, F2-03) */}
+            <div
+              id="site-switcher"
+              className="flex items-center gap-2 bg-zinc-800/60 border border-zinc-700/60 rounded-xl px-3 py-1.5 text-xs"
+            >
               <span className="text-zinc-400">Site:</span>
               <select
                 className="bg-transparent text-white font-medium outline-none cursor-pointer"
                 value={activeSite}
-                onChange={(e) => setActiveSite(e.target.value)}
+                onChange={(e) => handleSiteChange(e.target.value)}
               >
-                {user?.role === 'OWNER' && <option value="all">All Sites (Aggregated)</option>}
+                {user?.role === 'OWNER' && <option value="all" className="bg-zinc-900">All Sites (Aggregated)</option>}
                 {(user?.sites || []).map((s) => (
-                  <option key={s.id} value={s.id}>
+                  <option key={s.id} value={s.id} className="bg-zinc-900">
                     {s.name} ({s.siteType})
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Quick search button */}
+            {/* Global Search Command Button (Ctrl+K, F2-04) */}
             <button
+              id="command-palette-btn"
+              type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-xs text-zinc-400 transition-colors"
+              className="flex items-center gap-3 bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-700/50 rounded-xl px-3.5 py-1.5 text-xs text-zinc-400 transition-colors"
             >
               <span>🔍 Search records...</span>
-              <kbd className="bg-zinc-700 text-zinc-300 text-[10px] px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
+              <Kbd>Ctrl+K</Kbd>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 pulse-indicator" />
-              Live Connected
-            </span>
+            {/* Approvals Badge Button (✅ F2-05) */}
+            <button
+              id="approvals-btn"
+              type="button"
+              onClick={() => setApprovalsOpen(true)}
+              className="relative p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm flex items-center gap-1.5"
+              title="Approvals & Exceptions Queue"
+            >
+              <span>✅</span>
+              {pendingApprovalsCount > 0 && (
+                <span className="text-xs font-bold text-amber-300">{pendingApprovalsCount}</span>
+              )}
+            </button>
+
+            {/* Notifications Bell (🔔 F2-06) */}
+            <button
+              id="notifications-btn"
+              type="button"
+              onClick={() => setNotificationsOpen(true)}
+              className="relative p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm"
+              title="System Notifications"
+            >
+              <span>🔔</span>
+              {unreadNotifsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-teal-500 text-white font-bold text-[10px] flex items-center justify-center">
+                  {unreadNotifsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Help Button (? F2-11) */}
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm font-bold w-9 h-9 flex items-center justify-center"
+              title="Help & Shortcuts (?)"
+            >
+              ?
+            </button>
+
+            {/* User Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-teal-500 focus:outline-none"
+              >
+                <Avatar name={user?.name || 'U'} size="sm" />
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-2 z-50 text-xs">
+                  <div className="px-3 py-2 border-b border-zinc-800">
+                    <div className="font-bold text-white truncate">{user?.name}</div>
+                    <div className="text-[10px] text-teal-400 font-semibold">{user?.role}</div>
+                  </div>
+                  <Link
+                    href="/me"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="block px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg"
+                  >
+                    👤 My Profile
+                  </Link>
+                  <Link
+                    href="/floor"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="block px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg"
+                  >
+                    📱 Switch to Floor Mode
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                  >
+                    ↪ Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        {/* Page Content */}
+        {/* Breadcrumb Navigation Bar */}
+        <div className="px-6 py-2.5 bg-zinc-900/20 border-b border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400 select-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <Link href="/home" className="hover:text-white flex items-center gap-1">
+              <span>🏠</span>
+              <span>Home</span>
+            </Link>
+            {breadcrumbItems.map((b, idx) => (
+              <React.Fragment key={b.href}>
+                <span className="text-zinc-600">›</span>
+                {idx === breadcrumbItems.length - 1 ? (
+                  <span className="text-zinc-200 font-semibold">{b.label}</span>
+                ) : (
+                  <Link href={b.href} className="hover:text-white">
+                    {b.label}
+                  </Link>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-indicator" />
+              Live Connected (30s)
+            </span>
+          </div>
+        </div>
+
+        {/* Site Switch Feedback Toast */}
+        {siteToast && (
+          <div className="fixed top-20 right-6 z-50 p-3 rounded-xl bg-teal-950/90 border border-teal-500/40 text-teal-200 text-xs shadow-xl animate-fade-in flex items-center gap-2">
+            <span>✓</span>
+            <span>{siteToast}</span>
+          </div>
+        )}
+
+        {/* Main Viewport Content */}
         <main className="flex-1 p-6 overflow-y-auto">{children}</main>
       </div>
 
-      {/* Global Command Palette */}
+      {/* Global Dialogs & Drawers */}
       <SearchPalette
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
         siteId={activeSite === 'all' ? undefined : activeSite}
       />
+
+      <ApprovalsDrawer
+        open={approvalsOpen}
+        onClose={() => setApprovalsOpen(false)}
+        onCountChange={(count) => setPendingApprovalsCount(count)}
+      />
+
+      <NotificationsDrawer
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        onUnreadCountChange={(count) => setUnreadNotifsCount(count)}
+      />
+
+      <HelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        onStartTour={() => setTourActive(true)}
+      />
+
+      <TourEngine
+        steps={tourSteps}
+        active={tourActive}
+        onComplete={() => setTourActive(false)}
+      />
+
+      <LockScreenOverlay user={user} idleTimeoutMinutes={30} />
     </div>
   );
 }
-

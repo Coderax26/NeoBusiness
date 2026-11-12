@@ -101,3 +101,4 @@ export function explainTerm(termKey: string, locale: 'en' | 'mr' = 'en'): Glossa
   if (!term) return null;
   return term;
 }
+
