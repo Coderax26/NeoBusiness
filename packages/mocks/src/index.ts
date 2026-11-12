@@ -90,7 +90,7 @@ export const INITIAL_EXCEPTIONS_FIXTURE: ExceptionCardDto[] = [
   },
   {
     id: 'exc-supplier-003',
-    exceptionType: 'SUPPLIER_VARIANCE',
+    exceptionType: 'SUPPLIER_PRICE_SPIKE',
     referenceTable: 'purchase_orders',
     referenceId: 'PO-2611-0019',
     status: 'PENDING',

@@ -12,8 +12,8 @@ import {
   can,
   getAuthorizedNavItems,
   toSessionUser,
-} from '../../../../packages/shared/src/index.js';
-import * as shared from '../../../../packages/shared/src/index.js';
+} from '@neo/shared';
+import * as shared from '@neo/shared';
 
 /** Minimal chainable knex mock keyed by table name. */
 function mockKnex(tables: Record<string, any>) {

@@ -4,6 +4,8 @@
  * Implements OD-003 (INR / ₹ with Indian lakh/crore grouping) and docs/claude/10_FE_Web_Frontend.md §3.5.
  */
 
+import { fromScaled, toScaled } from './money.js';
+
 export interface FormatINROptions {
   showSymbol?: boolean;
   decimals?: number;
@@ -22,13 +24,15 @@ export function formatINR(
     return showSymbol ? '₹0.00' : '0.00';
   }
 
-  const num = typeof amount === 'string' ? Number(amount.replace(/,/g, '')) : amount;
-  if (Number.isNaN(num)) {
+  let scaled: bigint;
+  try {
+    scaled = toScaled(amount); // exact — no float drift (gap I-4)
+  } catch {
     return showSymbol ? '₹0.00' : '0.00';
   }
 
-  const isNegative = num < 0;
-  const fixed = Math.abs(num).toFixed(decimals);
+  const isNegative = scaled < 0n;
+  const fixed = fromScaled(isNegative ? -scaled : scaled, Math.min(decimals, 6));
   const [intPart, decPart] = fixed.split('.');
 
   // Indian numbering: last 3 digits, then groups of 2 digits

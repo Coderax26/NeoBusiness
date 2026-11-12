@@ -20,6 +20,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { SupplierService } from './supplier.service.js';
+import { SupplierBillService } from './supplier-bill.service.js';
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
@@ -32,7 +33,10 @@ import {
 @Controller('procurement/suppliers')
 @UseGuards(JwtAuthGuard, RbacGuard)
 export class SupplierController {
-  constructor(private readonly supplierService: SupplierService) {}
+  constructor(
+    private readonly supplierService: SupplierService,
+    private readonly billService: SupplierBillService,
+  ) {}
 
   @Post()
   @RequirePermission('supplier.create')
@@ -184,5 +188,13 @@ export class SupplierController {
       itemCategory,
       daysThreshold,
     );
+  }
+
+  @Get(':id/ledger')
+  @RequirePermission('supplier.read')
+  @ApiOperation({ summary: 'Get supplier statement / bill ledger (G-AP-1)' })
+  @ApiResponse({ status: 200, description: 'Supplier statement ledger' })
+  async getLedger(@Param('id') supplierId: string) {
+    return this.billService.getSupplierLedger(supplierId);
   }
 }

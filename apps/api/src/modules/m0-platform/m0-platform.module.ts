@@ -7,6 +7,13 @@ import { ConfigService } from './config.service.js';
 import { MigrationService } from './migration.service.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
+import { AdminService } from './admin.service.js';
+import { AdminController } from './admin.controller.js';
+import { AuditController } from './audit.controller.js';
+import { NotificationsController } from './notifications.controller.js';
+import { SearchController } from './search.controller.js';
+import { AttachmentsController } from './attachments.controller.js';
+import { EventsController } from './events.controller.js';
 import { PermissionService, RbacGuard } from './rbac.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { DocNumberService } from './doc-number.service.js';
@@ -27,6 +34,7 @@ import { PilotReconciliationService } from '../../shared/observability/pilot-rec
     ConfigService,
     MigrationService,
     AuthService,
+    AdminService,
     PermissionService,
     RbacGuard,
     JwtAuthGuard,
@@ -41,13 +49,22 @@ import { PilotReconciliationService } from '../../shared/observability/pilot-rec
       useClass: AuditInterceptor,
     },
   ],
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+    AdminController,
+    AuditController,
+    NotificationsController,
+    SearchController,
+    AttachmentsController,
+    EventsController,
+  ],
   exports: [
     DatabaseModule,
     AuthModule,
     ConfigService,
     MigrationService,
     AuthService,
+    AdminService,
     PermissionService,
     RbacGuard,
     JwtAuthGuard,

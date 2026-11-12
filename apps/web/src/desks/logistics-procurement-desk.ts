@@ -13,7 +13,7 @@ import {
   rankBackupSuppliers,
   CONFIRMED_BUSINESS_CONFIG,
   type BackupSupplierCandidate,
-} from '../../../../packages/shared/src/index.js';
+} from '@neo/shared';
 
 export interface TripStopOrder {
   orderId: string;

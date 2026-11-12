@@ -5,6 +5,8 @@
  * Phase P2 decisions (OD-001 through OD-025).
  */
 
+import { absMoney, addMoney, cmpMoney, fromScaled, mulMoney, pctOf, subMoney, toScaled } from './money.js';
+
 export const CONFIRMED_BUSINESS_CONFIG = {
   OWNER_ESCALATION_THRESHOLD_INR: 5000, // OD-002
   CURRENCY: 'INR', // OD-003
@@ -55,10 +57,10 @@ export function evaluatePriceBand(
   landedCost: number,
 ): PriceBandEvaluation {
   const marginPct =
-    unitPrice > 0 ? Number((((unitPrice - landedCost) / unitPrice) * 100).toFixed(2)) : 0;
-  const deltaFromFloor = Number((unitPrice - floorPrice).toFixed(2));
+    Number(pctOf(subMoney(unitPrice, landedCost, 6), unitPrice, 2));
+  const deltaFromFloor = Number(subMoney(unitPrice, floorPrice));
 
-  if (unitPrice < floorPrice) {
+  if (cmpMoney(unitPrice, floorPrice) < 0) {
     return {
       status: 'BELOW_FLOOR',
       deltaFromFloor,
@@ -69,7 +71,7 @@ export function evaluatePriceBand(
     };
   }
 
-  if (unitPrice < targetPrice) {
+  if (cmpMoney(unitPrice, targetPrice) < 0) {
     return {
       status: 'BELOW_TARGET',
       deltaFromFloor,
@@ -112,26 +114,24 @@ export function simulateCounterOfferMargin(
   quantity: number,
   originalRequestedPrice?: number,
 ): CounterOfferSimulation {
-  const lineTotal = Number((proposedPrice * quantity).toFixed(2));
-  const grossProfit = Number(((proposedPrice - landedCost) * quantity).toFixed(2));
+  const lineTotal = Number(mulMoney(proposedPrice, quantity));
+  const grossProfit = Number(mulMoney(subMoney(proposedPrice, landedCost, 6), quantity));
   const marginPct =
-    proposedPrice > 0
-      ? Number((((proposedPrice - landedCost) / proposedPrice) * 100).toFixed(2))
-      : 0;
-  const deltaFromFloor = Number((proposedPrice - floorPrice).toFixed(2));
+    Number(pctOf(subMoney(proposedPrice, landedCost, 6), proposedPrice, 2));
+  const deltaFromFloor = Number(subMoney(proposedPrice, floorPrice));
   const discountValueAtRisk =
     originalRequestedPrice !== undefined
-      ? Math.abs((floorPrice - originalRequestedPrice) * quantity)
-      : Math.abs((floorPrice - proposedPrice) * quantity);
+      ? Number(absMoney(mulMoney(subMoney(floorPrice, originalRequestedPrice, 6), quantity)))
+      : Number(absMoney(mulMoney(subMoney(floorPrice, proposedPrice, 6), quantity)));
 
   return {
-    proposedPrice: Number(proposedPrice.toFixed(2)),
+    proposedPrice: Number(fromScaled(toScaled(proposedPrice))),
     quantity,
     lineTotal,
     grossProfit,
     marginPct,
     deltaFromFloor,
-    isAboveFloor: proposedPrice >= floorPrice,
+    isAboveFloor: cmpMoney(proposedPrice, floorPrice) >= 0,
     requiresPinPrompt:
       lineTotal >= CONFIRMED_BUSINESS_CONFIG.OWNER_ESCALATION_THRESHOLD_INR ||
       discountValueAtRisk >= CONFIRMED_BUSINESS_CONFIG.OWNER_ESCALATION_THRESHOLD_INR,
@@ -157,17 +157,17 @@ export function evaluateCreditStatus(
   overdueDays: number,
   explicitCreditHold = false,
 ): CreditEvaluation {
-  const projectedExposure = Number((currentAr + orderAmount).toFixed(2));
+  const projectedExposure = Number(addMoney(currentAr, orderAmount));
   const utilizationPct =
-    creditLimit > 0 ? Number(((projectedExposure / creditLimit) * 100).toFixed(1)) : 100;
-  const isOverLimit = projectedExposure > creditLimit;
+    creditLimit > 0 ? Number(pctOf(projectedExposure, creditLimit, 1)) : 100;
+  const isOverLimit = cmpMoney(projectedExposure, creditLimit) > 0;
   const isHold = explicitCreditHold || overdueDays > 30 || isOverLimit;
 
   if (isHold) {
     const reasons: string[] = [];
     if (explicitCreditHold) reasons.push('Account on Credit Hold');
     if (overdueDays > 30) reasons.push(`${overdueDays} days overdue`);
-    if (isOverLimit) reasons.push(`Exceeds credit limit by ₹${(projectedExposure - creditLimit).toFixed(2)}`);
+    if (isOverLimit) reasons.push(`Exceeds credit limit by ₹${subMoney(projectedExposure, creditLimit)}`);
     return {
       projectedExposure,
       utilizationPct,
@@ -228,7 +228,7 @@ export function evaluateSupplierPriceSpike(
 
   const variancePct =
     baselinePrice > 0
-      ? Number((((poUnitPrice - baselinePrice) / baselinePrice) * 100).toFixed(2))
+      ? Number(pctOf(subMoney(poUnitPrice, baselinePrice, 6), baselinePrice, 2))
       : 0;
   const exceedsTolerance = variancePct > tolerancePct;
 
@@ -259,7 +259,7 @@ export function rankBackupSuppliers(
   return candidates
     .map((c) => {
       const deltaPct =
-        primaryRate > 0 ? Number((((c.quotedRate - primaryRate) / primaryRate) * 100).toFixed(2)) : 0;
+        primaryRate > 0 ? Number(pctOf(subMoney(c.quotedRate, primaryRate, 6), primaryRate, 2)) : 0;
       return {
         ...c,
         deltaPct,
@@ -343,7 +343,7 @@ export function evaluateHandoverVariance(
     };
   }
 
-  const cashVariance = Number((countedCash - expectedCash).toFixed(2));
+  const cashVariance = Number(subMoney(countedCash, expectedCash));
   const absVariance = Math.abs(cashVariance);
   const isDisputed = absVariance > 0;
 
@@ -413,22 +413,25 @@ export function allocateReceiptFifo(
     (a, b) => new Date(a.invoiceDate).getTime() - new Date(b.invoiceDate).getTime(),
   );
 
-  let remainingReceipt = Number(receiptAmount.toFixed(2));
+  let remainingReceipt = Number(fromScaled(toScaled(receiptAmount)));
   const allocations: FifoAllocationResult[] = [];
 
   for (const inv of sorted) {
     if (remainingReceipt <= 0) break;
     if (inv.outstandingAmount <= 0) continue;
 
-    const alloc = Math.min(remainingReceipt, inv.outstandingAmount);
-    const roundedAlloc = Number(alloc.toFixed(2));
-    remainingReceipt = Number((remainingReceipt - roundedAlloc).toFixed(2));
+    const roundedAlloc = Number(
+      fromScaled(
+        toScaled(cmpMoney(remainingReceipt, inv.outstandingAmount) <= 0 ? remainingReceipt : inv.outstandingAmount),
+      ),
+    );
+    remainingReceipt = Number(subMoney(remainingReceipt, roundedAlloc));
 
     allocations.push({
       invoiceId: inv.invoiceId,
       invoiceNumber: inv.invoiceNumber,
       allocatedAmount: roundedAlloc,
-      remainingInvoiceBalance: Number((inv.outstandingAmount - roundedAlloc).toFixed(2)),
+      remainingInvoiceBalance: Number(subMoney(inv.outstandingAmount, roundedAlloc)),
     });
   }
 

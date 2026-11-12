@@ -41,7 +41,8 @@ function isValidBillTransition(from: BillStatus, to: BillStatus): boolean {
   const transitions: Record<BillStatus, BillStatus[]> = {
     [BillStatus.DRAFT]: [BillStatus.PENDING_APPROVAL],
     [BillStatus.PENDING_APPROVAL]: [BillStatus.APPROVED, BillStatus.REJECTED],
-    [BillStatus.APPROVED]: [],
+    [BillStatus.APPROVED]: [BillStatus.PAID],
+    [BillStatus.PAID]: [],
     [BillStatus.REJECTED]: [BillStatus.DRAFT],
   };
 
@@ -223,7 +224,7 @@ export class SupplierBillService {
         throw new NotFoundException(`Bill ${billId} not found`);
       }
 
-      if (current.status === BillStatus.APPROVED) {
+      if (current.status === BillStatus.APPROVED && dto.status !== BillStatus.PAID) {
         throw new BadRequestException(`Bill ${billId} is already approved`);
       }
 
@@ -324,7 +325,33 @@ export class SupplierBillService {
         return this.getById(billId, trx);
       }
 
-      // 4. Handle DRAFT transition (from REJECTED)
+      // 4. Handle PAID transition
+      if (dto.status === BillStatus.PAID) {
+        await trx('supplier_bills').where('id', billId).update({
+          status: BillStatus.PAID,
+          updated_by: approverId,
+          updated_at: new Date(),
+        });
+
+        await this.outbox.raise(
+          trx,
+          'bill.paid',
+          billId,
+          {
+            billId,
+            billNumber: current.bill_number ?? current.bill_no,
+            supplierId: current.supplier_id,
+            siteId: current.site_id,
+            paidBy: approverId,
+            paidAt: new Date().toISOString(),
+          },
+          'm2',
+        );
+
+        return this.getById(billId, trx);
+      }
+
+      // 5. Handle DRAFT transition (from REJECTED)
       await trx('supplier_bills').where('id', billId).update({
         status: BillStatus.DRAFT,
         updated_by: approverId,
@@ -577,5 +604,97 @@ export class SupplierBillService {
     });
 
     return { id: taxInvoiceId, invoice_no: invoiceNo };
+  }
+
+  async getSupplierLedger(supplierId: string) {
+    const bills = await this.knex('supplier_bills')
+      .where('supplier_id', supplierId)
+      .orderBy('created_at', 'desc');
+
+    const totalBilled = bills.reduce(
+      (sum, b) => sum + Number(b.total_amount || b.amount || 0),
+      0,
+    );
+    const totalPaid = bills
+      .filter((b) => b.status === BillStatus.PAID)
+      .reduce((sum, b) => sum + Number(b.total_amount || b.amount || 0), 0);
+
+    return {
+      supplierId,
+      bills,
+      totalBilled: totalBilled.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
+      outstandingBalance: (totalBilled - totalPaid).toFixed(2),
+    };
+  }
+
+  async getApAging(siteId?: string) {
+    let query = this.knex('supplier_bills as sb')
+      .join('suppliers as s', 'sb.supplier_id', 's.id')
+      .whereIn('sb.status', [BillStatus.APPROVED, 'RECEIVED', 'VERIFIED']);
+
+    if (siteId) {
+      query = query.where('sb.site_id', siteId);
+    }
+
+    const openBills = await query.select(
+      'sb.id',
+      'sb.supplier_id',
+      's.name as supplier_name',
+      'sb.due_date',
+      'sb.total_amount',
+      'sb.amount',
+    );
+
+    const now = Date.now();
+    const buckets = {
+      '0_7': { bucket: '0_7', label: '0-7 Days', amountInr: 0, billCount: 0 },
+      '8_15': {
+        bucket: '8_15',
+        label: '8-15 Days',
+        amountInr: 0,
+        billCount: 0,
+      },
+      '16_30': {
+        bucket: '16_30',
+        label: '16-30 Days',
+        amountInr: 0,
+        billCount: 0,
+      },
+      '30_PLUS': {
+        bucket: '30_PLUS',
+        label: '30+ Days',
+        amountInr: 0,
+        billCount: 0,
+      },
+    };
+
+    for (const b of openBills) {
+      const amt = Number(b.total_amount || b.amount || 0);
+      const dueDate = new Date(b.due_date).getTime();
+      const overdueDays = Math.max(
+        0,
+        Math.floor((now - dueDate) / (1000 * 60 * 60 * 24)),
+      );
+
+      if (overdueDays <= 7) {
+        buckets['0_7'].amountInr += amt;
+        buckets['0_7'].billCount++;
+      } else if (overdueDays <= 15) {
+        buckets['8_15'].amountInr += amt;
+        buckets['8_15'].billCount++;
+      } else if (overdueDays <= 30) {
+        buckets['16_30'].amountInr += amt;
+        buckets['16_30'].billCount++;
+      } else {
+        buckets['30_PLUS'].amountInr += amt;
+        buckets['30_PLUS'].billCount++;
+      }
+    }
+
+    return Object.values(buckets).map((b) => ({
+      ...b,
+      amountInr: b.amountInr.toFixed(2),
+    }));
   }
 }

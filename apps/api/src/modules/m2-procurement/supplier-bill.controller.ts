@@ -189,6 +189,35 @@ export class SupplierBillController {
     return wrapResponse(result);
   }
 
+  @Get('ap/aging')
+  @RequirePermission('po.read')
+  @ApiOperation({ summary: 'Accounts Payable aging buckets by supplier' })
+  @ApiResponse({ status: 200, description: 'AP aging summary' })
+  async getApAging(@Query('siteId') siteId?: string) {
+    const result = await this.billService.getApAging(siteId);
+    return wrapResponse(result);
+  }
+
+  @Post(':id/pay')
+  @UseInterceptors(AuditInterceptor)
+  @RequirePermission('po.approve')
+  @ApiOperation({ summary: 'Record payment for approved supplier bill (APPROVED → PAID)' })
+  @ApiResponse({ status: 200, description: 'Bill marked as paid' })
+  async pay(
+    @Param('id') id: string,
+    @Body() body: { paymentRef?: string; paidAmount?: number },
+    @Req() req: any,
+  ) {
+    const bill = await this.billService.updateStatus(
+      id,
+      {
+        status: BillStatus.PAID,
+      },
+      req.user.id,
+    );
+    return wrapResponse(bill);
+  }
+
   @Get(':id')
   @RequirePermission('po.read')
   @ApiOperation({ summary: 'Get supplier bill details with lines' })

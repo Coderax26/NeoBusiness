@@ -18,7 +18,7 @@ import {
   CONFIRMED_BUSINESS_CONFIG,
   type SessionUser,
   type NavItem,
-} from '../../../../packages/shared/src/index.js';
+} from '@neo/shared';
 
 export interface CookieOptions {
   httpOnly: boolean;

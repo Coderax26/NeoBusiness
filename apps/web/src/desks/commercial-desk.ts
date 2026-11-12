@@ -15,8 +15,8 @@ import {
   formatINR,
   type PriceBandEvaluation,
   type CreditEvaluation,
-} from '../../../../packages/shared/src/index.js';
-import type { NeoApiClient } from '../../../../packages/api-client/src/index.js';
+} from '@neo/shared';
+import type { NeoApiClient } from '@neo/api-client';
 
 export interface QuickOrderLine {
   lineNumber: number;

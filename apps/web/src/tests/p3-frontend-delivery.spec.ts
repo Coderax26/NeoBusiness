@@ -20,23 +20,23 @@ import {
   allocateReceiptFifo,
   CONFIRMED_BUSINESS_CONFIG,
   type SessionUser,
-} from '../../../../packages/shared/src/index.js';
+} from '@neo/shared';
 import {
   t,
   EN_MESSAGES,
   MR_MESSAGES,
   type TranslationKey,
-} from '../../../../packages/i18n/src/index.js';
+} from '@neo/i18n';
 import {
   DESIGN_TOKENS,
   getStatusPillTheme,
   buildSparklineSvgPoints,
-} from '../../../../packages/ui/src/index.js';
+} from '@neo/ui';
 import {
   NeoApiClient,
   RealtimeEventHub,
-} from '../../../../packages/api-client/src/index.js';
-import { NeoMockServer } from '../../../../packages/mocks/src/index.js';
+} from '@neo/api-client';
+import { NeoMockServer } from '@neo/mocks';
 import {
   WebSessionManager,
   ControlTowerController,

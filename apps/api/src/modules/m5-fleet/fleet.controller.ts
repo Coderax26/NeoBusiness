@@ -184,4 +184,36 @@ export class FleetController {
   ) {
     return this.fleet.createExpense(id, dto, req.user.id);
   }
+
+  @Post('trips/:id/confirm-loading')
+  @RequirePermission('fleet.manage')
+  @ApiOperation({ summary: 'Storekeeper confirms loading before dispatch (G-FLT-2)' })
+  confirmLoading(
+    @Param('id') id: string,
+    @Body() body: { verifiedCratesCount?: number },
+    @Req() req: any,
+  ) {
+    return this.fleet.confirmLoading(id, body?.verifiedCratesCount ?? 0, req.user.id);
+  }
+
+  @Get('issues')
+  @RequirePermission('fleet.read')
+  @ApiOperation({ summary: 'List delivery issue reports' })
+  listIssues(
+    @Query('siteId') siteId?: string,
+    @Query('tripId') tripId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.fleet.listIssues({ siteId, tripId, status });
+  }
+
+  @Get('trip-expenses')
+  @RequirePermission('fleet.read')
+  @ApiOperation({ summary: 'List trip expenses' })
+  listExpenses(
+    @Query('siteId') siteId?: string,
+    @Query('tripId') tripId?: string,
+  ) {
+    return this.fleet.listExpenses({ siteId, tripId });
+  }
 }

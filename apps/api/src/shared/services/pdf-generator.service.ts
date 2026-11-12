@@ -75,6 +75,72 @@ export interface DepositSlipData {
   }>;
 }
 
+export interface OrderPdfData {
+  orderNo: string;
+  orderDate: string;
+  customerName: string;
+  customerAddress?: string;
+  customerGstin?: string;
+  siteName: string;
+  siteAddress?: string;
+  siteGstin?: string;
+  lines: Array<{
+    itemName: string;
+    qty: string;
+    unitPrice: string;
+    lineTotal: string;
+  }>;
+  totalAmount: string;
+  status: string;
+}
+
+export interface QuotePdfData {
+  quoteNo: string;
+  quoteDate: string;
+  validUntil?: string;
+  customerName: string;
+  customerAddress?: string;
+  siteName: string;
+  lines: Array<{
+    itemName: string;
+    qty: string;
+    unitPrice: string;
+    lineTotal: string;
+  }>;
+  totalAmount: string;
+}
+
+export interface PoPdfData {
+  poNo: string;
+  poDate: string;
+  supplierName: string;
+  supplierAddress?: string;
+  supplierGstin?: string;
+  siteName: string;
+  expectedDelivery?: string;
+  lines: Array<{
+    itemName: string;
+    qty: string;
+    unitPrice: string;
+    lineTotal: string;
+  }>;
+  totalAmount: string;
+}
+
+export interface StatementPdfData {
+  customerName: string;
+  statementDate: string;
+  currentBalance: string;
+  entries: Array<{
+    date: string;
+    refNo: string;
+    type: string;
+    debit: string;
+    credit: string;
+    balance: string;
+  }>;
+}
+
 @Injectable()
 export class PdfGeneratorService {
   /**
@@ -562,6 +628,229 @@ export class PdfGeneratorService {
         y += 35;
         doc.moveTo(40, y).lineTo(180, y).stroke('#000000');
         doc.moveTo(40 + pageWidth - 160, y).lineTo(40 + pageWidth, y).stroke('#000000');
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async generateOrder(data: OrderPdfData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const chunks: Buffer[] = [];
+        doc.on('data', (c: Buffer) => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+        doc.fontSize(18).font('Helvetica-Bold').text('SALES ORDER CONFIRMATION', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.siteName || 'NeoBus Commercial', 40, y);
+        y += 14;
+        doc.fontSize(9).font('Helvetica').text(`Order No: ${data.orderNo} | Date: ${data.orderDate} | Status: ${data.status}`, 40, y);
+        y += 20;
+
+        doc.fontSize(10).font('Helvetica-Bold').text(`Customer: ${data.customerName}`, 40, y);
+        if (data.customerGstin) {
+          y += 14;
+          doc.fontSize(9).font('Helvetica').text(`GSTIN: ${data.customerGstin}`, 40, y);
+        }
+        y += 25;
+
+        // Table
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Sr.', 42, y + 5, { width: 30 });
+        doc.text('Item Description', 75, y + 5, { width: 220 });
+        doc.text('Quantity', 300, y + 5, { width: 60, align: 'right' });
+        doc.text('Unit Price (INR)', 365, y + 5, { width: 75, align: 'right' });
+        doc.text('Total (INR)', 445, y + 5, { width: 65, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        data.lines.forEach((l, idx) => {
+          if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+          doc.fillColor('#000000');
+          doc.text(String(idx + 1), 42, y + 4, { width: 30 });
+          doc.text(l.itemName, 75, y + 4, { width: 220 });
+          doc.text(l.qty, 300, y + 4, { width: 60, align: 'right' });
+          doc.text(l.unitPrice, 365, y + 4, { width: 75, align: 'right' });
+          doc.text(l.lineTotal, 445, y + 4, { width: 65, align: 'right' });
+          y += 18;
+        });
+
+        y += 15;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text(`Total Amount: INR ${data.totalAmount}`, 40 + pageWidth - 200, y, { width: 200, align: 'right' });
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async generateQuote(data: QuotePdfData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const chunks: Buffer[] = [];
+        doc.on('data', (c: Buffer) => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+        doc.fontSize(18).font('Helvetica-Bold').text('COMMERCIAL QUOTATION', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.siteName || 'NeoBus Commercial', 40, y);
+        y += 14;
+        doc.fontSize(9).font('Helvetica').text(`Quote No: ${data.quoteNo} | Date: ${data.quoteDate}${data.validUntil ? ` | Valid Until: ${data.validUntil}` : ''}`, 40, y);
+        y += 20;
+
+        doc.fontSize(10).font('Helvetica-Bold').text(`Customer: ${data.customerName}`, 40, y);
+        y += 25;
+
+        // Table
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Sr.', 42, y + 5, { width: 30 });
+        doc.text('Item Description', 75, y + 5, { width: 220 });
+        doc.text('Quantity', 300, y + 5, { width: 60, align: 'right' });
+        doc.text('Quoted Price (INR)', 365, y + 5, { width: 75, align: 'right' });
+        doc.text('Total (INR)', 445, y + 5, { width: 65, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        data.lines.forEach((l, idx) => {
+          if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+          doc.fillColor('#000000');
+          doc.text(String(idx + 1), 42, y + 4, { width: 30 });
+          doc.text(l.itemName, 75, y + 4, { width: 220 });
+          doc.text(l.qty, 300, y + 4, { width: 60, align: 'right' });
+          doc.text(l.unitPrice, 365, y + 4, { width: 75, align: 'right' });
+          doc.text(l.lineTotal, 445, y + 4, { width: 65, align: 'right' });
+          y += 18;
+        });
+
+        y += 15;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text(`Total Quoted: INR ${data.totalAmount}`, 40 + pageWidth - 200, y, { width: 200, align: 'right' });
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async generatePurchaseOrder(data: PoPdfData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const chunks: Buffer[] = [];
+        doc.on('data', (c: Buffer) => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+        doc.fontSize(18).font('Helvetica-Bold').text('PURCHASE ORDER', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.siteName || 'NeoBus Procurement', 40, y);
+        y += 14;
+        doc.fontSize(9).font('Helvetica').text(`PO No: ${data.poNo} | Date: ${data.poDate}${data.expectedDelivery ? ` | Expected Delivery: ${data.expectedDelivery}` : ''}`, 40, y);
+        y += 20;
+
+        doc.fontSize(10).font('Helvetica-Bold').text(`Supplier: ${data.supplierName}`, 40, y);
+        if (data.supplierGstin) {
+          y += 14;
+          doc.fontSize(9).font('Helvetica').text(`GSTIN: ${data.supplierGstin}`, 40, y);
+        }
+        y += 25;
+
+        // Table
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Sr.', 42, y + 5, { width: 30 });
+        doc.text('Item Description', 75, y + 5, { width: 220 });
+        doc.text('Ordered Qty', 300, y + 5, { width: 60, align: 'right' });
+        doc.text('Unit Rate (INR)', 365, y + 5, { width: 75, align: 'right' });
+        doc.text('Total (INR)', 445, y + 5, { width: 65, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        data.lines.forEach((l, idx) => {
+          if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+          doc.fillColor('#000000');
+          doc.text(String(idx + 1), 42, y + 4, { width: 30 });
+          doc.text(l.itemName, 75, y + 4, { width: 220 });
+          doc.text(l.qty, 300, y + 4, { width: 60, align: 'right' });
+          doc.text(l.unitPrice, 365, y + 4, { width: 75, align: 'right' });
+          doc.text(l.lineTotal, 445, y + 4, { width: 65, align: 'right' });
+          y += 18;
+        });
+
+        y += 15;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text(`Total PO Value: INR ${data.totalAmount}`, 40 + pageWidth - 200, y, { width: 200, align: 'right' });
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async generateCustomerStatement(data: StatementPdfData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const chunks: Buffer[] = [];
+        doc.on('data', (c: Buffer) => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 80;
+        let y = 40;
+        doc.fontSize(18).font('Helvetica-Bold').text('CUSTOMER STATEMENT OF ACCOUNT', 40, y);
+        y += 24;
+        doc.fontSize(11).font('Helvetica-Bold').text(data.customerName, 40, y);
+        y += 14;
+        doc.fontSize(9).font('Helvetica').text(`Statement Date: ${data.statementDate} | Current Balance: INR ${data.currentBalance}`, 40, y);
+        y += 25;
+
+        // Table
+        doc.rect(40, y, pageWidth, 20).fill('#f0f0f0');
+        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+        doc.text('Date', 42, y + 5, { width: 70 });
+        doc.text('Reference No', 115, y + 5, { width: 100 });
+        doc.text('Type', 220, y + 5, { width: 65 });
+        doc.text('Debit (INR)', 290, y + 5, { width: 70, align: 'right' });
+        doc.text('Credit (INR)', 365, y + 5, { width: 70, align: 'right' });
+        doc.text('Balance (INR)', 440, y + 5, { width: 70, align: 'right' });
+        y += 22;
+
+        doc.font('Helvetica').fontSize(8);
+        data.entries.forEach((e, idx) => {
+          if (idx % 2 === 1) doc.rect(40, y, pageWidth, 16).fill('#fafafa');
+          doc.fillColor('#000000');
+          doc.text(e.date, 42, y + 4, { width: 70 });
+          doc.text(e.refNo, 115, y + 4, { width: 100 });
+          doc.text(e.type, 220, y + 4, { width: 65 });
+          doc.text(e.debit, 290, y + 4, { width: 70, align: 'right' });
+          doc.text(e.credit, 365, y + 4, { width: 70, align: 'right' });
+          doc.text(e.balance, 440, y + 4, { width: 70, align: 'right' });
+          y += 18;
+        });
+
+        y += 15;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text(`Closing Balance: INR ${data.currentBalance}`, 40 + pageWidth - 200, y, { width: 200, align: 'right' });
 
         doc.end();
       } catch (err) {

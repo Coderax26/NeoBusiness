@@ -13,9 +13,9 @@ import {
   evaluateBatchYield,
   maskSensitivePayload,
   type BatchYieldEvaluation,
-} from '../../../packages/shared/src/index.js';
-import { DESIGN_TOKENS } from '../../../packages/ui/src/index.js';
-import type { NeoApiClient } from '../../../packages/api-client/src/index.js';
+} from '@neo/shared';
+import { DESIGN_TOKENS } from '@neo/ui';
+import type { NeoApiClient } from '@neo/api-client';
 
 export type OfflineBadgeStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING';
 
@@ -264,7 +264,7 @@ export class TabletWarehouseProductionDesk {
 
     const dispatch = await this.outbox.dispatchCommand({
       type: 'WORK_ORDER_COMPLETE',
-      path: `/work-orders/${input.workOrderId}/complete`,
+      path: `/production/work-orders/${input.workOrderId}/complete`,
       payload: {
         workOrderId: input.workOrderId,
         actualOutputKg: input.actualOutputKg,
@@ -303,7 +303,7 @@ export class TabletWarehouseProductionDesk {
   }) {
     return this.outbox.dispatchCommand({
       type: 'GRN_BLIND_RECEIVE',
-      path: '/grn/blind',
+      path: '/procurement/grns', // blind GRN = POST /procurement/grns (qty counted only, BR-05)
       payload: input,
       idempotencyKey: input.idempotencyKey,
     });

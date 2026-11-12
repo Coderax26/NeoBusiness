@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "description": "NeoBus Office Desk & Interactive Owner Control Tower Web Application",
-  "main": "./src/index.ts"
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "next dev -p 4000",
+    "build": "next build",
+    "start": "next start -p 4000",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "next": "^15.5.29",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
 }
-

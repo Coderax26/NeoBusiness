@@ -99,6 +99,16 @@ export class InventoryController {
     );
   }
 
+  @Get('reservations')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'List stock reservations (G-INV-1)' })
+  async listReservations(
+    @Query('siteId') siteId?: string,
+    @Query('itemId') itemId?: string,
+  ) {
+    return this.inventoryService.listReservations(siteId, itemId);
+  }
+
   /**
    * POST /inventory/reservations
    */
@@ -129,6 +139,19 @@ export class InventoryController {
   ) {
     await this.inventoryPort.release(reservationId);
     return { success: true };
+  }
+
+  /**
+   * GET /inventory/transfers
+   */
+  @Get('transfers')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'List inter-site transfers (G-INV-1)' })
+  async listTransfers(
+    @Query('siteId') siteId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.inventoryService.listTransfers(siteId, status);
   }
 
   /**
@@ -208,6 +231,19 @@ export class InventoryController {
   }
 
   /**
+   * GET /inventory/adjustments
+   */
+  @Get('adjustments')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'List stock adjustments (G-INV-1)' })
+  async listAdjustments(
+    @Query('siteId') siteId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.inventoryService.listAdjustments(siteId, status);
+  }
+
+  /**
    * POST /inventory/adjustments
    */
   @Post('adjustments')
@@ -247,5 +283,69 @@ export class InventoryController {
       body.reason,
     );
     return { success: true };
+  }
+
+  /**
+   * POST /inventory/stock-counts - Create physical stock count sheet (G-INV-3)
+   */
+  @Post('stock-counts')
+  @RequirePermission('inventory.adjust')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create physical stock count sheet (G-INV-3)' })
+  async createStockCount(
+    @Body()
+    body: {
+      siteId: string;
+      locationId?: string;
+      notes?: string;
+      items: Array<{
+        itemId: string;
+        batchNo?: string;
+        systemQty?: string;
+        countedQty: string;
+      }>;
+    },
+    @Req() req: any,
+  ) {
+    return this.inventoryService.createStockCount(
+      body.siteId,
+      body.locationId,
+      body.notes,
+      body.items || [],
+      req.user.id,
+    );
+  }
+
+  /**
+   * GET /inventory/stock-counts - List physical stock count sheets (G-INV-3)
+   */
+  @Get('stock-counts')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'List physical stock count sheets (G-INV-3)' })
+  async listStockCounts(
+    @Query('siteId') siteId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.inventoryService.listStockCounts(siteId, status);
+  }
+
+  /**
+   * GET /inventory/stock-counts/:id - Get stock count sheet detail (G-INV-3)
+   */
+  @Get('stock-counts/:id')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'Get stock count sheet detail with counted lines (G-INV-3)' })
+  async getStockCount(@Param('id') id: string) {
+    return this.inventoryService.getStockCountById(id);
+  }
+
+  /**
+   * POST /inventory/stock-counts/:id/approve - Approve stock count sheet & post adjustments (G-INV-3)
+   */
+  @Post('stock-counts/:id/approve')
+  @RequirePermission('inventory.adjust')
+  @ApiOperation({ summary: 'Approve stock count sheet & post variances (G-INV-3)' })
+  async approveStockCount(@Param('id') id: string, @Req() req: any) {
+    return this.inventoryService.approveStockCount(id, req.user.id);
   }
 }

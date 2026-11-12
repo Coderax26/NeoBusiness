@@ -20,7 +20,7 @@ import {
   type CustomerProfitabilityDto,
   type ActiveTruckTelemetryDto,
   type FactoryBatchDto,
-} from '../../../../packages/api-client/src/index.js';
+} from '@neo/api-client';
 import {
   INITIAL_PULSE_FIXTURE,
   INITIAL_STATUS_MATRIX_FIXTURE,
@@ -29,13 +29,13 @@ import {
   INITIAL_FLEET_TELEMETRY_FIXTURE,
   INITIAL_FACTORY_BATCHES_FIXTURE,
   INITIAL_CUSTOMER_PROFITABILITY_FIXTURE,
-} from '../../../../packages/mocks/src/index.js';
+} from '@neo/mocks';
 import {
   simulateCounterOfferMargin,
   formatINR,
   type CounterOfferSimulation,
-} from '../../../../packages/shared/src/index.js';
-import { buildSparklineSvgPoints } from '../../../../packages/ui/src/index.js';
+} from '@neo/shared';
+import { buildSparklineSvgPoints } from '@neo/ui';
 
 export type PipelineStageKey =
   | 'ALL'

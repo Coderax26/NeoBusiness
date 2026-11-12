@@ -16,7 +16,7 @@ import {
   allocateReceiptFifo,
   type HandoverVarianceEvaluation,
   type FifoInvoiceItem,
-} from '../../../../packages/shared/src/index.js';
+} from '@neo/shared';
 
 export interface EodChecklistState {
   allTripsClosed: boolean;

@@ -835,4 +835,41 @@ export class FleetService {
       throw new BadRequestException('GPS coordinates are invalid');
     }
   }
+
+  async confirmLoading(tripId: string, verifiedCratesCount: number, userId: string) {
+    const trip = await this.knex('delivery_trips').where('id', tripId).first();
+    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
+    const [updated] = await this.knex('delivery_trips')
+      .where('id', tripId)
+      .update({
+        updated_at: Clock.nowUtc(),
+        updated_by: userId,
+      })
+      .returning('*');
+    return {
+      tripId,
+      verifiedCratesCount,
+      status: 'LOADING_CONFIRMED',
+      trip: updated,
+    };
+  }
+
+  async listIssues(filter: { siteId?: string; tripId?: string; status?: string }) {
+    let query = this.knex('issue_reports as ir')
+      .leftJoin('delivery_trips as dt', 'ir.trip_id', 'dt.id')
+      .select('ir.*', 'dt.trip_no');
+    if (filter.siteId) query = query.where('ir.site_id', filter.siteId);
+    if (filter.tripId) query = query.where('ir.trip_id', filter.tripId);
+    if (filter.status) query = query.where('ir.status', filter.status);
+    return query.orderBy('ir.created_at', 'desc');
+  }
+
+  async listExpenses(filter: { siteId?: string; tripId?: string }) {
+    let query = this.knex('trip_expenses as te')
+      .leftJoin('delivery_trips as dt', 'te.trip_id', 'dt.id')
+      .select('te.*', 'dt.trip_no');
+    if (filter.siteId) query = query.where('te.site_id', filter.siteId);
+    if (filter.tripId) query = query.where('te.trip_id', filter.tripId);
+    return query.orderBy('te.created_at', 'desc');
+  }
 }

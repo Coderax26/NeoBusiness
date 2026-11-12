@@ -1251,4 +1251,165 @@ export class InventoryService implements InventoryPort {
   ): Promise<string> {
     return (this.ledgerPosting ?? new LedgerPostingService()).post(trx, entry);
   }
+
+  async listTransfers(siteId?: string, status?: string) {
+    let query = this.knex('stock_transfers as st')
+      .leftJoin('sites as fs', 'st.from_site_id', 'fs.id')
+      .leftJoin('sites as ts', 'st.to_site_id', 'ts.id')
+      .leftJoin('items as i', 'st.item_id', 'i.id')
+      .select(
+        'st.*',
+        'fs.name as from_site_name',
+        'ts.name as to_site_name',
+        'i.name as item_name',
+        'i.sku_code',
+      );
+    if (siteId) {
+      query = query.where((q) =>
+        q.where('st.from_site_id', siteId).orWhere('st.to_site_id', siteId),
+      );
+    }
+    if (status) query = query.where('st.status', status);
+    return query.orderBy('st.created_at', 'desc');
+  }
+
+  async listAdjustments(siteId?: string, status?: string) {
+    let query = this.knex('stock_adjustments as sa')
+      .leftJoin('sites as s', 'sa.site_id', 's.id')
+      .leftJoin('items as i', 'sa.item_id', 'i.id')
+      .select(
+        'sa.*',
+        's.name as site_name',
+        'i.name as item_name',
+        'i.sku_code',
+      );
+    if (siteId) query = query.where('sa.site_id', siteId);
+    if (status) query = query.where('sa.status', status);
+    return query.orderBy('sa.created_at', 'desc');
+  }
+
+  async listReservations(siteId?: string, itemId?: string) {
+    let query = this.knex('stock_reservations as sr')
+      .leftJoin('sites as s', 'sr.site_id', 's.id')
+      .leftJoin('items as i', 'sr.item_id', 'i.id')
+      .select(
+        'sr.*',
+        's.name as site_name',
+        'i.name as item_name',
+        'i.sku_code',
+      );
+    if (siteId) query = query.where('sr.site_id', siteId);
+    if (itemId) query = query.where('sr.item_id', itemId);
+    return query.orderBy('sr.created_at', 'desc');
+  }
+
+  /**
+   * Create a physical stock count sheet (G-INV-3)
+   */
+  async createStockCount(
+    siteId: string,
+    locationId: string | undefined,
+    notes: string | undefined,
+    items: Array<{ itemId: string; batchNo?: string; systemQty?: string; countedQty: string }>,
+    userId: string,
+  ) {
+    const countNo = `CNT-${Date.now().toString(36).toUpperCase()}`;
+    const [sheet] = await this.knex('stock_count_sheets')
+      .insert({
+        site_id: siteId,
+        location_id: locationId || null,
+        count_no: countNo,
+        status: 'DRAFT',
+        notes: notes || null,
+        created_by: userId,
+      })
+      .returning('*');
+
+    const linesToInsert = items.map((it) => {
+      const sys = Number(it.systemQty ?? 0);
+      const counted = Number(it.countedQty ?? 0);
+      return {
+        count_sheet_id: sheet.id,
+        item_id: it.itemId,
+        batch_no: it.batchNo || null,
+        system_qty: sys,
+        counted_qty: counted,
+        variance_qty: counted - sys,
+      };
+    });
+
+    let insertedLines: any[] = [];
+    if (linesToInsert.length > 0) {
+      insertedLines = await this.knex('stock_count_items')
+        .insert(linesToInsert)
+        .returning('*');
+    }
+
+    return { ...sheet, items: insertedLines };
+  }
+
+  async listStockCounts(siteId?: string, status?: string) {
+    let query = this.knex('stock_count_sheets as scs')
+      .leftJoin('sites as s', 'scs.site_id', 's.id')
+      .leftJoin('users as u', 'scs.created_by', 'u.id')
+      .select('scs.*', 's.name as site_name', 'u.name as creator_name');
+
+    if (siteId) query = query.where('scs.site_id', siteId);
+    if (status) query = query.where('scs.status', status);
+
+    return query.orderBy('scs.created_at', 'desc');
+  }
+
+  async getStockCountById(id: string) {
+    const sheet = await this.knex('stock_count_sheets as scs')
+      .leftJoin('sites as s', 'scs.site_id', 's.id')
+      .leftJoin('users as u', 'scs.created_by', 'u.id')
+      .where('scs.id', id)
+      .select('scs.*', 's.name as site_name', 'u.name as creator_name')
+      .first();
+
+    if (!sheet) throw new BadRequestException(`Stock count sheet ${id} not found`);
+
+    const items = await this.knex('stock_count_items as sci')
+      .leftJoin('items as i', 'sci.item_id', 'i.id')
+      .where('sci.count_sheet_id', id)
+      .select('sci.*', 'i.name as item_name', 'i.sku_code');
+
+    return { ...sheet, items };
+  }
+
+  async approveStockCount(id: string, userId: string) {
+    const sheet = await this.getStockCountById(id);
+    if (sheet.status !== 'DRAFT') {
+      throw new BadRequestException(`Stock count sheet is already ${sheet.status}`);
+    }
+
+    // For items with non-zero variance, record adjustment
+    for (const item of sheet.items) {
+      const variance = Number(item.variance_qty);
+      if (variance !== 0) {
+        await this.knex('stock_adjustments').insert({
+          site_id: sheet.site_id,
+          item_id: item.item_id,
+          adjustment_type: variance > 0 ? 'COUNT_SURPLUS' : 'COUNT_DEFICIT',
+          quantity: Math.abs(variance),
+          reason: `Count variance on sheet ${sheet.count_no}`,
+          status: 'APPROVED',
+          requested_by: sheet.created_by,
+          approved_by: userId,
+          approved_at: new Date(),
+        });
+      }
+    }
+
+    await this.knex('stock_count_sheets')
+      .where('id', id)
+      .update({
+        status: 'APPROVED',
+        approved_by: userId,
+        approved_at: new Date(),
+      });
+
+    return { success: true, status: 'APPROVED' };
+  }
 }

@@ -1,0 +1,191 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RequirePermission } from './rbac.service.js';
+import { AdminService } from './admin.service.js';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  ResetPinDto,
+  CreateSiteDto,
+  UpdateSiteDto,
+  CreateLocationDto,
+  UpdateBusinessRuleDto,
+  UpdateApprovalPolicyDto,
+} from './dto/admin.dto.js';
+
+@ApiTags('admin')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('admin')
+export class AdminController {
+  constructor(private readonly adminService: AdminService) {}
+
+  // ─── Users ──────────────────────────────────────────────────────────────────
+
+  @Get('users')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List users with optional role/site filtering' })
+  async listUsers(
+    @Query('role') role?: string,
+    @Query('siteId') siteId?: string,
+    @Query('isActive') isActive?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.listUsers({ role, siteId, isActive, search });
+  }
+
+  @Post('users')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Create a new user' })
+  async createUser(@Body() dto: CreateUserDto, @Req() req: any) {
+    return this.adminService.createUser(dto, req.user?.id);
+  }
+
+  @Get('users/:id')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Get user detail by ID' })
+  async getUser(@Param('id') id: string) {
+    return this.adminService.getUserById(id);
+  }
+
+  @Patch('users/:id')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update user profile or status' })
+  async updateUser(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateUser(id, dto, req.user?.id);
+  }
+
+  @Post('users/:id/reset-pin')
+  @RequirePermission('config.edit')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset a user PIN' })
+  async resetPin(
+    @Param('id') id: string,
+    @Body() dto: ResetPinDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.resetPin(id, dto.pin, req.user?.id);
+  }
+
+  // ─── Sites & Locations ──────────────────────────────────────────────────────
+
+  @Get('sites')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List all sites' })
+  async listSites(@Query('includeInactive') includeInactive?: string) {
+    return this.adminService.listSites(includeInactive === 'true');
+  }
+
+  @Post('sites')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Create a new site' })
+  async createSite(@Body() dto: CreateSiteDto, @Req() req: any) {
+    return this.adminService.createSite(dto, req.user?.id);
+  }
+
+  @Patch('sites/:id')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update site details' })
+  async updateSite(
+    @Param('id') id: string,
+    @Body() dto: UpdateSiteDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateSite(id, dto, req.user?.id);
+  }
+
+  @Get('sites/:id/locations')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List locations for a specific site' })
+  async listSiteLocations(@Param('id') siteId: string) {
+    return this.adminService.listLocations(siteId);
+  }
+
+  @Post('sites/:id/locations')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Create a location under a site' })
+  async createLocation(
+    @Param('id') siteId: string,
+    @Body() dto: Omit<CreateLocationDto, 'siteId'>,
+    @Req() req: any,
+  ) {
+    return this.adminService.createLocation({ ...dto, siteId }, req.user?.id);
+  }
+
+  // ─── Roles ──────────────────────────────────────────────────────────────────
+
+  @Get('roles')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List all roles and their mapped permissions' })
+  async listRoles() {
+    return this.adminService.listRoles();
+  }
+
+  // ─── Business Rules & Approvals ─────────────────────────────────────────────
+
+  @Get('business-rules')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List all business rule thresholds and configs' })
+  async listBusinessRules() {
+    return this.adminService.listBusinessRules();
+  }
+
+  @Patch('business-rules/:key')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update a business rule threshold' })
+  async updateBusinessRule(
+    @Param('key') key: string,
+    @Body() dto: UpdateBusinessRuleDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateBusinessRule(key, dto, req.user?.id);
+  }
+
+  @Get('approval-policies')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List all exception approval policies' })
+  async listApprovalPolicies() {
+    return this.adminService.listApprovalPolicies();
+  }
+
+  @Patch('approval-policies/:exceptionType')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update approval policy for an exception type' })
+  async updateApprovalPolicy(
+    @Param('exceptionType') exceptionType: string,
+    @Body() dto: UpdateApprovalPolicyDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateApprovalPolicy(exceptionType, dto, req.user?.id);
+  }
+
+  @Get('doc-sequences')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List document numbering sequences' })
+  async listDocSequences() {
+    return this.adminService.listDocSequences();
+  }
+}
+

@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import { POService } from './po.service.js';
 import { CreatePODto, ConfirmQuantitiesDto } from './dto/po.dto.js';
 
@@ -67,6 +70,39 @@ export class POController {
     const po = await this.poService.getById(id);
     const lines = await this.poService.getLines(id);
     return { ...po, lines };
+  }
+
+  @Get(':id/pdf')
+  @RequirePermission('po.read')
+  @ApiOperation({ summary: 'Generate Purchase Order PDF (G-DOC-4)' })
+  async getPdf(@Param('id') id: string, @Res() res: any) {
+    const po = await this.poService.getById(id);
+    if (!po) throw new NotFoundException(`PO ${id} not found`);
+    const lines = await this.poService.getLines(id);
+
+    const supplier = await this.poService['knex']('suppliers').where('id', po.supplier_id).first();
+    const site = await this.poService['knex']('sites').where('id', po.receiving_site_id).first();
+
+    const pdfGen = new PdfGeneratorService();
+    const buffer = await pdfGen.generatePurchaseOrder({
+      poNo: po.po_no,
+      poDate: new Date(po.created_at).toISOString().split('T')[0],
+      expectedDelivery: po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString().split('T')[0] : undefined,
+      supplierName: supplier?.legal_name || 'Supplier',
+      supplierGstin: supplier?.gstin,
+      siteName: site?.name || 'NeoBus',
+      lines: lines.map((l: any) => ({
+        itemName: l.item_name || 'Item',
+        qty: String(l.ordered_qty),
+        unitPrice: String(l.agreed_unit_price || '0'),
+        lineTotal: String(l.line_total || '0'),
+      })),
+      totalAmount: String(po.total_amount || '0'),
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="PO-${po.po_no}.pdf"`);
+    res.send(buffer);
   }
 
   @Get(':id/lines')

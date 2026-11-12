@@ -33,7 +33,8 @@ export function RequirePermission(...permissions: string[]) {
 @Injectable()
 export class PermissionService {
   private cache = new Map<string, Set<string>>();
-  private loadedAt = 0;
+  /** Per-role load time — a refresh of one role must not extend another role's TTL. */
+  private loadedAt = new Map<string, number>();
   private readonly ttl = 60 * 1000; // 1 minute
 
   constructor(@InjectKnex() private readonly knex: Knex) {}
@@ -41,7 +42,7 @@ export class PermissionService {
   async getPermissions(role: string): Promise<Set<string>> {
     const now = Date.now();
     const cached = this.cache.get(role);
-    if (cached && now - this.loadedAt < this.ttl) {
+    if (cached && now - (this.loadedAt.get(role) ?? 0) < this.ttl) {
       return cached;
     }
 
@@ -49,9 +50,9 @@ export class PermissionService {
       .where('role', role)
       .select('permission_code');
 
-    const perms = new Set(rows.map((r) => r.permission_code));
+    const perms = new Set<string>(rows.map((r: any) => r.permission_code));
     this.cache.set(role, perms);
-    this.loadedAt = now;
+    this.loadedAt.set(role, now);
     return perms;
   }
 
@@ -67,7 +68,7 @@ export class PermissionService {
 
   invalidate(): void {
     this.cache.clear();
-    this.loadedAt = 0;
+    this.loadedAt.clear();
   }
 }
 

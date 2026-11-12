@@ -21,7 +21,9 @@
     "seed": "npm --prefix apps/api run build && npm --prefix apps/api run seed",
     "build:api": "npm --prefix apps/api run build",
     "test:api": "npm --prefix apps/api run test",
-    "test:fe": "npm --prefix apps/api run test -- ../web/src/tests/p3-frontend-delivery.spec.ts",
+    "test:fe": "npm --prefix apps/api run test -- ../web/src/tests",
+    "gen:api-routes": "node scripts/generate-api-routes.mjs",
+    "check:api-routes": "node scripts/generate-api-routes.mjs --check",
     "test:all": "npm --prefix apps/api run test"
   }
 }

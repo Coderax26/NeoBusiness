@@ -12,6 +12,9 @@ export enum BillStatus {
   /** Approved, ready to generate taxes and post */
   APPROVED = 'APPROVED',
 
+  /** Paid in full or settled */
+  PAID = 'PAID',
+
   /** Rejected, requires correction */
   REJECTED = 'REJECTED',
 }

@@ -44,6 +44,10 @@ import { CreditNoteController } from './credit-note.controller.js';
 import { CodSettlementController } from './cod-settlement.controller.js';
 import { TallyExportController } from './tally-export.controller.js';
 import { OpeningBalanceController } from './opening-balance.controller.js';
+import { ExpenseService } from './expense.service.js';
+import { ExpenseController } from './expense.controller.js';
+import { ReportsService } from './reports.service.js';
+import { ReportsController } from './reports.controller.js';
 
 @Global()
 @Module({
@@ -60,6 +64,8 @@ import { OpeningBalanceController } from './opening-balance.controller.js';
     CodSettlementController,
     TallyExportController,
     OpeningBalanceController,
+    ExpenseController,
+    ReportsController,
   ],
   providers: [
     InvoiceService,
@@ -70,6 +76,8 @@ import { OpeningBalanceController } from './opening-balance.controller.js';
     EodService,
     WorklistService,
     CreditNoteService,
+    ExpenseService,
+    ReportsService,
     CreditPortService,
     CodSettlementService,
     TallyExportService,
@@ -100,6 +108,8 @@ import { OpeningBalanceController } from './opening-balance.controller.js';
     TallyExportService,
     ChequeService,
     OpeningBalanceService,
+    ExpenseService,
+    ReportsService,
     LEDGER_PORT,
     CREDIT_PORT,
   ],

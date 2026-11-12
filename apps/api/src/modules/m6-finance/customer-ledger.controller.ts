@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -18,6 +19,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import { LedgerService } from './ledger.service.js';
 import { WorklistService } from './worklist.service.js';
 import {
@@ -52,6 +54,40 @@ export class CustomerLedgerController {
       query.limit,
     );
     return wrapResponse(entries);
+  }
+
+  @Get('customers/:id/statement/pdf')
+  @RequirePermission('order.confirm_in_band')
+  @ApiOperation({ summary: 'Generate Customer Account Statement PDF (G-DOC-3)' })
+  async getStatementPdf(
+    @Param('id') customerId: string,
+    @Query('limit') limit: number,
+    @Req() req: any,
+    @Res() res: any,
+  ) {
+    const siteId = req.user.siteId;
+    const entries = await this.ledgerService.getCustomerLedger(customerId, siteId, limit || 50);
+    const balance = await this.ledgerService.getCustomerBalance(customerId);
+    const customer = await this.ledgerService['knex']('customers').where('id', customerId).first();
+
+    const pdfGen = new PdfGeneratorService();
+    const buffer = await pdfGen.generateCustomerStatement({
+      customerName: customer?.legal_name || 'Customer',
+      statementDate: new Date().toISOString().split('T')[0],
+      currentBalance: balance.toStorageString(),
+      entries: entries.map((e: any) => ({
+        date: new Date(e.created_at || Date.now()).toISOString().split('T')[0],
+        refNo: e.ref_no || e.ref_id || '-',
+        type: e.entry_type || 'TXN',
+        debit: e.debit_amount ? String(e.debit_amount) : '-',
+        credit: e.credit_amount ? String(e.credit_amount) : '-',
+        balance: String(e.running_balance || '0'),
+      })),
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Statement-${customer?.name || customerId}.pdf"`);
+    res.send(buffer);
   }
 
   @Get('customers/:id/ar-balance')

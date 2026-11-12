@@ -12,7 +12,7 @@ import {
   evaluateTripClosureReadiness,
   CONFIRMED_BUSINESS_CONFIG,
   type TripClosureReadiness,
-} from '../../../packages/shared/src/index.js';
+} from '@neo/shared';
 
 export interface MobileQueuedMutation {
   idempotencyKey: string;

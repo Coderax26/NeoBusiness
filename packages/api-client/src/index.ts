@@ -50,15 +50,29 @@ export interface StatusMatrixDto {
   };
 }
 
+/**
+ * Exception types raised by the backend (M7a) — must stay identical to
+ * `ExceptionType` in apps/api/src/shared/ports/ports.interface.ts (drift-guarded by test TC-F1-04).
+ * Note: COD_ONLY is a *credit status*, not an exception type.
+ */
+export const EXCEPTION_TYPES = [
+  'PRICE_OVERRIDE',
+  'CREDIT_BREACH',
+  'SUPPLIER_PRICE_SPIKE',
+  'SUPPLIER_SHORTFALL',
+  'ALLOCATION',
+  'YIELD_VARIANCE',
+  'WASTAGE_WRITEOFF',
+  'STOCK_VARIANCE',
+  'CREDIT_REBATE_WRITEOFF',
+  'DELIVERY_DISPUTE',
+  'MANUAL_LEDGER_ADJUSTMENT',
+  'CASH_HANDOVER_VARIANCE',
+] as const;
+export type ExceptionType = (typeof EXCEPTION_TYPES)[number];
 export interface ExceptionCardDto {
   id: string;
-  exceptionType:
-  | 'PRICE_OVERRIDE'
-  | 'CREDIT_BREACH'
-  | 'SUPPLIER_VARIANCE'
-  | 'HANDOVER_DISPUTE'
-  | 'YIELD_VARIANCE'
-  | 'RETURN_DISPUTE';
+  exceptionType: ExceptionType;
   referenceTable: string;
   referenceId: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COUNTERED' | 'EXPIRED';
@@ -345,3 +359,5 @@ export class RealtimeEventHub {
   }
 }
 
+
+export * from './routes.generated.js';

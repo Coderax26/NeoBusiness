@@ -8,12 +8,14 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   NotFoundException,
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import { OrderService } from './order.service.js';
 import {
   CreateOrderDto,
@@ -132,6 +134,69 @@ export class OrderController {
     }
 
     return query;
+  }
+
+  /**
+   * GET /orders/summary - Orders KPI strip summary (G-M1-1)
+   */
+  @Get('summary')
+  @RequirePermission('order.view')
+  async getSummary(@Query('siteId') siteId?: string) {
+    const knex = this.orderSvc['knex'];
+    let query = knex('sales_orders');
+    if (siteId) query = query.where('fulfillment_site_id', siteId);
+
+    const rows = await query
+      .select('order_status')
+      .count('* as count')
+      .groupBy('order_status');
+    const counts: Record<string, number> = {};
+    for (const r of rows) {
+      counts[r.order_status] = Number(r.count);
+    }
+    return {
+      counts,
+      totalOrders: Object.values(counts).reduce((a, b) => a + b, 0),
+    };
+  }
+
+  /**
+   * GET /orders/:id/pdf - Server-rendered Order PDF (G-DOC-1)
+   */
+  @Get(':id/pdf')
+  @RequirePermission('order.view')
+  async getPdf(@Param('id') id: string, @Res() res: any) {
+    const knex = this.orderSvc['knex'];
+    const order = await knex('sales_orders').where('id', id).first();
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+
+    const customer = await knex('customers').where('id', order.customer_id).first();
+    const site = await knex('sites').where('id', order.fulfillment_site_id).first();
+    const lines = await knex('sales_order_lines as sol')
+      .leftJoin('items as i', 'sol.item_id', 'i.id')
+      .where('sol.order_id', id)
+      .select('sol.*', 'i.name as item_name');
+
+    const pdfGen = new PdfGeneratorService();
+    const buffer = await pdfGen.generateOrder({
+      orderNo: order.order_no,
+      orderDate: new Date(order.created_at_idx).toISOString().split('T')[0],
+      customerName: customer?.legal_name || 'Customer',
+      customerGstin: customer?.gstin,
+      siteName: site?.name || 'NeoBus',
+      lines: lines.map((l: any) => ({
+        itemName: l.item_name || 'Item',
+        qty: String(l.qty),
+        unitPrice: String(l.agreed_unit_price || l.requested_unit_price || '0'),
+        lineTotal: String(l.line_total || '0'),
+      })),
+      totalAmount: String(order.total_amount || '0'),
+      status: order.order_status,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Order-${order.order_no}.pdf"`);
+    res.send(buffer);
   }
 
   /**
