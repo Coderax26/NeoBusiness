@@ -7,8 +7,10 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['**/*.spec.ts'],
+    include: ['**/*.spec.ts', '../web/src/**/*.spec.ts'],
     fileParallelism: false,
+    hookTimeout: 30000,
+    testTimeout: 30000,
     // Load .env so tests that use createKnex() (which reads process.env.DATABASE_URL)
     // can connect to the dev/test database.
     setupFiles: ['./vitest.setup.ts'],

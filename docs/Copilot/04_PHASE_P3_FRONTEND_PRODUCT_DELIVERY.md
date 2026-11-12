@@ -156,7 +156,7 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F0.1 Monorepo & Workspaces Setup**:
+- [x] **F0.1 Monorepo & Workspaces Setup**:
   - Configure root `package.json` with npm workspaces (`apps/*`, `packages/*`).
   - Create package scaffolding:
     - `packages/ui`
@@ -165,7 +165,7 @@ flowchart TD
     - `packages/i18n`
     - `packages/mocks`
   - Setup shared `tsconfig.base.json`, ESLint, and Prettier configurations.
-- [ ] **F0.2 Design System & Tailwind Tokens (`packages/ui`)**:
+- [x] **F0.2 Design System & Tailwind Tokens (`packages/ui`)**:
   - Implement Tailwind theme extension with Obsidian Dark and Clean Slate color tokens.
   - Create atomic primitives:
     - `Button`, `IconButton`, `Badge`, `Card`, `Dialog`, `Sheet` (Slide-over drawer).
@@ -174,21 +174,21 @@ flowchart TD
     - `StatusPill`: Universal color mappings for Orders, Invoices, Trips, POs, Exceptions.
     - `AnimatedCounter`: Spring-based count-up animation for KPI metrics.
     - `Sparkline`: Micro SVG inline trend line.
-- [ ] **F0.3 Typed API Client Generation (`packages/api-client`)**:
+- [x] **F0.3 Typed API Client Generation (`packages/api-client`)**:
   - Script OpenAPI spec extraction from NestJS backend (`npm run openapi:generate`).
   - Generate TypeScript models, DTOs, and TanStack Query hooks using `openapi-typescript-codegen` or `@hey-api/openapi-ts`.
   - Configure base HTTP client with JWT injection, CSRF double-submit token, and auto-generated `Idempotency-Key` headers for all mutations.
-- [ ] **F0.4 Shared Permissions & Business Utilities (`packages/shared`)**:
+- [x] **F0.4 Shared Permissions & Business Utilities (`packages/shared`)**:
   - Port `can(user, permission, scope)` helper shared across Web, Tablet, and Mobile.
   - Implement Indian currency formatters, date/time helpers configured for `Asia/Kolkata`.
   - Export Zod validation schemas for all primary forms.
-- [ ] **F0.5 Internationalization Engine (`packages/i18n`)**:
+- [x] **F0.5 Internationalization Engine (`packages/i18n`)**:
   - Setup `next-intl` dictionary bindings for English (`en`) and Marathi (`mr`).
   - Include full bilingual dictionary for operational terms (खरेदी, विक्री, उत्पादन, साठा, पावती, अपवाद).
-- [ ] **F0.6 Mock Service Worker Engine (`packages/mocks`)**:
+- [x] **F0.6 Mock Service Worker Engine (`packages/mocks`)**:
   - Setup MSW handlers for all 10 modules covering every REST endpoint.
   - Create realistic fixture data for Scenarios A through F.
-- [ ] **F0.7 Storybook Workshop**:
+- [x] **F0.7 Storybook Workshop**:
   - Initialize Storybook in `packages/ui` to visually inspect all widgets, buttons, and responsive layouts.
 
 **Milestone Exit Criteria**:
@@ -203,24 +203,24 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F1.1 BFF Authentication & Session Engine**:
+- [x] **F1.1 BFF Authentication & Session Engine**:
   - Next.js Route Handlers proxying login/logout to `POST /api/v1/auth/login`.
   - Store JWT in `httpOnly`, `Secure`, `SameSite=Strict` session cookies; zero tokens in `localStorage`.
   - Implement PIN re-prompt modal for sensitive approvals over threshold (`OD-002`).
   - Automatic idle session timeout handler (15 minutes for office desk, auto-lock for tablet).
-- [ ] **F1.2 Global Navigation Shell (`apps/web`)**:
+- [x] **F1.2 Global Navigation Shell (`apps/web`)**:
   - Header with Global Search (`Ctrl+K` command palette across Customers, Orders, Invoices).
   - Multi-Site Switcher dropdown (`OD-007`) allowing multi-site coordinators to switch active site context or select "All Sites" (Owner only).
   - Language toggle (`English` / `मराठी`) persisting to user preferences.
   - Dynamic sidebar rendering only allowed module groups based on `user.permissions`.
-- [ ] **F1.3 Real-Time SSE Event Hub**:
+- [x] **F1.3 Real-Time SSE Event Hub**:
   - Establish persistent Server-Sent Events client to `/api/v1/events/stream` with exponential backoff reconnect.
   - Broadcast real-time cache invalidations to TanStack Query keys on incoming events:
     - `exception.requested` $\to$ Invalidate `['exceptions']`, trigger audio-visual alert.
     - `order.confirmed` $\to$ Invalidate `['orders']`, `['pulse']`.
     - `trip.dispatched` $\to$ Invalidate `['trips']`, `['fleet']`.
     - `handover.verified` $\to$ Invalidate `['custody']`, `['cashier']`.
-- [ ] **F1.4 Universal Notification Drawer**:
+- [x] **F1.4 Universal Notification Drawer**:
   - Notification slide-over tray with tabbed filtering (`All`, `Exceptions`, `System`).
   - Deep-link routing on click directly to the offending order, trip, or invoice.
 
@@ -236,31 +236,31 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F2.1 Glassmorphic Pulse Header**:
+- [x] **F2.1 Glassmorphic Pulse Header**:
   - Connect Hero KPI cards to `GET /api/v1/analytics/pulse` (30s polling + SSE instant invalidation, `OD-021`).
   - Card 1: Today's Tax Invoices / Sales count and amount (`OD-020`) with animated spring counter.
   - Card 2: Blended Gross Margin % with dynamic radial meter and category drill-down drawer.
   - Card 3: Cash & Cheques in Custody split pill with 1-click Cashier Handover link.
   - Card 4: Actionable Exception Counter with pulsing beacon.
-- [ ] **F2.2 Interactive Mission Control Operations Pipeline**:
+- [x] **F2.2 Interactive Mission Control Operations Pipeline**:
   - Horizontal status progression bar (`Confirmed` $\to$ `Production` $\to$ `Loading` $\to$ `In-Transit` $\to$ `Delivered`).
   - Click-to-filter interaction updating lower dashboard context.
   - SLA breach highlights on delayed stages.
-- [ ] **F2.3 Active Fleet & Dispatch Telemetry Mini-Board**:
+- [x] **F2.3 Active Fleet & Dispatch Telemetry Mini-Board**:
   - Live progress cards for all active trips.
   - Embedded Leaflet/Mapbox modal with animated vehicle icons, route polylines, and delivery pins.
-- [ ] **F2.4 Cross-Filtering Analytics Workbench**:
+- [x] **F2.4 Cross-Filtering Analytics Workbench**:
   - Time-scrubbing filter toolbar: `Today`, `Yesterday`, `7D`, `MTD`, `Custom Range`.
   - Customer Profitability scatter chart (Volume vs Margin) with customer drill-down.
   - AR Aging horizontal bar chart with 1-click delinquent customer drawer.
   - Batch Yield variance tracker with BOM baseline comparison.
-- [ ] **F2.5 Zero-Latency Exception Workbench**:
+- [x] **F2.5 Zero-Latency Exception Workbench**:
   - Real-time slide-over panel displaying pending exceptions (`M7-S1`).
   - Interactive **Margin Simulator Slider** for price overrides (`OD-019`): Owner drags price slider to view projected gross margin before submitting counter-offer.
   - Decision hotkeys: `A` (Approve), `C` (Counter), `R` (Reject).
   - PIN confirmation modal for overrides $\ge$ ₹5,000 (`OD-002`).
   - Concurrency handling: If resolved on another device, card transitions smoothly to "Resolved by {name}".
-- [ ] **F2.6 Wall-Board Kiosk Mode**:
+- [x] **F2.6 Wall-Board Kiosk Mode**:
   - Fullscreen display mode with high-contrast Obsidian dark theme and auto-rotating panel views.
 
 **Milestone Exit Criteria**:
@@ -276,26 +276,26 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F3.1 Keyboard-Fast Quick Order Entry (`M1-S1`)**:
+- [x] **F3.1 Keyboard-Fast Quick Order Entry (`M1-S1`)**:
   - Pure keyboard navigation workflow: `Customer` $\to$ `Site` $\to$ `Delivery Date` $\to$ `Line Grid`.
   - `Tab` navigates cells, `Enter` on last cell adds row, `Ctrl+Enter` submits order, `Esc` dismisses pickers.
   - Debounced (150ms) auto-complete for Customer and Item search.
   - Auto-fill defaults: Price defaults to item's Target Price; quantity defaults to primary UoM.
-- [ ] **F3.2 Live Price Band & Margin Indicator (BR-01)**:
+- [x] **F3.2 Live Price Band & Margin Indicator (BR-01)**:
   - Each order row displays a `PriceBandChip`:
     - Green *In Band* if $\text{Price} \ge \text{Target}$.
     - Amber *Below Target* if $\text{Floor} \le \text{Price} < \text{Target}$.
     - Red *Below Floor by ₹X* if $\text{Price} < \text{Floor}$.
   - If any row is below floor, primary CTA transforms from **Confirm Order** to **Request Price Override**.
   - Customer 5-Order Price Memory popup displaying previous purchase prices for selected item.
-- [ ] **F3.3 Customer 360 & Credit Meter (BR-02)**:
+- [x] **F3.3 Customer 360 & Credit Meter (BR-02)**:
   - Header credit meter displaying $\text{AR} + \text{This Order}$ vs Credit Limit.
   - Overdue days badge. If on Credit Hold, displays amber warning banner; dispatch will be blocked.
-- [ ] **F3.4 Daily Base & Floor Price Sheet (`M1-S2`)**:
+- [x] **F3.4 Daily Base & Floor Price Sheet (`M1-S2`)**:
   - Dense grid for Owner to set daily Base & Floor prices across all items.
   - Inline editing with keyboard navigation.
   - Sticky publish footer showing count of items modified and number of open quotes impacted.
-- [ ] **F3.5 Sales Quotes Workbench (`M1-S4`)**:
+- [x] **F3.5 Sales Quotes Workbench (`M1-S4`)**:
   - Quote builder with expiry countdown timer and 1-click conversion to confirmed Sales Order.
 
 **Milestone Exit Criteria**:
@@ -310,25 +310,25 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F4.1 Interactive AR Aging Workbench (`M6-S5`)**:
+- [x] **F4.1 Interactive AR Aging Workbench (`M6-S5`)**:
   - Aging buckets: 0–7, 8–15, 16–30, 30+ days.
   - Customer ledger view with clickable invoice history and running balance.
   - 1-Click WhatsApp payment reminder dispatch integration (`OD-024`).
   - PTP (Promise-to-Pay) logging drawer with due-date tracker.
-- [ ] **F4.2 Cashier Handover Desk (`M6-S4`, BR-07, OD-015, OD-016)**:
+- [x] **F4.2 Cashier Handover Desk (`M6-S4`, BR-07, OD-015, OD-016)**:
   - Dedicated desk for Operations Coordinator acting as cashier.
   - Agent selection dropdown: displays driver/collector custody wallet balances (cash & cheques).
   - Side-by-side **Expected Cash vs Counted Cash** inputs.
   - Live variance calculation:
     - Zero variance: **Verify Handover** button enabled (Green).
     - Non-zero variance: Highlights variance in red, displays **Dispute Handover** action, notifies Owner (`OD-002` if $\ge$ ₹5,000).
-- [ ] **F4.3 Tax Invoice Desk & PDF Viewer (`M6-S6`)**:
+- [x] **F4.3 Tax Invoice Desk & PDF Viewer (`M6-S6`)**:
   - Virtualized invoice list with status filters (`UNPAID`, `PARTIAL`, `PAID`, `OVERDUE`).
   - Slide-over detail drawer with embedded PDF viewer, print button, and download link.
-- [ ] **F4.4 Cheque Lifecycle Management (`M6-S7`)**:
+- [x] **F4.4 Cheque Lifecycle Management (`M6-S7`)**:
   - Cheque register tracking stages: `RECEIVED` $\to$ `DEPOSITED` $\to$ `CLEARED` or `BOUNCED`.
   - Bounce recording modal triggering replacement cheque entry or reversal.
-- [ ] **F4.5 End-of-Day (EOD) Closing Checklist (`M6-S9`, OD-020)**:
+- [x] **F4.5 End-of-Day (EOD) Closing Checklist (`M6-S9`, OD-020)**:
   - Interactive 4-point verification checklist:
     1. All delivery trips closed.
     2. All agent custody wallets zeroed/verified.
@@ -336,7 +336,7 @@ flowchart TD
     4. Physical cash tallied with bank deposit slip.
   - Each item displays green check or red warning with direct link to resolve.
   - **Owner Sign-Off** CTA enabled only when all 4 checks pass.
-- [ ] **F4.6 Opening Balance Import Workbench (`OD-023`)**:
+- [x] **F4.6 Opening Balance Import Workbench (`OD-023`)**:
   - CSV template download, drag-and-drop file upload, preview table with validation errors highlighted.
   - Dual sign-off workflow: Coordinator verifies $\to$ Owner commits atomic import $\to$ Reversal option.
 
@@ -352,18 +352,18 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F5.1 3-Pane Interactive Trip Builder (`M5-S1`)**:
+- [x] **F5.1 3-Pane Interactive Trip Builder (`M5-S1`)**:
   - **Left Pane (Order Pool)**: Orders in `READY` status, filterable by delivery area, weight, and delivery window.
   - **Center Pane (Trip Canvas)**: Vehicle and driver selection, drag-and-drop stop reordering.
   - **Right Pane (Route Map)**: Interactive map displaying sequenced stop route and estimated kilometers.
-- [ ] **F5.2 Live Vehicle Capacity & Weight Gauges**:
+- [x] **F5.2 Live Vehicle Capacity & Weight Gauges**:
   - Dynamic weight meter (kg) and crate meter against vehicle rated capacity.
   - Visual warning if load exceeds 95% capacity; hard block if load exceeds 100%.
   - Credit hold warning badge if any included order is blocked.
-- [ ] **F5.3 Live Dispatch Board (`M5-S2`)**:
+- [x] **F5.3 Live Dispatch Board (`M5-S2`)**:
   - Real-time status cards for all trips (`PLANNED` $\to$ `LOADING` $\to$ `IN_TRANSIT` $\to$ `COMPLETED`).
   - **Dispatch Trip** button enabled only after tablet warehouse confirms loading completion.
-- [ ] **F5.4 Logistics Issue Desk (`M5-S8`, OD-002)**:
+- [x] **F5.4 Logistics Issue Desk (`M5-S8`, OD-002)**:
   - Delivery exception workbench (customer unavailable, rejected crates, road delay).
   - Escalation to Owner if disputed returns exceed ₹5,000 threshold.
 
@@ -379,25 +379,25 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F6.1 Tablet PWA Shell & Offline Infrastructure (`apps/tablet`)**:
+- [x] **F6.1 Tablet PWA Shell & Offline Infrastructure (`apps/tablet`)**:
   - Manifest and Serwist service worker for standalone PWA installation.
   - Persistent `OfflineBadge` in top header: `Online` (Green), `Offline` (Amber), `Syncing (N)` (Blue).
   - Dexie.js (IndexedDB) local outbox storing queued actions when connection drops.
   - Background auto-sync on network reconnect with retry backoff.
-- [ ] **F6.2 Touch-First Production Kanban (`M4-S1`)**:
+- [x] **F6.2 Touch-First Production Kanban (`M4-S1`)**:
   - Large drag-and-drop or tap-to-move columns: `Queued`, `Cooking / Processing`, `Packing`, `Completed`.
   - Extra-large touch cards ($\ge 48\text{px}$ targets) showing batch ID, recipe, target quantity, and countdown timer.
   - Role protection: Absolute zero price, cost, or margin values rendered in DOM or network payloads.
-- [ ] **F6.3 Batch Completion & Yield Desk (`M4-S3`, OD-012)**:
+- [x] **F6.3 Batch Completion & Yield Desk (`M4-S3`, OD-012)**:
   - Tactile on-screen numeric keypad for inputting actual finished goods output (kg) and scrap (kg).
   - Live yield variance indicator calculated against BOM standard mass balance ($\pm 3\%$ tolerance).
   - Scrap reason selector chips (e.g. "Over-cooking", "Machine Jam", "Quality Reject").
-- [ ] **F6.4 Blind GRN Receiving Desk (`M2-S4`, `M3-S3`, BR-05)**:
+- [x] **F6.4 Blind GRN Receiving Desk (`M2-S4`, `M3-S3`, BR-05)**:
   - Storekeeper selects arriving PO or supplier.
   - Item list displayed with blank quantity fields only.
   - **Zero PO Leakage**: Neither ordered quantity nor pricing is included in the DOM, state, or network request. Storekeeper must physically count and enter verified quantities using numeric keypad.
   - Batch number and expiry date entry with camera delivery note photo attachment.
-- [ ] **F6.5 Vehicle Loading Checklist (`M3-S4`)**:
+- [x] **F6.5 Vehicle Loading Checklist (`M3-S4`)**:
   - Storekeeper ticks off loaded crates against trip manifest.
   - Single-tap verification triggers `trip.loading_confirmed` event to office dispatch board.
 
@@ -414,18 +414,18 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F7.1 Interactive PO Builder (`M2-S2`)**:
+- [x] **F7.1 Interactive PO Builder (`M2-S2`)**:
   - Supplier picker with active rate card prices automatically populated.
   - Line-item grid with quantity, unit price, tax, and delivery date.
   - Delivery site selection and back-to-back margin preview for trading goods.
-- [ ] **F7.2 Supplier Price-Spike Variance Warnings (OD-009, OD-010)**:
+- [x] **F7.2 Supplier Price-Spike Variance Warnings (OD-009, OD-010)**:
   - When PO price exceeds baseline (same-supplier last price, then item-wide cost), line highlights in amber with variance % badge.
   - Auto-suggests ranked backup suppliers within 2% tolerance.
   - If variance exceeds policy threshold, PO confirmation routes to Owner Exception Queue.
-- [ ] **F7.3 Requisitions & Shortfall Workbench (`M2-S3`, `M2-S5`)**:
+- [x] **F7.3 Requisitions & Shortfall Workbench (`M2-S3`, `M2-S5`)**:
   - Live list of raw material shortfalls generated from confirmed sales orders and low-stock alerts.
   - 1-Click "Generate POs" action grouping shortfalls by primary supplier.
-- [ ] **F7.4 Supplier Scorecard Desk (`M2-S6`)**:
+- [x] **F7.4 Supplier Scorecard Desk (`M2-S6`)**:
   - Visual radar cards for suppliers: On-Time Delivery %, Quality Acceptance %, Price Stability Index.
 
 **Milestone Exit Criteria**:
@@ -440,20 +440,20 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F8.1 Field Mobile Shell (`apps/mobile`)**:
+- [x] **F8.1 Field Mobile Shell (`apps/mobile`)**:
   - Lightweight mobile client optimized for low-end Android smartphones.
   - Simple 4-digit PIN authentication with persistent offline JWT.
   - Local sync queue tracking pending uploads and clock skew warnings.
-- [ ] **F8.2 Driver Stop Manifest & Navigation (`M5-S4`, `M5-S5`)**:
+- [x] **F8.2 Driver Stop Manifest & Navigation (`M5-S4`, `M5-S5`)**:
   - Daily assigned trip manifest ordered by stop sequence.
   - Single-tap navigation handoff to Google Maps / Waze.
   - Customer contact card with direct phone dialer.
-- [ ] **F8.3 Electronic Proof of Delivery (ePOD) (`M5-S6`, OD-014)**:
+- [x] **F8.3 Electronic Proof of Delivery (ePOD) (`M5-S6`, OD-014)**:
   - Digital signature capture pad on smartphone screen.
   - Camera photo capture of signed physical delivery challan.
   - OTP entry field (optional for standard deliveries, mandatory for credit-hold stops).
   - Immediate offline confirmation generating digital receipt.
-- [ ] **F8.4 Mobile Cash & Cheque Collection Desk (`M6-S1`, OD-015)**:
+- [x] **F8.4 Mobile Cash & Cheque Collection Desk (`M6-S1`, OD-015)**:
   - Driver/Collector records payments collected at customer doorstep.
   - Payment method toggle: `Cash` or `Cheque` (with cheque photo and bank details).
   - Updates driver's custody wallet ledger locally with automatic background sync.
@@ -470,23 +470,23 @@ flowchart TD
 
 #### Tasks & Deliverables
 
-- [ ] **F9.1 Comprehensive Unit & Component Test Suite**:
+- [x] **F9.1 Comprehensive Unit & Component Test Suite**:
   - Vitest + React Testing Library suites for all `@neo/ui` components and desk screens.
   - Verify number formatting, currency formatting, and Marathi translation completeness.
-- [ ] **F9.2 Security & Role Masking Contract Tests**:
+- [x] **F9.2 Security & Role Masking Contract Tests**:
   - Playwright test asserting `PROD_MGR` session has zero cost/price elements in DOM.
   - Contract test verifying Blind GRN screen never receives PO expected quantities.
   - Route guard tests verifying OPS_COORD cannot access `/admin/*` or `/control/audit`.
-- [ ] **F9.3 Offline Resilience & Outbox Replay Tests**:
+- [x] **F9.3 Offline Resilience & Outbox Replay Tests**:
   - Automated Playwright browser tests disconnecting network (`page.setOffline(true)`), creating records, reconnecting, and asserting exact 1x backend persistence with matching `Idempotency-Key`.
-- [ ] **F9.4 Playwright End-to-End Scenarios A through F**:
+- [x] **F9.4 Playwright End-to-End Scenarios A through F**:
   - **Scenario A**: Below-floor quick order $\to$ Exception created $\to$ Owner counters with slider $\to$ Order confirmed.
   - **Scenario B**: Requisition shortfall $\to$ PO generated $\to$ Price-spike detected $\to$ Owner approval $\to$ Blind GRN received.
   - **Scenario C**: Stock transfer request $\to$ Warehouse dispatch $\to$ Transit status $\to$ Receiving site check-in.
   - **Scenario D**: Trip built $\to$ Loading confirmed $\to$ Driver delivery $\to$ Signature captured $\to$ Trip closed.
   - **Scenario E**: Driver COD collection $\to$ Cashier handover verified $\to$ EOD 4-point check $\to$ Owner sign-off.
   - **Scenario F**: Work order planned $\to$ Raw materials issued $\to$ Batch output completed $\to$ Yield verified.
-- [ ] **F9.5 Performance & Accessibility (Lighthouse CI)**:
+- [x] **F9.5 Performance & Accessibility (Lighthouse CI)**:
   - Core Web Vitals: LCP < 2.0s, FID < 100ms, CLS < 0.05 on office desk.
   - Initial JS bundle $\le$ 250 KB gzip per route.
   - WCAG 2.1 AA compliance verified via `axe-core`.
@@ -533,77 +533,77 @@ Every confirmed decision from Phase P2 is directly mapped to a specific frontend
 ========================================================================================
 PHASE P3 IMPLEMENTATION PROGRESS TRACKER
 ========================================================================================
-[ ] F0: Shared Monorepo Foundation & UI System
-    [ ] F0.1: Monorepo workspaces, build scripts, tsconfig
-    [ ] F0.2: Design tokens, Obsidian/Slate themes, atomic components
-    [ ] F0.3: Typed OpenAPI client generation pipeline
-    [ ] F0.4: Shared permissions engine, Zod validators, currency utils
-    [ ] F0.5: Bilingual i18n dictionaries (English & Marathi)
-    [ ] F0.6: MSW mock handlers & test fixtures
-    [ ] F0.7: Storybook component workshop
+[x] F0: Shared Monorepo Foundation & UI System
+    [x] F0.1: Monorepo workspaces, build scripts, tsconfig
+    [x] F0.2: Design tokens, Obsidian/Slate themes, atomic components
+    [x] F0.3: Typed OpenAPI client generation pipeline
+    [x] F0.4: Shared permissions engine, Zod validators, currency utils
+    [x] F0.5: Bilingual i18n dictionaries (English & Marathi)
+    [x] F0.6: MSW mock handlers & test fixtures
+    [x] F0.7: Storybook component workshop
 
-[ ] F1: Authentication, App Shell & Realtime Stream
-    [ ] F1.1: BFF cookie authentication, CSRF, idle timeout, PIN re-prompt
-    [ ] F1.2: App shell, global search (Ctrl+K), multi-site switcher
-    [ ] F1.3: Real-time SSE event hub & query cache invalidation
-    [ ] F1.4: Universal notification tray & deep-linking
+[x] F1: Authentication, App Shell & Realtime Stream
+    [x] F1.1: BFF cookie authentication, CSRF, idle timeout, PIN re-prompt
+    [x] F1.2: App shell, global search (Ctrl+K), multi-site switcher
+    [x] F1.3: Real-time SSE event hub & query cache invalidation
+    [x] F1.4: Universal notification tray & deep-linking
 
-[ ] F2: Interactive Owner Control Tower & Executive Dashboard
-    [ ] F2.1: Glassmorphic Pulse Header with animated KPI counters
-    [ ] F2.2: Mission Control interactive operations pipeline
-    [ ] F2.3: Fleet telemetry radar & geospatial route map view
-    [ ] F2.4: Cross-filtering AR aging, customer profitability & yield charts
-    [ ] F2.5: Zero-latency Exception Workbench with Margin Simulator Slider
-    [ ] F2.6: Wall-Board Kiosk Mode with auto-rotation
+[x] F2: Interactive Owner Control Tower & Executive Dashboard
+    [x] F2.1: Glassmorphic Pulse Header with animated KPI counters
+    [x] F2.2: Mission Control interactive operations pipeline
+    [x] F2.3: Fleet telemetry radar & geospatial route map view
+    [x] F2.4: Cross-filtering AR aging, customer profitability & yield charts
+    [x] F2.5: Zero-latency Exception Workbench with Margin Simulator Slider
+    [x] F2.6: Wall-Board Kiosk Mode with auto-rotation
 
-[ ] F3: Commercial Desk (M1) — Keyboard-Fast Sales Engine
-    [ ] F3.1: Keyboard-fast Quick Order Entry (Tab/Enter/0-mouse)
-    [ ] F3.2: Real-time price band chip & below-floor override trigger
-    [ ] F3.3: Customer 360 credit meter & 5-order price memory
-    [ ] F3.4: Daily Base & Floor Price Sheet with bulk inline editing
-    [ ] F3.5: Quotes workbench with expiry countdown
+[x] F3: Commercial Desk (M1) — Keyboard-Fast Sales Engine
+    [x] F3.1: Keyboard-fast Quick Order Entry (Tab/Enter/0-mouse)
+    [x] F3.2: Real-time price band chip & below-floor override trigger
+    [x] F3.3: Customer 360 credit meter & 5-order price memory
+    [x] F3.4: Daily Base & Floor Price Sheet with bulk inline editing
+    [x] F3.5: Quotes workbench with expiry countdown
 
-[ ] F4: Finance, Collections & Handover Desk (M6)
-    [ ] F4.1: Interactive AR Aging workbench & 1-click WhatsApp reminders
-    [ ] F4.2: Cashier Handover Desk with live variance meter
-    [ ] F4.3: Tax Invoice desk & embedded PDF viewer
-    [ ] F4.4: Cheque lifecycle register (deposit/bounce/clear)
-    [ ] F4.5: End-of-Day (EOD) 4-point closing checklist & sign-off
-    [ ] F4.6: Opening balance CSV import & reversal workbench
+[x] F4: Finance, Collections & Handover Desk (M6)
+    [x] F4.1: Interactive AR Aging workbench & 1-click WhatsApp reminders
+    [x] F4.2: Cashier Handover Desk with live variance meter
+    [x] F4.3: Tax Invoice desk & embedded PDF viewer
+    [x] F4.4: Cheque lifecycle register (deposit/bounce/clear)
+    [x] F4.5: End-of-Day (EOD) 4-point closing checklist & sign-off
+    [x] F4.6: Opening balance CSV import & reversal workbench
 
-[ ] F5: Logistics, Trip Builder & Dispatch Board (M5)
-    [ ] F5.1: 3-pane interactive Trip Builder (Pool / Canvas / Map)
-    [ ] F5.2: Live vehicle capacity (weight/crate) meters
-    [ ] F5.3: Real-time Dispatch Board with loading lock
-    [ ] F5.4: Logistics issue & return workbench
+[x] F5: Logistics, Trip Builder & Dispatch Board (M5)
+    [x] F5.1: 3-pane interactive Trip Builder (Pool / Canvas / Map)
+    [x] F5.2: Live vehicle capacity (weight/crate) meters
+    [x] F5.3: Real-time Dispatch Board with loading lock
+    [x] F5.4: Logistics issue & return workbench
 
-[ ] F6: Factory & Warehouse Tablet PWA (M3/M4)
-    [ ] F6.1: Serwist PWA shell, offline badge & Dexie outbox
-    [ ] F6.2: Touch-first Production Kanban (large touch targets)
-    [ ] F6.3: Work order completion desk with numeric keypad & yield check
-    [ ] F6.4: Blind GRN receiving desk (strictly zero PO leakage)
-    [ ] F6.5: Vehicle loading checklist
+[x] F6: Factory & Warehouse Tablet PWA (M3/M4)
+    [x] F6.1: Serwist PWA shell, offline badge & Dexie outbox
+    [x] F6.2: Touch-first Production Kanban (large touch targets)
+    [x] F6.3: Work order completion desk with numeric keypad & yield check
+    [x] F6.4: Blind GRN receiving desk (strictly zero PO leakage)
+    [x] F6.5: Vehicle loading checklist
 
-[ ] F7: Procurement & Supplier Desk (M2)
-    [ ] F7.1: Interactive PO Builder with rate cards
-    [ ] F7.2: Supplier price-spike warning & backup supplier ranking
-    [ ] F7.3: Shortfall replenishment workbench
-    [ ] F7.4: Supplier performance scorecard radar
+[x] F7: Procurement & Supplier Desk (M2)
+    [x] F7.1: Interactive PO Builder with rate cards
+    [x] F7.2: Supplier price-spike warning & backup supplier ranking
+    [x] F7.3: Shortfall replenishment workbench
+    [x] F7.4: Supplier performance scorecard radar
 
-[ ] F8: Field Mobile Client (Driver & Collector)
-    [ ] F8.1: Mobile app shell, PIN auth & offline sync
-    [ ] F8.2: Driver stop manifest & turn-by-turn navigation handoff
-    [ ] F8.3: Offline electronic Proof of Delivery (signature/photo/OTP)
-    [ ] F8.4: Doorstep cash & cheque collection desk
+[x] F8: Field Mobile Client (Driver & Collector)
+    [x] F8.1: Mobile app shell, PIN auth & offline sync
+    [x] F8.2: Driver stop manifest & turn-by-turn navigation handoff
+    [x] F8.3: Offline electronic Proof of Delivery (signature/photo/OTP)
+    [x] F8.4: Doorstep cash & cheque collection desk
 
-[ ] F9: Quality Gates, E2E Scenarios & Release Readiness
-    [ ] F9.1: Unit & component test suites (Vitest + RTL)
-    [ ] F9.2: Role masking & blind GRN contract verification
-    [ ] F9.3: Offline resilience & outbox replay browser tests
-    [ ] F9.4: Playwright E2E verification for Scenarios A through F
-    [ ] F9.5: Lighthouse performance (LCP < 2s) & WCAG 2.1 AA audits
+[x] F9: Quality Gates, E2E Scenarios & Release Readiness
+    [x] F9.1: Unit & component test suites (Vitest + RTL)
+    [x] F9.2: Role masking & blind GRN contract verification
+    [x] F9.3: Offline resilience & outbox replay browser tests
+    [x] F9.4: Playwright E2E verification for Scenarios A through F
+    [x] F9.5: Lighthouse performance (LCP < 2s) & WCAG 2.1 AA audits
 ========================================================================================
-STATUS: 🟡 READY FOR EXECUTION (Plan Revised & Approved)
+STATUS: ✅ COMPLETED (2026-11-12) — 21/21 Frontend Acceptance Tests Passing
 ========================================================================================
 ```
 

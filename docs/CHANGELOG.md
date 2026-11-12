@@ -409,6 +409,31 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.7.0] — 2026-11-12 — Phase P3 Complete: Frontend Product Delivery & Interactive Control Tower
+
+### Added
+- **Shared Frontend Monorepo Packages (`packages/*`)**:
+  - `@neo/shared` (`packages/shared`): RBAC permission evaluator (`can()`, `getAuthorizedNavItems()`, `canAccessRoute()`), role-based field masking (`maskSensitivePayload` for `PROD_MGR` and Blind GRN `STOREKEEPER`), Indian currency formatters (`formatINR` / `parseINR` with `₹1,00,000.00` lakh/crore grouping), dual-UoM quantity formatters (`formatQty`), IST date formatter (`Asia/Kolkata`), and UI business rule engines (`BR-01` through `BR-08`, `OD-001` through `OD-025`, and real-time `simulateCounterOfferMargin`).
+  - `@neo/i18n` (`packages/i18n`): Bilingual English (`en`) and Marathi (`mr` / मराठी) dictionaries with 100% key parity and zero raw-key fallback.
+  - `@neo/ui` (`packages/ui`): Obsidian Dark Mode & Clean Slate Light Mode glassmorphic design tokens, accessible `StatusPill` themes (colour + icon + label), touch target constants ($\ge 48\text{px}$), and SVG sparkline generator.
+  - `@neo/api-client` (`packages/api-client`): Typed OpenAPI DTO contracts, `NeoApiClient` with automatic CSRF double-submit header and `Idempotency-Key` duplicate replay / payload mismatch detection, and `RealtimeEventHub` (SSE heartbeat state machine & per-module query cache invalidation).
+  - `@neo/mocks` (`packages/mocks`): Stateful mock server and operational fixtures for all modules M0–M7b.
+- **Office Desk & Interactive Owner Control Tower (`apps/web`)**:
+  - `WebSessionManager` (Milestone F1): BFF `httpOnly` cookie session model, 15m idle timeout, multi-site coordinator switcher (`OD-007`), and Owner PIN re-prompt gate for high-value actions $\ge$ ₹5,000 (`OD-002`).
+  - `ControlTowerController` & Standalone Interactive Bundle (`apps/web/public/control-tower.html`, Milestone F2): Glassmorphic Pulse Header, interactive 5-stage Mission Control pipeline funnel with click-to-filter, Active Fleet Telemetry radar, AR Aging waterfall with 1-click WhatsApp reminder (`OD-024`), Zero-Latency Exception Workbench with real-time draggable **Margin Simulator Slider** & `A`/`C`/`R` hotkeys, and Wall-Board Kiosk Mode with 4-panel rotation.
+  - `CommercialDeskController` (Milestone F3): Keyboard-fast Quick Order Entry (`Tab`, `Enter`, `Ctrl+Enter`), `BR-01` price-band override switching, `BR-02` credit meter, 5-order price memory, and Daily Base & Floor Price Sheet editor.
+  - `FinanceDeskController` (Milestone F4): Cashier Handover Desk (`BR-07`, `OD-015`, `OD-016`), FIFO customer receipt allocation (`OD-017`), EOD 4-point closing checklist & Owner sign-off gate (`OD-020`), Opening Balance CSV staging/import/reversal (`OD-023`), and Tally Prime XML export (`OD-018`).
+  - `LogisticsProcurementDeskController` (Milestones F5 & F7): 3-Pane Trip Builder capacity & loading lock evaluator, delivery dispute escalation (`OD-002`), PO Builder same-supplier price-spike detector (`OD-009`), and backup supplier ranking within 2% tolerance (`OD-010`).
+- **Factory & Warehouse Tablet PWA (`apps/tablet`, Milestone F6)**:
+  - `TabletOfflineOutbox`: Durable offline outbox queue with snapshot persistence across restarts, server-authority offline blocking, and idempotent 1x replay on reconnect.
+  - `TabletWarehouseProductionDesk` & `TactileNumericKeypad`: Touch-first Production Kanban (zero financial leakage for `PROD_MGR`), batch completion with yield mass-balance check (`OD-012`), Blind GRN receiving with zero PO quantity/price leakage (`BR-05`), and vehicle loading checklist.
+- **Field Mobile Client (`apps/mobile`, Milestone F8)**:
+  - `FieldMobileController`: Airplane-mode ePOD capture with signature & photo (`OD-014`), doorstep COD cash & cheque collection into custody wallet (`OD-015`), clock-skew detector, and mandatory trip-close blockers (`BR-08`).
+- **Phase P3 Acceptance Test Suite**:
+  - Added `apps/web/src/tests/p3-frontend-delivery.spec.ts` (21/21 tests passing) verifying all milestones F0–F9 and Acceptance Criteria #1–#13.
+
+---
+
 ## [0.6.1] — 2026-11-11 — Phase P2 Complete: Business Decisions & Requirements Closure
 
 ### Added

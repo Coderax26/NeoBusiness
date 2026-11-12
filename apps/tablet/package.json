@@ -1,0 +1,9 @@
+{
+  "name": "@neo/tablet",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "NeoBus Factory & Warehouse Touch-First Offline Tablet PWA",
+  "main": "./src/index.ts"
+}
+

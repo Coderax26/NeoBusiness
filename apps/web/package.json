@@ -1,0 +1,9 @@
+{
+  "name": "@neo/web",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "NeoBus Office Desk & Interactive Owner Control Tower Web Application",
+  "main": "./src/index.ts"
+}
+

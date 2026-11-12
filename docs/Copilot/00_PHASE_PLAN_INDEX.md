@@ -11,8 +11,8 @@ These documents are implementation plans only. They do not change application co
 | P0 | `01_PHASE_P0_TEST_BASELINE_AND_CORRECTNESS.md` | Make the backend test baseline deterministic and remove correctness blockers | ✅ Complete |
 | P1 | `02_PHASE_P1_BACKEND_CONTRACT_COMPLETION.md` | Complete backend APIs, integrations, events, and cross-module behavior | ✅ Complete |
 | P2 | `03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md` | Close behavior-changing decisions and update the delivery contract | ✅ Complete |
-| P3 | `04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md` | Build web, mobile, and tablet products from the frontend blueprint | 🟡 Current |
-| P4 | `05_PHASE_P4_PRODUCTION_READINESS.md` | Security, performance, recovery, observability, deployment, and pilot readiness | ⏳ Planned |
+| P3 | `04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md` | Build web, mobile, and tablet products from the frontend blueprint | ✅ Complete |
+| P4 | `05_PHASE_P4_PRODUCTION_READINESS.md` | Security, performance, recovery, observability, deployment, and pilot readiness | 🟡 Current |
 | P5 | `06_PHASE_P5_DOCUMENTATION_AND_GOVERNANCE.md` | Reconcile project status, traceability, ownership, and release governance | ⏳ Planned |
 
 ## Current starting point

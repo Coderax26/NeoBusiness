@@ -1,0 +1,24 @@
+{
+  "name": "neobus-monorepo",
+  "version": "0.7.0",
+  "private": true,
+  "description": "NeoBus Enterprise ERP & Control Tower Monorepo (API, Web, Tablet PWA, Mobile, Shared Packages)",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "apps/tablet",
+    "apps/mobile",
+    "packages/shared",
+    "packages/i18n",
+    "packages/api-client",
+    "packages/mocks",
+    "packages/ui"
+  ],
+  "scripts": {
+    "build:api": "npm --prefix apps/api run build",
+    "test:api": "npm --prefix apps/api run test",
+    "test:fe": "npm --prefix apps/api run test -- ../web/src/tests/p3-frontend-delivery.spec.ts",
+    "test:all": "npm --prefix apps/api run test"
+  }
+}
+

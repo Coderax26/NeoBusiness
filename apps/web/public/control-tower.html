@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeoBus Control Tower — Interactive Executive Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+    }
+    .tabular-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .glass-panel {
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.85); opacity: 0.9; }
+      70% { transform: scale(2.2); opacity: 0; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .radar-beacon::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background-color: #10B981;
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+  </style>
+</head>
+<body id="app-body" class="bg-zinc-950 text-zinc-100 min-h-screen transition-colors duration-300">
+  <!-- TOP TELEMETRY BAR -->
+  <header class="sticky top-0 z-30 glass-panel bg-zinc-900/75 border-b border-zinc-800/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/25">
+        ⚡
+      </div>
+      <div>
+        <div class="flex items-center gap-2.5">
+          <h1 id="i18n-title" class="text-lg font-bold tracking-tight">NeoBus Control Tower</h1>
+          <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">v0.7 P3</span>
+        </div>
+        <p class="text-xs text-zinc-400">Multi-Site Food Manufacturing & Trading Command Center</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Site Switcher (OD-007) -->
+      <select id="site-switcher" class="bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-indigo-500">
+        <option value="ALL">All Sites (Consolidated)</option>
+        <option value="site-pune-central" selected>Pune Central Plant</option>
+        <option value="site-mumbai-vashi">Mumbai Vashi Hub</option>
+        <option value="site-nagpur">Nagpur Distribution Depot</option>
+      </select>
+
+      <!-- Timeframe Scrubber -->
+      <div class="flex bg-zinc-900 border border-zinc-800 rounded-lg p-0.5 text-xs">
+        <button onclick="setTimeframe('TODAY')" id="tf-TODAY" class="px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium">Live Today</button>
+        <button onclick="setTimeframe('7D')" id="tf-7D" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white">7D</button>
+        <button onclick="setTimeframe('MTD')" id="tf-MTD" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white">MTD</button>
+      </div>
+
+      <!-- Live SSE Heartbeat Beacon -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+        <span class="relative flex h-2.5 w-2.5 radar-beacon">
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span id="i18n-sse">SSE: LIVE (0.2s)</span>
+      </div>
+
+      <!-- Language Switcher (EN / मराठी) -->
+      <button onclick="toggleLanguage()" id="lang-btn" class="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700/80 text-xs font-semibold hover:border-indigo-500 transition">
+        EN | मराठी
+      </button>
+
+      <!-- Kiosk Mode Toggle -->
+      <button onclick="toggleKioskMode()" id="kiosk-btn" class="px-3 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/25 transition">
+        🖥️ Wall-Board Kiosk
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto p-6 space-y-6">
+    <!-- 1. HERO PULSE HEADER (4 INTERACTIVE KPI CARDS) -->
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <!-- Metric 1: Today's Sales (OD-020) -->
+      <div class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 hover:border-indigo-500/50 transition group">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span id="i18n-sales">Today's Sales (Tax Invoices)</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono">OD-020</span>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <div id="kpi-sales" class="text-2xl font-bold tabular-mono text-white">₹4,82,450.00</div>
+          <svg width="100" height="28" class="stroke-indigo-400 fill-none" stroke-width="2">
+            <polyline points="0,24 16,19 32,15 48,11 64,6 80,10 100,4" />
+          </svg>
+        </div>
+        <div class="mt-3">
+          <div class="flex justify-between text-[11px] text-zinc-400 mb-1">
+            <span>Target: ₹6,00,000.00</span>
+            <span class="text-indigo-400 font-semibold">80.4%</span>
+          </div>
+          <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full" style="width: 80.4%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metric 2: Blended Gross Margin -->
+      <div class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 hover:border-emerald-500/50 transition">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span id="i18n-margin">Blended Gross Margin</span>
+          <span class="text-emerald-400 font-semibold">▲ +1.2% vs Yesterday</span>
+        </div>
+        <div class="flex items-baseline gap-3">
+          <div class="text-2xl font-bold tabular-mono text-emerald-400">11.40%</div>
+          <span class="text-xs text-zinc-400">Target Band: 10.0% – 15.0%</span>
+        </div>
+        <div class="mt-3 flex gap-2 text-[11px]">
+          <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">Dairy: 12.8%</span>
+          <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">Trading: 8.9%</span>
+        </div>
+      </div>
+
+      <!-- Metric 3: Cash & Cheques in Custody (OD-015) -->
+      <div class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 hover:border-amber-500/50 transition">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span id="i18n-custody">Cash & Cheques in Custody</span>
+          <span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-mono">OD-015</span>
+        </div>
+        <div class="text-2xl font-bold tabular-mono text-white">₹1,28,400.00</div>
+        <div class="mt-3 flex items-center gap-2 text-xs">
+          <span class="px-2.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 tabular-mono">Cash: ₹95,400</span>
+          <span class="px-2.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 tabular-mono">Cheques: ₹33,000</span>
+        </div>
+      </div>
+
+      <!-- Metric 4: Actionable Exception Queue (OD-002) -->
+      <div class="glass-panel bg-zinc-900/60 border border-rose-500/40 rounded-2xl p-5 shadow-lg shadow-rose-950/20">
+        <div class="flex items-center justify-between text-xs text-rose-300 mb-2">
+          <span id="i18n-exceptions" class="font-semibold">Actionable Exceptions</span>
+          <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">SLA: 60m</span>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <div id="kpi-exc-count" class="text-2xl font-bold tabular-mono text-rose-400">3 Pending</div>
+          <span class="text-xs text-zinc-400">At Risk: ₹33,700</span>
+        </div>
+        <div class="mt-3 text-xs text-zinc-300">
+          ⚡ Use hotkeys <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700">A</kbd> <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700">C</kbd> <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700">R</kbd> below
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. INTERACTIVE MISSION CONTROL PIPELINE -->
+    <section class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 id="i18n-pipeline" class="text-sm font-bold uppercase tracking-wider text-zinc-300">Mission Control: Live Operations Pipeline</h2>
+          <p class="text-xs text-zinc-400">Click any stage to dynamically cross-filter orders and telemetry</p>
+        </div>
+        <span id="active-stage-badge" class="px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">
+          Showing: ALL STAGES
+        </span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <button onclick="filterStage('CONFIRMED')" class="text-left p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-indigo-500 transition">
+          <div class="text-xs text-zinc-400">① Confirmed Orders</div>
+          <div class="text-xl font-bold tabular-mono mt-1">18 Orders</div>
+          <div class="text-xs text-indigo-400 tabular-mono mt-0.5">₹3,40,000.00</div>
+        </button>
+        <button onclick="filterStage('PRODUCTION')" class="text-left p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-indigo-500 transition">
+          <div class="text-xs text-zinc-400">② In Production</div>
+          <div class="text-xl font-bold tabular-mono mt-1">6 Batches</div>
+          <div class="text-xs text-indigo-400 tabular-mono mt-0.5">₹1,85,000.00</div>
+        </button>
+        <button onclick="filterStage('LOADING')" class="text-left p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-indigo-500 transition">
+          <div class="text-xs text-zinc-400">③ Bay Loading</div>
+          <div class="text-xl font-bold tabular-mono mt-1">3 Vehicles</div>
+          <div class="text-xs text-amber-400 tabular-mono mt-0.5">₹92,000.00</div>
+        </button>
+        <button onclick="filterStage('IN_TRANSIT')" class="text-left p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-indigo-500 transition">
+          <div class="text-xs text-zinc-400">④ In Transit</div>
+          <div class="text-xl font-bold tabular-mono mt-1">5 Trucks</div>
+          <div class="text-xs text-emerald-400 tabular-mono mt-0.5">₹1,64,000.00</div>
+        </button>
+        <button onclick="filterStage('DELIVERED')" class="text-left p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-indigo-500 transition">
+          <div class="text-xs text-zinc-400">⑤ Delivered Today</div>
+          <div class="text-xl font-bold tabular-mono mt-1">24 Stops</div>
+          <div class="text-xs text-emerald-400 tabular-mono mt-0.5">₹4,82,450.00</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. EXCEPTION WORKBENCH (MARGIN SIMULATOR) & ACTIVE FLEET RADAR -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Exception Workbench (7 cols) -->
+      <div class="lg:col-span-7 glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 id="i18n-workbench" class="text-sm font-bold uppercase tracking-wider text-zinc-200">Zero-Latency Exception Workbench</h2>
+            <p class="text-xs text-zinc-400">Interactive Price Counter-Offer Margin Simulator & 1-Click Approval</p>
+          </div>
+          <span class="px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-mono">BR-01 · OD-002</span>
+        </div>
+
+        <!-- Interactive Price Override Card -->
+        <div id="exc-card-1" class="p-4 rounded-xl bg-zinc-950/80 border border-amber-500/40 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-xs font-bold">▲ HIGH PRIORITY</span>
+              <span class="font-semibold text-sm">PRICE OVERRIDE · SO-2611-0042 (ABC Traders)</span>
+            </div>
+            <span class="text-xs text-zinc-400 tabular-mono">Expires in 56m</span>
+          </div>
+
+          <p class="text-xs text-zinc-300">
+            Requested <strong>500 kg Malai Paneer Block</strong> @ <span class="text-rose-400 font-mono font-bold">₹88.00/kg</span>
+            (Floor: <span class="font-mono">₹90.00</span> · Target: <span class="font-mono">₹95.00</span> · Cost: <span class="font-mono">₹82.00</span> · Last Paid: <span class="font-mono">₹91.00</span>)
+          </p>
+
+          <!-- Interactive Margin Simulator Slider -->
+          <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400 font-medium">Interactive Counter-Offer Price Simulator:</span>
+              <span id="sim-price-display" class="text-sm font-bold text-indigo-400 tabular-mono">₹89.50 / kg</span>
+            </div>
+            <input
+              id="margin-slider"
+              type="range"
+              min="85"
+              max="96"
+              step="0.5"
+              value="89.5"
+              oninput="updateMarginSimulation(this.value)"
+              class="w-full accent-indigo-500 cursor-pointer"
+            />
+            <div class="grid grid-cols-3 gap-2 pt-1 text-xs tabular-mono">
+              <div class="p-2 rounded bg-zinc-950 border border-zinc-800/80">
+                <div class="text-[10px] text-zinc-400">Simulated Margin %</div>
+                <div id="sim-margin-pct" class="font-bold text-emerald-400">8.38%</div>
+              </div>
+              <div class="p-2 rounded bg-zinc-950 border border-zinc-800/80">
+                <div class="text-[10px] text-zinc-400">Gross Profit (500 kg)</div>
+                <div id="sim-profit-inr" class="font-bold text-white">₹3,750.00</div>
+              </div>
+              <div class="p-2 rounded bg-zinc-950 border border-zinc-800/80">
+                <div class="text-[10px] text-zinc-400">Line Total</div>
+                <div id="sim-total-inr" class="font-bold text-indigo-300">₹44,750.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5 pt-1">
+            <button onclick="resolveCard('APPROVED')" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+              ✓ Approve ₹88.00 (A)
+            </button>
+            <button onclick="resolveCard('COUNTERED')" id="btn-counter" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+              ⚡ Send Counter ₹89.50 (C)
+            </button>
+            <button onclick="resolveCard('REJECTED')" class="px-3.5 py-2 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-semibold transition">
+              ✕ Reject Override (R)
+            </button>
+            <span id="resolution-status" class="text-xs font-semibold text-emerald-400 ml-auto"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fleet Telemetry & AR Waterfall (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+        <!-- Active Fleet Radar -->
+        <div class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 id="i18n-fleet" class="text-sm font-bold uppercase tracking-wider text-zinc-200">Active Fleet & Dispatch Radar</h2>
+            <span class="text-xs text-emerald-400 font-mono">5 Trucks Active</span>
+          </div>
+          <div class="space-y-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-white">🚚 MH-12-Q-4401 · Ramesh Jadhav</div>
+                <div class="text-zinc-400 mt-0.5">Stop 4 of 8 · ETA next: 14 mins · COD: ₹38,500</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-mono font-semibold">50%</span>
+            </div>
+            <div class="p-3 rounded-xl bg-zinc-950/80 border border-amber-500/30 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-white">🚚 MH-14-BA-1209 · Vijay Kadam</div>
+                <div class="text-amber-300 mt-0.5">Stop 7 of 7 · ⚠️ Delayed 20m · COD: ₹24,500</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-mono font-semibold">92%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AR Aging Waterfall -->
+        <div class="glass-panel bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 id="i18n-ar" class="text-sm font-bold uppercase tracking-wider text-zinc-200">Real-Time AR Aging Waterfall</h2>
+            <button onclick="triggerWhatsappReminder()" id="wa-btn" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-600/30 transition">
+              💬 1-Click WhatsApp Reminder (30d+)
+            </button>
+          </div>
+          <div class="space-y-2 text-xs tabular-mono">
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-400 w-36">Current (0–7d)</span>
+              <div class="flex-1 mx-3 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-indigo-500" style="width: 68%"></div></div>
+              <span class="font-semibold text-white">₹8,40,000.00</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-400 w-36">Due (8–15d)</span>
+              <div class="flex-1 mx-3 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-amber-400" style="width: 30%"></div></div>
+              <span class="font-semibold text-white">₹3,10,000.00</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-rose-400 font-semibold w-36">Critical (30d+)</span>
+              <div class="flex-1 mx-3 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-rose-500" style="width: 14%"></div></div>
+              <span class="font-bold text-rose-400">₹85,000.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let currentLang = 'en';
+    const i18n = {
+      en: {
+        title: 'NeoBus Control Tower',
+        sales: "Today's Sales (Tax Invoices)",
+        margin: 'Blended Gross Margin',
+        custody: 'Cash & Cheques in Custody',
+        exceptions: 'Actionable Exceptions',
+        pipeline: 'Mission Control: Live Operations Pipeline',
+        workbench: 'Zero-Latency Exception Workbench',
+        fleet: 'Active Fleet & Dispatch Radar',
+        ar: 'Real-Time AR Aging Waterfall',
+      },
+      mr: {
+        title: 'निओबस नियंत्रण कक्ष (Control Tower)',
+        sales: 'आजची विक्री (कर बीजके)',
+        margin: 'सरासरी निव्वळ नफा %',
+        custody: 'ताब्यातील रोख व धनादेश',
+        exceptions: 'प्रलंबित अपवाद मंजुरी',
+        pipeline: 'थेट कार्यप्रवाह टप्पे (Mission Control)',
+        workbench: 'अपवाद निर्णय मंच',
+        fleet: 'सक्रिय वाहने व वितरण स्थिती',
+        ar: 'थकीत येणेबाकी विश्लेषण',
+      }
+    };
+
+    function formatINR(num) {
+      return '₹' + Number(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateMarginSimulation(val) {
+      const price = parseFloat(val);
+      const cost = 82;
+      const qty = 500;
+      const marginPct = (((price - cost) / price) * 100).toFixed(2);
+      const profit = (price - cost) * qty;
+      const total = price * qty;
+
+      document.getElementById('sim-price-display').textContent = formatINR(price) + ' / kg';
+      document.getElementById('sim-margin-pct').textContent = marginPct + '%';
+      document.getElementById('sim-profit-inr').textContent = formatINR(profit);
+      document.getElementById('sim-total-inr').textContent = formatINR(total);
+      document.getElementById('btn-counter').textContent = `⚡ Send Counter ${formatINR(price)} (C)`;
+    }
+
+    function resolveCard(action) {
+      const price = document.getElementById('margin-slider').value;
+      const statusEl = document.getElementById('resolution-status');
+      statusEl.textContent = action === 'COUNTERED'
+        ? `✓ Counter-Offer Sent @ ₹${parseFloat(price).toFixed(2)}`
+        : `✓ ${action} by Owner`;
+      document.getElementById('kpi-exc-count').textContent = '2 Pending';
+    }
+
+    function filterStage(stage) {
+      document.getElementById('active-stage-badge').textContent = 'Filtered Stage: ' + stage;
+    }
+
+    function setTimeframe(tf) {
+      ['TODAY', '7D', 'MTD'].forEach(k => {
+        const btn = document.getElementById('tf-' + k);
+        btn.className = k === tf
+          ? 'px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium'
+          : 'px-2.5 py-1 rounded-md text-zinc-400 hover:text-white';
+      });
+    }
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'en' ? 'mr' : 'en';
+      const dict = i18n[currentLang];
+      document.getElementById('i18n-title').textContent = dict.title;
+      document.getElementById('i18n-sales').textContent = dict.sales;
+      document.getElementById('i18n-margin').textContent = dict.margin;
+      document.getElementById('i18n-custody').textContent = dict.custody;
+      document.getElementById('i18n-exceptions').textContent = dict.exceptions;
+      document.getElementById('i18n-pipeline').textContent = dict.pipeline;
+      document.getElementById('i18n-workbench').textContent = dict.workbench;
+      document.getElementById('i18n-fleet').textContent = dict.fleet;
+      document.getElementById('i18n-ar').textContent = dict.ar;
+    }
+
+    function triggerWhatsappReminder() {
+      const btn = document.getElementById('wa-btn');
+      btn.textContent = '✓ WhatsApp Reminders Queued (3 Customers)';
+    }
+
+    function toggleKioskMode() {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,9 @@
+{
+  "name": "@neo/mobile",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "NeoBus Field Driver & Collector Offline-First Mobile Client",
+  "main": "./src/index.ts"
+}
+
