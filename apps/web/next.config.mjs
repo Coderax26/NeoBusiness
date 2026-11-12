@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   transpilePackages: ['@neo/shared', '@neo/api-client', '@neo/ui', '@neo/i18n'],
   async rewrites() {

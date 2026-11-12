@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, frontend_with_anitgravity, frontend_with_antigravity]
   pull_request:
-    branches: [master, main]
+    branches: [master, main, frontend_with_anitgravity, frontend_with_antigravity]
 
 jobs:
   lint-test-build:
@@ -73,3 +73,11 @@ jobs:
 
       - name: Run e2e tests
         run: npm run test:e2e
+
+      - name: Check API routes drift
+        working-directory: .
+        run: npm run check:api-routes
+
+      - name: Run frontend unit & tech stack tests
+        working-directory: .
+        run: npm run test:fe

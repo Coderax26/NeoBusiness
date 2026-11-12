@@ -1,4 +1,5 @@
 import React from 'react';
+import { Providers } from './providers';
 import './globals.css';
 
 export const metadata = {
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

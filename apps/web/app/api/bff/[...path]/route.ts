@@ -21,21 +21,76 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ pat
   const body = hasBody ? await req.arrayBuffer() : undefined;
 
   try {
-    const upstream = await fetch(targetUrl, {
+    let upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
       body,
     });
 
+    let newAccessToken: string | undefined;
+    let newRefreshToken: string | undefined;
+
+    // Silent refresh attempt on 401 (Section 5 / D-2 BFF pattern)
+    if (upstream.status === 401) {
+      const refreshToken = req.cookies.get('neobus_refresh_token')?.value;
+      if (refreshToken) {
+        try {
+          const refreshRes = await fetch(`${API_ORIGIN}/api/v1/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            newAccessToken = refreshData.accessToken;
+            newRefreshToken = refreshData.refreshToken;
+
+            headers.set('Authorization', `Bearer ${newAccessToken}`);
+            // Retry request with rotated access token
+            upstream = await fetch(targetUrl, {
+              method: req.method,
+              headers,
+              body,
+            });
+          }
+        } catch {
+          // If refresh fails, return original 401 response
+        }
+      }
+    }
+
     const contentType = upstream.headers.get('content-type') || 'application/json';
     const upstreamData = await upstream.arrayBuffer();
 
-    return new NextResponse(upstreamData, {
+    const response = new NextResponse(upstreamData, {
       status: upstream.status,
       headers: {
         'Content-Type': contentType,
       },
     });
+
+    if (newAccessToken) {
+      response.cookies.set('neobus_access_token', newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 15 * 60,
+      });
+    }
+
+    if (newRefreshToken) {
+      response.cookies.set('neobus_refresh_token', newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+    }
+
+    return response;
   } catch (err: any) {
     return NextResponse.json(
       { error: { code: 'UPSTREAM_ERROR', message: `Cannot reach API: ${err.message}` } },
