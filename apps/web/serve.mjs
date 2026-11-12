@@ -77,3 +77,4 @@ server.listen(PORT, () => {
   console.log(`⚡ NeoBus Interactive Control Tower UI running at: http://localhost:${PORT}`);
   console.log(`🔗 Proxying /api/v1/* and /health to backend API at: ${API_ORIGIN}`);
 });
+

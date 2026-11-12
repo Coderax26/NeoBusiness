@@ -177,3 +177,4 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/exceptions?status=PENDING" 
 3. **Resetting the Development Database**:
    - To roll back the last migration batch: `npm --prefix apps/api run migrate:rollback`
    - To re-apply migrations and re-seed: `npm run migrate && npm run seed`
+
