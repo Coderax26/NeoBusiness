@@ -27,85 +27,11 @@ export interface SessionUser {
   permissions?: string[];
 }
 
-export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
-  OWNER: ['*'],
-  OPS_COORD: [
-    'dashboard.read_pulse',
-    'dashboard.read_status',
-    'dashboard.read_eod',
-    'order.create',
-    'order.read',
-    'order.confirm_in_band',
-    'order.request_override',
-    'quote.create',
-    'quote.read',
-    'customer.read',
-    'customer.write',
-    'item.read',
-    'supplier.read',
-    'supplier.write',
-    'po.create',
-    'po.read',
-    'requisition.read',
-    'requisition.write',
-    'shortfall.read',
-    'shortfall.write',
-    'inventory.read',
-    'inventory.transfer',
-    'inventory.adjust_request',
-    'production.read',
-    'bom.read',
-    'trip.create',
-    'trip.read',
-    'trip.dispatch',
-    'trip.close',
-    'fleet.issue_resolve',
-    'invoice.read',
-    'invoice.create',
-    'collection.create',
-    'collection.read',
-    'ar.read',
-    'receipt.verify_handover', // OD-016: Ops Coordinator acts as cashier
-    'cheque.manage',
-    'credit_note.request',
-    'eod.prepare',
-    'opening_balance.draft', // OD-023
-    'exception.read',
-    'notification.read',
-  ],
-  PROD_MGR: [
-    'production.read',
-    'production.start',
-    'production.complete',
-    'production.wastage',
-    'production.attendance',
-    'requisition.create',
-    'inventory.read_qty_only',
-  ],
-  STOREKEEPER: [
-    'grn.blind_receive',
-    'inventory.read_qty_only',
-    'inventory.transfer_send',
-    'inventory.transfer_receive',
-    'inventory.adjust_request',
-    'trip.confirm_loading',
-  ],
-  DRIVER: [
-    'trip.read_own',
-    'delivery.epod',
-    'delivery.return_log',
-    'collection.cod_capture',
-    'custody.read_own',
-    'custody.initiate_handover',
-  ],
-  COLLECTOR: [
-    'ar.read_assigned',
-    'collection.create',
-    'ptp.create',
-    'custody.read_own',
-    'custody.initiate_handover',
-  ],
-};
+/**
+ * NOTE (gap I-1): the hard-coded ROLE_PERMISSIONS map was removed. Permission codes
+ * are owned by the backend (`role_permissions`) and delivered via GET /auth/me.
+ * Use `toSessionUser()` to build a SessionUser from that response.
+ */
 
 export interface NavItem {
   id: string;
@@ -132,48 +58,48 @@ export const ALL_NAV_ITEMS: readonly NavItem[] = [
   { id: 'control-dashboard', labelKey: 'nav.controlDashboard', route: '/control/dashboard', group: 'CONTROL', requiredPermission: 'dashboard.read_pulse', surface: 'WEB' },
   { id: 'control-approvals', labelKey: 'nav.approvals', route: '/control/approvals', group: 'CONTROL', requiredPermission: 'exception.resolve', surface: 'WEB' },
   { id: 'control-analytics', labelKey: 'nav.analytics', route: '/control/analytics', group: 'CONTROL', requiredPermission: 'analytics.read_customers', surface: 'WEB' },
-  { id: 'control-audit', labelKey: 'nav.audit', route: '/control/audit', group: 'CONTROL', requiredPermission: 'audit.read', surface: 'WEB' },
+  { id: 'control-audit', labelKey: 'nav.audit', route: '/control/audit', group: 'CONTROL', requiredPermission: 'audit.view', surface: 'WEB' },
   // Coordinator Home
-  { id: 'coord-home', labelKey: 'nav.todayBoard', route: '/home', group: 'HOME', requiredPermission: 'order.read', surface: 'WEB' },
+  { id: 'coord-home', labelKey: 'nav.todayBoard', route: '/home', group: 'HOME', requiredPermission: 'order.view', surface: 'WEB' },
   // Sales (M1)
   { id: 'sales-quick-order', labelKey: 'nav.quickOrder', route: '/sales/orders/new', group: 'SALES', requiredPermission: 'order.create', surface: 'WEB' },
-  { id: 'sales-orders', labelKey: 'nav.orders', route: '/sales/orders', group: 'SALES', requiredPermission: 'order.read', surface: 'WEB' },
-  { id: 'sales-quotes', labelKey: 'nav.quotes', route: '/sales/quotes', group: 'SALES', requiredPermission: 'quote.read', surface: 'WEB' },
-  { id: 'sales-customers', labelKey: 'nav.customers', route: '/sales/customers', group: 'SALES', requiredPermission: 'customer.read', surface: 'WEB' },
-  { id: 'sales-prices', labelKey: 'nav.dailyPriceSheet', route: '/sales/prices', group: 'SALES', requiredPermission: 'pricing.publish', surface: 'WEB' },
+  { id: 'sales-orders', labelKey: 'nav.orders', route: '/sales/orders', group: 'SALES', requiredPermission: 'order.view', surface: 'WEB' },
+  { id: 'sales-quotes', labelKey: 'nav.quotes', route: '/sales/quotes', group: 'SALES', requiredPermission: 'quote.view', surface: 'WEB' },
+  { id: 'sales-customers', labelKey: 'nav.customers', route: '/sales/customers', group: 'SALES', requiredPermission: 'customer.view', surface: 'WEB' },
+  { id: 'sales-prices', labelKey: 'nav.dailyPriceSheet', route: '/sales/prices', group: 'SALES', requiredPermission: 'price.set_daily', surface: 'WEB' },
   // Procurement (M2)
   { id: 'proc-suppliers', labelKey: 'nav.suppliers', route: '/procurement/suppliers', group: 'PROCUREMENT', requiredPermission: 'supplier.read', surface: 'WEB' },
   { id: 'proc-pos', labelKey: 'nav.purchaseOrders', route: '/procurement/pos/new', group: 'PROCUREMENT', requiredPermission: 'po.create', surface: 'WEB' },
-  { id: 'proc-shortfalls', labelKey: 'nav.shortfalls', route: '/procurement/shortfalls', group: 'PROCUREMENT', requiredPermission: 'shortfall.read', surface: 'WEB' },
+  { id: 'proc-shortfalls', labelKey: 'nav.shortfalls', route: '/procurement/shortfalls', group: 'PROCUREMENT', requiredPermission: 'po.read', surface: 'WEB' },
   { id: 'proc-requisitions', labelKey: 'nav.requisitions', route: '/procurement/requisitions', group: 'PROCUREMENT', requiredPermission: 'requisition.read', surface: 'WEB' },
   // Inventory (M3)
   { id: 'inv-stock', labelKey: 'nav.stock', route: '/inventory/stock', group: 'INVENTORY', requiredPermission: 'inventory.read', surface: 'WEB' },
   { id: 'inv-transfers', labelKey: 'nav.transfers', route: '/inventory/transfers', group: 'INVENTORY', requiredPermission: 'inventory.transfer', surface: 'WEB' },
-  { id: 'inv-adjustments', labelKey: 'nav.adjustments', route: '/inventory/adjustments', group: 'INVENTORY', requiredPermission: 'inventory.adjust_request', surface: 'WEB' },
+  { id: 'inv-adjustments', labelKey: 'nav.adjustments', route: '/inventory/adjustments', group: 'INVENTORY', requiredPermission: 'stock.adjust_request', surface: 'WEB' },
   // Production (M4)
-  { id: 'prod-orders', labelKey: 'nav.workOrders', route: '/production/orders', group: 'PRODUCTION', requiredPermission: 'production.read', surface: 'WEB' },
-  { id: 'prod-boms', labelKey: 'nav.boms', route: '/production/boms', group: 'PRODUCTION', requiredPermission: 'bom.read', surface: 'WEB' },
+  { id: 'prod-orders', labelKey: 'nav.workOrders', route: '/production/orders', group: 'PRODUCTION', requiredPermission: 'wo.start', surface: 'WEB' },
+  { id: 'prod-boms', labelKey: 'nav.boms', route: '/production/boms', group: 'PRODUCTION', requiredPermission: 'wo.start', surface: 'WEB' },
   // Logistics (M5)
-  { id: 'log-trips', labelKey: 'nav.tripBuilder', route: '/logistics/trips/new', group: 'LOGISTICS', requiredPermission: 'trip.create', surface: 'WEB' },
-  { id: 'log-dispatch', labelKey: 'nav.dispatchBoard', route: '/logistics/dispatch', group: 'LOGISTICS', requiredPermission: 'trip.read', surface: 'WEB' },
-  { id: 'log-issues', labelKey: 'nav.issueDesk', route: '/logistics/issues', group: 'LOGISTICS', requiredPermission: 'fleet.issue_resolve', surface: 'WEB' },
+  { id: 'log-trips', labelKey: 'nav.tripBuilder', route: '/logistics/trips/new', group: 'LOGISTICS', requiredPermission: 'fleet.manage', surface: 'WEB' },
+  { id: 'log-dispatch', labelKey: 'nav.dispatchBoard', route: '/logistics/dispatch', group: 'LOGISTICS', requiredPermission: 'fleet.read', surface: 'WEB' },
+  { id: 'log-issues', labelKey: 'nav.issueDesk', route: '/logistics/issues', group: 'LOGISTICS', requiredPermission: 'fleet.resolve_issue', surface: 'WEB' },
   // Finance (M6)
   { id: 'fin-invoices', labelKey: 'nav.invoices', route: '/finance/invoices', group: 'FINANCE', requiredPermission: 'invoice.read', surface: 'WEB' },
-  { id: 'fin-ar', labelKey: 'nav.arAging', route: '/finance/ar', group: 'FINANCE', requiredPermission: 'ar.read', surface: 'WEB' },
+  { id: 'fin-ar', labelKey: 'nav.arAging', route: '/finance/ar', group: 'FINANCE', requiredPermission: 'analytics.read_ar', surface: 'WEB' },
   { id: 'fin-handover', labelKey: 'nav.cashHandover', route: '/finance/handover', group: 'FINANCE', requiredPermission: 'receipt.verify_handover', surface: 'WEB' },
-  { id: 'fin-cheques', labelKey: 'nav.cheques', route: '/finance/cheques', group: 'FINANCE', requiredPermission: 'cheque.manage', surface: 'WEB' },
-  { id: 'fin-eod', labelKey: 'nav.eodClosing', route: '/finance/eod', group: 'FINANCE', requiredPermission: 'eod.prepare', surface: 'WEB' },
+  { id: 'fin-cheques', labelKey: 'nav.cheques', route: '/finance/cheques', group: 'FINANCE', requiredPermission: 'receipt.verify_handover', surface: 'WEB' },
+  { id: 'fin-eod', labelKey: 'nav.eodClosing', route: '/finance/eod', group: 'FINANCE', requiredPermission: 'eod.signoff', surface: 'WEB' },
   // Admin (M0)
-  { id: 'admin-settings', labelKey: 'nav.settings', route: '/admin/settings', group: 'ADMIN', requiredPermission: 'admin.settings', surface: 'WEB' },
-  { id: 'admin-users', labelKey: 'nav.usersAndSites', route: '/admin/users', group: 'ADMIN', requiredPermission: 'admin.users', surface: 'WEB' },
+  { id: 'admin-settings', labelKey: 'nav.settings', route: '/admin/settings', group: 'ADMIN', requiredPermission: 'config.edit', surface: 'WEB' },
+  { id: 'admin-users', labelKey: 'nav.usersAndSites', route: '/admin/users', group: 'ADMIN', requiredPermission: 'config.edit', surface: 'WEB' },
   // Tablet PWA
-  { id: 'tab-production', labelKey: 'nav.tabletKanban', route: '/t/production', group: 'TABLET', requiredPermission: 'production.start', surface: 'TABLET' },
+  { id: 'tab-production', labelKey: 'nav.tabletKanban', route: '/t/production', group: 'TABLET', requiredPermission: 'wo.start', surface: 'TABLET' },
   { id: 'tab-rm-request', labelKey: 'nav.rmRequest', route: '/t/rm-request', group: 'TABLET', requiredPermission: 'requisition.create', surface: 'TABLET' },
-  { id: 'tab-attendance', labelKey: 'nav.attendance', route: '/t/attendance', group: 'TABLET', requiredPermission: 'production.attendance', surface: 'TABLET' },
-  { id: 'tab-grn', labelKey: 'nav.blindGrn', route: '/t/grn', group: 'TABLET', requiredPermission: 'grn.blind_receive', surface: 'TABLET' },
-  { id: 'tab-loading', labelKey: 'nav.vehicleLoading', route: '/t/loading', group: 'TABLET', requiredPermission: 'trip.confirm_loading', surface: 'TABLET' },
-  { id: 'tab-transfers', labelKey: 'nav.tabletTransfers', route: '/t/transfers', group: 'TABLET', requiredPermission: 'inventory.transfer_send', surface: 'TABLET' },
-  { id: 'tab-stock', labelKey: 'nav.tabletStock', route: '/t/stock', group: 'TABLET', requiredPermission: 'inventory.read_qty_only', surface: 'TABLET' },
+  { id: 'tab-attendance', labelKey: 'nav.attendance', route: '/t/attendance', group: 'TABLET', requiredPermission: 'wo.start', surface: 'TABLET' },
+  { id: 'tab-grn', labelKey: 'nav.blindGrn', route: '/t/grn', group: 'TABLET', requiredPermission: 'grn.record_blind', surface: 'TABLET' },
+  { id: 'tab-loading', labelKey: 'nav.vehicleLoading', route: '/t/loading', group: 'TABLET', requiredPermission: 'trip.load', surface: 'TABLET' },
+  { id: 'tab-transfers', labelKey: 'nav.tabletTransfers', route: '/t/transfers', group: 'TABLET', requiredPermission: 'stock.transfer', surface: 'TABLET' },
+  { id: 'tab-stock', labelKey: 'nav.tabletStock', route: '/t/stock', group: 'TABLET', requiredPermission: 'inventory.read', surface: 'TABLET' },
 ];
 
 /**
@@ -195,7 +121,7 @@ export function can(
 
   if (user.role === 'OWNER') return true;
 
-  const granted = user.permissions ?? ROLE_PERMISSIONS[user.role] ?? [];
+  const granted = user.permissions ?? []; // server-provided only (gap I-1)
   if (granted.includes('*')) return true;
   return granted.includes(permission);
 }
@@ -365,3 +291,34 @@ export function maskSensitivePayload<T>(
   return clone as T;
 }
 
+
+/** Shape returned by GET /auth/me (gap I-2). */
+export interface AuthMeResponse {
+  id: string;
+  name?: string;
+  full_name?: string;
+  phone: string;
+  role: UserRole;
+  siteIds?: string[];
+  sites?: Array<{ id: string; name: string; type: string }>;
+  preferredLanguage?: string;
+  permissions?: string[];
+}
+
+/**
+ * Builds a SessionUser from the backend /auth/me payload. Permissions are never
+ * invented client-side: a missing list means "no permissions".
+ */
+export function toSessionUser(me: AuthMeResponse): SessionUser {
+  const siteIds = me.siteIds ?? [];
+  return {
+    id: me.id,
+    name: me.name ?? me.full_name ?? '',
+    phone: me.phone,
+    role: me.role,
+    siteIds,
+    activeSiteId: siteIds[0] ?? '',
+    preferredLanguage: me.preferredLanguage === 'mr' ? 'mr' : 'en',
+    permissions: me.permissions ?? [],
+  };
+}

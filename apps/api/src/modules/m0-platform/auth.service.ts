@@ -206,9 +206,41 @@ export class AuthService {
       .where('user_id', user.id)
       .pluck('site_id');
 
+    const siteIds: string[] = [
+      ...new Set<string>([user.assigned_site_id, ...siteAccess].filter(Boolean)),
+    ];
+
+    // Gap I-2: expose sites (id, name, type) — OWNER sees every active site
+    const siteQuery = this.knex('sites').where('is_active', true);
+    if (user.role !== 'OWNER') siteQuery.whereIn('id', siteIds);
+    const siteRows: any[] = await siteQuery.select('id', 'name', 'site_type');
+    const sites = siteRows.map((s) => ({
+      id: s.id,
+      name: s.name,
+      type: s.site_type,
+    }));
+
     return {
       ...user,
-      siteIds: [user.assigned_site_id, ...siteAccess].filter(Boolean),
+      name: user.full_name,
+      siteIds,
+      sites,
+      preferredLanguage: user.preferred_language ?? 'en',
+      permissions: await this.getPermissionCodes(user.role),
     };
+  }
+
+  /**
+   * Gap I-1/I-2: permission list comes from role_permissions (single source of
+   * truth). OWNER holds every permission ('*') — mirrors RbacGuard behaviour.
+   */
+  async getPermissionCodes(role: string): Promise<string[]> {
+    if (role === 'OWNER') return ['*'];
+    const rows: Array<{ permission_code: string }> = await this.knex(
+      'role_permissions',
+    )
+      .where('role', role)
+      .select('permission_code');
+    return rows.map((r) => r.permission_code).sort();
   }
 }
