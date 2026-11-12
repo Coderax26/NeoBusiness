@@ -232,23 +232,25 @@ When all green → owner taps **Sign-off** (`eod.closed` → accounting export, 
 
 ## 13. Build checklist
 
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#8-m6-collections--financials-traceability).
+
 **Sprint 1 (core)**
-- [ ] Migrations: `invoices`, `invoice_lines`, `collection_receipts`, `receipt_allocations`, `customer_ledger_entries`, `custody_ledger`, `cash_handovers`, `cheque_register`, `ptp_followups`, `collection_worklists`, `eod_closings`
-- [ ] Append-only triggers/revokes on receipts and ledgers
-- [ ] Invoice generation (manual *Mark Dispatched* trigger) with GST split + PDF
-- [ ] `logCollection` transaction (BR-07) with idempotency
-- [ ] Custody wallet + handover verification
-- [ ] AR aging job · overdue/credit-hold job · `CreditPort` read model
-- [ ] Worklist job · PTP workflow
-- [ ] WhatsApp receipt via `NotifyPort`
-- [ ] EOD checklist + deposit slip + sign-off
-- [ ] Mobile collection screens (offline) · coordinator desk screens
-- [ ] Opening-balance import tool
+- [x] `[M6-CHK-01]` Migrations: `invoices`, `invoice_lines`, `collection_receipts`, `receipt_allocations`, `customer_ledger_entries`, `custody_ledger`, `cash_handovers`, `cheque_register`, `ptp_followups`, `collection_worklists`, `eod_closings`
+- [x] `[M6-CHK-02]` Append-only triggers/revokes on receipts and ledgers
+- [x] `[M6-CHK-03]` Invoice generation (manual *Mark Dispatched* trigger) with GST split + PDF
+- [x] `[M6-CHK-04]` `logCollection` transaction (BR-07) with idempotency
+- [x] `[M6-CHK-05]` Custody wallet + handover verification
+- [x] `[M6-CHK-06]` AR aging job · overdue/credit-hold job · `CreditPort` read model
+- [x] `[M6-CHK-07]` Worklist job · PTP workflow
+- [x] `[M6-CHK-08]` WhatsApp receipt via `NotifyPort`
+- [x] `[M6-CHK-09]` EOD checklist + deposit slip + sign-off
+- [x] `[M6-CHK-10]` Mobile collection screens (offline) · coordinator desk screens
+- [x] `[M6-CHK-11]` Opening-balance import tool
 
 **Sprint 2–3**
-- [ ] Credit notes (return/damage from M5, rebate/write-off via owner)
-- [ ] Cheque lifecycle screens
-- [ ] Supplier AP + payments · `grn.posted` handler
-- [ ] Accounting export bridge (nightly, idempotent)
-- [ ] Switch invoice trigger to `trip.dispatched`; COD settlement on `trip.closed`
-- [ ] 7-day parallel run with Mr. X's manual EOD · acceptance tests §10 (+ Scenario E)
+- [x] `[M6-CHK-12]` Credit notes (return/damage from M5, rebate/write-off via owner)
+- [x] `[M6-CHK-13]` Cheque lifecycle screens
+- [x] `[M6-CHK-14]` Supplier AP + payments · `grn.posted` handler
+- [x] `[M6-CHK-15]` Accounting export bridge (nightly, idempotent)
+- [x] `[M6-CHK-16]` Switch invoice trigger to `trip.dispatched`; COD settlement on `trip.closed`
+- [x] `[M6-CHK-17]` 7-day parallel run with Mr. X's manual EOD · acceptance tests §10 (+ Scenario E verified in `m6-acceptance.spec.ts`)

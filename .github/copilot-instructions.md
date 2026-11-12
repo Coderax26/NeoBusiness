@@ -2,9 +2,9 @@
 
 ## Repository orientation
 
-NeoBus is a multi-site food-trading and manufacturing ERP/CRM implemented as a NestJS modular monolith. The active backend is in `apps/api`; the repository also reserves `apps/web`, `apps/mobile`, and `apps/tablet` for the office web, offline field app, and factory/warehouse PWA. Read `CHANGELOG.md`, `docs/IMPLEMENTATION_ROADMAP.md`, and `docs/OPEN_DECISIONS.md` before changing behavior. Treat decisions marked **CONFIRMED** as fixed; do not re-litigate them.
+NeoBus is a multi-site food-trading and manufacturing ERP/CRM implemented as a NestJS modular monolith. The active backend is in `apps/api`; client applications are in `apps/web` (office web), `apps/tablet` (factory PWA), and `apps/mobile` (offline driver/collector app), with shared components in `packages/*`. Read `docs/CHANGELOG.md`, `docs/PROJECT_STATUS_MATRIX.md`, `docs/IMPLEMENTATION_ROADMAP.md`, and `docs/OPEN_DECISIONS.md` before changing behavior. Treat decisions marked **CONFIRMED** as fixed; do not re-litigate them.
 
-The backend is organized by business module (`m0-platform`, `m1-commercial`, `m2-procurement`, `m3-inventory`, `m4-production`, `m5-fleet`, `m6-finance`, `m7-control-tower`, and `m7a-exceptions`) plus `src/shared`. Controllers handle HTTP concerns, services contain business rules, and repositories contain Knex queries only. The current implemented areas are M0, M7a, M1, M6 core, and part of M3; check the changelog and roadmap before assuming a module is complete.
+The backend is organized by business module (`m0-platform`, `m1-commercial`, `m2-procurement`, `m3-inventory`, `m4-production`, `m5-fleet`, `m6-finance`, `m7a-exceptions`, and `m7b-dashboards`) plus `src/shared`. Controllers handle HTTP concerns, services contain business rules, and repositories contain Knex queries only. All business modules M0 through M7b, frontend apps, and production hardening are complete with a deterministic test baseline (25 test suites, 338 tests passing). Check `docs/PROJECT_STATUS_MATRIX.md` for authoritative module status.
 
 ## Commands
 

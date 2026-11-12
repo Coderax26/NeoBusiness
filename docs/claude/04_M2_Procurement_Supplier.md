@@ -182,12 +182,14 @@ PO:  DRAFT ─► (price OK) ─────────────► ISSUED �
 
 ## 13. Build checklist
 
-- [ ] Migrations: `suppliers`, `supplier_items`, `supplier_rate_quotes`, `rate_contracts`, `purchase_requisitions`, `purchase_orders`, `purchase_order_lines`, `goods_receipts`, `goods_receipt_lines`, `po_shortfalls`, `supplier_bills`
-- [ ] **Sprint 2:** GRN (no PO link) + blind-receiving serialiser + `grn.posted`
-- [ ] **Sprint 3:** PO service with BR-03 and `last_purchase_price_snapshot`
-- [ ] Link GRN ↔ PO; update `received_qty`; shortfall detection
-- [ ] Backup-supplier ranking service
-- [ ] Back-to-back PO generator with spread
-- [ ] Supplier performance job and scorecard
-- [ ] `ProcurementPort` (replace manual landed cost in M1)
-- [ ] Screens S1–S6 · acceptance tests §10 (+ Scenarios B, C)
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#4-m2-procurement--supplier-traceability).
+
+- [x] `[M2-CHK-01]` Migrations: `suppliers`, `supplier_items`, `supplier_rate_quotes`, `rate_contracts`, `purchase_requisitions`, `purchase_orders`, `purchase_order_lines`, `goods_receipts`, `goods_receipt_lines`, `po_shortfalls`, `supplier_bills`
+- [x] `[M2-CHK-02]` **Sprint 2:** GRN (no PO link) + blind-receiving serialiser + `grn.posted`
+- [x] `[M2-CHK-03]` **Sprint 3:** PO service with BR-03 and `last_purchase_price_snapshot`
+- [x] `[M2-CHK-04]` Link GRN ↔ PO; update `received_qty`; shortfall detection (BR-05)
+- [x] `[M2-CHK-05]` Backup-supplier ranking service
+- [x] `[M2-CHK-06]` Back-to-back PO generator with spread
+- [x] `[M2-CHK-07]` Supplier performance job and scorecard
+- [x] `[M2-CHK-08]` `ProcurementPort` (replace manual landed cost in M1)
+- [x] `[M2-CHK-09]` Screens S1–S6 · acceptance tests §10 (+ Scenarios B, C verified in `m2-acceptance.spec.ts`)

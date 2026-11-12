@@ -409,6 +409,30 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.9.0] — 2026-11-12 — Phase P5 Complete: Documentation, Traceability & Release Governance
+
+### Added
+- **P5.1 Authoritative Project Status Matrix (`docs/PROJECT_STATUS_MATRIX.md`):**
+  - Established a single source of truth across all modules (M0–M7b, Frontend apps, and Phases P0–P5) using standardized explicit states (`Verified`, `Product complete`, `Released`, `Deferred`).
+  - Documented ownership, target release (`v1.0.0-rc1`), blocking dependencies, and live test baseline (25 suites, 338 tests passing, 0 failures).
+- **P5.2 Master Blueprint Traceability Matrix (`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`):**
+  - Assigned unique requirement IDs to all checklist items (`[M0-CHK-01]` to `[FE-CHK-15]`) across `docs/claude/02_M0` through `10_FE`.
+  - Reconciled every requirement to concrete source files, migrations, REST routes, domain events, automated tests, UI screens, evidence status, and confirmed ADR decisions.
+  - Updated all 9 checklist documents in `docs/claude/` with `[x]` completion states, requirement tags, and links to evidence.
+- **P5.3 Roadmap, Overview & Changelog Reconciliation:**
+  - Updated [`docs/IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) to mark Sprint 1, Sprint 2, Sprint 3, and Phase 6 (P4) items as fully complete.
+  - Reconciled [`docs/PROJECT_OVERVIEW.txt`](PROJECT_OVERVIEW.txt) to reflect M7b completion, the full business rules register (BR-01 to BR-08), master phase links, and current version `v1.0.0-rc1`.
+  - Added root [`CHANGELOG.md`](../CHANGELOG.md) pointer to resolve path ambiguity with `docs/CHANGELOG.md`.
+  - Documented explicit deferrals (`DEF-01` WhatsApp live KYC with active SMS fallback, `DEF-02` external e-invoicing API, `DEF-03` biometric hardware terminal, `DEF-04` native Marathi review).
+- **P5.4 Release Governance & Checklist (`docs/RELEASE_GOVERNANCE_AND_CHECKLIST.md`):**
+  - Created RACI ownership matrix for remaining operational tasks and 10-point release gate checklist (Code Review, Migrations, Tests, Security, Observability, Backup/PITR, User Acceptance, Deployment, Rollback, Support Handover).
+- **P5.5 Module Naming Standardization & Repository Cleanup:**
+  - Removed deprecated empty directory `apps/api/src/modules/m7-control-tower`.
+  - Standardized module naming across backend (`m7a-exceptions`, `m7b-dashboards`) and presentation layer (unified Control Tower in `@neo/ui` and `ControlTowerPage.tsx`).
+  - Updated architecture documentation in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md), `CLAUDE.md`, `README.md`, and `.github/copilot-instructions.md`.
+
+---
+
 ## [0.8.0] — 2026-11-12 — Phase P4 Complete: Production Readiness & Security Hardening
 
 ### Added

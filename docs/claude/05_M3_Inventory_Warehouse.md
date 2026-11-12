@@ -204,13 +204,15 @@ Adjustment: REQUESTED ─► APPROVED ─► POSTED   |   REQUESTED ─► REJEC
 
 ## 13. Build checklist
 
-- [ ] Migrations: `inventory_batches`, `stock_ledger_txns` (+ append-only triggers), `stock_reservations`, `stock_transfers`, `stock_transfer_lines`, `stock_adjustments`
-- [ ] Ledger posting service (single entry point; updates cached qty in-transaction)
-- [ ] ATP query + `InventoryPort` (swap out stub in M1)
-- [ ] FEFO reservation algorithm with row locking + concurrency test
-- [ ] GRN posting handler (before M2 PO link exists)
-- [ ] Transfer workflow and variance handling
-- [ ] Adjustment request → exception → posting
-- [ ] Vehicle location handling (`VEHICLE` locations) for M5
-- [ ] Expiry/drift/stale-reservation jobs
-- [ ] Screens S1–S7 · acceptance tests §10 (+ Scenario F stock part)
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#5-m3-inventory--warehouse-traceability).
+
+- [x] `[M3-CHK-01]` Migrations: `inventory_batches`, `stock_ledger_txns` (+ append-only triggers), `stock_reservations`, `stock_transfers`, `stock_transfer_lines`, `stock_adjustments`
+- [x] `[M3-CHK-02]` Ledger posting service (single entry point; updates cached qty in-transaction)
+- [x] `[M3-CHK-03]` ATP query + `InventoryPort` (swap out stub in M1)
+- [x] `[M3-CHK-04]` FEFO reservation algorithm with row locking + concurrency test (verified in `p4-production-readiness.spec.ts`)
+- [x] `[M3-CHK-05]` GRN posting handler (before M2 PO link exists)
+- [x] `[M3-CHK-06]` Transfer workflow and variance handling
+- [x] `[M3-CHK-07]` Adjustment request → exception → posting
+- [x] `[M3-CHK-08]` Vehicle location handling (`VEHICLE` locations) for M5
+- [x] `[M3-CHK-09]` Expiry/drift/stale-reservation jobs
+- [x] `[M3-CHK-10]` Screens S1–S7 · acceptance tests §10 (+ Scenario F stock part verified in `m3-acceptance.spec.ts`)

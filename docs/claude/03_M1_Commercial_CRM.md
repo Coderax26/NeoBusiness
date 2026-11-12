@@ -211,13 +211,15 @@ evaluateLine(item, qty, price):
 
 ## 13. Build checklist
 
-- [ ] Migrations: `customers`, `customer_contacts`, `communication_log`, `items`, `uom_conversions`, `daily_price_lists`, `quotes`, `quote_lines`, `sales_orders`, `sales_order_lines`, `order_status_log`
-- [ ] `PricingService` (band lookup, auto-floor, margin) + `PricingPort`
-- [ ] `CreditService` (BR-02) + `CreditPort` (AR read via M6 or manual field)
-- [ ] Order state machine with guards and status log
-- [ ] Quote service + expiry job
-- [ ] Price-memory query + index on `(customer_id, item_id, confirmed_at)`
-- [ ] Exception integration: raise cards, handle `exception.resolved`
-- [ ] API + permission checks + masking tests
-- [ ] Screens S1–S5
-- [ ] Acceptance tests §10 (+ Scenario A end-to-end)
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#3-m1-commercial--crm-traceability).
+
+- [x] `[M1-CHK-01]` Migrations: `customers`, `customer_contacts`, `communication_log`, `items`, `uom_conversions`, `daily_price_lists`, `quotes`, `quote_lines`, `sales_orders`, `sales_order_lines`, `order_status_log`
+- [x] `[M1-CHK-02]` `PricingService` (band lookup, auto-floor, margin) + `PricingPort`
+- [x] `[M1-CHK-03]` `CreditService` (BR-02) + `CreditPort` (AR read via M6 or manual field)
+- [x] `[M1-CHK-04]` Order state machine with guards and status log
+- [x] `[M1-CHK-05]` Quote service + expiry job
+- [x] `[M1-CHK-06]` Price-memory query + index on `(customer_id, item_id, confirmed_at)`
+- [x] `[M1-CHK-07]` Exception integration: raise cards, handle `exception.resolved`
+- [x] `[M1-CHK-08]` API + permission checks + masking tests
+- [x] `[M1-CHK-09]` Screens S1–S5 (`QuickOrderPage.tsx`, `CustomersPage.tsx`)
+- [x] `[M1-CHK-10]` Acceptance tests §10 (+ Scenario A end-to-end verified in `m1-acceptance.spec.ts`)

@@ -102,7 +102,8 @@ neobus/
 │   │   │   │   ├── m4-production/  BOM, work orders, yield, wastage
 │   │   │   │   ├── m5-fleet/       Trips, driver app, ePOD, returns
 │   │   │   │   ├── m6-finance/     Invoices, AR, custody wallet, EOD
-│   │   │   │   └── m7-control-tower/ Exceptions, notifications, dashboards
+│   │   │   │   ├── m7a-exceptions/ Exception engine + notifications
+│   │   │   │   └── m7b-dashboards/ Dashboards, real-time pulse, KPI analytics
 │   │   │   └── shared/
 │   │   │       ├── ports/          Interface contracts between modules
 │   │   │       ├── events/         Domain event definitions

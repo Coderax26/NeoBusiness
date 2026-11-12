@@ -13,15 +13,16 @@ These documents are implementation plans only. They do not change application co
 | P2 | `03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md` | Close behavior-changing decisions and update the delivery contract | ✅ Complete |
 | P3 | `04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md` | Build web, mobile, and tablet products from the frontend blueprint | ✅ Complete |
 | P4 | `05_PHASE_P4_PRODUCTION_READINESS.md` | Security, performance, recovery, observability, deployment, and pilot readiness | ✅ Complete |
-| P5 | `06_PHASE_P5_DOCUMENTATION_AND_GOVERNANCE.md` | Reconcile project status, traceability, ownership, and release governance | 🟡 Current |
+| P5 | `06_PHASE_P5_DOCUMENTATION_AND_GOVERNANCE.md` | Reconcile project status, traceability, ownership, and release governance | ✅ Complete |
 
-## Current starting point
+## Delivery Completion & Master Status
 
-- Backend modules M0, M1, M2, M3, M4, M5, M6, M7a, and M7b are fully implemented and verified.
-- All 9 inter-module ports (`PricingPort`, `ItemPort`, `CreditPort`, `ExceptionPort`, `NotifyPort`, `LedgerPort`, `InventoryPort`, `ProcurementPort`, `ProductionPort`) are backed by real implementations.
-- Complete M6 Financials HTTP API layer (11 controllers, DTOs, response envelope, opening balances, PDFs).
-- `apps/api` test suite is 100% passing: 22/22 test files, 279/279 tests passing.
-- `apps/web`, `apps/mobile`, and `apps/tablet` are queued for Phase P3 once Phase P2 decisions close.
+- **Phases P0–P5:** 100% Complete (2026-11-12).
+- **Backend Modules (M0–M7b):** M0, M1, M2, M3, M4, M5, M6, M7a, M7b fully implemented, hardened, and verified.
+- **Frontend Clients:** Web Office (`apps/web`), Factory Tablet (`apps/tablet`), Field Mobile (`apps/mobile`), shared packages (`@neo/*`), and unified Control Tower delivered.
+- **Production Readiness (Phase P4):** STRIDE threat model, security fixes (`SEC-01`–`SEC-05`), PITR backup procedures, metrics/observability, non-root Docker hardening, and 7-day operational pilot runbook delivered.
+- **Documentation & Governance (Phase P5):** Single source of truth (`docs/PROJECT_STATUS_MATRIX.md`), master blueprint traceability (`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`), release checklist & RACI governance (`docs/RELEASE_GOVERNANCE_AND_CHECKLIST.md`), roadmap & changelog reconciled (`docs/CHANGELOG.md` v0.9.0 / v1.0.0-rc1).
+- **Deterministic Test Baseline:** 25/25 test suites passing · 338/338 automated tests passing · 0 failures. Production NestJS & Vite builds exit code 0.
 
 ## Dependency rule
 

@@ -2,8 +2,10 @@
 
 **Product name:** NeoBus
 **Internal code name:** NeoCore
-**Version:** 0.5.1 (M2 Procurement Complete)
-**Date:** 2026-11-09
+**Version:** 1.0.0-rc1 (Phase P5 Complete: Documentation, Traceability & Governance)
+**Date:** 2026-11-12
+**Authoritative Status:** See [`docs/PROJECT_STATUS_MATRIX.md`](PROJECT_STATUS_MATRIX.md)
+**Test Baseline:** 25/25 test suites passing · 338/338 automated tests passing · 0 failures
 
 ---
 
@@ -66,19 +68,20 @@ Before NeoBus, Mr. X was the "live human router" for all decisions: price negoti
 
 ---
 
-## Module Implementation Status (v0.5.1)
+## Module Implementation Status (v1.0.0-rc1)
 
 | Module | Status | Key Deliverables |
 |--------|--------|------------------|
-| **M0 — Platform Foundation** | ✅ Complete | Auth, RBAC, RLS, audit, config, doc-seq, idempotency, outbox |
+| **M0 — Platform Foundation** | ✅ Complete | Auth, RBAC, RLS, audit, config, doc-seq, idempotency, outbox, upload validation |
 | **M7a — Exception Engine** | ✅ Complete | Exception approvals (12 types, delegation + escalation), notification hub |
 | **M1 — Commercial & CRM** | ✅ Complete | Customers, items, pricing (BR-01), credit (BR-02), quotes, orders. Scenario A verified |
 | **M6 — Finance & Collections** | ✅ Complete | Invoices (BR-03), collections + custody (BR-07), ledger, handover, PTP, EOD, worklist, credit notes, COD settlement, Tally export, cheque lifecycle |
-| **M2 — Procurement** | ✅ Complete | Suppliers, POs (BR-03), GRN, shortfall (BR-05), rate quotes, back-to-back, 26 acceptance tests |
+| **M2 — Procurement** | ✅ Complete | Suppliers, POs (BR-03/04), GRN, shortfall (BR-05), rate quotes, back-to-back, 26 acceptance tests |
 | **M3 — Inventory** | ✅ Complete | Stock ledger, ATP/FEFO, batches, reservations, transfers, adjustments, expiry jobs |
 | **M4 — Production** | ✅ Complete | BOM, work orders, yield & wastage, attendance, BR-06, tablet PWA support |
 | **M5 — Fleet & Delivery** | ✅ Complete | Trips, ePOD, returns, credit notes, COD settlement, BR-08, issues, expenses |
-| **M7b — Dashboards** | ⏳ Pending | Analytics (next in sequence per IMPLEMENTATION_ROADMAP.md) |
+| **M7b — Dashboards & Analytics** | ✅ Complete | Real-time Pulse Header, Operational Status Matrix, AR aging, customer profitability, supplier scorecard |
+| **Frontend Apps (`apps/*`)** | ✅ Complete | Web Office (`apps/web`), Factory Tablet (`apps/tablet`), Mobile Field (`apps/mobile`), shared `@neo/*` packages |
 
 ---
 
@@ -89,6 +92,7 @@ Before NeoBus, Mr. X was the "live human router" for all decisions: price negoti
 | BR-01 | Price band: floor/target; below raises exception | ✅ | M1 PricingService |
 | BR-02 | Credit: AR + order ≤ limit, else HOLD | ✅ | M1 CreditService + M6 Ledger |
 | BR-03 | Invoice at dispatch; tax treatment enum | ✅ | M6 InvoiceService |
+| BR-04 | Supplier price spike detection (>2% variance) | ✅ | M2 POService |
 | BR-05 | Supplier shortfall detection (>2% variance) | ✅ | M2 GRN/Shortfall |
 | BR-06 | Yield check at WO completion (>5% deviation) | ✅ | M4 WorkOrderService |
 | BR-07 | Collection atomic across ledgers | ✅ | M6 CollectionService |
@@ -157,22 +161,40 @@ Before NeoBus, Mr. X was the "live human router" for all decisions: price negoti
 
 ---
 
+---
+
+## Master Phase Plans (`docs/Copilot/`)
+
+- [00_PHASE_PLAN_INDEX.md](Copilot/00_PHASE_PLAN_INDEX.md) — Master Phase Execution Index (Phases P0–P5 ✅ Complete)
+- [01_PHASE_P0_TEST_BASELINE_AND_CORRECTNESS.md](Copilot/01_PHASE_P0_TEST_BASELINE_AND_CORRECTNESS.md) — P0 Test Baseline & Correctness
+- [02_PHASE_P1_BACKEND_CONTRACT_COMPLETION.md](Copilot/02_PHASE_P1_BACKEND_CONTRACT_COMPLETION.md) — P1 Backend Contract Completion
+- [03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md](Copilot/03_PHASE_P2_BUSINESS_DECISIONS_AND_REQUIREMENTS.md) — P2 Business Decisions & Requirements
+- [04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md](Copilot/04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md) — P3 Frontend Product Delivery
+- [05_PHASE_P4_PRODUCTION_READINESS.md](Copilot/05_PHASE_P4_PRODUCTION_READINESS.md) — P4 Production Readiness & Runbooks
+- [06_PHASE_P5_DOCUMENTATION_AND_GOVERNANCE.md](Copilot/06_PHASE_P5_DOCUMENTATION_AND_GOVERNANCE.md) — P5 Documentation & Release Governance
+
+---
+
 ## Related Documents
 
+- [PROJECT_STATUS_MATRIX.md](PROJECT_STATUS_MATRIX.md) — Authoritative single-source-of-truth status matrix
+- [BLUEPRINT_TRACEABILITY_MATRIX.md](BLUEPRINT_TRACEABILITY_MATRIX.md) — Master requirement traceability matrix
+- [RELEASE_GOVERNANCE_AND_CHECKLIST.md](RELEASE_GOVERNANCE_AND_CHECKLIST.md) — Release checklist & RACI governance
+- [APPLICATION_RUN_GUIDE.md](APPLICATION_RUN_GUIDE.md) — Complete setup and execution run guide
+- [P4_DEPLOYMENT_AND_OBSERVABILITY_RUNBOOK.md](P4_DEPLOYMENT_AND_OBSERVABILITY_RUNBOOK.md) — Deployment & observability runbook
+- [P4_BACKUP_AND_RECOVERY_RUNBOOK.md](P4_BACKUP_AND_RECOVERY_RUNBOOK.md) — PITR backup & recovery procedures
+- [P4_OPERATIONAL_PILOT_RUNBOOK.md](P4_OPERATIONAL_PILOT_RUNBOOK.md) — 7-day parallel operational pilot runbook
+- [P4_SECURITY_AND_THREAT_MODEL.md](P4_SECURITY_AND_THREAT_MODEL.md) — STRIDE threat model & security register
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Technology stack, module boundaries, security
-- [BLUEPRINT_TRACEABILITY.md](BLUEPRINT_TRACEABILITY.md) — Requirements to implementation mapping
 - [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) — Phased plan, milestones, risks
-- [OPEN_DECISIONS.md](OPEN_DECISIONS.md) — Current open decisions
-- [SECURITY.md](SECURITY.md) — Security controls and policies
-- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) — Coding conventions, PR checklist
-- [TESTING_STRATEGY.md](TESTING_STRATEGY.md) — Testing approach and test types
+- [OPEN_DECISIONS.md](OPEN_DECISIONS.md) — Closed & confirmed decisions register
 - [CHANGELOG.md](CHANGELOG.md) — Full version history
 
 ---
 
 ## Next Steps
 
-Per `docs/IMPLEMENTATION_ROADMAP.md`:
-- **M7b Dashboards** — Analytics and KPI visualization (blocked by M1, M3, M5 data readiness)
-- **Mobile/Tablet full offline sync** — Photo upload, command queue
-- **Challan PDF generation** — Pending (no PDF library in backend yet)
+Per `docs/RELEASE_GOVERNANCE_AND_CHECKLIST.md`:
+1. Execute the 7-day operational pilot parallel run with Owner sign-off (`docs/P4_OPERATIONAL_PILOT_RUNBOOK.md`).
+2. Production staging rehearsal with automated backup verification (`scripts/backup-and-verify.mjs`).
+3. Complete pilot-phase Meta KYC for WhatsApp Business API activation (DEF-01).

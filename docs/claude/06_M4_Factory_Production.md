@@ -189,13 +189,15 @@ production_requisition OPEN ──(PM plans / auto-plan)──► Work Order PLA
 
 ## 13. Build checklist
 
-- [ ] Migrations: `bom_headers`, `bom_lines`, `production_requisitions`, `production_work_orders`, `work_order_materials`, `work_order_outputs`, `wastage_records`, `labour_attendance_logs`
-- [ ] BOM service with versioning
-- [ ] Requisition planner (net qty, required-by, dedupe) + `ProductionPort`
-- [ ] RM availability check + shortage → M2 requisition
-- [ ] Work Order state machine (start/stage/complete/cancel)
-- [ ] Completion transaction (M3 postings, yield check, wastage rules)
-- [ ] Attendance log
-- [ ] Tablet Kanban + completion forms (large buttons, local language)
-- [ ] Masking tests · late-WO job
-- [ ] Acceptance tests §10 (+ Scenario F end-to-end)
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#6-m4-factory-production-traceability).
+
+- [x] `[M4-CHK-01]` Migrations: `bom_headers`, `bom_lines`, `production_requisitions`, `production_work_orders`, `work_order_materials`, `work_order_outputs`, `wastage_records`, `labour_attendance_logs`
+- [x] `[M4-CHK-02]` BOM service with versioning
+- [x] `[M4-CHK-03]` Requisition planner (net qty, required-by, dedupe) + `ProductionPort`
+- [x] `[M4-CHK-04]` RM availability check + shortage → M2 requisition
+- [x] `[M4-CHK-05]` Work Order state machine (start/stage/complete/cancel)
+- [x] `[M4-CHK-06]` Completion transaction (M3 postings, yield check, wastage rules)
+- [x] `[M4-CHK-07]` Attendance log (`apps/tablet` digital log verified; biometric terminal deferred DEF-03)
+- [x] `[M4-CHK-08]` Tablet Kanban + completion forms (large buttons, local language in `apps/tablet`)
+- [x] `[M4-CHK-09]` Masking tests · late-WO job
+- [x] `[M4-CHK-10]` Acceptance tests §10 (+ Scenario F end-to-end verified in `m4-acceptance.spec.ts`)

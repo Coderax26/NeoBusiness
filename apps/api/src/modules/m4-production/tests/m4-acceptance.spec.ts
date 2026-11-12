@@ -56,7 +56,7 @@ describe('M4 Factory Production Acceptance', () => {
   let testCounter = 0;
   beforeEach(async () => {
     // Generate unique suffix for this test run to avoid unique constraint violations
-    const testRunId = `${Date.now().toString().slice(-4)}${testCounter++}`;
+    const testRunId = `${uuidv4().slice(0, 8)}-${testCounter++}`;
 
     // Use advisory lock to prevent deadlocks when multiple workers
     // truncate the same tables concurrently.
@@ -108,7 +108,7 @@ describe('M4 Factory Production Acceptance', () => {
         .insert({
           id: uuidv4(),
           full_name: 'Owner User',
-          phone: `+91987654320${testRunId}0`,
+          phone: `+91${Math.floor(1000000000 + Math.random() * 9000000000)}`,
           role: 'OWNER',
           assigned_site_id: siteId,
           is_active: true,
@@ -120,7 +120,7 @@ describe('M4 Factory Production Acceptance', () => {
         .insert({
           id: uuidv4(),
           full_name: 'Production Manager',
-          phone: `+91987654321${testRunId}1`,
+          phone: `+91${Math.floor(1000000000 + Math.random() * 9000000000)}`,
           role: 'PROD_MGR',
           assigned_site_id: siteId,
           is_active: true,

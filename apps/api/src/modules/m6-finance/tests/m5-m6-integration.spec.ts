@@ -163,8 +163,9 @@ describe('M5-M6 Cross-Module Integration', () => {
       .where('role', 'DRIVER')
       .first('id');
 
-    // Create unique test users if not available
-    const phoneSuffix = Date.now().toString().slice(-4);
+    // Create unique test users and entities with guaranteed collision-free identifiers
+    const uniqueSuffix = uuidv4().slice(0, 8);
+    const randomPhone = `+9198${Math.floor(10000000 + Math.random() * 90000000)}`;
 
     if (existingOwner) {
       ownerId = String(existingOwner.id);
@@ -173,7 +174,7 @@ describe('M5-M6 Cross-Module Integration', () => {
         .insert({
           id: uuidv4(),
           full_name: 'Owner User',
-          phone: `+91987654321${phoneSuffix}`,
+          phone: `+9197${Math.floor(10000000 + Math.random() * 90000000)}`,
           role: 'OWNER',
           assigned_site_id: siteId,
           is_active: true,
@@ -189,7 +190,7 @@ describe('M5-M6 Cross-Module Integration', () => {
         .insert({
           id: uuidv4(),
           full_name: 'Test Driver',
-          phone: `+91987654321${Number(phoneSuffix) + 1}`,
+          phone: `+9196${Math.floor(10000000 + Math.random() * 90000000)}`,
           role: 'DRIVER',
           assigned_site_id: siteId,
           is_active: true,
@@ -198,13 +199,13 @@ describe('M5-M6 Cross-Module Integration', () => {
       driverId = String(driver.id);
     }
 
-    // Create customer
+    // Create customer with unique customer_code and phone
     const [customer] = await knex('customers')
       .insert({
         id: uuidv4(),
-        customer_code: `CUST-${phoneSuffix}`,
+        customer_code: `CUST-${uniqueSuffix}`,
         business_name: 'Test Customer',
-        phone: `+91981234567${phoneSuffix.slice(-1)}`,
+        phone: randomPhone,
         state_code: 'MH',
         credit_limit: '100000',
         default_site_id: siteId,
@@ -219,7 +220,7 @@ describe('M5-M6 Cross-Module Integration', () => {
       .insert({
         id: uuidv4(),
         site_id: siteId,
-        registration_no: `MH-01-AB-${phoneSuffix}`,
+        registration_no: `MH-01-${uniqueSuffix}`,
         vehicle_type: 'TRUCK',
         capacity_kg: '1000',
         is_active: true,
@@ -231,7 +232,7 @@ describe('M5-M6 Cross-Module Integration', () => {
     const [salesOrder] = await knex('sales_orders')
       .insert({
         id: uuidv4(),
-        order_no: `SO-TEST-${phoneSuffix}`,
+        order_no: `SO-TEST-${uniqueSuffix}`,
         customer_id: customerId,
         fulfillment_site_id: siteId,
         order_status: 'CONFIRMED',
@@ -258,7 +259,7 @@ describe('M5-M6 Cross-Module Integration', () => {
         id: uuidv4(),
         item_id: itemId,
         site_id: siteId,
-        batch_number: `BATCH-${phoneSuffix}`,
+        batch_number: `BATCH-${uniqueSuffix}`,
         expiry_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       })
       .returning('*');

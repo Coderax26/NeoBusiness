@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Last synced with:** `CHANGELOG.md` through **v0.8.0 (2026-11-12)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
-> Updated **2026-11-12** with Phase P4 completion (Production Readiness: Security Hardening `SEC-01`–`SEC-05`, Concurrency/Load Verification, Backup/PITR Runbook, Observability & Metrics, Deployment Hardening, and 7-Day Operational Pilot Reconciliation).  
+> **Last synced with:** `CHANGELOG.md` through **v0.9.0 (2026-11-12)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
+> Updated **2026-11-12** with Phase P5 completion (Documentation & Governance: Authoritative Status Matrix, Master Blueprint Traceability Matrix, Release Governance RACI & Checklist, Roadmap Reconciliation, and Repository Clean-up).  
 > When a module ships, a migration lands or a convention changes, update the matching section here in the same PR.
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
@@ -85,8 +85,8 @@ NeoBusinessSolution/
 │   │       │   ├── m4-production/ BOM, work orders, yield, wastage
 │   │       │   ├── m5-fleet/      Trips, driver app, ePOD, returns
 │   │       │   ├── m6-finance/    Invoices, collections, AR, custody, EOD
-│   │       │   ├── m7-control-tower/ Dashboards, analytics
-│   │       │   └── m7a-exceptions/   Exception engine + notification hub
+│   │       │   ├── m7a-exceptions/   Exception engine + notification hub
+│   │       │   └── m7b-dashboards/   Real-time pulse, KPI analytics, control tower read models
 │   │       └── shared/
 │   │           ├── database/      Knex instance setup
 │   │           ├── events/        Domain event type definitions

@@ -197,14 +197,16 @@ Driver UI rules (§9.3): zero typing where possible, numeric keypad only, large 
 
 ## 13. Build checklist
 
-- [ ] Migrations: `vehicles`, `delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_challans`, `issue_reports`, `trip_expenses`
-- [ ] Trip builder service (capacity check, sequencing)
-- [ ] Loading + dispatch (credit check, `trip.dispatched`)
-- [ ] Challan PDF generation (+ e-way bill reference field)
-- [ ] ePOD capture API with idempotency + GPS
-- [ ] BR-08 guard and trip close
-- [ ] Issue reporting + routing rules
-- [ ] Driver mobile app (offline manifest, queue, photo upload, local language)
-- [ ] Coordinator web screens S1, S2, S8 · storekeeper screen S3
-- [ ] Replace M6 "Mark Dispatched" invoice trigger with `trip.dispatched`
-- [ ] Offline stress test (airplane mode, duplicate replay) · acceptance tests §10 (+ Scenario D)
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#7-m5-fleet-dispatch--delivery-traceability).
+
+- [x] `[M5-CHK-01]` Migrations: `vehicles`, `delivery_trips`, `delivery_stops`, `delivery_stop_lines`, `delivery_challans`, `issue_reports`, `trip_expenses`
+- [x] `[M5-CHK-02]` Trip builder service (capacity check, sequencing)
+- [x] `[M5-CHK-03]` Loading + dispatch (credit check, `trip.dispatched`)
+- [x] `[M5-CHK-04]` Challan PDF generation (+ e-way bill reference field)
+- [x] `[M5-CHK-05]` ePOD capture API with idempotency + GPS
+- [x] `[M5-CHK-06]` BR-08 guard and trip close
+- [x] `[M5-CHK-07]` Issue reporting + routing rules
+- [x] `[M5-CHK-08]` Driver mobile app (offline manifest, queue, photo upload, local language in `apps/mobile`)
+- [x] `[M5-CHK-09]` Coordinator web screens S1, S2, S8 · storekeeper screen S3
+- [x] `[M5-CHK-10]` Replace M6 "Mark Dispatched" invoice trigger with `trip.dispatched`
+- [x] `[M5-CHK-11]` Offline stress test (airplane mode, duplicate replay) · acceptance tests §10 (+ Scenario D verified in `m5-acceptance.spec.ts`)

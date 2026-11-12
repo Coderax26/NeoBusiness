@@ -218,20 +218,22 @@ Template codes (ADD): `order_confirmation`, `dispatch_alert`, `tax_invoice`, `pa
 
 ## 13. Build checklist
 
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#9-m7-control-tower--exceptions-traceability).
+
 **M7a (early)**
-- [ ] Migrations: `exception_approvals` (+ extended enum/columns), `approval_policies`, `exception_events`, `notification_templates`, `notification_outbox`, `whatsapp_optins`
-- [ ] Exception service (raise, resolve, idempotency, expire/escalate) + `ExceptionPort`
-- [ ] Card payload builders per exception type (start with `PRICE_OVERRIDE`, `CREDIT_BREACH`)
-- [ ] Notification hub: FCM + in-app first (log-only for WhatsApp), `NotifyPort`
-- [ ] Owner approval queue UI (mobile) with counter-price keypad
-- [ ] Device registration and push deep links
-- [ ] Add remaining exception types as M2/M3/M4/M5/M6 land
+- [x] `[M7-CHK-01]` Migrations: `exception_approvals` (+ extended enum/columns), `approval_policies`, `exception_events`, `notification_templates`, `notification_outbox`, `whatsapp_optins`
+- [x] `[M7-CHK-02]` Exception service (raise, resolve, idempotency, expire/escalate) + `ExceptionPort`
+- [x] `[M7-CHK-03]` Card payload builders per exception type (start with `PRICE_OVERRIDE`, `CREDIT_BREACH`)
+- [x] `[M7-CHK-04]` Notification hub: FCM + in-app first (log-only for WhatsApp), `NotifyPort`
+- [x] `[M7-CHK-05]` Owner approval queue UI (mobile) with counter-price keypad
+- [x] `[M7-CHK-06]` Device registration and push deep links
+- [x] `[M7-CHK-07]` Add remaining exception types as M2/M3/M4/M5/M6 land
 
 **M7b (late)**
-- [ ] Read models / materialised views and refresh jobs
-- [ ] Pulse Header, Status Matrix, EOD view
-- [ ] Analytics: customer profitability, supplier fill-rate & price inflation, yield & wastage trend, AR aging
-- [ ] WhatsApp BSP integration + templates + opt-ins + SMS fallback
-- [ ] Audit viewer · policy/threshold settings UI
-- [ ] KPI queries and weekly audit job
-- [ ] Acceptance tests §10 (+ Scenarios A, B, C end-to-end)
+- [x] `[M7-CHK-08]` Read models / materialised views and refresh jobs
+- [x] `[M7-CHK-09]` Pulse Header, Status Matrix, EOD view
+- [x] `[M7-CHK-10]` Analytics: customer profitability, supplier fill-rate & price inflation, yield & wastage trend, AR aging
+- [ ] `[M7-CHK-11]` WhatsApp BSP integration + templates + opt-ins + SMS fallback *(Deferred DEF-01: live BSP credentials pending Owner Meta KYC; SMS fallback verified)*
+- [x] `[M7-CHK-12]` Audit viewer · policy/threshold settings UI
+- [x] `[M7-CHK-13]` KPI queries and weekly audit job
+- [x] `[M7-CHK-14]` Acceptance tests §10 (+ Scenarios A, B, C end-to-end verified in test suites)

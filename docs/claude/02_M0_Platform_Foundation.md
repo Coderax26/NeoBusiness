@@ -170,16 +170,18 @@ M0 publishes no business events. It provides the shared `EventBus` + **outbox** 
 
 ## 13. Build checklist
 
-- [ ] Project skeleton, shared utilities (`Money`, `Qty`, `Clock`), event bus + outbox
-- [ ] Migrations: `sites`, `users`, `locations`, `user_site_access`, `role_permissions`, `business_rule_config`, `doc_sequences`, `attachments`, `idempotency_keys`, `device_registrations`, `immutable_audit_logs`
-- [ ] Auth endpoints (login, OTP, refresh, logout) + rate limiting
-- [ ] RBAC guard + permission seed + masking serialiser
-- [ ] RLS policies + request-scoped `SET LOCAL`
-- [ ] Append-only triggers/revokes
-- [ ] Audit service/hook
-- [ ] Config service + seed of README §6 defaults
-- [ ] Doc numbering service
-- [ ] File upload service (pre-signed)
-- [ ] Offline sync client library + server idempotency middleware
-- [ ] Scheduler + job registry
-- [ ] Seed script and acceptance tests §10
+> **Traceability & Evidence:** See [`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`](../BLUEPRINT_TRACEABILITY_MATRIX.md#2-m0-platform-foundation-traceability).
+
+- [x] `[M0-CHK-01]` Project skeleton, shared utilities (`Money`, `Qty`, `Clock`), event bus + outbox
+- [x] `[M0-CHK-02]` Migrations: `sites`, `users`, `locations`, `user_site_access`, `role_permissions`, `business_rule_config`, `doc_sequences`, `attachments`, `idempotency_keys`, `device_registrations`, `immutable_audit_logs`
+- [x] `[M0-CHK-03]` Auth endpoints (login, OTP, refresh, logout) + rate limiting
+- [x] `[M0-CHK-04]` RBAC guard + permission seed + masking serialiser
+- [x] `[M0-CHK-05]` RLS policies + request-scoped `SET LOCAL`
+- [x] `[M0-CHK-06]` Append-only triggers/revokes
+- [x] `[M0-CHK-07]` Audit service/hook
+- [x] `[M0-CHK-08]` Config service + seed of README §6 defaults
+- [x] `[M0-CHK-09]` Doc numbering service
+- [x] `[M0-CHK-10]` File upload service (pre-signed / validated)
+- [x] `[M0-CHK-11]` Offline sync client library + server idempotency middleware
+- [x] `[M0-CHK-12]` Scheduler + job registry
+- [x] `[M0-CHK-13]` Seed script and acceptance tests §10 (verified in `p4-production-readiness.spec.ts`)

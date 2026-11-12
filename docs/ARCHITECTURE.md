@@ -133,14 +133,16 @@ Field device (SQLite write queue)
 
 | Module | Owns these tables | Status |
 |--------|-----------------|--------|
-| M0 | sites, locations, users, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events | **COMPLETE** |
-| M1 | customers, customer_contacts, communication_log, items, uom_conversions, daily_price_lists, quotes, quote_lines, sales_orders, sales_order_lines, order_status_log | **COMPLETE** |
-| M2 | suppliers, supplier_items, supplier_rate_quotes, rate_contracts, purchase_requisitions, purchase_orders, purchase_order_lines, goods_receipts, goods_receipt_lines, po_shortfalls, supplier_bills | Pending |
-| M3 | inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments | Pending |
-| M4 | bom_headers, bom_lines, production_requisitions, production_work_orders, work_order_materials, work_order_outputs, wastage_records, labour_attendance_logs | Pending |
-| M5 | vehicles, delivery_trips, delivery_stops, delivery_stop_lines, delivery_challans, issue_reports, trip_expenses | Pending |
-| M6 | invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, credit_notes, supplier_ledger_entries, supplier_payments, cashbook_entries, bank_deposits, eod_closings, accounting_export_batches | **NEXT** |
-| M7 | exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox, whatsapp_optins | **COMPLETE** |
+| M0 Platform Foundation | sites, locations, users, user_site_access, role_permissions, business_rule_config, doc_sequences, attachments, idempotency_keys, device_registrations, immutable_audit_logs, outbox_events | **COMPLETE** |
+| M1 Commercial & CRM | customers, customer_contacts, communication_log, items, uom_conversions, daily_price_lists, quotes, quote_lines, sales_orders, sales_order_lines, order_status_log | **COMPLETE** |
+| M2 Procurement & Supplier | suppliers, supplier_items, supplier_rate_quotes, rate_contracts, purchase_requisitions, purchase_orders, purchase_order_lines, goods_receipts, goods_receipt_lines, po_shortfalls, supplier_bills | **COMPLETE** |
+| M3 Inventory & Warehouse | inventory_batches, stock_ledger_txns, stock_reservations, stock_transfers, stock_transfer_lines, stock_adjustments | **COMPLETE** |
+| M4 Factory Production | bom_headers, bom_lines, production_requisitions, production_work_orders, work_order_materials, work_order_outputs, wastage_records, labour_attendance_logs | **COMPLETE** |
+| M5 Fleet & Delivery | vehicles, delivery_trips, delivery_stops, delivery_stop_lines, delivery_challans, issue_reports, trip_expenses | **COMPLETE** |
+| M6 Collections & Financials | invoices, invoice_lines, collection_receipts, receipt_allocations, customer_ledger_entries, custody_ledger, cash_handovers, cheque_register, ptp_followups, collection_worklists, credit_notes, supplier_ledger_entries, supplier_payments, cashbook_entries, bank_deposits, eod_closings, accounting_export_batches | **COMPLETE** |
+| M7a Exception Engine | exception_approvals, approval_policies, exception_events, notification_templates, notification_outbox, whatsapp_optins | **COMPLETE** |
+| M7b Dashboards & Metrics | Materialized views (`mv_pulse_today`, `mv_ops_status`, `mv_ar_aging`, `mv_customer_profitability`, `mv_supplier_scorecard`), rolling metrics cache | **COMPLETE** |
+| Presentation Layer | Unified Control Tower UI (`packages/ui`, `apps/web/src/pages/ControlTowerPage.tsx`) | **COMPLETE** |
 
 ### 4.2 Port contracts (synchronous interfaces)
 

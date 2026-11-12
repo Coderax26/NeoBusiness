@@ -83,12 +83,13 @@ describe('SupplierBillService — Workstream A & B Integration Tests', () => {
     });
 
     // 2. Seed user
+    const uniqueSuffix = uuidv4().slice(0, 8);
     await knex('users').insert({
       id: userId,
       assigned_site_id: siteId,
       role: 'OWNER',
       full_name: 'Procurement Manager',
-      phone: `+91987${Date.now().toString().slice(-7)}`,
+      phone: `+91${Math.floor(1000000000 + Math.random() * 9000000000)}`,
       pin_hash: 'test_hash',
       is_active: true,
       created_at: new Date(),
@@ -98,9 +99,9 @@ describe('SupplierBillService — Workstream A & B Integration Tests', () => {
     // 3. Seed supplier
     await knex('suppliers').insert({
       id: supplierId,
-      supplier_code: `SUP-${Date.now().toString().slice(-4)}`,
+      supplier_code: `SUP-${uniqueSuffix}`,
       company_name: 'Alpha Ingredients Pvt Ltd',
-      phone: `+91981${Date.now().toString().slice(-7)}`,
+      phone: `+91${Math.floor(1000000000 + Math.random() * 9000000000)}`,
       payment_terms_days: 30,
       lead_time_days_avg: 5,
       reliability_score_pct: 95.0,
@@ -116,7 +117,7 @@ describe('SupplierBillService — Workstream A & B Integration Tests', () => {
     // 4. Seed item
     await knex('items').insert({
       id: itemId,
-      sku_code: `SKU-${Date.now().toString().slice(-4)}`,
+      sku_code: `SKU-${uniqueSuffix}`,
       name: 'Raw Milk Powder',
       item_category: 'RAW_MATERIAL',
       primary_uom: 'KG',

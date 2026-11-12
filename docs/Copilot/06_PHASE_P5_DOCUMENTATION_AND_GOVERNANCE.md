@@ -98,7 +98,9 @@ Ensure module names in code, docs, migrations, changelog, and dashboards use one
 
 ## Exit criteria
 
-- A new contributor can identify the real project status from one entry point.
-- Every remaining task has an owner, priority, dependency, and evidence requirement.
-- Blueprint, roadmap, changelog, overview, and traceability documents agree.
-- Release decisions and accepted deferrals are auditable.
+- [x] A new contributor can identify the real project status from one entry point (`docs/PROJECT_STATUS_MATRIX.md`).
+- [x] Every remaining task has an owner, priority, dependency, and evidence requirement (`docs/RELEASE_GOVERNANCE_AND_CHECKLIST.md`).
+- [x] Blueprint, roadmap, changelog, overview, and traceability documents agree (`docs/BLUEPRINT_TRACEABILITY_MATRIX.md`, `docs/IMPLEMENTATION_ROADMAP.md`, `docs/PROJECT_OVERVIEW.txt`, `docs/CHANGELOG.md`).
+- [x] Release decisions and accepted deferrals are auditable (`docs/RELEASE_GOVERNANCE_AND_CHECKLIST.md`, `DEF-01`–`DEF-04` register).
+
+> **Phase P5 Status:** ✅ COMPLETED (2026-11-12) — All 5 workstreams (`P5.1`–`P5.5`) fully delivered, verified, and reconciled across code, documentation, checklists, and release governance.
