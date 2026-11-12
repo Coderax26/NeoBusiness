@@ -54,3 +54,4 @@ export function captureClientException(error: Error | unknown, context?: Record<
     console.error('[Client Exception Boundary]', errorPayload);
   }
 }
+

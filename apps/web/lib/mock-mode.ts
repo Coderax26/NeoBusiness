@@ -40,3 +40,4 @@ export function getMockResponse(path: string): any | null {
 
   return null;
 }
+

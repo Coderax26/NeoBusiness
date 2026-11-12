@@ -11,3 +11,4 @@ export const OrderPendingApproval = () => <StatusBadge entity="ORDER" status="PE
 export const InvoicePaid = () => <StatusBadge entity="INVOICE" status="PAID" />;
 export const InvoiceOverdue = () => <StatusBadge entity="INVOICE" status="OVERDUE" />;
 export const WorkOrderVariance = () => <StatusBadge entity="WORK_ORDER" status="VARIANCE_FLAG" />;
+

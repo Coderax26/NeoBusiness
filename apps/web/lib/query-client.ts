@@ -58,3 +58,4 @@ export const queryKeys = {
     ledger: (customerId: string) => ['m6', 'customers', customerId, 'ledger'] as const,
   },
 };
+

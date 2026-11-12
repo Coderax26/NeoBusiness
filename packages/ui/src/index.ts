@@ -1,7 +1,43 @@
 /**
- * @neo/ui — Obsidian & Clean Slate Design System, Status Pills & Interactive Widget View-Models
+ * @neo/ui — NeoBus Design System & Usability Component Library (§5)
  */
 
+export * from './tokens.js';
+export * from './theme/theme-provider.js';
+export * from './theme/tailwind-preset.js';
+
+// Foundations (§5.1)
+export * from './foundations/Button.js';
+export * from './foundations/IconButton.js';
+export * from './foundations/Badge.js';
+export * from './foundations/StatusPill.js';
+export * from './foundations/HelpTip.js';
+export * from './foundations/Tooltip.js';
+export * from './foundations/Card.js';
+export * from './foundations/Dialog.js';
+export * from './foundations/Drawer.js';
+export * from './foundations/FeedbackStates.js';
+
+// Data Entry (§5.2)
+export * from './data-entry/Inputs.js';
+export * from './data-entry/MoneyInput.js';
+export * from './data-entry/QtyInput.js';
+export * from './data-entry/DatePickers.js';
+export * from './data-entry/NumericKeypad.js';
+export * from './data-entry/Pickers.js';
+export * from './data-entry/LineItemGrid.js';
+
+// Data Display (§5.3)
+export * from './data-display/DataTable.js';
+export * from './data-display/DisplayWidgets.js';
+
+// Templates (§5.4)
+export * from './templates/PageTemplates.js';
+
+// Help Primitives (F1-10)
+export * from './help/HelpPrimitives.js';
+
+// Legacy / View-Model Compatibility
 export const DESIGN_TOKENS = {
   themes: {
     obsidianDark: {
@@ -128,10 +164,6 @@ const TONE_CLASSES: Record<SemanticTone, string> = {
   neutral: DESIGN_TOKENS.accents.neutral.badge,
 };
 
-/**
- * Returns semantic colour, icon, and accessible badge classes for any entity status.
- * Never relies on colour alone — always pairs with a symbol/icon and label (WCAG 2.1 AA).
- */
 export function getStatusPillTheme(entity: EntityType, status: string): StatusPillTheme {
   const tone = STATUS_MAP[entity]?.[status] ?? 'neutral';
   return {
@@ -141,9 +173,6 @@ export function getStatusPillTheme(entity: EntityType, status: string): StatusPi
   };
 }
 
-/**
- * Generates an SVG polyline path string for inline sparklines in Hero KPI cards.
- */
 export function buildSparklineSvgPoints(
   values: number[],
   width = 120,
@@ -164,4 +193,3 @@ export function buildSparklineSvgPoints(
     })
     .join(' ');
 }
-

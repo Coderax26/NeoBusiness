@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@neo/shared": ["../shared/src/index.ts"],
+      "@neo/i18n": ["../i18n/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}
