@@ -1,0 +1,114 @@
+version: '3.9'
+
+# P4.5 Production Hardened Stack — Non-root execution, CPU/Memory limits, healthchecks
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neobus_prod_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-neobus_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-neobus_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - postgres_wal_archive:/var/lib/postgresql/wal_archive
+    command: >
+      postgres
+      -c wal_level=replica
+      -c archive_mode=on
+      -c archive_command='test ! -f /var/lib/postgresql/wal_archive/%f && cp %p /var/lib/postgresql/wal_archive/%f'
+      -c max_connections=100
+      -c shared_buffers=256MB
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neobus_app} -d ${POSTGRES_DB:-neobus_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    container_name: neobus_prod_redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis_prod_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: neobus_prod_api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_FORMAT: json
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
+      APP_TZ: Asia/Kolkata
+    ports:
+      - "127.0.0.1:3000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: neobus_prod_web
+    restart: always
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      WEB_PORT: 4000
+      API_ORIGIN: http://api:3000
+    ports:
+      - "127.0.0.1:4000:4000"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_prod_data:
+  postgres_wal_archive:
+  redis_prod_data:
+

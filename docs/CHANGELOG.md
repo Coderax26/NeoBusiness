@@ -409,6 +409,27 @@ Format: [Semantic Versioning](https://semver.org/). Types: Added, Changed, Fixed
 
 ---
 
+## [0.8.0] — 2026-11-12 — Phase P4 Complete: Production Readiness & Security Hardening
+
+### Added
+- **P4.1 Security Hardening & Threat Model (`docs/P4_SECURITY_AND_THREAT_MODEL.md`):**
+  - Documented STRIDE threat model, trust boundaries, and security findings register (`SEC-01`–`SEC-05` closed).
+  - Hardened [`AuthController`](../apps/api/src/modules/m0-platform/auth.controller.ts) (`login`, `refresh`, `me`) to throw NestJS HTTP `UnauthorizedException`/`NotFoundException`, support `password ?? pin`, and strip `password_hash`/`pin_hash` from user responses.
+  - Hardened [`RlsContextMiddleware`](../apps/api/src/shared/middleware/rls-context.middleware.ts) with parameterized PostgreSQL `set_config('app.role', ?, true)` calls.
+  - Added [`upload-security.util.ts`](../apps/api/src/shared/security/upload-security.util.ts) (`sanitizeFileName`, `validateUploadContent` with magic-byte and size checks).
+- **P4.3 Backup, PITR & Restore Verification:**
+  - Added [`scripts/backup-and-verify.mjs`](../scripts/backup-and-verify.mjs) (`verifyBackupReadinessLocal()`) and [`docs/P4_BACKUP_AND_RECOVERY_RUNBOOK.md`](../docs/P4_BACKUP_AND_RECOVERY_RUNBOOK.md) covering pg_dump, WAL archiving, RPO/RTO targets, and restore rehearsal procedures.
+- **P4.4 Observability & Metrics:**
+  - Added [`ObservabilityService`](../apps/api/src/shared/observability/observability.service.ts), [`CorrelationMiddleware`](../apps/api/src/shared/observability/correlation.middleware.ts), and extended [`HealthController`](../apps/api/src/health.controller.ts) with `/health`, `/health/ready`, `/metrics` (Prometheus), and `/metrics/json` endpoints.
+- **P4.5 Deployment Hardening & Runbooks:**
+  - Added non-root multi-stage container builds (`apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`), hardened [`docker-compose.prod.yml`](../docker-compose.prod.yml) with WAL archiving and resource limits, [`validateEnvironmentConfig()`](../apps/api/src/shared/config/env-validator.ts) enforced in `main.ts` for production with `app.enableShutdownHooks()`, and [`docs/P4_DEPLOYMENT_AND_OBSERVABILITY_RUNBOOK.md`](../docs/P4_DEPLOYMENT_AND_OBSERVABILITY_RUNBOOK.md).
+- **P4.6 Operational Pilot & Parallel Reconciliation:**
+  - Added [`PilotReconciliationService`](../apps/api/src/shared/observability/pilot-reconciliation.service.ts) and [`docs/P4_OPERATIONAL_PILOT_RUNBOOK.md`](../docs/P4_OPERATIONAL_PILOT_RUNBOOK.md) for daily 7-domain parallel reconciliation and Owner Sign-Off governance.
+- **P4 Verification Suite:**
+  - Added `apps/api/src/modules/m0-platform/tests/p4-production-readiness.spec.ts` (`11/11` tests passing) covering `P4.1`–`P4.6` security, concurrency/load latency targets, backup readiness, Prometheus metrics, env guardrails, and pilot reconciliation.
+
+---
+
 ## [0.7.0] — 2026-11-12 — Phase P3 Complete: Frontend Product Delivery & Interactive Control Tower
 
 ### Added

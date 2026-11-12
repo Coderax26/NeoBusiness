@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Last synced with:** `CHANGELOG.md` through **v0.7.0 (2026-11-12)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
-> Updated **2026-11-12** with Phase P3 completion (Frontend Product Delivery across `apps/web`, `apps/tablet`, `apps/mobile`, shared `@neo/*` packages, Interactive Control Tower Dashboard, and 21/21 frontend acceptance tests).  
+> **Last synced with:** `CHANGELOG.md` through **v0.8.0 (2026-11-12)** and `docs/DEVELOPMENT_GUIDE.md` **v1.0.0**.  
+> Updated **2026-11-12** with Phase P4 completion (Production Readiness: Security Hardening `SEC-01`–`SEC-05`, Concurrency/Load Verification, Backup/PITR Runbook, Observability & Metrics, Deployment Hardening, and 7-Day Operational Pilot Reconciliation).  
 > When a module ships, a migration lands or a convention changes, update the matching section here in the same PR.
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`

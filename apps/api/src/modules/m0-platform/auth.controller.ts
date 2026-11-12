@@ -7,6 +7,8 @@ import {
   Get,
   Req,
   UseGuards,
+  UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -40,27 +42,31 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
-    @Body() body: { phone: string; password: string },
+    @Body() body: { phone: string; password?: string; pin?: string },
   ): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-    const result = await this.authService.validateUser(
-      body.phone,
-      body.password,
-    );
+    const credential = body.password ?? body.pin ?? '';
+    const result = await this.authService.validateUser(body.phone, credential);
     if (!result) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
-    return result;
+    const { password_hash, pin_hash, ...safeUser } = result.user;
+    return {
+      user: safeUser,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refresh(
     @Body() body: { refreshToken: string },
-  ): Promise<{ accessToken: string; refreshToken: string } | null> {
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const result = await this.authService.refreshAccessToken(body.refreshToken);
     if (!result) {
-      throw new Error('Invalid or expired refresh token');
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
     return result;
   }
@@ -83,7 +89,7 @@ export class AuthController {
     const user = req.user as JwtPayload;
     const fullUser = await this.authService.getUserWithSites(user.sub);
     if (!fullUser) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
     const { password_hash, pin_hash, ...safeUser } = fullUser;
     return safeUser;

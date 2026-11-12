@@ -3,12 +3,31 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { validateEnvironmentConfig } from './shared/config/env-validator.js';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // ── P4.5 Environment Configuration Validation ─────────────────────────────
+  const envCheck = validateEnvironmentConfig();
+  for (const w of envCheck.warnings) {
+    logger.warn(`[Config] ${w}`);
+  }
+  if (!envCheck.valid) {
+    for (const e of envCheck.errors) {
+      logger.error(`[Config] ${e}`);
+    }
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
   });
+
+  // ── P4.5 Graceful Shutdown Hooks ──────────────────────────────────────────
+  app.enableShutdownHooks();
 
   // ── Security headers ──────────────────────────────────────────────────────
   app.use(helmet());
@@ -30,7 +49,9 @@ async function bootstrap() {
   );
 
   // ── API prefix ────────────────────────────────────────────────────────────
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health', 'health/ready', 'metrics', 'metrics/json'],
+  });
 
   // ── OpenAPI / Swagger ─────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'production') {

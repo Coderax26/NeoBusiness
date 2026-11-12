@@ -16,6 +16,9 @@ import { RlsContextMiddleware } from '../../shared/middleware/rls-context.middle
 import { IdempotencyMiddleware } from '../../shared/middleware/idempotency.middleware.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
 import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
+import { ObservabilityService } from '../../shared/observability/observability.service.js';
+import { CorrelationMiddleware } from '../../shared/observability/correlation.middleware.js';
+import { PilotReconciliationService } from '../../shared/observability/pilot-reconciliation.service.js';
 
 @Global()
 @Module({
@@ -31,6 +34,8 @@ import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
     PdfGeneratorService,
     OutboxService,
     OutboxRelay,
+    ObservabilityService,
+    PilotReconciliationService,
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
@@ -50,10 +55,14 @@ import { OutboxRelay } from '../../shared/events/outbox-relay.service.js';
     PdfGeneratorService,
     OutboxService,
     OutboxRelay,
+    ObservabilityService,
+    PilotReconciliationService,
   ],
 })
 export class M0PlatformModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RlsContextMiddleware, IdempotencyMiddleware).forRoutes('*');
+    consumer
+      .apply(CorrelationMiddleware, RlsContextMiddleware, IdempotencyMiddleware)
+      .forRoutes('*');
   }
 }
