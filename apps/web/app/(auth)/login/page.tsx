@@ -17,37 +17,37 @@ interface DemoPersona {
 
 const DEMO_PERSONAS: DemoPersona[] = [
   {
-    label: 'Vikram Deshmukh (Owner)',
+    label: 'Ravi Kumar (Owner)',
     role: 'OWNER',
-    identifier: 'owner@neobus.in',
-    secret: '123456',
+    identifier: '+919876543210',
+    secret: '1234',
     usePin: false,
     badge: 'Full Control Tower',
     desc: 'Approvals, margins, analytics, EOD sign-off & admin',
   },
   {
-    label: 'Priya Kulkarni (Ops Coord)',
+    label: 'Anita Desai (Ops Coord)',
     role: 'OPS_COORD',
-    identifier: 'ops@neobus.in',
-    secret: '123456',
+    identifier: '+919876543211',
+    secret: '2233',
     usePin: false,
     badge: 'Office Desk',
     desc: 'Sales orders, procurement, dispatch & daily price sheet',
   },
   {
-    label: 'Ramesh Jadhav (Storekeeper)',
+    label: 'Arjun Rao (Storekeeper)',
     role: 'STOREKEEPER',
-    identifier: '9876543212',
-    secret: '123456',
+    identifier: '+919876543215',
+    secret: '6677',
     usePin: true,
     badge: 'Floor Mode',
     desc: 'Touch-friendly blind GRN, stock count, transfers & loading',
   },
   {
-    label: 'Suresh Patil (Production Mgr)',
+    label: 'Suresh Patel (Production Mgr)',
     role: 'PROD_MGR',
-    identifier: '9876543213',
-    secret: '123456',
+    identifier: '+919876543212',
+    secret: '3344',
     usePin: true,
     badge: 'Factory Floor',
     desc: 'Work orders, batch output, wastage & worker attendance',
@@ -56,8 +56,8 @@ const DEMO_PERSONAS: DemoPersona[] = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const [identifier, setIdentifier] = useState('owner@neobus.in');
-  const [secret, setSecret] = useState('123456');
+  const [identifier, setIdentifier] = useState('+919876543210');
+  const [secret, setSecret] = useState('1234');
   const [usePin, setUsePin] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
@@ -71,7 +71,9 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('neobus_remembered_identifier');
-      if (saved) setIdentifier(saved);
+      if (saved && saved !== 'owner@neobus.in') {
+        setIdentifier(saved);
+      }
     }
   }, []);
 
@@ -112,8 +114,8 @@ export default function LoginPage() {
 
     try {
       const payload = usePin
-        ? { identifier, pin: secret }
-        : { identifier, password: secret, pin: secret };
+        ? { phone: identifier, identifier, pin: secret }
+        : { phone: identifier, identifier, password: secret, pin: secret };
 
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -248,7 +250,7 @@ export default function LoginPage() {
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Quick-Fill Role Personas (Click to Load Credentials)
               </span>
-              <span className="text-[11px] text-teal-400 font-mono">PIN / Password: 123456</span>
+              <span className="text-[11px] text-teal-400 font-mono">Seeded Demo Users</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {DEMO_PERSONAS.map((persona) => {
@@ -278,9 +280,9 @@ export default function LoginPage() {
                     </div>
                     <p className="text-xs text-zinc-400 line-clamp-1 mb-1.5">{persona.desc}</p>
                     <div className="flex items-center gap-2 text-[11px] font-mono text-teal-300/90">
-                      <span>ID: {persona.identifier}</span>
+                      <span>Phone: {persona.identifier}</span>
                       <span>·</span>
-                      <span>{persona.usePin ? 'PIN Mode' : 'Password Mode'}</span>
+                      <span>PIN: {persona.secret}</span>
                     </div>
                   </button>
                 );

@@ -34,8 +34,28 @@ export class AuthService {
     phone: string,
     password: string,
   ): Promise<{ user: any; accessToken: string; refreshToken: string } | null> {
+    if (!phone || !password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const EMAIL_TO_PHONE_ALIAS: Record<string, string> = {
+      'owner@neobus.in': '+919876543210',
+      'ops@neobus.in': '+919876543211',
+      'prod@neobus.in': '+919876543212',
+      'driver@neobus.in': '+919876543213',
+      'collector@neobus.in': '+919876543214',
+      'store@neobus.in': '+919876543215',
+    };
+
+    const trimmed = phone.trim().toLowerCase();
+    const mappedPhone =
+      EMAIL_TO_PHONE_ALIAS[trimmed] ??
+      (/^\d{10}$/.test(trimmed) ? `+91${trimmed}` : phone.trim());
+
     const user = await this.knex('users')
-      .where('phone', phone)
+      .where((qb) => {
+        qb.where('phone', mappedPhone).orWhere('phone', phone.trim());
+      })
       .andWhere('is_active', true)
       .first();
 

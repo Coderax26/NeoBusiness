@@ -43,10 +43,14 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
-    @Body() body: { phone: string; password?: string; pin?: string },
+    @Body() body: { phone?: string; identifier?: string; email?: string; password?: string; pin?: string },
   ): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-    const credential = body.password ?? body.pin ?? '';
-    const result = await this.authService.validateUser(body.phone, credential);
+    const rawIdentifier = (body?.phone ?? body?.identifier ?? body?.email ?? '').trim();
+    const credential = (body?.password ?? body?.pin ?? '').trim();
+    if (!rawIdentifier || !credential) {
+      throw new UnauthorizedException('Phone/identifier and password/PIN are required');
+    }
+    const result = await this.authService.validateUser(rawIdentifier, credential);
     if (!result) {
       throw new UnauthorizedException('Invalid credentials');
     }
