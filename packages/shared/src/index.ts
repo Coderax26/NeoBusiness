@@ -6,4 +6,5 @@ export * from './duplicate-detection.js';
 export * from './setup-wizard.js';
 export * from './sales-rules.js';
 export * from './procurement-rules.js';
+export * from './inventory-rules.js';
 

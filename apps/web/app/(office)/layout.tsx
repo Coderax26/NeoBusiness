@@ -136,8 +136,14 @@ export default function OfficeLayout({
       accent: '#F59E0B', // Amber
       items: [
         { label: 'Stock Overview', href: '/inventory/stock', icon: '📊', permission: 'inventory.read' },
-        { label: 'Physical Counts', href: '/inventory/stock-counts', icon: '🔢', permission: 'inventory.read' },
+        { label: 'Check Availability (ATP)', href: '/inventory/availability', icon: '✅', permission: 'inventory.read' },
+        { label: 'Expiry Watchlist', href: '/inventory/expiry', icon: '⏳', permission: 'inventory.read' },
         { label: 'Inter-Site Transfers', href: '/inventory/transfers', icon: '🔄', permission: 'inventory.transfer' },
+        { label: 'Stock Adjustments', href: '/inventory/adjustments', icon: '⚖️', permission: 'inventory.adjust' },
+        { label: 'Stock Ledger', href: '/inventory/ledger', icon: '📒', permission: 'inventory.read' },
+        { label: 'Reservations', href: '/inventory/reservations', icon: '🔒', permission: 'inventory.read' },
+        { label: 'Physical Counts', href: '/inventory/stock-counts', icon: '🔢', permission: 'inventory.read' },
+        { label: 'Stock Alerts', href: '/control/stock-alerts', icon: '🚨', permission: 'inventory.read' },
       ],
     },
     {

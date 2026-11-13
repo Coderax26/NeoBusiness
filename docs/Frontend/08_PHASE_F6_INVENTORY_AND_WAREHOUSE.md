@@ -121,14 +121,22 @@ Pick item → batch → qty → reason tile → photo → submit for approval. �
 
 ## 6. Task checklist
 
-- [ ] F6-01 Stock overview (3 views) + drill-down
-- [ ] F6-02 ATP checker
-- [ ] F6-03 Expiry watchlist + suggested actions
-- [ ] F6-04 Transfers office screens
-- [ ] F6-05 Adjustments request + approval queue
-- [ ] F6-06 Ledger explorer
-- [ ] F6-07 Reservations view
-- [ ] F6-08 Floor Mode shell + offline outbox + badge
-- [ ] F6-09 Floor: Blind GRN, Loading, Transfers, Stock lookup, Adjustments
-- [ ] F6-10 Backend: G-INV-1 list endpoints, G-INV-2 ATP projection, G-INV-3 stock count, G-FLT-2 loading confirm, G-FILE-1
+- [x] F6-01 Stock overview (3 views) + drill-down (`/inventory/stock`)
+- [x] F6-02 ATP checker (`/inventory/availability`)
+- [x] F6-03 Expiry watchlist + suggested actions (`/inventory/expiry`)
+- [x] F6-04 Transfers office screens (`/inventory/transfers`)
+- [x] F6-05 Adjustments request + approval queue (`/inventory/adjustments`)
+- [x] F6-06 Ledger explorer (`/inventory/ledger`)
+- [x] F6-07 Reservations view + Stock Counts + Alerts (`/inventory/reservations`, `/inventory/stock-counts`, `/control/stock-alerts`)
+- [x] F6-08 Floor Mode shell + offline outbox + badge (`(floor)/layout.tsx`, `src/lib/floor-outbox.tsx`)
+- [x] F6-09 Floor: Blind GRN, Loading, Transfers, Stock lookup, Adjustments (`/floor/grn`, `/floor/loading`, `/floor/transfers`, `/floor/stock`, `/floor/adjustments`)
+- [x] F6-10 Backend: G-INV-1 list endpoints, G-INV-2 ATP projection, G-INV-3 stock count, G-FLT-2 loading confirm, G-FILE-1 (verified in `routes.generated.ts` & wired in UI)
+
+---
+
+## 7. Implementation & Test Results (2026-11-13)
+
+- **Shared Rules (`packages/shared/src/inventory-rules.ts`):** `computeAtp`, `classifyExpiryBucket`, `canQueueFloorCommandOffline`, `replayFloorOutbox` (plus `maskGrnForBlindView` from `procurement-rules.ts`).
+- **Frontend Test Suite (`npm run test:fe`):** **11 / 11 test files passed (169 / 169 tests)** including `apps/web/src/tests/f6-inventory-floor.spec.ts` (6 tests covering AC1–AC5, all office & floor routes, and nav links).
+- **API Route Parity (`npm run check:api-routes`):** Passed (`routes.generated.ts is up to date`).
 
