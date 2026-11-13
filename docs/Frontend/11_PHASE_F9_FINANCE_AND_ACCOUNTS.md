@@ -130,17 +130,43 @@ Wizard (OD-023): download template → upload CSV → validation preview → **D
 
 ## 6. Task checklist
 
-- [ ] F9-01 Finance home
-- [ ] F9-02 Invoices list/detail/PDF/cancel
-- [ ] F9-03 AR aging, open invoices, statements
-- [ ] F9-04 Record payment + allocation + receipts register
-- [ ] F9-05 Cash handover desk + disputes
-- [ ] F9-06 Cheques lifecycle board
-- [ ] F9-07 Credit notes
-- [ ] F9-08 COD settlement
-- [ ] F9-09 Promises to pay
-- [ ] F9-10 EOD closing wizard + deposit slip
-- [ ] F9-11 Tally export
-- [ ] F9-12 Opening balance wizard
-- [ ] F9-13 Backend: G-AP-1/2, G-FIN-1/2/3, G-NOTIF-2, receipt PDF G-DOC-5
+- [x] F9-01 Finance home
+- [x] F9-02 Invoices list/detail/PDF/cancel
+- [x] F9-03 AR aging, open invoices, statements
+- [x] F9-04 Record payment + allocation + receipts register
+- [x] F9-05 Cash handover desk + disputes
+- [x] F9-06 Cheques lifecycle board
+- [x] F9-07 Credit notes
+- [x] F9-08 COD settlement
+- [x] F9-09 Promises to pay
+- [x] F9-10 EOD closing wizard + deposit slip
+- [x] F9-11 Tally export
+- [x] F9-12 Opening balance wizard
+- [x] F9-13 Backend: G-AP-1/2, G-FIN-1/2/3, G-NOTIF-2, receipt PDF G-DOC-5
+
+---
+
+## 7. Implementation & Test Results
+
+- **Shared Rules (`packages/shared/src/finance-rules.ts` & `business-rules.ts`):**
+  - `allocateReceiptFifo`, `evaluateHandoverVariance`, `formatINR`, `processChequeTransition`, `evaluateEodChecklist`, `generateTallyXmlBatch`, `transitionOpeningBalanceBatch`.
+- **Store / Seed (`apps/web/src/lib/finance-data.ts`):**
+  - Seed data for GST/Exempt/Nil/Non-GST invoices, AR aging buckets, receipts, BR-07 cash handovers, cheques/PDCs, credit notes, COD stops, PTPs, supplier payables, Tally vouchers, and opening balance batches.
+- **Screens Implemented:**
+  - `/finance` — Finance Home (KPI cards, stacked AR aging bar, cashbook position, today's tasks)
+  - `/finance/invoices` — Tax Invoices (status filter, manual invoice generation, GST detail modal with disabled IRN fields, PDF/WhatsApp actions, void request)
+  - `/finance/receivables` — AR Aging, collector worklists, credit hold toggle, customer statement drill-down
+  - `/finance/collections` — Record Payment with oldest-first FIFO allocation preview, receipts register, append-only reversal
+  - `/finance/handovers` — Cash Handover Desk (BR-07) with denomination counter, live variance warning, Owner dispute escalation
+  - `/finance/cheques` — Cheques & PDC Lifecycle Board (`RECEIVED -> DEPOSITED -> CLEARED | BOUNCED -> RETURNED`)
+  - `/finance/credit-notes` — Credit Notes request & Owner approval/rejection
+  - `/finance/cod` — COD Settlement for pending trip stops
+  - `/finance/ptp` — Promises to Pay by due-date bucket (`TODAY`, `OVERDUE`, `UPCOMING`, `BROKEN`, `KEPT`)
+  - `/finance/payables` — Supplier Bills & Payables (AP)
+  - `/finance/eod` — Guided End-of-Day (EOD) Close checklist with fix links, deposit slip preview, and gated Owner sign-off
+  - `/finance/tally` — Tally Prime XML Export with date range & voucher-type filters and downloadable XML batches
+  - `/admin/opening-balances` — Opening Balances Wizard (`DRAFT -> SIGNED_OFF -> IMPORTED -> REVERSED`)
+- **Verification:**
+  - `npm run test:fe`: **14/14 test files passed (188/188 tests)**, including `f9-finance-accounts.spec.ts` (8/8 tests covering AC1–AC7, pages, and sidebar registration).
+  - `npm run check:api-routes`: **Passed** (`routes.generated.ts is up to date`).
 

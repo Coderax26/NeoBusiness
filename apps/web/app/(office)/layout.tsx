@@ -176,9 +176,18 @@ export default function OfficeLayout({
       title: 'Money (Finance)',
       accent: '#16A34A', // Green
       items: [
+        { label: 'Finance Home', href: '/finance', icon: '💰', permission: 'finance.view' },
         { label: 'Tax Invoices', href: '/finance/invoices', icon: '💳', permission: 'finance.view' },
+        { label: 'Receivables (AR)', href: '/finance/receivables', icon: '📊', permission: 'finance.view' },
+        { label: 'Collections (Receipts)', href: '/finance/collections', icon: '🧾', permission: 'finance.view' },
         { label: 'Cash Handovers', href: '/finance/handovers', icon: '💵', permission: 'receipt.verify_handover' },
+        { label: 'Cheques & PDC', href: '/finance/cheques', icon: '🏦', permission: 'finance.view' },
+        { label: 'Credit Notes', href: '/finance/credit-notes', icon: '📝', permission: 'finance.view' },
+        { label: 'COD Settlement', href: '/finance/cod', icon: '🪙', permission: 'finance.view' },
+        { label: 'Promises to Pay', href: '/finance/ptp', icon: '🤝', permission: 'finance.view' },
+        { label: 'Supplier Payables', href: '/finance/payables', icon: '📤', permission: 'finance.view' },
         { label: 'Day Closing (EOD)', href: '/finance/eod', icon: '🔒', permission: 'eod.signoff' },
+        { label: 'Tally XML Export', href: '/finance/tally', icon: '📦', permission: 'finance.view' },
         { label: 'Statutory Reports', href: '/reports', icon: '📈', permission: 'report.view' },
       ],
     },
@@ -186,6 +195,7 @@ export default function OfficeLayout({
       title: 'Admin & Control',
       accent: '#8B5CF6', // Purple
       items: [
+        { label: 'Opening Balances', href: '/admin/opening-balances', icon: '⚖️', permission: 'admin.manage' },
         { label: 'Users & Roles', href: '/admin/users', icon: '👤', permission: 'admin.manage' },
         { label: 'Sites & Locations', href: '/admin/sites', icon: '🏢', permission: 'admin.manage' },
         { label: 'Business Rules', href: '/admin/rules', icon: '⚙️', permission: 'config.edit' },
