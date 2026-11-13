@@ -22,6 +22,7 @@ export interface SessionUser {
   phone: string;
   role: UserRole;
   siteIds: string[];
+  sites?: Array<{ id: string; name: string; siteType?: string }>;
   activeSiteId: string;
   preferredLanguage: 'en' | 'mr';
   permissions?: string[];

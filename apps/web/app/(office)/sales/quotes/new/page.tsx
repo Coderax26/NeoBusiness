@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button, Card } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import { INITIAL_CUSTOMERS_SUMMARY, INITIAL_DAILY_PRICES } from '../../../../src/lib/sales-data';
+import { INITIAL_CUSTOMERS_SUMMARY, INITIAL_DAILY_PRICES } from '../../../../../src/lib/sales-data';
 
 export default function NewQuotePage() {
   const [customerId, setCustomerId] = useState(INITIAL_CUSTOMERS_SUMMARY[0].id);
@@ -147,3 +147,4 @@ export default function NewQuotePage() {
     </div>
   );
 }
+

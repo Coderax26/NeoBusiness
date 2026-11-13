@@ -2,16 +2,38 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": "../..",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "jsx": "preserve",
-    "types": ["vitest/globals", "node"],
-    "lib": ["dom", "dom.iterable", "esnext"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
     "app/**/*.ts",
     "app/**/*.tsx",
     "lib/**/*.ts",
-    "lib/**/*.tsx"
+    "lib/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/tests"
   ]
 }

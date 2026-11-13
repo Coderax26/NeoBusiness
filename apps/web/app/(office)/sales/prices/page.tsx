@@ -8,7 +8,7 @@ import {
   formatINR,
   type SessionUser,
 } from '@neo/shared';
-import { INITIAL_DAILY_PRICES, type DailyPriceRow } from '../../../src/lib/sales-data';
+import { INITIAL_DAILY_PRICES, type DailyPriceRow } from '../../../../src/lib/sales-data';
 
 export default function TodaysPricesPage() {
   const todayStr = new Date().toISOString().split('T')[0];

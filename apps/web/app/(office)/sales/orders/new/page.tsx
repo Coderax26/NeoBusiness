@@ -16,7 +16,7 @@ import {
   INITIAL_CUSTOMERS_SUMMARY,
   INITIAL_DAILY_PRICES,
   type SalesOrderLine,
-} from '../../../../src/lib/sales-data';
+} from '../../../../../src/lib/sales-data';
 
 export default function QuickOrderEntryPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
