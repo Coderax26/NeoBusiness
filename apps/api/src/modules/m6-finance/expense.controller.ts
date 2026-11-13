@@ -17,14 +17,15 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
-import { ExpenseService, CreateExpenseDto } from './expense.service.js';
+import { ExpenseService } from './expense.service.js';
+import type { CreateExpenseDto } from './expense.service.js';
 
 @ApiTags('M6 Finance — Non-trip Expenses & Cashbook')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('finance')
 export class ExpenseController {
-  constructor(private readonly expenseService: ExpenseService) {}
+  constructor(private readonly expenseService: ExpenseService) { }
 
   /**
    * POST /finance/expenses - Record non-trip office / site expense (G-FIN-2)
