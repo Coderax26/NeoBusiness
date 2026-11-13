@@ -1,0 +1,398 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import {
+  DataTable,
+  type ColumnDef,
+  Button,
+  KpiCard,
+  Badge,
+  StatusPill,
+  Dialog,
+  exportToCsv,
+} from '@neo/ui';
+import { formatINR, CANCEL_REASONS } from '@neo/shared';
+import { INITIAL_SALES_ORDERS, type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
+
+const STATUS_TABS: { key: string; label: string }[] = [
+  { key: 'ALL', label: 'All' },
+  { key: 'DRAFT', label: 'Draft' },
+  { key: 'PENDING_APPROVAL', label: 'Waiting approval' },
+  { key: 'CONFIRMED', label: 'Confirmed' },
+  { key: 'IN_PRODUCTION_SOURCING', label: 'Being made/sourced' },
+  { key: 'READY', label: 'Ready' },
+  { key: 'DISPATCHED', label: 'On the way' },
+  { key: 'DELIVERED', label: 'Delivered' },
+  { key: 'CANCELLED', label: 'Cancelled' },
+];
+
+export default function OrdersTrackerPage() {
+  const [orders, setOrders] = useState<SalesOrderRecord[]>(INITIAL_SALES_ORDERS);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'calendar'>('table');
+  const [statusTab, setStatusTab] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const [savedView, setSavedView] = useState<string | null>(null);
+
+  // Cancel reason dialog
+  const [cancelTarget, setCancelTarget] = useState<SalesOrderRecord | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
+
+  const handleConfirmOrder = (id: string) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: 'CONFIRMED' } : o)),
+    );
+  };
+
+  const handleDuplicateOrder = (order: SalesOrderRecord) => {
+    const cloned: SalesOrderRecord = {
+      ...order,
+      id: `ord-${Date.now()}`,
+      orderNumber: `SO-2026-${Math.floor(1050 + Math.random() * 900)}`,
+      status: 'DRAFT',
+      createdAt: new Date().toISOString(),
+    };
+    setOrders((prev) => [cloned, ...prev]);
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancelTarget) return;
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === cancelTarget.id ? { ...o, status: 'CANCELLED', cancelReason } : o,
+      ),
+    );
+    setCancelTarget(null);
+  };
+
+  // Saved Views (§5)
+  const applySavedView = (viewKey: string) => {
+    if (savedView === viewKey) {
+      setSavedView(null);
+      setStatusTab('ALL');
+      return;
+    }
+    setSavedView(viewKey);
+    if (viewKey === 'READY_PUNE') setStatusTab('READY');
+    if (viewKey === 'WAITING_OWNER') setStatusTab('PENDING_APPROVAL');
+    if (viewKey === 'MY_TODAY') setStatusTab('ALL');
+  };
+
+  const filteredOrders = orders.filter((o) => {
+    if (statusTab !== 'ALL' && o.status !== statusTab) return false;
+    if (savedView === 'READY_PUNE' && !o.siteName.includes('Pune')) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customerName.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  // KPIs
+  const todayCount = orders.length;
+  const waitingCount = orders.filter((o) => o.status === 'PENDING_APPROVAL' || o.status === 'COUNTER_OFFERED').length;
+  const readyCount = orders.filter((o) => o.status === 'READY').length;
+  const deliveredCount = orders.filter((o) => o.status === 'DELIVERED').length;
+  const totalValue = orders.reduce((s, o) => s + o.grandTotal, 0);
+
+  const getStatusTone = (status: SalesOrderStatus) => {
+    if (status === 'DELIVERED' || status === 'PAID' || status === 'READY') return 'success';
+    if (status === 'PENDING_APPROVAL' || status === 'COUNTER_OFFERED') return 'warning';
+    if (status === 'CANCELLED') return 'danger';
+    if (status === 'CONFIRMED' || status === 'DISPATCHED') return 'info';
+    return 'neutral';
+  };
+
+  const columns: ColumnDef<SalesOrderRecord>[] = [
+    {
+      id: 'orderNumber',
+      header: 'Order No.',
+      accessorKey: 'orderNumber',
+      cell: (info) => {
+        const o = info.row.original;
+        return (
+          <Link href={`/sales/orders/${o.id}`} className="font-mono text-xs font-bold text-teal-400 hover:underline">
+            {o.orderNumber}
+          </Link>
+        );
+      },
+    },
+    {
+      id: 'customer',
+      header: 'Customer & Site',
+      cell: (info) => {
+        const o = info.row.original;
+        return (
+          <div>
+            <Link href={`/sales/customers/${o.customerId}`} className="font-bold text-white text-xs hover:text-teal-300">
+              {o.customerName}
+            </Link>
+            <div className="text-[11px] text-zinc-400">{o.siteName}</div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'delivery',
+      header: 'Delivery Slot',
+      cell: (info) => {
+        const o = info.row.original;
+        return (
+          <div className="text-xs">
+            <div className="text-zinc-200">{o.deliveryDate}</div>
+            <div className="text-[11px] text-zinc-500">Slot {o.deliveryWindow}</div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'total',
+      header: 'Order Value',
+      accessorKey: 'grandTotal',
+      cell: (info) => (
+        <span className="font-mono text-xs font-bold text-white">
+          {formatINR(info.getValue() as number)}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      accessorKey: 'status',
+      cell: (info) => {
+        const s = info.getValue() as SalesOrderStatus;
+        return <StatusPill tone={getStatusTone(s)} label={s.replace('_', ' ')} />;
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: (info) => {
+        const o = info.row.original;
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <Link href={`/sales/orders/${o.id}`} className="text-teal-400 hover:underline font-medium">
+              View
+            </Link>
+            {o.status === 'DRAFT' && (
+              <button onClick={() => handleConfirmOrder(o.id)} className="text-emerald-400 hover:underline">
+                Confirm
+              </button>
+            )}
+            <button onClick={() => handleDuplicateOrder(o)} className="text-zinc-400 hover:text-white">
+              Duplicate
+            </button>
+            {o.status !== 'CANCELLED' && o.status !== 'DELIVERED' && (
+              <button onClick={() => setCancelTarget(o)} className="text-rose-400 hover:underline">
+                Cancel
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div>
+          <h1 className="text-2xl font-black text-white">Orders Tracker</h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Track order confirmations, Owner price/credit approvals, production readiness, and dispatches.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              exportToCsv('sales-orders.csv', filteredOrders, [
+                { key: 'orderNumber', label: 'Order No' },
+                { key: 'customerName', label: 'Customer' },
+                { key: 'deliveryDate', label: 'Delivery Date' },
+                { key: 'grandTotal', label: 'Total' },
+                { key: 'status', label: 'Status' },
+              ])
+            }
+          >
+            📤 Export CSV
+          </Button>
+          <Link href="/sales/orders/new">
+            <Button variant="primary" size="sm">
+              + New Quick Order
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* KPI Strip (§5) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <KpiCard title="Today's Orders" value={String(todayCount)} subtitle="Active pipeline" tone="default" />
+        <KpiCard title="Waiting for Owner" value={String(waitingCount)} subtitle="Price/credit exceptions" tone={waitingCount > 0 ? 'warning' : 'success'} />
+        <KpiCard title="Ready to Dispatch" value={String(readyCount)} subtitle="Packed & staged" tone="brand" />
+        <KpiCard title="Delivered Today" value={String(deliveredCount)} subtitle="POD received" tone="success" />
+        <KpiCard title="Value Today" value={formatINR(totalValue)} subtitle="Gross order value" tone="default" />
+      </div>
+
+      {/* Saved Views & View Mode Toggle */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-2xl">
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            placeholder="Search order # or customer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-60 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+          />
+          <span className="text-[11px] text-zinc-500 ml-1">Saved Views:</span>
+          {[
+            { key: 'MY_TODAY', label: 'My orders today' },
+            { key: 'READY_PUNE', label: 'Ready for Pune route' },
+            { key: 'WAITING_OWNER', label: 'Waiting for Owner' },
+          ].map((sv) => (
+            <button
+              key={sv.key}
+              onClick={() => applySavedView(sv.key)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                savedView === sv.key
+                  ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                  : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white'
+              }`}
+            >
+              {sv.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+          {(['table', 'kanban', 'calendar'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              className={`px-3 py-1 rounded-lg font-medium capitalize ${
+                viewMode === m ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Status Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
+        {STATUS_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setStatusTab(t.key)}
+            className={`px-3 py-1.5 rounded-xl font-semibold whitespace-nowrap border transition-colors ${
+              statusTab === t.key
+                ? 'bg-teal-600 text-white border-teal-500'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content by View Mode */}
+      {viewMode === 'table' && <DataTable columns={columns} data={filteredOrders} pageSize={10} />}
+
+      {viewMode === 'kanban' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[
+            { status: 'PENDING_APPROVAL', title: 'Waiting Approval' },
+            { status: 'CONFIRMED', title: 'Confirmed' },
+            { status: 'READY', title: 'Ready for Dispatch' },
+            { status: 'DELIVERED', title: 'Delivered' },
+          ].map((col) => {
+            const colOrders = filteredOrders.filter((o) => o.status === col.status);
+            return (
+              <div key={col.status} className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-white pb-2 border-b border-zinc-800">
+                  <span>{col.title}</span>
+                  <Badge tone="neutral">{colOrders.length}</Badge>
+                </div>
+                {colOrders.map((o) => (
+                  <Link key={o.id} href={`/sales/orders/${o.id}`}>
+                    <div className="p-3 bg-zinc-950 border border-zinc-800 hover:border-teal-500/50 rounded-xl space-y-1.5 transition-colors">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-mono font-bold text-teal-400">{o.orderNumber}</span>
+                        <span className="font-mono font-bold text-white">{formatINR(o.grandTotal)}</span>
+                      </div>
+                      <div className="text-xs font-semibold text-zinc-200">{o.customerName}</div>
+                      <div className="text-[11px] text-zinc-500">{o.deliveryDate} • Slot {o.deliveryWindow}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {viewMode === 'calendar' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from(new Set(filteredOrders.map((o) => o.deliveryDate))).map((date) => (
+            <div key={date} className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
+              <div className="text-xs font-bold text-teal-400 border-b border-zinc-800 pb-2">
+                📅 Delivery Date: {date}
+              </div>
+              {filteredOrders
+                .filter((o) => o.deliveryDate === date)
+                .map((o) => (
+                  <Link key={o.id} href={`/sales/orders/${o.id}`}>
+                    <div className="p-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs flex justify-between items-center hover:border-teal-500/40">
+                      <div>
+                        <span className="font-bold text-white">{o.customerName}</span>
+                        <span className="block text-[11px] text-zinc-400">{o.orderNumber} • Slot {o.deliveryWindow}</span>
+                      </div>
+                      <StatusPill tone={getStatusTone(o.status)} label={o.status} />
+                    </div>
+                  </Link>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Cancel Reason Dialog (§11) */}
+      <Dialog
+        open={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title={`Cancel Order ${cancelTarget?.orderNumber || ''}`}
+        maxWidth="sm"
+      >
+        <div className="space-y-4 my-2 text-xs">
+          <p className="text-zinc-300">Please choose a reason for cancelling this order:</p>
+          <select
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+          >
+            {CANCEL_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setCancelTarget(null)}>
+              Keep Order
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleConfirmCancel}>
+              Confirm Cancel
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  );
+}

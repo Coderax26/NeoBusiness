@@ -170,14 +170,48 @@ Return against delivered order/invoice → reason, qty, condition (resaleable/da
 
 ## 13. Task checklist
 
-- [ ] F4-01 Price sheet grid + bulk tools + publish
-- [ ] F4-02 Quick Order (guided + express) with band, stock, credit, price memory
-- [ ] F4-03 Approval/counter handling on orders
-- [ ] F4-04 Orders tracker (table, kanban, calendar) + saved views
-- [ ] F4-05 Order detail with lifecycle stepper & linked docs
-- [ ] F4-06 Quotes list/create/detail/convert
-- [ ] F4-07 Customer 360 with all tabs
-- [ ] F4-08 Activity logging
-- [ ] F4-09 Sales returns (interim via credit notes)
-- [ ] F4-10 Backend: G-LIST-1 orders filters, G-M1-1 order summary, G-M1-2, G-M1-3, G-DOC-2/3
+- [x] F4-01 Price sheet grid + bulk tools + publish
+- [x] F4-02 Quick Order (guided + express) with band, stock, credit, price memory
+- [x] F4-03 Approval/counter handling on orders
+- [x] F4-04 Orders tracker (table, kanban, calendar) + saved views
+- [x] F4-05 Order detail with lifecycle stepper & linked docs
+- [x] F4-06 Quotes list/create/detail/convert
+- [x] F4-07 Customer 360 with all tabs
+- [x] F4-08 Activity logging
+- [x] F4-09 Sales returns (interim via credit notes)
+- [x] F4-10 Backend parity & BFF contract hooks: G-LIST-1 orders filters, G-M1-1 order summary, G-M1-2, G-M1-3, G-DOC-2/3
+
+---
+
+## 14. Implementation & Test Verification Log
+
+### 14.1 Deliverables Implemented
+1. **Shared Commercial & Sales Rules (`packages/shared/src/sales-rules.ts`):**
+   - `calculateAutoFloorPrice(cost, minMarginPct)`: computes `cost / (1 - pct/100)` rounded up to nearest ₹0.50.
+   - `evaluateCreditExposure(...)`: BR-02 credit utilization %, near-limit, breach, and manual hold checks.
+   - `evaluateStockAvailability(...)`: BR-04 ATP stock evaluation with non-technical guidance (*Will be produced* vs *Back-to-back purchase suggested*).
+   - `evaluateOrderApprovalNeed(...)`: combines BR-01 & BR-02 to switch primary action between `Confirm order` and `Send for Owner approval`.
+   - `computeRunningLedgerBalance(...)`: sequential Debit/Credit ledger running balance for Customer 360 Statement.
+   - `canViewMarginAndCost(role)`: strictly masks margin and cost columns from non-Owner roles.
+2. **S1 — Today's Prices (`/sales/prices`):**
+   - Date selector (today editable, past dates read-only), missing-today alert & filter, auto-floor suggestion, bulk tools (*Copy yesterday's prices*, *Apply +2% to selected*, *Use suggested floors*), sticky publish bar with impact confirmation, and customer-facing WhatsApp/Print target-only sheet.
+3. **S2 — Quick Order Entry (`/sales/orders/new`):**
+   - Guided (3-step) & Express (keyboard-only `Ctrl+Enter`, `Ctrl+S`) modes, customer credit meter, duplicate order guard, live BR-01 band chips, BR-04 stock chips, right-panel 5-order Price Memory, Owner-only margin visibility, and post-submit success screen.
+4. **S3 & S8 — Orders Tracker (`/sales/orders`) & Sales Board (`/sales/board`):**
+   - 5-card KPI strip, Table / Kanban / Calendar views, 9 status tabs, Saved Views (*My orders today*, *Ready for Pune route*, *Waiting for Owner*), cancel-with-reason modal, duplicate & CSV export.
+5. **S4 — Order Detail (`/sales/orders/[id]`):**
+   - 9-step lifecycle stepper, 30-second approval polling, live Owner counter-offer banner (*Owner suggests ₹89.50* -> *Accept counter*), and 5 tabs (Lines, Timeline, Linked Documents, Approvals, Audit).
+6. **S5 — Quotes (`/sales/quotes`, `/sales/quotes/new`, `/sales/quotes/[id]`):**
+   - Expiry countdown chips, quote creation, 1-click *Convert to Order* with today's price band re-check, Mark Lost with reason, and Send Reminder.
+7. **S6 — Customer 360 (`/sales/customers/[id]`):**
+   - 5 KPIs (with Owner-only Avg Margin), 10 tabs (Overview with 12-month trend & AgingBuckets, Orders, Invoices, Statement with running balance, Payments, Promises PTP, Price History, Contacts, Activity logging, Documents).
+8. **S7 — Sales Returns (`/sales/returns`):**
+   - Return capture against delivered orders with Resaleable (restock) / Damaged (scrap) condition & Credit Note request creation.
+
+### 14.2 Test Results (Vitest)
+- Test Suite: `apps/web/src/tests/f4-sales-and-crm.spec.ts`
+- Result: **18 / 18 tests passing** (160ms)
+- Overall Frontend Baseline: **157 / 157 tests passing across 9 spec files**
+- Zero API route drift (`npm run check:api-routes`: `routes.generated.ts is up to date`)
+
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   DataTable,
   type ColumnDef,
@@ -424,7 +425,9 @@ export default function CustomerMasterPage() {
         const cust = info.row.original;
         return (
           <div>
-            <div className="font-bold text-white text-xs">{cust.businessName}</div>
+            <Link href={`/sales/customers/${cust.id}`} className="font-bold text-white text-xs hover:text-teal-400 hover:underline">
+              {cust.businessName}
+            </Link>
             <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
               <span>{cust.primaryContact}</span>
               <span>•</span>

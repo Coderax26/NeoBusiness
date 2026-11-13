@@ -82,3 +82,4 @@ export function calculateSetupProgress(completedCount: number, totalCount = 8): 
   if (totalCount <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round((completedCount / totalCount) * 100)));
 }
+
