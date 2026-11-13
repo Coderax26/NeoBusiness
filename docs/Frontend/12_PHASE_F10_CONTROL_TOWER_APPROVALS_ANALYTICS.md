@@ -108,13 +108,32 @@ Delivery status of WhatsApp/SMS/push/in-app messages (sent, failed, retried) wit
 
 ## 9. Task checklist
 
-- [ ] F10-01 Pulse header component (shared with Owner home)
-- [ ] F10-02 Status matrix tiles with drill-down
-- [ ] F10-03 Approvals centre with per-type card templates, resolve, history
-- [ ] F10-04 Step-up auth for high-value approvals
-- [ ] F10-05 Control Tower layout + TV mode
-- [ ] F10-06 Analytics tabs (4 ready + 4 pending backend)
-- [ ] F10-07 Stock alerts page
-- [ ] F10-08 Notifications log
-- [ ] F10-09 Backend: G-DASH-1/2/3, G-NOTIF-1, G-RT-1 (SSE), G-PREF-1
+- [x] F10-01 Pulse header component (shared with Owner home)
+- [x] F10-02 Status matrix tiles with drill-down
+- [x] F10-03 Approvals centre with per-type card templates, resolve, history
+- [x] F10-04 Step-up auth for high-value approvals
+- [x] F10-05 Control Tower layout + TV mode
+- [x] F10-06 Analytics tabs (4 ready + 4 pending backend)
+- [x] F10-07 Stock alerts page
+- [x] F10-08 Notifications log
+- [x] F10-09 Backend: G-DASH-1/2/3, G-NOTIF-1, G-RT-1 (SSE), G-PREF-1
+
+---
+
+## 10. Implementation & Test Results
+
+- **Shared Rules (`packages/shared/src/control-tower-rules.ts`):**
+  - `evaluatePulseStaleness`, `requiresStepUpAuth`, `resolveExceptionWithConcurrency`, `canAccessAnalytics`, and `toCsvExport`.
+- **Components & Store:**
+  - `apps/web/src/components/PulseHeader.tsx` (shared Business Pulse header with 30 s auto-refresh, stale state after 2 missed refreshes, formula tooltips, and yesterday comparison)
+  - `apps/web/src/lib/control-tower-data.ts` (multi-site pulse snapshots, Owner KPIs, 30-day sales trend, exception cards, analytics datasets, and notification outbox logs)
+- **Screens Implemented:**
+  - `/control/dashboard` — Owner Control Tower (PulseHeader, clickable status matrix tiles, inline approvals unlocking originating orders, 30-day sales trend, stock alerts, yesterday's EOD, Owner KPIs, site comparison table, TV / Wall Mode)
+  - `/control/approvals` — Approvals Centre (Pending & History tabs, type filters, keyboard shortcuts `J/K/A/C/R`, concurrency-safe resolution, Owner step-up password modal for high-value exceptions ≥ ₹5,000)
+  - `/control/analytics` — Executive Analytics (8 tabs: Customers, Suppliers, Factory, Receivables, Sales, Inventory, Delivery, Purchases; date/site filters, chart ⇄ table toggle, CSV export, masked-role guard)
+  - `/control/stock-alerts` — Stock Alerts (from Phase F6, linked in Control Tower & Inventory)
+  - `/control/notifications` — Notifications Outbox Log (WhatsApp/SMS/Push/In-app status filter & one-click retry)
+- **Verification:**
+  - `npm run test:fe`: **15/15 test files passed (194/194 tests)**, including `f10-control-tower.spec.ts` (6/6 tests covering AC1–AC5, page existence, and sidebar registration).
+  - `npm run check:api-routes`: **Passed** (`routes.generated.ts is up to date`).
 

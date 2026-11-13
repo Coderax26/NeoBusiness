@@ -104,7 +104,10 @@ export default function OfficeLayout({
       accent: '#0F766E', // Teal
       items: [
         { label: 'Today Board', href: '/home', icon: '🏠' },
-        { label: 'Approvals Queue', href: '/approvals', icon: '⚖️', permission: 'exception.resolve', badge: '3' },
+        { label: 'Control Tower', href: '/control/dashboard', icon: '🗼', permission: 'dashboard.read_pulse' },
+        { label: 'Approvals Centre', href: '/control/approvals', icon: '⚖️', permission: 'exception.resolve', badge: '4' },
+        { label: 'Executive Analytics', href: '/control/analytics', icon: '📈', permission: 'analytics.read_customers' },
+        { label: 'Notifications Log', href: '/control/notifications', icon: '🔔', permission: 'audit.view' },
       ],
     },
     {
