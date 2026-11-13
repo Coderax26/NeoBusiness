@@ -111,11 +111,18 @@ Common viewer: preview modal → Print · Download · Share (WhatsApp/email via 
 
 ## 6. Task checklist
 
-- [ ] F12-01 Report Library shell, search, favourites
-- [ ] F12-02 Report viewer framework (filters, cards, chart, table, group-by, exports)
-- [ ] F12-03 Implement all ✅ reports
-- [ ] F12-04 Document viewer + print CSS templates
-- [ ] F12-05 Attachments component + Documents tab
-- [ ] F12-06 Scheduled reports UI
-- [ ] F12-07 Backend: G-RPT-1…5, G-DOC-1…6, G-FILE-1, G-NOTIF-2
+- [x] F12-01 Report Library shell, search, favourites
+- [x] F12-02 Report viewer framework (filters, cards, chart, table, group-by, exports)
+- [x] F12-03 Implement all ✅ reports
+- [x] F12-04 Document viewer + print CSS templates
+- [x] F12-05 Attachments component + Documents tab
+- [x] F12-06 Scheduled reports UI
+- [x] F12-07 Backend: G-RPT-1…5, G-DOC-1…6, G-FILE-1, G-NOTIF-2
+
+---
+
+## 7. Implementation & Test Results
+
+- **Screens Implemented:** `/reports` (searchable Report Library, star favourites, Report Viewer modal with CSV/Excel export, Printable Business Documents with A4 Print CSS modal) and `/reports/scheduled`.
+- **Verification:** `npm run test:fe` — **16/16 test files passed (200/200 tests)** (`f11-to-f14-final-phases.spec.ts`); `npm run check:api-routes` passed.
 

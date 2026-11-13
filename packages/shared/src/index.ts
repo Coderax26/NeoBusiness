@@ -11,4 +11,5 @@ export * from './production-rules.js';
 export * from './fleet-rules.js';
 export * from './finance-rules.js';
 export * from './control-tower-rules.js';
+export * from './admin-rules.js';
 

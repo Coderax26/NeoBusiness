@@ -191,7 +191,8 @@ export default function OfficeLayout({
         { label: 'Supplier Payables', href: '/finance/payables', icon: '📤', permission: 'finance.view' },
         { label: 'Day Closing (EOD)', href: '/finance/eod', icon: '🔒', permission: 'eod.signoff' },
         { label: 'Tally XML Export', href: '/finance/tally', icon: '📦', permission: 'finance.view' },
-        { label: 'Statutory Reports', href: '/reports', icon: '📈', permission: 'report.view' },
+        { label: 'Report Library', href: '/reports', icon: '📈', permission: 'report.view' },
+        { label: 'Scheduled Reports', href: '/reports/scheduled', icon: '⏰', permission: 'report.view' },
       ],
     },
     {
@@ -199,10 +200,18 @@ export default function OfficeLayout({
       accent: '#8B5CF6', // Purple
       items: [
         { label: 'Opening Balances', href: '/admin/opening-balances', icon: '⚖️', permission: 'admin.manage' },
-        { label: 'Users & Roles', href: '/admin/users', icon: '👤', permission: 'admin.manage' },
+        { label: 'Users & Access', href: '/admin/users', icon: '👤', permission: 'admin.manage' },
+        { label: 'Roles & Matrix', href: '/admin/roles', icon: '🛡️', permission: 'admin.manage' },
         { label: 'Sites & Locations', href: '/admin/sites', icon: '🏢', permission: 'admin.manage' },
-        { label: 'Business Rules', href: '/admin/rules', icon: '⚙️', permission: 'config.edit' },
-        { label: 'Audit Trail', href: '/admin/audit', icon: '📜', permission: 'audit.view' },
+        { label: 'Company Profile', href: '/admin/company', icon: '🏛️', permission: 'admin.manage' },
+        { label: 'Business Rules', href: '/admin/business-rules', icon: '⚙️', permission: 'config.edit' },
+        { label: 'Approval Rules', href: '/admin/approval-rules', icon: '🔁', permission: 'config.edit' },
+        { label: 'Templates & Series', href: '/admin/templates', icon: '✉️', permission: 'config.edit' },
+        { label: 'Audit Trail', href: '/control/audit', icon: '📜', permission: 'audit.view' },
+        { label: 'System Health', href: '/admin/system', icon: '🩺', permission: 'admin.manage' },
+        { label: 'Rollout Gate (F14)', href: '/admin/rollout', icon: '🚀', permission: 'admin.manage' },
+        { label: 'ERP Extensions (R4)', href: '/extensions', icon: '🧩' },
+        { label: 'Help & Training', href: '/help', icon: '🎓' },
       ],
     },
   ];

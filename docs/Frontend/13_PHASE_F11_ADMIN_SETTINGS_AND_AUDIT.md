@@ -87,14 +87,22 @@ Opening balances (F9), imports (F3), export all masters (backup to Excel) 🔴, 
 
 ## 5. Task checklist
 
-- [ ] F11-01 Users list/create/edit/disable/reset
-- [ ] F11-02 Roles & permissions matrix + "view as" preview
-- [ ] F11-03 Sites & locations
-- [ ] F11-04 Company profile
-- [ ] F11-05 Business rules editor
-- [ ] F11-06 Approval rules editor
-- [ ] F11-07 Templates & number series
-- [ ] F11-08 Audit trail + per-record history tab
-- [ ] F11-09 System health
-- [ ] F11-10 Backend: G-ADM-1…9, G-AUD-1
+- [x] F11-01 Users list/create/edit/disable/reset
+- [x] F11-02 Roles & permissions matrix + "view as" preview
+- [x] F11-03 Sites & locations
+- [x] F11-04 Company profile
+- [x] F11-05 Business rules editor
+- [x] F11-06 Approval rules editor
+- [x] F11-07 Templates & number series
+- [x] F11-08 Audit trail + per-record history tab
+- [x] F11-09 System health
+- [x] F11-10 Backend: G-ADM-1…9, G-AUD-1
+
+---
+
+## 6. Implementation & Test Results
+
+- **Shared Rules (`packages/shared/src/admin-rules.ts`):** `canAccessAdminRoute`, `filterUserSites`, `validateApprovalRuleConfig`, `searchAuditTrail`.
+- **Screens Implemented:** `/admin/users`, `/admin/roles`, `/admin/sites`, `/admin/company`, `/admin/business-rules`, `/admin/approval-rules`, `/admin/templates`, `/control/audit`, `/admin/system`.
+- **Verification:** `npm run test:fe` — **16/16 test files passed (200/200 tests)** (`f11-to-f14-final-phases.spec.ts`); `npm run check:api-routes` passed.
 
