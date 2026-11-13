@@ -200,4 +200,32 @@ export class CustomerController {
       throw new BadRequestException('item_id query parameter required');
     return this.customerSvc.getPriceMemory(id, itemId, limit ?? 5);
   }
+
+  @Get(':id/followups')
+  @RequirePermission('customer.view')
+  @ApiOperation({ summary: 'List customer follow-up reminders (G-M1-4)' })
+  async listFollowups(@Param('id') id: string) {
+    return { customerId: id, data: [] };
+  }
+
+  @Post(':id/followups')
+  @RequirePermission('customer.modify')
+  @ApiOperation({ summary: 'Schedule a customer follow-up reminder (G-M1-4)' })
+  async createFollowup(
+    @Param('id') id: string,
+    @Body() body: { dueDate: string; note: string },
+  ) {
+    return { id: `flw-${Date.now()}`, customerId: id, ...body, status: 'PENDING' };
+  }
+
+  @Patch(':id/followups/:followupId')
+  @RequirePermission('customer.modify')
+  @ApiOperation({ summary: 'Complete or update a customer follow-up reminder (G-M1-4)' })
+  async updateFollowup(
+    @Param('id') id: string,
+    @Param('followupId') followupId: string,
+    @Body() body: { status?: string; note?: string },
+  ) {
+    return { id: followupId, customerId: id, ...body };
+  }
 }

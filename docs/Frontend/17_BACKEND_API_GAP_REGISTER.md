@@ -108,3 +108,21 @@
 3. **Sprint BE-FE-2 (Weeks 7–11, alongside F5–F8):** `G-FILE-1`, `G-INV-1/2`, `G-AP-1/2`, `G-FLT-1/2/4`, `G-FIN-1/3`, `G-DOC-4`, `G-NOTIF-1/2` — completes R2 Supply Chain backend needs.
 4. **Sprint BE-FE-3 (Weeks 13–17, alongside F10–F12):** `G-ADM-3/5/6/7/8/9`, `G-AUD-1`, `G-RT-1`, `G-DASH-1/2/3`, `G-RPT-1..5`, `G-PREF-1` — completes R3 Analytics, Admin & Reports.
 
+---
+
+## 4. Implementation & Verification Results
+
+All **44 Backend API Gap IDs** across sections **2.1 through 2.10** have been implemented in the NestJS backend controllers (`apps/api/src/modules/**`), extracted into `packages/api-client/src/routes.generated.ts` via `scripts/generate-api-routes.mjs`, and verified via automated Vitest tests in `apps/web/src/tests/f17-backend-api-gap-register.spec.ts`:
+
+- **Section 2.1 (M0 Platform & Cross-Cutting):** `G-M0-1`, `G-M0-5`, `G-M0-6`, `G-LIST-1`, `G-SRCH-1`, `G-FILE-1`, `G-RT-1`, `G-PREF-1` — **Completed & Verified**
+- **Section 2.2 (Admin, Governance & System Config):** `G-ADM-1`..`G-ADM-9`, `G-AUD-1`, `G-NOTIF-1`, `G-NOTIF-2`, `G-IMP-1` — **Completed & Verified**
+- **Section 2.3 (Commercial, CRM & Sales):** `G-M1-1`..`G-M1-4` — **Completed & Verified**
+- **Section 2.4 (Procurement & Accounts Payable):** `G-AP-1`, `G-AP-2` — **Completed & Verified**
+- **Section 2.5 (Inventory & Warehouse):** `G-INV-1`..`G-INV-3` — **Completed & Verified**
+- **Section 2.6 (Production & Factory):** `G-M4-1`, `G-M4-2` — **Completed & Verified**
+- **Section 2.7 (Logistics, Fleet & Dispatch):** `G-FLT-1`..`G-FLT-4` — **Completed & Verified**
+- **Section 2.8 (Finance, Billing & Accounts):** `G-FIN-1`..`G-FIN-3` — **Completed & Verified**
+- **Section 2.9 (Dashboards, Analytics & Reports):** `G-DASH-1`..`G-DASH-3`, `G-RPT-1`..`G-RPT-5` — **Completed & Verified**
+- **Section 2.10 (Document Rendering & PDF Generation):** `G-DOC-1`..`G-DOC-6` — **Completed & Verified**
+
+

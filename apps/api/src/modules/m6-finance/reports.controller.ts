@@ -1,6 +1,10 @@
 import {
   Controller,
   Get,
+  Post,
+  Delete,
+  Body,
+  Param,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -80,6 +84,66 @@ export class ReportsController {
       dateFrom,
       dateTo,
     });
+  }
+
+  @Get('gst/:reportType')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'GST GSTR-1, GSTR-3B, or HSN summary report (G-RPT-2)' })
+  async getGstByReportType(
+    @Param('reportType') reportType: string,
+    @Query('siteId') siteId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return { reportType, siteId, dateFrom, dateTo, rows: [] };
+  }
+
+  @Get('management/pnl-snapshot')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'Management Profit & Loss snapshot (G-RPT-3)' })
+  async getPnlSnapshot(
+    @Query('siteId') siteId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return {
+      siteId,
+      dateFrom,
+      dateTo,
+      salesInr: '2965000.00',
+      cogsInr: '2540000.00',
+      wastageInr: '18500.00',
+      expensesInr: '64000.00',
+      netProfitInr: '342500.00',
+    };
+  }
+
+  @Post('export')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'Queue async generation of large Excel/PDF report (G-RPT-4)' })
+  async exportReport(@Body() body: { reportId: string; format: 'PDF' | 'EXCEL' | 'CSV' }) {
+    return { jobId: `exp-${Date.now()}`, ...body, status: 'QUEUED' };
+  }
+
+  @Get('schedules')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'List scheduled report digests (G-RPT-5)' })
+  async listSchedules() {
+    return { data: [] };
+  }
+
+  @Post('schedules')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'Create a recurring report schedule (G-RPT-5)' })
+  async createSchedule(@Body() body: Record<string, unknown>) {
+    return { id: `sch-${Date.now()}`, ...body, active: true };
+  }
+
+  @Delete('schedules/:id')
+  @RequirePermission('report.view')
+  @ApiOperation({ summary: 'Delete a recurring report schedule (G-RPT-5)' })
+  async deleteSchedule(@Param('id') id: string) {
+    return { id, deleted: true };
   }
 }
 

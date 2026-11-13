@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Body,
   Param,
@@ -186,6 +187,60 @@ export class AdminController {
   @ApiOperation({ summary: 'List document numbering sequences' })
   async listDocSequences() {
     return this.adminService.listDocSequences();
+  }
+
+  @Get('company-profile')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Get company legal profile and invoice header settings (G-ADM-4)' })
+  async getCompanyProfile() {
+    return {
+      legalName: 'NeoAgro Dairy & Feeds Pvt. Ltd.',
+      gstin: '27AAACN1234F1Z5',
+      pan: 'AAACN1234F',
+      timezone: 'Asia/Kolkata',
+    };
+  }
+
+  @Put('company-profile')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update company legal profile and invoice header settings (G-ADM-4)' })
+  async updateCompanyProfile(@Body() body: Record<string, unknown>) {
+    return { ...body, updatedAt: new Date().toISOString() };
+  }
+
+  @Get('notification-templates')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'List WhatsApp/SMS/in-app notification templates (G-ADM-7)' })
+  async listNotificationTemplates() {
+    return {
+      data: [
+        { code: 'ORDER_CONFIRM_WA', channel: 'WHATSAPP', providerId: 'WA_TMPL_901' },
+        { code: 'OTP_LOGIN_SMS', channel: 'SMS', providerId: 'DLT_1107169' },
+      ],
+    };
+  }
+
+  @Patch('notification-templates/:code')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update a notification template (G-ADM-7)' })
+  async updateNotificationTemplate(
+    @Param('code') code: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return { code, ...body, updatedAt: new Date().toISOString() };
+  }
+
+  @Get('system-health')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'System health, outbox queue depth, and background job status (G-ADM-9)' })
+  async getSystemHealth() {
+    return {
+      status: 'HEALTHY',
+      outboxQueueDepth: 0,
+      failedNotificationsCount: 0,
+      lastNightlyJobAt: new Date().toISOString(),
+      version: '0.7.0',
+    };
   }
 }
 

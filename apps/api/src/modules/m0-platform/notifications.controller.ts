@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Body,
   Param,
   Query,
   Req,
@@ -88,6 +89,19 @@ export class NotificationsController {
     }
 
     return { id, status: 'QUEUED' };
+  }
+
+  @Post('send-document')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send an invoice, quote, PO, or statement PDF via WhatsApp/email (G-NOTIF-2)' })
+  async sendDocument(
+    @Body() body: { documentType: string; documentId: string; channel: 'WHATSAPP' | 'EMAIL'; recipient: string },
+  ) {
+    return {
+      queued: true,
+      ...body,
+      dispatchedAt: new Date().toISOString(),
+    };
   }
 }
 

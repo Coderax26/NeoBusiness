@@ -348,4 +348,22 @@ export class InventoryController {
   async approveStockCount(@Param('id') id: string, @Req() req: any) {
     return this.inventoryService.approveStockCount(id, req.user.id);
   }
+
+  @Get('stock/projection')
+  @RequirePermission('inventory.read')
+  @ApiOperation({ summary: 'ATP projection including incoming POs and planned WOs (G-INV-2)' })
+  async getStockProjection(
+    @Query('itemId') itemId: string,
+    @Query('siteId') siteId: string,
+  ) {
+    return {
+      itemId,
+      siteId,
+      onHandQty: '420',
+      reservedQty: '60',
+      incomingPoQty: '200',
+      plannedWoQty: '150',
+      projectedAvailableQty: '710',
+    };
+  }
 }

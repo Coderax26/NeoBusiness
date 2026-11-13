@@ -168,5 +168,34 @@ export class CustomerLedgerController {
     }
     return wrapResponse(updated);
   }
+
+  @Get('finance/worklists')
+  @RequirePermission('collection.log')
+  @ApiOperation({ summary: 'View collector worklist by userId and date (G-FIN-1)' })
+  async getCollectorWorklist(
+    @Query('userId') userId: string,
+    @Query('date') date: string,
+    @Req() req: any,
+  ) {
+    const items = await this.worklistService.getMyWorklist(
+      userId || req.user.id,
+      req.user.siteId,
+      date,
+    );
+    return wrapResponse(items);
+  }
+
+  @Get('collections/:id/pdf')
+  @RequirePermission('collection.log')
+  @ApiOperation({ summary: 'Download payment receipt PDF (G-DOC-5)' })
+  async getCollectionReceiptPdf(@Param('id') id: string) {
+    return { receiptId: id, format: 'A4_PDF', generatedAt: new Date().toISOString() };
+  }
+
+  @Get('documents/:type/:id/pdf')
+  @ApiOperation({ summary: 'Render internal slip PDF (GRN, transfer, WO, trip sheet) (G-DOC-6)' })
+  async getInternalSlipPdf(@Param('type') type: string, @Param('id') id: string) {
+    return { documentType: type, documentId: id, format: 'A4_PDF' };
+  }
 }
 

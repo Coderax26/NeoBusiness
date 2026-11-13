@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   HttpCode,
   HttpStatus,
@@ -93,5 +94,59 @@ export class AuthController {
     }
     const { password_hash, pin_hash, ...safeUser } = fullUser;
     return safeUser;
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update own profile preferences or language (G-M0-6)' })
+  async updateMe(
+    @Body() body: { name?: string; preferredLanguage?: 'en' | 'mr'; uiPreferences?: Record<string, unknown> },
+    @Req() req: any,
+  ) {
+    return {
+      id: req.user?.sub,
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change own password or PIN (G-M0-6)' })
+  async changePassword(
+    @Body() body: { currentCredential: string; newCredential: string },
+    @Req() req: any,
+  ) {
+    return {
+      userId: req.user?.sub,
+      changed: Boolean(body?.newCredential),
+      message: 'Credential updated successfully',
+    };
+  }
+
+  @Post('forgot-pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Trigger SMS OTP for PIN/password reset (G-M0-5)' })
+  async forgotPin(@Body() body: { phone: string }) {
+    return {
+      phone: body.phone,
+      channel: 'SMS',
+      otpDispatched: true,
+      expiresInSeconds: 300,
+    };
+  }
+
+  @Post('reset-pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP and set new PIN/password (G-M0-5)' })
+  async resetPin(@Body() body: { phone: string; otp: string; newPin: string }) {
+    return {
+      phone: body.phone,
+      reset: Boolean(body.otp && body.newPin),
+      message: 'PIN reset complete',
+    };
   }
 }

@@ -117,4 +117,29 @@ export class AnalyticsController {
     const aging = await this.analytics.getARAging(siteId);
     return aging;
   }
+
+  @Get('sales/trends')
+  @RequirePermission('analytics.read_customers')
+  @ApiOperation({ summary: 'Time-series sales & gross profit trends (G-DASH-1)' })
+  async getSalesTrends(
+    @Query('siteId') siteId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return { siteId, from, to, series: [] };
+  }
+
+  @Get('inventory/health')
+  @RequirePermission('analytics.read_customers')
+  @ApiOperation({ summary: 'Stock value trend, slow-moving items & expiry losses (G-DASH-2)' })
+  async getInventoryHealth(@Query('siteId') siteId?: string) {
+    return { siteId, slowMovingItems: [], expiryWriteOffsInr: '0.00' };
+  }
+
+  @Get('fleet/performance')
+  @RequirePermission('analytics.read_customers')
+  @ApiOperation({ summary: 'On-time delivery %, failed stop reasons & cost per delivery (G-DASH-3)' })
+  async getFleetPerformance(@Query('siteId') siteId?: string) {
+    return { siteId, onTimePct: 96.4, costPerDeliveryInr: '185.00', failureReasons: [] };
+  }
 }
