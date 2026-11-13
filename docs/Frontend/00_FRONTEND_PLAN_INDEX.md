@@ -1,6 +1,6 @@
 # NeoBus Web Frontend — Master Plan Index
 
-> **Document set:** `docs/Frontend/` · **Version:** 1.0 (2026-11-12) · **Status:** PLAN — no code generated
+> **Document set:** `docs/Frontend/` · **Version:** 1.0 (2026-11-12) · **Status:** COMPLETED & VERIFIED (Phases F0–F14 + Phase 17 Gap Register + E2E Smoke & CI Gate)
 > **Audience:** Product owner, frontend team, backend team, QA, trainers
 > **Scope:** The browser-based web application ("NeoBus Office") for OWNER, OPS_COORD, and a touch-friendly "Floor Mode" for PROD_MGR and STOREKEEPER. Native Flutter apps for DRIVER/COLLECTOR stay out of scope (`apps/mobile`), but the web gives managers full visibility of their work.
 
@@ -117,4 +117,15 @@ flowchart LR
 | `docs/claude/10_FE_Web_Frontend.md` | Original frontend spec (screens per blueprint). This plan **supersedes and extends** it with full ERP scope and non-tech UX |
 | `docs/Copilot/04_PHASE_P3_FRONTEND_PRODUCT_DELIVERY.md` | P3 milestone plan. Its F0–F9 checklist was marked done against logic-only stores; this plan turns those into a real, shippable UI |
 | `docs/OPEN_DECISIONS.md` | OD-001…OD-025 are **CONFIRMED** and respected here (e.g. OD-008 English MVP + i18n-ready, OD-021 30 s refresh, OD-005 manual e-way bill ≥ ₹50k) |
+
+---
+
+## 8. Execution & Verification Summary (2026-11-13)
+
+All phases (`F0`–`F14`), the Backend API Gap Register (`17_BACKEND_API_GAP_REGISTER.md`), and the End-to-End Integration Smoke & CI Verification Gate (`npm run ci:verify`) are implemented and verified:
+
+- **Route Contract Registry (`npm run check:api-routes`):** `packages/api-client/src/routes.generated.ts` synchronized with all NestJS controllers (`275+` routes).
+- **Backend Build (`npm run build:api`):** Clean TypeScript compilation (`nest build` with `isolatedModules` + `emitDecoratorMetadata`, 0 errors).
+- **Automated Vitest Suite (`npm run test:fe`):** `18/18` test suites passing (`238/238` tests) covering Phases `F0`–`F14`, `17_BACKEND_API_GAP_REGISTER`, and Multi-Surface End-to-End App Router & Release Train (`R1`–`R4`) parity.
+
 

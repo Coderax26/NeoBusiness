@@ -24,6 +24,7 @@
     "test:fe": "npm --prefix apps/api run test -- ../web/src/tests",
     "gen:api-routes": "node scripts/generate-api-routes.mjs",
     "check:api-routes": "node scripts/generate-api-routes.mjs --check",
+    "ci:verify": "npm run check:api-routes && npm run build:api && npm run test:fe",
     "test:all": "npm --prefix apps/api run test"
   }
 }
