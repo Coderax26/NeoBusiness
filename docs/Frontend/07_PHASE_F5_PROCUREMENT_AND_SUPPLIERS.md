@@ -93,12 +93,20 @@ Ranking table + charts: fill rate, average price variance %, PO count, GRN count
 
 ## 6. Task checklist
 
-- [ ] F5-01 Procurement pipeline home
-- [ ] F5-02 Requisitions list, create, group-by-supplier, convert wizard
-- [ ] F5-03 PO list, builder wizard, confirm quantities, issue, cancel, detail
-- [ ] F5-04 GRN office list & comparison view
-- [ ] F5-05 Shortfall workbench with ranked backups
-- [ ] F5-06 Supplier bills with 3-way comparison & approval
-- [ ] F5-07 Scorecards & rate monitoring
-- [ ] F5-08 Backend: G-AP-1 supplier payments, G-AP-2 AP aging, G-DOC-4 PO PDF, G-FILE-1
+- [x] F5-01 Procurement pipeline home (`/procurement`)
+- [x] F5-02 Requisitions list, create, group-by-supplier, convert wizard (`/procurement/requisitions`)
+- [x] F5-03 PO list, builder wizard, confirm quantities, issue, cancel, detail (`/procurement/purchase-orders`, `/procurement/purchase-orders/[id]`)
+- [x] F5-04 GRN office list & comparison view + Blind GRN preview (`/procurement/grns`)
+- [x] F5-05 Shortfall workbench with ranked backups (`/procurement/shortfalls`)
+- [x] F5-06 Supplier bills with 3-way comparison & approval + AP payments/aging (`/procurement/supplier-bills`, `/procurement/bills`)
+- [x] F5-07 Scorecards & rate monitoring (`/procurement/scorecards`)
+- [x] F5-08 Backend: G-AP-1 supplier payments, G-AP-2 AP aging, G-DOC-4 PO PDF, G-FILE-1 (verified in `routes.generated.ts` & wired in UI)
+
+---
+
+## 7. Implementation & Test Results (2026-11-13)
+
+- **Shared Rules (`packages/shared/src/procurement-rules.ts`):** `evaluateThreeWayMatch`, `formatPriceSpikePlainWarning`, `maskGrnForBlindView`, `groupRequisitionsBySupplier` (plus `evaluateSupplierPriceSpike` & `rankBackupSuppliers` from `business-rules.ts`).
+- **Frontend Test Suite (`npm run test:fe`):** **10 / 10 test files passed (163 / 163 tests)** including `apps/web/src/tests/f5-procurement-suppliers.spec.ts` (6 tests covering AC1–AC5 and all routes/guards).
+- **API Route Parity (`npm run check:api-routes`):** Passed (`routes.generated.ts is up to date`).
 

@@ -121,10 +121,14 @@ export default function OfficeLayout({
       title: 'Purchase (Procurement)',
       accent: '#6366F1', // Indigo
       items: [
-        { label: 'Purchase Orders', href: '/procurement/purchase-orders', icon: '📦', permission: 'po.read' },
+        { label: 'Procurement Home', href: '/procurement', icon: '🧭', permission: 'po.read' },
         { label: 'Requisitions', href: '/procurement/requisitions', icon: '📥', permission: 'requisition.read' },
+        { label: 'Purchase Orders', href: '/procurement/purchase-orders', icon: '📦', permission: 'po.read' },
+        { label: 'Goods Received (GRN)', href: '/procurement/grns', icon: '🚚', permission: 'grn.read' },
+        { label: 'Shortfall Workbench', href: '/procurement/shortfalls', icon: '⚠', permission: 'po.read' },
+        { label: 'Supplier Bills (AP)', href: '/procurement/supplier-bills', icon: '🧾', permission: 'po.read' },
         { label: 'Suppliers & Rates', href: '/procurement/suppliers', icon: '🏭', permission: 'supplier.read' },
-        { label: 'Supplier Bills (AP)', href: '/procurement/bills', icon: '🧾', permission: 'po.read' },
+        { label: 'Scorecards & Trends', href: '/procurement/scorecards', icon: '📈', permission: 'supplier.read' },
       ],
     },
     {
