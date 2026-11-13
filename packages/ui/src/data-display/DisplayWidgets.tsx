@@ -13,7 +13,7 @@ export interface KpiCardProps {
     label: string;
   };
   sparklineValues?: number[];
-  tone?: 'default' | 'success' | 'warning' | 'danger';
+  tone?: 'default' | 'success' | 'warning' | 'danger' | 'brand' | 'info' | string;
   onClick?: () => void;
 }
 
@@ -28,8 +28,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   const points = sparklineValues ? buildSparklineSvgPoints(sparklineValues, 100, 28) : '';
 
-  const toneClasses = {
+  const toneClasses: Record<string, string> = {
     default: 'border-zinc-800 bg-zinc-900/60 text-zinc-100',
+    brand: 'border-teal-500/30 bg-teal-950/20 text-teal-100',
+    info: 'border-sky-500/30 bg-sky-950/20 text-sky-100',
     success: 'border-emerald-500/30 bg-emerald-950/20 text-emerald-100',
     warning: 'border-amber-500/30 bg-amber-950/20 text-amber-100',
     danger: 'border-rose-500/30 bg-rose-950/20 text-rose-100',
@@ -40,7 +42,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
       onClick={onClick}
       className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg transition-transform hover:-translate-y-0.5 ${
         onClick ? 'cursor-pointer' : ''
-      } ${toneClasses[tone]}`}
+      } ${toneClasses[tone] || toneClasses.default}`}
     >
       <div className="flex items-start justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">

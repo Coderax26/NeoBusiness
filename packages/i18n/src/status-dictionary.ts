@@ -275,25 +275,27 @@ export const STATUS_DICTIONARY: Record<string, Record<string, HumanStatus>> = {
  * Falls back safely if the code is unknown.
  */
 export function getHumanStatus(
-  entity: string,
-  code: string,
+  entity?: string,
+  code?: string,
   locale: 'en' | 'mr' = 'en',
 ): HumanStatus {
-  const entityGroup = STATUS_DICTIONARY[entity.toUpperCase()];
-  const match = entityGroup?.[code.toUpperCase()];
+  const safeEntity = String(entity || 'ORDER').toUpperCase();
+  const safeCode = String(code || 'DRAFT').toUpperCase();
+  const entityGroup = STATUS_DICTIONARY[safeEntity];
+  const match = entityGroup?.[safeCode];
 
   if (match) {
     return match;
   }
 
   // Graceful fallback: un-snake code to Title Case
-  const fallbackLabel = code
+  const fallbackLabel = String(code || entity || 'Status')
     .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
   return {
-    code,
+    code: safeCode,
     en: fallbackLabel,
     mr: fallbackLabel,
     tone: 'neutral',

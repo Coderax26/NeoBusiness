@@ -5,8 +5,8 @@ import { Skeleton, EmptyState } from '../foundations/FeedbackStates.js';
 export interface ColumnDef<T> {
   id: string;
   header: string;
-  accessorKey?: keyof T;
-  cell?: (item: T) => React.ReactNode;
+  accessorKey?: keyof T | string;
+  cell?: (item: any) => React.ReactNode;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
 }
@@ -284,8 +284,16 @@ export function DataTable<T extends { id: string | number }>({
                       </td>
                     )}
                     {activeColumns.map((col) => {
+                      const cellContext =
+                        item && typeof item === 'object'
+                          ? Object.assign(Object.create(item), item, {
+                              row: (item as any).row ?? { original: item },
+                              getValue: () =>
+                                col.accessorKey ? (item as any)[col.accessorKey] : undefined,
+                            })
+                          : item;
                       const content = col.cell
-                        ? col.cell(item)
+                        ? col.cell(cellContext)
                         : col.accessorKey
                         ? String((item as any)[col.accessorKey] ?? '—')
                         : '—';
