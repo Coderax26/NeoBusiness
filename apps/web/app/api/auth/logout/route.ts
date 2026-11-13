@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   const response = NextResponse.json({ success: true });
   response.cookies.delete('neobus_access_token');
   response.cookies.delete('neobus_refresh_token');
+  response.cookies.delete('neobus_session_user');
   return response;
 }
 

@@ -13,10 +13,11 @@ const EMAIL_TO_SEEDED_PHONE: Record<string, string> = {
 
 const DEMO_USERS: Record<
   string,
-  { id: string; fullName: string; role: string; phone: string; pin: string }
+  { id: string; name: string; fullName: string; role: string; phone: string; pin: string }
 > = {
   '+919876543210': {
     id: 'usr-owner-01',
+    name: 'Ravi Kumar',
     fullName: 'Ravi Kumar',
     role: 'OWNER',
     phone: '+919876543210',
@@ -24,6 +25,7 @@ const DEMO_USERS: Record<
   },
   '+919876543211': {
     id: 'usr-ops-01',
+    name: 'Anita Desai',
     fullName: 'Anita Desai',
     role: 'OPS_COORD',
     phone: '+919876543211',
@@ -31,6 +33,7 @@ const DEMO_USERS: Record<
   },
   '+919876543212': {
     id: 'usr-prod-01',
+    name: 'Suresh Patel',
     fullName: 'Suresh Patel',
     role: 'PROD_MGR',
     phone: '+919876543212',
@@ -38,6 +41,7 @@ const DEMO_USERS: Record<
   },
   '+919876543213': {
     id: 'usr-driver-01',
+    name: 'Mehul Shah',
     fullName: 'Mehul Shah',
     role: 'DRIVER',
     phone: '+919876543213',
@@ -45,6 +49,7 @@ const DEMO_USERS: Record<
   },
   '+919876543214': {
     id: 'usr-collector-01',
+    name: 'Priya Nair',
     fullName: 'Priya Nair',
     role: 'COLLECTOR',
     phone: '+919876543214',
@@ -52,6 +57,7 @@ const DEMO_USERS: Record<
   },
   '+919876543215': {
     id: 'usr-store-01',
+    name: 'Arjun Rao',
     fullName: 'Arjun Rao',
     role: 'STOREKEEPER',
     phone: '+919876543215',
@@ -111,14 +117,27 @@ export async function POST(req: NextRequest) {
     if (res.ok) {
       const data = await res.json();
       const { accessToken, refreshToken, user } = data;
-      const response = NextResponse.json({ success: true, user });
+      const normalizedUser = {
+        ...user,
+        name: user?.full_name || user?.fullName || user?.name || 'User',
+        fullName: user?.full_name || user?.fullName || user?.name || 'User',
+      };
+      const response = NextResponse.json({ success: true, user: normalizedUser });
 
       response.cookies.set('neobus_access_token', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 15 * 60,
+        maxAge: 8 * 60 * 60,
+      });
+
+      response.cookies.set('neobus_session_user', JSON.stringify(normalizedUser), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 8 * 60 * 60,
       });
 
       if (refreshToken) {
@@ -142,6 +161,13 @@ export async function POST(req: NextRequest) {
   if (demoUser && (submittedSecret === demoUser.pin || submittedSecret === '123456')) {
     const response = NextResponse.json({ success: true, user: demoUser });
     response.cookies.set('neobus_access_token', `demo-jwt-${demoUser.role}-${Date.now()}`, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 8 * 60 * 60,
+    });
+    response.cookies.set('neobus_session_user', JSON.stringify(demoUser), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
