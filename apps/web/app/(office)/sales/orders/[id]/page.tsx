@@ -19,6 +19,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedRaw = localStorage.getItem('neobus_sales_orders');
+        if (savedRaw) {
+          const parsed: SalesOrderRecord[] = JSON.parse(savedRaw);
+          const match = parsed.find((o) => o.id === id);
+          if (match) {
+            setOrder(match);
+          }
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }, [id]);
+
   // Poll every 30s for live approval/counter updates (§4.2, OD-021)
   useEffect(() => {
     if (order.status !== 'PENDING_APPROVAL') return;

@@ -168,6 +168,7 @@ export default function QuickOrderEntryPage() {
 
   const handleSubmitOrder = useCallback(async () => {
     const isApprovalNeeded = approvalEval.primaryAction === 'SEND_FOR_APPROVAL';
+    const newId = `ord-${Date.now()}`;
     const orderNumber = `SO-2026-${Math.floor(1050 + Math.random() * 900)}`;
     const status = isApprovalNeeded ? 'PENDING_APPROVAL' : 'CONFIRMED';
 
@@ -183,13 +184,76 @@ export default function QuickOrderEntryPage() {
         }),
       }).catch(() => {});
     } finally {
+      if (typeof window !== 'undefined') {
+        try {
+          const existingRaw = localStorage.getItem('neobus_sales_orders');
+          const existing = existingRaw ? JSON.parse(existingRaw) : [];
+          const newOrderRecord = {
+            id: newId,
+            orderNumber,
+            customerId: customer.id,
+            customerName: customer.name,
+            siteName,
+            deliveryDate,
+            deliveryWindow,
+            status,
+            subtotal,
+            gstTotal,
+            grandTotal,
+            createdAt: new Date().toISOString(),
+            createdBy: user?.name || 'Anita Desai (Coordinator)',
+            lines,
+            timeline: [
+              {
+                step: 'Created',
+                timestamp: new Date().toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                user: user?.name || 'Anita Desai',
+                note: `Order placed via ${mode} mode`,
+              },
+              {
+                step: isApprovalNeeded ? 'Sent for Approval' : 'Confirmed',
+                timestamp: new Date().toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                user: user?.name || 'Anita Desai',
+                note: isApprovalNeeded
+                  ? 'Routed to Owner Approvals Inbox'
+                  : 'Passed price-band and credit guards',
+              },
+            ],
+          };
+          localStorage.setItem(
+            'neobus_sales_orders',
+            JSON.stringify([newOrderRecord, ...existing]),
+          );
+        } catch {
+          // ignore storage quota errors
+        }
+      }
       setSubmittedOrder({
-        id: 'ord-101',
+        id: newId,
         orderNumber,
         status,
       });
     }
-  }, [approvalEval.primaryAction, customer.id, deliveryDate, deliveryWindow, lines]);
+  }, [
+    approvalEval.primaryAction,
+    customer.id,
+    customer.name,
+    deliveryDate,
+    deliveryWindow,
+    gstTotal,
+    grandTotal,
+    lines,
+    mode,
+    siteName,
+    subtotal,
+    user?.name,
+  ]);
 
   // Keyboard shortcuts (§4.2: Ctrl+Enter submit, Ctrl+S draft)
   useEffect(() => {
@@ -247,6 +311,11 @@ export default function QuickOrderEntryPage() {
             >
               + New order
             </Button>
+            <Link href="/sales/orders">
+              <Button variant="secondary" size="sm">
+                📋 All Orders
+              </Button>
+            </Link>
             <Link href={`/sales/orders/${submittedOrder.id}`}>
               <Button variant="primary" size="sm">
                 Go to order →

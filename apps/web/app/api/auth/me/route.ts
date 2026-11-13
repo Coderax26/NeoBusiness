@@ -19,12 +19,17 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'supplier.read',
     'po.create',
     'po.read',
+    'grn.read',
     'requisition.read',
     'inventory.read',
     'inventory.transfer',
+    'inventory.adjust',
     'stock.adjust_request',
+    'wo.read',
+    'wo.start',
     'fleet.manage',
     'fleet.read',
+    'fleet.view',
     'fleet.resolve_issue',
     'invoice.read',
     'analytics.read_ar',
@@ -40,9 +45,9 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'grn.record_blind',
     'trip.load',
   ],
-  PROD_MGR: ['wo.start', 'requisition.create', 'inventory.read'],
-  DRIVER: ['fleet.read', 'trip.load'],
-  COLLECTOR: ['invoice.read', 'receipt.verify_handover'],
+  PROD_MGR: ['wo.read', 'wo.start', 'requisition.create', 'inventory.read'],
+  DRIVER: ['fleet.read', 'fleet.view', 'trip.load'],
+  COLLECTOR: ['invoice.read', 'finance.view', 'receipt.verify_handover'],
 };
 
 const ROLE_FALLBACK_PROFILES: Record<string, { id: string; name: string; phone: string }> = {
@@ -63,10 +68,10 @@ function buildSessionUserPayload(raw: any) {
     Array.isArray(raw?.siteIds) && raw.siteIds.length > 0
       ? raw.siteIds
       : sites.map((s: any) => s.id);
-  const permissions =
-    Array.isArray(raw?.permissions) && raw.permissions.length > 0
-      ? raw.permissions
-      : ROLE_DEFAULT_PERMISSIONS[role] || ['*'];
+
+  const defaultPerms = ROLE_DEFAULT_PERMISSIONS[role] || ['*'];
+  const rawPerms = Array.isArray(raw?.permissions) ? raw.permissions : [];
+  const permissions = Array.from(new Set([...defaultPerms, ...rawPerms]));
 
   const fullName = raw?.fullName || raw?.full_name || raw?.name || profile.name;
 

@@ -63,7 +63,7 @@ export default function RoleHomePage() {
               + New Quick Order
             </Button>
           </Link>
-          <Link href="/approvals">
+          <Link href="/control/approvals">
             <Button variant="secondary" size="md">
               Approvals Inbox
             </Button>

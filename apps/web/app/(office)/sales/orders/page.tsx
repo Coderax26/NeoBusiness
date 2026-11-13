@@ -34,6 +34,22 @@ export default function OrdersTrackerPage() {
   const [search, setSearch] = useState('');
   const [savedView, setSavedView] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedRaw = localStorage.getItem('neobus_sales_orders');
+        if (savedRaw) {
+          const parsed: SalesOrderRecord[] = JSON.parse(savedRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders([...parsed, ...INITIAL_SALES_ORDERS]);
+          }
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }, []);
+
   // Cancel reason dialog
   const [cancelTarget, setCancelTarget] = useState<SalesOrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
@@ -396,3 +412,4 @@ export default function OrdersTrackerPage() {
     </div>
   );
 }
+
