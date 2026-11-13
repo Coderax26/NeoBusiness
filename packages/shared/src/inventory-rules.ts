@@ -70,6 +70,13 @@ export type FloorCommandType =
   | 'LOADING_CONFIRM'
   | 'TRANSFER_RECEIVE'
   | 'ADJUSTMENT_REQUEST'
+  | 'WO_START'
+  | 'WO_CONSUME'
+  | 'WO_OUTPUT'
+  | 'WO_WASTAGE'
+  | 'WO_COMPLETE'
+  | 'RM_REQUEST'
+  | 'ATTENDANCE_LOG'
   | 'APPROVAL_ACTION'
   | 'PRICING_CHANGE';
 

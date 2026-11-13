@@ -150,7 +150,12 @@ export default function OfficeLayout({
       title: 'Factory (Production)',
       accent: '#EA580C', // Orange
       items: [
-        { label: 'Production Board', href: '/production/work-orders', icon: '⚙️', permission: 'wo.read' },
+        { label: 'Production Overview', href: '/production', icon: '📊', permission: 'wo.read' },
+        { label: 'Recipes & BOMs', href: '/production/boms', icon: '🧪', permission: 'wo.read' },
+        { label: 'Work Orders', href: '/production/work-orders', icon: '⚙️', permission: 'wo.read' },
+        { label: 'RM Requisitions', href: '/production/requisitions', icon: '📥', permission: 'requisition.read' },
+        { label: 'Wastage Log', href: '/production/wastage', icon: '🗑️', permission: 'wo.read' },
+        { label: 'Attendance & Labour', href: '/production/attendance', icon: '👷', permission: 'wo.read' },
         { label: 'Floor Terminal', href: '/floor', icon: '📱' },
       ],
     },

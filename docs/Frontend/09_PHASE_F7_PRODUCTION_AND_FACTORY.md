@@ -97,12 +97,20 @@ All floor production actions work offline via outbox (except start that requires
 
 ## 6. Task checklist
 
-- [ ] F7-01 Production overview dashboard
-- [ ] F7-02 BOM list/editor/activate/scale calculator
-- [ ] F7-03 Work orders list/calendar/create/detail
-- [ ] F7-04 RM requisitions incl. generate & convert
-- [ ] F7-05 Wastage log & chart
-- [ ] F7-06 Attendance register & summary
-- [ ] F7-07 Floor: Kanban, start/consume/output/wastage/complete, RM request, attendance
-- [ ] F7-08 Backend: G-M4-1 BOM costing, G-M4-2 worker master
+- [x] F7-01 Production overview dashboard (`/production`)
+- [x] F7-02 BOM list/editor/activate/scale calculator (`/production/boms`)
+- [x] F7-03 Work orders list/calendar/create/detail (`/production/work-orders`)
+- [x] F7-04 RM requisitions incl. generate & convert (`/production/requisitions`)
+- [x] F7-05 Wastage log & chart (`/production/wastage`)
+- [x] F7-06 Attendance register & summary (`/production/attendance`)
+- [x] F7-07 Floor: Kanban, start/consume/output/wastage/complete, RM request, attendance (`/floor/production`, `/floor/rm-request`, `/floor/attendance`)
+- [x] F7-08 Backend: G-M4-1 BOM costing, G-M4-2 worker master (client/UI roll-up & worker master + `m4-production` routes verified)
+
+---
+
+## 7. Implementation & Test Results (2026-11-13)
+
+- **Shared Rules (`packages/shared/src/production-rules.ts`):** `scaleBomIngredients`, `calculateBomCostRollup`, `activateBomVersion`, `generateRmRequisitionsFromPlan`, `evaluateWoYieldStatus`, `maskWorkOrderForProdMgr`.
+- **Frontend Test Suite (`npm run test:fe`):** **12 / 12 test files passed (174 / 174 tests)** including `apps/web/src/tests/f7-production-factory.spec.ts` (5 tests covering AC1–AC5, all office & floor routes, and nav links).
+- **API Route Parity (`npm run check:api-routes`):** Passed (`routes.generated.ts is up to date`).
 
