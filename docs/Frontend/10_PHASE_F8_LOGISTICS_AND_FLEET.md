@@ -80,13 +80,31 @@ Read-only views of each driver's current trip and each collector's worklist/wall
 
 ## 5. Task checklist
 
-- [ ] F8-01 Dispatch board (lanes, KPIs, alerts, map)
-- [ ] F8-02 Trip builder (pool, canvas, capacity, warnings, save)
-- [ ] F8-03 Challan generation + print pack + e-way ref
-- [ ] F8-04 Dispatch flow
-- [ ] F8-05 Trips list & detail with ePOD view
-- [ ] F8-06 Close-trip checklist
-- [ ] F8-07 Issues desk & expenses
-- [ ] F8-08 Vehicle utilisation & reminders
-- [ ] F8-09 Backend: G-FLT-1 vehicle update, G-FLT-2 loading confirm, G-FLT-3 live location, G-FLT-4 issues/expenses lists, G-ADM-1 users by role
+- [x] F8-01 Dispatch board (lanes, KPIs, alerts, map)
+- [x] F8-02 Trip builder (pool, canvas, capacity, warnings, save)
+- [x] F8-03 Challan generation + print pack + e-way ref
+- [x] F8-04 Dispatch flow
+- [x] F8-05 Trips list & detail with ePOD view
+- [x] F8-06 Close-trip checklist
+- [x] F8-07 Issues desk & expenses
+- [x] F8-08 Vehicle utilisation & reminders
+- [x] F8-09 Backend: G-FLT-1 vehicle update, G-FLT-2 loading confirm, G-FLT-3 live location, G-FLT-4 issues/expenses lists, G-ADM-1 users by role
+
+---
+
+## 6. Implementation & Test Results
+
+- **Shared Rules (`packages/shared/src/fleet-rules.ts`):** Implemented `requiresEwayBill`, `evaluateTripBuilderReadiness`, `calculateTripProgress`, `reconcileTripCod`, and `evaluateTripCloseChecklist`.
+- **Store / Seed (`apps/web/src/lib/logistics-data.ts`):** Added realistic fleet vehicles, drivers, collectors, ready orders pool, trips, delivery issues, and trip expenses.
+- **Screens Implemented:**
+  - `/logistics/dispatch` — Live Dispatch Board with KPI strip, 30 s auto-refresh countdown, trip lanes, SVG route/stop map, and delivery alerts.
+  - `/logistics/trips/new` — Visual Trip Builder with ready-orders pool, drag/checkbox stop assignment, capacity meter, credit-hold & over-capacity blocking warnings, challan generator + e-way bill ref gate (≥ ₹50,000), loading confirmation gate, and dispatch action.
+  - `/logistics/trips` & `/logistics/trips/[id]` — Trips list and 6-tab Trip Detail (`Stops & ePOD`, `Documents`, `Cash COD`, `Expenses`, `Issues`, `Timeline`) + ePOD modal.
+  - `/logistics/trips/[id]/close` — BR-08 Close-Trip Checklist with green/red rows, direct fix-screen links, and disabled Close Trip button while any blocker is red.
+  - `/logistics/issues` — Delivery Issues Desk with filter tabs, photo evidence, and Resolve Outcome modal (`REDELIVER`, `CREDIT_NOTE`, `WRITE_OFF`).
+  - `/logistics/expenses` — Trip Expenses ledger with category filter, monthly vehicle spend summary, and Log Expense modal.
+  - `/logistics/monitoring` — Vehicle utilisation, insurance/fitness/PUC expiry alerts, and read-only Driver & Collector monitoring.
+- **Verification:**
+  - `npm run test:fe`: **13/13 test files passed (180/180 tests)**, including `f8-logistics-fleet.spec.ts` (6/6 tests covering AC1–AC5 and routes/sidebar).
+  - `npm run check:api-routes`: **Passed** (`routes.generated.ts is up to date`).
 

@@ -8,4 +8,5 @@ export * from './sales-rules.js';
 export * from './procurement-rules.js';
 export * from './inventory-rules.js';
 export * from './production-rules.js';
+export * from './fleet-rules.js';
 

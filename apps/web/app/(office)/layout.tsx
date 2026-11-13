@@ -163,8 +163,13 @@ export default function OfficeLayout({
       title: 'Delivery (Logistics)',
       accent: '#2563EB', // Blue
       items: [
-        { label: 'Plan Trips', href: '/logistics/trips', icon: '🚚', permission: 'fleet.view' },
         { label: 'Live Dispatch Board', href: '/logistics/dispatch', icon: '📡', permission: 'fleet.view' },
+        { label: 'Plan Trip (Builder)', href: '/logistics/trips/new', icon: '🗺️', permission: 'fleet.view' },
+        { label: 'Trips & ePOD', href: '/logistics/trips', icon: '🚚', permission: 'fleet.view' },
+        { label: 'Delivery Issues', href: '/logistics/issues', icon: '⚠️', permission: 'fleet.view' },
+        { label: 'Trip Expenses', href: '/logistics/expenses', icon: '⛽', permission: 'fleet.view' },
+        { label: 'Vehicles Master', href: '/logistics/vehicles', icon: '🚛', permission: 'fleet.view' },
+        { label: 'Fleet Monitoring', href: '/logistics/monitoring', icon: '📊', permission: 'fleet.view' },
       ],
     },
     {
