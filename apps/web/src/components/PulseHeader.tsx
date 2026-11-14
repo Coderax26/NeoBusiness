@@ -24,19 +24,21 @@ export function PulseHeader({
     SITE_PULSE_DATA.find((s) => s.siteId === siteId) ?? SITE_PULSE_DATA[0];
 
   useEffect(() => {
+    let elapsed = 0;
     const interval = setInterval(() => {
-      setSecondsAgo((prev) => {
-        if (prev >= 29) {
-          if (simulateOffline) {
-            setMissedRefreshes((m) => m + 1);
-          } else {
-            setMissedRefreshes(0);
-            onRefreshTick?.();
-          }
-          return 0;
+      elapsed += 1;
+      if (elapsed > 29) {
+        elapsed = 0;
+        setSecondsAgo(0);
+        if (simulateOffline) {
+          setMissedRefreshes((m) => m + 1);
+        } else {
+          setMissedRefreshes(0);
+          onRefreshTick?.();
         }
-        return prev + 1;
-      });
+      } else {
+        setSecondsAgo(elapsed);
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [simulateOffline, onRefreshTick]);

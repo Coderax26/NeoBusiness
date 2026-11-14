@@ -68,10 +68,15 @@ export function FloorOutboxProvider({ children }: { children: React.ReactNode })
           idempotencyKey: item.idempotencyKey,
         }),
       });
-      // Treat 2xx or offline-safe BFF fallback as synced for demo resilience
-      return { ok: res.ok || res.status === 404 || res.status === 401 };
-    } catch {
-      return { ok: true };
+      return {
+        ok: res.ok,
+        errorReason: res.ok ? undefined : `HTTP ${res.status}`,
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        errorReason: err?.message || 'Network request failed',
+      };
     }
   }, []);
 
@@ -81,7 +86,18 @@ export function FloorOutboxProvider({ children }: { children: React.ReactNode })
     if (queued.length === 0) return;
     setIsSyncing(true);
     const result = await replayFloorOutbox(outbox, sendToBackend);
-    setOutbox(result.updated);
+    const updatedMap = new Map(result.updated.map((u) => [u.id, u]));
+    setOutbox((prev) =>
+      prev.map((item) => {
+        const replayed = updatedMap.get(item.id);
+        if (!replayed) return item;
+        // Preserve retry changes if item was re-queued while replay ran
+        if (item.status === 'QUEUED' && replayed.status === 'FAILED') {
+          return replayed;
+        }
+        return replayed;
+      }),
+    );
     setLastSyncedAt(
       new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     );
@@ -113,9 +129,14 @@ export function FloorOutboxProvider({ children }: { children: React.ReactNode })
       }
     }
 
+    const uniqueToken =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
     const item: FloorOutboxItem = {
-      id: `fl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      idempotencyKey: `idem-${type}-${Date.now()}`,
+      id: `fl-${uniqueToken}`,
+      idempotencyKey: `idem-${type}-${uniqueToken}`,
       type,
       endpoint,
       payload,
