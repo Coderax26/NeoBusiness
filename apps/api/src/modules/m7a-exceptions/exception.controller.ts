@@ -66,7 +66,8 @@ export class ExceptionController {
       .limit(limit)
       .offset(offset);
 
-    if (q.status) query.andWhere('status', q.status);
+    const statusFilter = q.status === 'OPEN' ? 'PENDING' : q.status;
+    if (statusFilter) query.andWhere('status', statusFilter);
     if (q.type) query.andWhere('exception_type', q.type);
 
     // RLS automatically restricts to the caller's site_ids

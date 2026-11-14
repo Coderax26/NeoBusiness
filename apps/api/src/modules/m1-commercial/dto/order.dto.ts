@@ -36,6 +36,10 @@ export class CreateOrderDto {
   @IsString()
   deliveryTimeWindow?: string;
 
+  @IsOptional()
+  @IsBoolean()
+  autoSubmit?: boolean;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderLineDto)

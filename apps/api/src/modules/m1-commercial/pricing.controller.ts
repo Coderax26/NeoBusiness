@@ -25,26 +25,43 @@ export class PricingController {
    * Returns: array of { itemId, skuCode, itemName, category, uom, landedCost, floorPrice, targetPrice, minMarginPct, source, publishedAt }
    */
   @Get('today')
-  @RequirePermission('price.set_daily')
-  async getTodayPrices(@Query() q: GetPricesQueryDto) {
+  @RequirePermission('item.view')
+  async getTodayPrices(@Query() q: GetPricesQueryDto, @Req() req: any) {
     const date = q.date ?? new Date().toISOString().split('T')[0];
-    return this.pricingSvc.getPricesForDate(date, {
+    const rows = await this.pricingSvc.getPricesForDate(date, {
       itemCategory: q.itemCategory,
     });
+    if (req?.user?.role && req.user.role !== 'OWNER') {
+      return rows.map((row: any) => ({
+        ...row,
+        latestLandedCost: null,
+        minMarginPctUsed: null,
+      }));
+    }
+    return rows;
   }
 
   /**
    * GET /prices/:date - Get price band for specific date
    */
   @Get(':date')
-  @RequirePermission('price.set_daily')
+  @RequirePermission('item.view')
   async getPricesForDate(
     @Param('date') date: string,
     @Query() q: GetPricesQueryDto,
+    @Req() req: any,
   ) {
-    return this.pricingSvc.getPricesForDate(date, {
+    const rows = await this.pricingSvc.getPricesForDate(date, {
       itemCategory: q.itemCategory,
     });
+    if (req?.user?.role && req.user.role !== 'OWNER') {
+      return rows.map((row: any) => ({
+        ...row,
+        latestLandedCost: null,
+        minMarginPctUsed: null,
+      }));
+    }
+    return rows;
   }
 
   /**

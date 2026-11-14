@@ -15,18 +15,43 @@ import {
 import {
   INITIAL_CUSTOMERS_SUMMARY,
   INITIAL_DAILY_PRICES,
+  type DailyPriceRow,
   type SalesOrderLine,
 } from '../../../../../src/lib/sales-data';
+
+type CustomerSummaryOption = {
+  id: string;
+  code: string;
+  name: string;
+  phone: string;
+  gstin: string;
+  site: string;
+  defaultSiteId?: string;
+  window: '10-12' | '04-08' | '13-16' | '18-21';
+  creditLimit: number;
+  outstanding: number;
+  overdueDays: number;
+  creditHold: boolean;
+  lastOrderDate: string;
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function QuickOrderEntryPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [mode, setMode] = useState<'GUIDED' | 'EXPRESS'>('GUIDED');
   const [guidedStep, setGuidedStep] = useState<1 | 2 | 3>(1);
 
+  const [customers, setCustomers] = useState<CustomerSummaryOption[]>(
+    INITIAL_CUSTOMERS_SUMMARY,
+  );
+  const [dailyPrices, setDailyPrices] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(INITIAL_CUSTOMERS_SUMMARY[0].id);
+  const [selectedSiteId, setSelectedSiteId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryWindow, setDeliveryWindow] = useState<'10-12' | '04-08' | '13-16' | '18-21'>('10-12');
-  const [siteName, setSiteName] = useState('Pune Central Depot');
+  const [siteName, setSiteName] = useState('NeoCore Factory — Mumbai');
 
   const [lines, setLines] = useState<SalesOrderLine[]>([
     {
@@ -49,6 +74,8 @@ export default function QuickOrderEntryPage() {
   const [focusedItemId, setFocusedItemId] = useState<string>(INITIAL_DAILY_PRICES[0].itemId);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedOrder, setSubmittedOrder] = useState<{
     id: string;
     orderNumber: string;
@@ -56,28 +83,174 @@ export default function QuickOrderEntryPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.user) setUser(data.user);
-      })
-      .catch(() => {});
+    let active = true;
+
+    const loadInitialData = async () => {
+      let loadedSites: Array<{ id: string; name: string }> = [];
+      let fallbackSiteId = '';
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (active && meData?.user) {
+            setUser(meData.user);
+            loadedSites = Array.isArray(meData.user.sites)
+              ? meData.user.sites.map((s: any) => ({
+                  id: String(s.id),
+                  name: String(s.name || s.id),
+                }))
+              : [];
+            if (loadedSites.length > 0) {
+              setSites(loadedSites);
+              fallbackSiteId = loadedSites[0].id;
+              setSelectedSiteId((prev) => prev || loadedSites[0].id);
+              setSiteName(loadedSites[0].name);
+            } else if (meData.user.activeSiteId) {
+              fallbackSiteId = String(meData.user.activeSiteId);
+              setSelectedSiteId((prev) => prev || fallbackSiteId);
+            }
+          }
+        }
+      } catch {
+        // ignore network error
+      }
+
+      try {
+        const custRes = await fetch('/api/proxy/customers');
+        if (custRes.ok) {
+          const custRows = await custRes.json();
+          if (active && Array.isArray(custRows) && custRows.length > 0) {
+            const siteLookup = new Map(loadedSites.map((s) => [s.id, s.name]));
+            const mappedCustomers: CustomerSummaryOption[] = custRows.map((c: any) => {
+              const defSiteId = c.default_site_id ? String(c.default_site_id) : fallbackSiteId;
+              const win = c.preferred_delivery_window;
+              const normalizedWin: '10-12' | '04-08' | '13-16' | '18-21' =
+                win === '04-08' || win === '10-12' || win === '13-16' || win === '18-21'
+                  ? win
+                  : '10-12';
+              return {
+                id: String(c.id),
+                code: String(c.customer_code || ''),
+                name: String(c.business_name || c.name || 'Customer'),
+                phone: String(c.phone || ''),
+                gstin: String(c.gstin || ''),
+                site:
+                  siteLookup.get(defSiteId) ||
+                  loadedSites[0]?.name ||
+                  'NeoCore Factory — Mumbai',
+                defaultSiteId: defSiteId,
+                window: normalizedWin,
+                creditLimit: Number(c.credit_limit ?? 0),
+                outstanding: Number(c.current_ar_balance ?? 0),
+                overdueDays: 0,
+                creditHold: Boolean(c.credit_hold),
+                lastOrderDate: '',
+              };
+            });
+            setCustomers(mappedCustomers);
+            setSelectedCustomerId(mappedCustomers[0].id);
+            setDeliveryWindow(mappedCustomers[0].window);
+            if (mappedCustomers[0].defaultSiteId) {
+              setSelectedSiteId(mappedCustomers[0].defaultSiteId);
+              setSiteName(mappedCustomers[0].site);
+            }
+          }
+        }
+      } catch {
+        // ignore network error
+      }
+
+      try {
+        const priceRes = await fetch('/api/proxy/prices/today');
+        if (priceRes.ok) {
+          const priceRows = await priceRes.json();
+          if (active && Array.isArray(priceRows) && priceRows.length > 0) {
+            const mappedPrices: DailyPriceRow[] = priceRows.map((r: any) => ({
+              itemId: String(r.itemId),
+              sku: String(r.skuCode || ''),
+              itemName: String(r.itemName || ''),
+              category:
+                r.itemCategory === 'RAW_MATERIAL' ||
+                r.itemCategory === 'PROCESSED_FG' ||
+                r.itemCategory === 'TRADED_GOOD'
+                  ? r.itemCategory
+                  : 'PROCESSED_FG',
+              uom: String(r.primaryUom || 'KG').toLowerCase(),
+              yesterdayFloor: Number(r.floorPrice ?? 0),
+              yesterdayTarget: Number(r.targetPrice ?? 0),
+              landedCost: Number(r.latestLandedCost ?? 0),
+              minMarginPct: Number(r.minMarginPctUsed ?? 0.15) * 100,
+              floorPrice: r.floorPrice != null ? Number(r.floorPrice) : null,
+              targetPrice: r.targetPrice != null ? Number(r.targetPrice) : null,
+              atpStock: 500,
+            }));
+            setDailyPrices(mappedPrices);
+            const firstItem = mappedPrices[0];
+            setFocusedItemId(firstItem.itemId);
+            setLines((prev) =>
+              prev.map((l, idx) =>
+                idx === 0 && !UUID_RE.test(l.itemId)
+                  ? {
+                      ...l,
+                      itemId: firstItem.itemId,
+                      sku: firstItem.sku,
+                      itemName: firstItem.itemName,
+                      category: firstItem.category,
+                      qty: 50,
+                      uom: firstItem.uom,
+                      unitPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                      floorPrice: firstItem.floorPrice ?? firstItem.yesterdayFloor ?? 90,
+                      targetPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                      atpStock: firstItem.atpStock,
+                    }
+                  : l,
+              ),
+            );
+          }
+        }
+      } catch {
+        // ignore network error
+      }
+    };
+
+    loadInitialData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const isOwner = !user || canViewMarginAndCost(user.role);
   const customer =
-    INITIAL_CUSTOMERS_SUMMARY.find((c) => c.id === selectedCustomerId) ||
-    INITIAL_CUSTOMERS_SUMMARY[0];
+    customers.find((c) => c.id === selectedCustomerId) || customers[0];
 
   // Duplicate order guard (§4.2)
   useEffect(() => {
-    if (customer.id === 'cust-1' && deliveryDate === '2026-11-13') {
-      setDuplicateWarning(
-        `Heads up: ${customer.name} already has an order (SO-2026-1041) for ${deliveryDate} placed within the last 30 mins.`,
-      );
-    } else {
+    if (!UUID_RE.test(customer.id)) {
       setDuplicateWarning(null);
+      return;
     }
+    let active = true;
+    fetch(`/api/proxy/orders?date=${encodeURIComponent(deliveryDate)}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows) => {
+        if (!active || !Array.isArray(rows)) return;
+        const match = rows.find(
+          (o: any) => o.customer_id === customer.id && o.order_status !== 'CANCELLED',
+        );
+        if (match) {
+          setDuplicateWarning(
+            `Duplicate check: ${customer.name} already has order ${match.order_no} for ${deliveryDate}.`,
+          );
+        } else {
+          setDuplicateWarning(null);
+        }
+      })
+      .catch(() => {
+        if (active) setDuplicateWarning(null);
+      });
+    return () => {
+      active = false;
+    };
   }, [customer, deliveryDate]);
 
   // Totals calculation
@@ -87,7 +260,7 @@ export default function QuickOrderEntryPage() {
 
   // Owner margin calculation
   const totalCost = lines.reduce((sum, l) => {
-    const priceInfo = INITIAL_DAILY_PRICES.find((p) => p.itemId === l.itemId);
+    const priceInfo = dailyPrices.find((p) => p.itemId === l.itemId);
     return sum + l.qty * (priceInfo?.landedCost || l.unitPrice * 0.85);
   }, 0);
   const marginPct = subtotal > 0 ? ((subtotal - totalCost) / subtotal) * 100 : 0;
@@ -104,7 +277,8 @@ export default function QuickOrderEntryPage() {
   const approvalEval = evaluateOrderApprovalNeed(lines, creditEval);
 
   const handleAddLine = useCallback(() => {
-    const nextItem = INITIAL_DAILY_PRICES[lines.length % INITIAL_DAILY_PRICES.length];
+    const sourceList = dailyPrices.length > 0 ? dailyPrices : INITIAL_DAILY_PRICES;
+    const nextItem = sourceList[lines.length % sourceList.length];
     const newLine: SalesOrderLine = {
       id: `line-${Date.now()}`,
       itemId: nextItem.itemId,
@@ -122,14 +296,14 @@ export default function QuickOrderEntryPage() {
     };
     setLines((prev) => [...prev, newLine]);
     setFocusedItemId(nextItem.itemId);
-  }, [lines.length]);
+  }, [dailyPrices, lines.length]);
 
   const handleUpdateLine = (id: string, patch: Partial<SalesOrderLine>) => {
     setLines((prev) =>
       prev.map((l) => {
         if (l.id !== id) return l;
         if (patch.itemId && patch.itemId !== l.itemId) {
-          const itemMeta = INITIAL_DAILY_PRICES.find((p) => p.itemId === patch.itemId);
+          const itemMeta = dailyPrices.find((p) => p.itemId === patch.itemId);
           if (itemMeta) {
             setFocusedItemId(itemMeta.itemId);
             return {
@@ -167,92 +341,77 @@ export default function QuickOrderEntryPage() {
   }, [selectedCustomerId, deliveryDate, lines]);
 
   const handleSubmitOrder = useCallback(async () => {
-    const isApprovalNeeded = approvalEval.primaryAction === 'SEND_FOR_APPROVAL';
-    const newId = `ord-${Date.now()}`;
-    const orderNumber = `SO-2026-${Math.floor(1050 + Math.random() * 900)}`;
-    const status = isApprovalNeeded ? 'PENDING_APPROVAL' : 'CONFIRMED';
+    setSubmitError(null);
+    const fulfillmentSiteId =
+      selectedSiteId || customer.defaultSiteId || user?.activeSiteId || sites[0]?.id || '';
+    if (!UUID_RE.test(customer.id) || !UUID_RE.test(fulfillmentSiteId)) {
+      setSubmitError('Live customer and site data from the backend are still loading. Please retry in a moment.');
+      return;
+    }
+    if (lines.some((l) => !UUID_RE.test(l.itemId))) {
+      setSubmitError('Live item prices from the backend are still loading. Please select a valid item.');
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      await fetch('/api/proxy/orders', {
+      const res = await fetch('/api/proxy/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId: customer.id,
+          fulfillmentSiteId,
           deliveryDate,
-          deliveryWindow,
-          lines,
+          deliveryTimeWindow: deliveryWindow,
+          autoSubmit: true,
+          lines: lines.map((l) => ({
+            itemId: l.itemId,
+            qty: Number(l.qty),
+            requestedPrice: Number(l.unitPrice),
+          })),
         }),
-      }).catch(() => {});
-    } finally {
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          payload?.error?.message ||
+          (Array.isArray(payload?.message) ? payload.message.join(', ') : payload?.message) ||
+          `Order submission failed (${res.status})`;
+        setSubmitError(String(msg));
+        return;
+      }
+
       if (typeof window !== 'undefined') {
         try {
-          const existingRaw = localStorage.getItem('neobus_sales_orders');
-          const existing = existingRaw ? JSON.parse(existingRaw) : [];
-          const newOrderRecord = {
-            id: newId,
-            orderNumber,
-            customerId: customer.id,
-            customerName: customer.name,
-            siteName,
-            deliveryDate,
-            deliveryWindow,
-            status,
-            subtotal,
-            gstTotal,
-            grandTotal,
-            createdAt: new Date().toISOString(),
-            createdBy: user?.name || 'Anita Desai (Coordinator)',
-            lines,
-            timeline: [
-              {
-                step: 'Created',
-                timestamp: new Date().toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }),
-                user: user?.name || 'Anita Desai',
-                note: `Order placed via ${mode} mode`,
-              },
-              {
-                step: isApprovalNeeded ? 'Sent for Approval' : 'Confirmed',
-                timestamp: new Date().toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }),
-                user: user?.name || 'Anita Desai',
-                note: isApprovalNeeded
-                  ? 'Routed to Owner Approvals Inbox'
-                  : 'Passed price-band and credit guards',
-              },
-            ],
-          };
-          localStorage.setItem(
-            'neobus_sales_orders',
-            JSON.stringify([newOrderRecord, ...existing]),
-          );
+          localStorage.removeItem('neobus_quick_order_draft');
         } catch {
-          // ignore storage quota errors
+          // ignore storage errors
         }
       }
+
       setSubmittedOrder({
-        id: newId,
-        orderNumber,
-        status,
+        id: String(payload.orderId || payload.id),
+        orderNumber: String(payload.orderNo || payload.orderNumber || ''),
+        status: String(
+          payload.status ||
+            (approvalEval.primaryAction === 'SEND_FOR_APPROVAL' ? 'PENDING_APPROVAL' : 'CONFIRMED'),
+        ),
       });
+    } catch {
+      setSubmitError('Unable to reach backend API to submit order.');
+    } finally {
+      setSubmitting(false);
     }
   }, [
     approvalEval.primaryAction,
+    customer.defaultSiteId,
     customer.id,
-    customer.name,
     deliveryDate,
     deliveryWindow,
-    gstTotal,
-    grandTotal,
     lines,
-    mode,
-    siteName,
-    subtotal,
-    user?.name,
+    selectedSiteId,
+    sites,
+    user?.activeSiteId,
   ]);
 
   // Keyboard shortcuts (§4.2: Ctrl+Enter submit, Ctrl+S draft)
@@ -271,7 +430,7 @@ export default function QuickOrderEntryPage() {
   }, [handleSubmitOrder, handleSaveDraft]);
 
   const focusedItemMeta =
-    INITIAL_DAILY_PRICES.find((p) => p.itemId === focusedItemId) || INITIAL_DAILY_PRICES[0];
+    dailyPrices.find((p) => p.itemId === focusedItemId) || dailyPrices[0] || INITIAL_DAILY_PRICES[0];
 
   // After submit success screen (§4.2)
   if (submittedOrder) {
@@ -408,16 +567,19 @@ export default function QuickOrderEntryPage() {
               <select
                 value={selectedCustomerId}
                 onChange={(e) => {
-                  const next = INITIAL_CUSTOMERS_SUMMARY.find((c) => c.id === e.target.value);
+                  const next = customers.find((c) => c.id === e.target.value);
                   setSelectedCustomerId(e.target.value);
                   if (next) {
+                    if (next.defaultSiteId) {
+                      setSelectedSiteId(next.defaultSiteId);
+                    }
                     setSiteName(next.site);
                     setDeliveryWindow(next.window);
                   }
                 }}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-teal-500"
               >
-                {INITIAL_CUSTOMERS_SUMMARY.map((c) => (
+                {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.code})
                   </option>
@@ -428,13 +590,23 @@ export default function QuickOrderEntryPage() {
             <div>
               <label className="block text-zinc-400 font-semibold mb-1">Dispatch Site</label>
               <select
-                value={siteName}
-                onChange={(e) => setSiteName(e.target.value)}
+                value={selectedSiteId}
+                onChange={(e) => {
+                  const found = sites.find((s) => s.id === e.target.value);
+                  setSelectedSiteId(e.target.value);
+                  if (found) setSiteName(found.name);
+                }}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
               >
-                <option value="Pune Central Depot">Pune Central Depot</option>
-                <option value="Baner Transit Depot">Baner Transit Depot</option>
-                <option value="Hadapsar Warehouse">Hadapsar Warehouse</option>
+                {sites.length > 0 ? (
+                  sites.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">{siteName}</option>
+                )}
               </select>
             </div>
 
@@ -552,7 +724,7 @@ export default function QuickOrderEntryPage() {
                             onChange={(e) => handleUpdateLine(line.id, { itemId: e.target.value })}
                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 text-white font-medium focus:outline-none focus:border-teal-500"
                           >
-                            {INITIAL_DAILY_PRICES.map((p) => (
+                            {dailyPrices.map((p) => (
                               <option key={p.itemId} value={p.itemId}>
                                 {p.itemName}
                               </option>
@@ -725,6 +897,7 @@ export default function QuickOrderEntryPage() {
               <Button
                 variant={approvalEval.primaryAction === 'CONFIRM' ? 'primary' : 'secondary'}
                 size="md"
+                disabled={submitting}
                 className={
                   approvalEval.primaryAction === 'SEND_FOR_APPROVAL'
                     ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500'
@@ -732,10 +905,16 @@ export default function QuickOrderEntryPage() {
                 }
                 onClick={handleSubmitOrder}
               >
-                {approvalEval.buttonLabel}
+                {submitting ? 'Submitting...' : approvalEval.buttonLabel}
               </Button>
             </div>
           </div>
+
+          {submitError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">
+              ❌ {submitError}
+            </div>
+          )}
 
           {approvalEval.reasons.length > 0 && (
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">

@@ -36,7 +36,7 @@ export class OrderController {
   @Post()
   @RequirePermission('order.create')
   async create(@Body() dto: CreateOrderDto, @Req() req: any) {
-    return this.orderSvc.createOrder(
+    const created = await this.orderSvc.createOrder(
       dto.customerId,
       dto.fulfillmentSiteId,
       dto.lines.map((l) => ({
@@ -46,7 +46,42 @@ export class OrderController {
       })),
       req.user.id,
       dto.quoteId,
+      dto.deliveryDate,
+      dto.deliveryTimeWindow,
     );
+
+    if (dto.autoSubmit) {
+      try {
+        const confirmed = await this.orderSvc.confirm(
+          created.orderId,
+          'Submitted from Quick Order Entry',
+          req.user.id,
+        );
+        return {
+          ...created,
+          status: confirmed.status,
+        };
+      } catch (err) {
+        if (
+          err instanceof BadRequestException &&
+          err.message.toLowerCase().includes('below floor')
+        ) {
+          const override = await this.orderSvc.requestOverride(
+            created.orderId,
+            'Requested price below daily floor',
+            req.user.id,
+          );
+          return {
+            ...created,
+            status: 'PENDING_APPROVAL',
+            exceptionIds: [override.exceptionId],
+          };
+        }
+        throw err;
+      }
+    }
+
+    return created;
   }
 
   /**
@@ -119,18 +154,30 @@ export class OrderController {
     const limit = Math.min(q.limit ?? 50, 100);
     const offset = q.offset ?? 0;
 
-    const query = this.orderSvc['knex']('sales_orders')
-      .orderBy('created_at_idx', 'desc')
+    const knex = this.orderSvc['knex'];
+    const query = knex('sales_orders as so')
+      .leftJoin('customers as c', 'so.customer_id', 'c.id')
+      .leftJoin('sites as s', 'so.fulfillment_site_id', 's.id')
+      .select(
+        'so.*',
+        'c.business_name as customer_name',
+        'c.customer_code as customer_code',
+        's.name as site_name',
+        knex.raw(
+          '(SELECT COUNT(*)::int FROM sales_order_lines sol WHERE sol.order_id = so.id) as lines_count',
+        ),
+      )
+      .orderBy('so.created_at_idx', 'desc')
       .limit(limit)
       .offset(offset);
 
-    if (q.status) query.andWhere('order_status', q.status);
-    if (q.siteId) query.andWhere('fulfillment_site_id', q.siteId);
+    if (q.status) query.andWhere('so.order_status', q.status);
+    if (q.siteId) query.andWhere('so.fulfillment_site_id', q.siteId);
     if (q.date) {
       const date = new Date(q.date);
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
-      query.andWhereBetween('created_at_idx', [date, nextDate]);
+      query.andWhereBetween('so.created_at_idx', [date, nextDate]);
     }
 
     return query;

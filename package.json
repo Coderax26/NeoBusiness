@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "dev:api": "npm --prefix apps/api run start:dev",
-    "dev:web": "node apps/web/serve.mjs",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:prototype": "node apps/web/serve.mjs",
     "migrate": "npm --prefix apps/api run build && npm --prefix apps/api run migrate",
     "seed": "npm --prefix apps/api run build && npm --prefix apps/api run seed",
     "build:api": "npm --prefix apps/api run build",

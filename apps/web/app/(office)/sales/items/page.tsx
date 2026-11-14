@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   DataTable,
   type ColumnDef,
@@ -134,6 +134,69 @@ const INITIAL_ITEMS: ItemRecord[] = [
 
 export default function ItemMasterPage() {
   const [items, setItems] = useState<ItemRecord[]>(INITIAL_ITEMS);
+
+  const loadItems = useCallback(async () => {
+    try {
+      const [itemsRes, pricesRes] = await Promise.all([
+        fetch('/api/proxy/items'),
+        fetch('/api/proxy/prices/today').catch(() => null),
+      ]);
+      if (!itemsRes.ok) return;
+      const rows = await itemsRes.json();
+      if (!Array.isArray(rows) || rows.length === 0) return;
+
+      const priceMap = new Map<string, number>();
+      if (pricesRes && pricesRes.ok) {
+        const prices = await pricesRes.json().catch(() => []);
+        if (Array.isArray(prices)) {
+          for (const p of prices) {
+            if (p.itemId && p.targetPrice != null) {
+              priceMap.set(String(p.itemId), Number(p.targetPrice));
+            }
+          }
+        }
+      }
+
+      const mapped: ItemRecord[] = rows.map((i: any) => ({
+        id: String(i.id),
+        sku: String(i.sku_code || ''),
+        name: String(i.name || ''),
+        category:
+          i.item_category === 'RAW_MATERIAL' ||
+          i.item_category === 'PROCESSED_FG' ||
+          i.item_category === 'TRADED_GOOD'
+            ? i.item_category
+            : 'TRADED_GOOD',
+        primaryUom: String(i.primary_uom || 'KG').toLowerCase(),
+        secondaryUom: i.secondary_uom ? String(i.secondary_uom).toLowerCase() : undefined,
+        conversionFactor: i.standard_weight_per_secondary_kg
+          ? Number(i.standard_weight_per_secondary_kg)
+          : 1,
+        isCatchWeight: Boolean(i.is_catch_weight),
+        hsnCode: String(i.hsn_code || ''),
+        gstRate: i.tax_rate_pct != null ? Number(i.tax_rate_pct) * 100 : 5,
+        taxTreatment:
+          i.tax_treatment === 'EXEMPT' ||
+          i.tax_treatment === 'NIL_RATED' ||
+          i.tax_treatment === 'NON_GST'
+            ? i.tax_treatment
+            : 'TAXABLE',
+        minMarginPct: i.min_margin_pct != null ? Number(i.min_margin_pct) * 100 : 15,
+        shelfLifeDays: Number(i.shelf_life_days ?? 14),
+        minStockQty: Number(i.min_stock_qty ?? 0),
+        currentStock: 0,
+        todayPrice: priceMap.get(String(i.id)),
+        active: i.is_active !== false,
+      }));
+      setItems(mapped);
+    } catch {
+      // ignore network error; fallback remains visible
+    }
+  }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -203,7 +266,16 @@ export default function ItemMasterPage() {
     setFormOpen(true);
   };
 
-  const handleSaveItem = (addAnother = false) => {
+  const normalizeApiUom = (val: string): 'KG' | 'CRATE' | 'CARTON' | 'LITER' | 'BAG' | 'OTHER' => {
+    const u = val.trim().toUpperCase();
+    if (u === 'KG' || u === 'CRATE' || u === 'CARTON' || u === 'LITER' || u === 'BAG') return u;
+    if (u === 'CRATES') return 'CRATE';
+    if (u === 'CARTONS') return 'CARTON';
+    if (u === 'LITERS' || u === 'LTR' || u === 'L') return 'LITER';
+    return 'OTHER';
+  };
+
+  const handleSaveItem = async (addAnother = false) => {
     const errors: Record<string, string> = {};
     if (!sku.trim()) errors.sku = 'SKU Code is required.';
     if (!name.trim()) errors.name = 'Item Name is required.';
@@ -221,36 +293,70 @@ export default function ItemMasterPage() {
       return;
     }
 
-    const newItem: ItemRecord = {
-      id: editingItem ? editingItem.id : `itm-${Date.now()}`,
-      sku: sku.trim().toUpperCase(),
-      name: name.trim(),
-      category,
-      primaryUom: primaryUom.trim().toLowerCase(),
-      secondaryUom: secondaryUom.trim().toLowerCase(),
-      conversionFactor: parseFloat(conversionFactor) || 1,
-      isCatchWeight,
-      hsnCode: hsnCode.trim(),
-      gstRate: parseFloat(gstRate) || 0,
-      taxTreatment,
-      minMarginPct: parseFloat(minMarginPct) || 0,
-      shelfLifeDays: parseInt(shelfLifeDays, 10) || 0,
-      minStockQty: parseInt(minStockQty, 10) || 0,
-      currentStock: editingItem ? editingItem.currentStock : 0,
-      todayPrice: editingItem ? editingItem.todayPrice : 100,
-      active: editingItem ? editingItem.active : true,
-    };
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isEditingReal = Boolean(editingItem && uuidRe.test(editingItem.id));
+    const parsedMargin = Math.min(1, Math.max(0, Number(((parseFloat(minMarginPct) || 0) / 100).toFixed(2))));
+    const parsedTax = Math.max(0, Number(((parseFloat(gstRate) || 0) / 100).toFixed(4)));
+    const parsedShelfLife = Math.max(1, parseInt(shelfLifeDays, 10) || 14);
 
-    if (editingItem) {
-      setItems((prev) => prev.map((i) => (i.id === editingItem.id ? newItem : i)));
-    } else {
-      setItems((prev) => [newItem, ...prev]);
-    }
+    try {
+      const endpoint = isEditingReal
+        ? `/api/proxy/items/${editingItem!.id}`
+        : '/api/proxy/items';
+      const method = isEditingReal ? 'PATCH' : 'POST';
+      const bodyPayload = isEditingReal
+        ? {
+            name: name.trim(),
+            itemCategory: category,
+            primaryUom: normalizeApiUom(primaryUom),
+            secondaryUom: secondaryUom.trim() ? normalizeApiUom(secondaryUom) : undefined,
+            shelfLifeDays: parsedShelfLife,
+            taxRatePct: parsedTax,
+            hsnCode: hsnCode.trim() || undefined,
+            isCatchWeight,
+            minMarginPct: parsedMargin,
+            taxTreatment,
+          }
+        : {
+            skuCode: sku.trim().toUpperCase(),
+            name: name.trim(),
+            itemCategory: category,
+            primaryUom: normalizeApiUom(primaryUom),
+            secondaryUom: secondaryUom.trim() ? normalizeApiUom(secondaryUom) : undefined,
+            shelfLifeDays: parsedShelfLife,
+            taxRatePct: parsedTax,
+            hsnCode: hsnCode.trim() || undefined,
+            isCatchWeight,
+            minMarginPct: parsedMargin,
+            taxTreatment,
+            isActive: true,
+          };
 
-    if (addAnother) {
-      openNewForm();
-    } else {
-      setFormOpen(false);
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          resData?.error?.message ||
+          (Array.isArray(resData?.message) ? resData.message.join(', ') : resData?.message) ||
+          `Failed to save item (${res.status})`;
+        setFormErrors({ name: String(msg) });
+        setActiveTab('basics');
+        return;
+      }
+
+      await loadItems();
+      if (addAnother) {
+        openNewForm();
+      } else {
+        setFormOpen(false);
+      }
+    } catch {
+      setFormErrors({ name: 'Unable to reach backend API to save item.' });
+      setActiveTab('basics');
     }
   };
 

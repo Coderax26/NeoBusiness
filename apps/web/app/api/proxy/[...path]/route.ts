@@ -30,41 +30,23 @@ async function handleProxy(
       body: bodyBuffer,
     });
 
-    if (upstream.ok) {
-      const contentType = upstream.headers.get('content-type') || 'application/json';
-      const upstreamData = await upstream.arrayBuffer();
-      return new NextResponse(upstreamData, {
-        status: upstream.status,
-        headers: { 'Content-Type': contentType },
-      });
-    }
-  } catch {
-    // Fall back to local acknowledgement below when upstream is offline or rejects mock IDs
-  }
-
-  // Graceful local acknowledgement for UI mutations/queries using interactive mock IDs
-  let parsedBody: Record<string, unknown> = {};
-  if (bodyBuffer && bodyBuffer.byteLength > 0) {
-    try {
-      parsedBody = JSON.parse(new TextDecoder().decode(bodyBuffer));
-    } catch {
-      parsedBody = {};
-    }
-  }
-
-  return NextResponse.json(
-    {
-      success: true,
-      path: `/api/v1/${targetPath}`,
-      method: req.method,
-      data: {
-        id: `rec-${Date.now()}`,
-        ...parsedBody,
-        syncedAt: new Date().toISOString(),
+    const contentType = upstream.headers.get('content-type') || 'application/json';
+    const upstreamData = await upstream.arrayBuffer();
+    return new NextResponse(upstreamData, {
+      status: upstream.status,
+      headers: { 'Content-Type': contentType },
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'BACKEND_UNREACHABLE',
+          message: `Backend API server at ${API_ORIGIN} is unreachable (${err?.message || 'connection failed'})`,
+        },
       },
-    },
-    { status: 200 },
-  );
+      { status: 502 },
+    );
+  }
 }
 
 export const GET = handleProxy;
@@ -72,3 +54,4 @@ export const POST = handleProxy;
 export const PUT = handleProxy;
 export const PATCH = handleProxy;
 export const DELETE = handleProxy;
+

@@ -14,10 +14,18 @@ import type { SessionUser } from '@neo/shared';
 
 export default function RoleHomePage() {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [orderSummary, setOrderSummary] = useState<{
+    counts: Record<string, number>;
+    totalOrders: number;
+  } | null>(null);
+  const [pendingExceptions, setPendingExceptions] = useState<
+    Array<{ id?: string; exception_type?: string }>
+  >([]);
+  const [exceptionsLoaded, setExceptionsLoaded] = useState(false);
   const [todoList, setTodoList] = useState([
     { id: 'todo-1', label: 'Verify today’s base & floor prices', count: '1 missing', href: '/sales/prices', done: false },
-    { id: 'todo-2', label: 'Confirm draft sales orders', count: '6 pending', href: '/sales/orders', done: false },
-    { id: 'todo-3', label: 'Build dispatch trips for ready orders', count: '4 ready', href: '/logistics/trips', done: false },
+    { id: 'todo-2', label: 'Confirm draft sales orders', count: '0 pending', href: '/sales/orders', done: false },
+    { id: 'todo-3', label: 'Build dispatch trips for ready orders', count: '0 ready', href: '/logistics/trips', done: false },
     { id: 'todo-4', label: 'Verify driver cash handovers', count: '3 waiting', href: '/finance/handovers', done: false },
     { id: 'todo-5', label: 'Bank cheque deposit register', count: '2 cheques', href: '/finance/cheques', done: false },
     { id: 'todo-6', label: 'Customer promises to pay (PTP) due today', count: '5 due', href: '/finance/invoices', done: false },
@@ -26,13 +34,75 @@ export default function RoleHomePage() {
   ]);
 
   useEffect(() => {
+    let active = true;
     fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.user) setUser(data.user);
+      .then((res) => (res.ok ? res.json() : null))
+      .then(async (data) => {
+        if (!active || !data?.user) return;
+        setUser(data.user);
+
+        try {
+          const summaryRes = await fetch('/api/proxy/orders/summary');
+          if (active && summaryRes.ok) {
+            const summary = await summaryRes.json();
+            if (summary && typeof summary === 'object') {
+              setOrderSummary(summary);
+              const draftOrPending =
+                (summary.counts?.DRAFT ?? 0) +
+                (summary.counts?.PENDING_APPROVAL ?? 0);
+              const readyCount = summary.counts?.READY ?? 0;
+              setTodoList((prev) =>
+                prev.map((item) => {
+                  if (item.id === 'todo-2') {
+                    return { ...item, count: `${draftOrPending} pending` };
+                  }
+                  if (item.id === 'todo-3') {
+                    return { ...item, count: `${readyCount} ready` };
+                  }
+                  return item;
+                }),
+              );
+            }
+          }
+        } catch {
+          // ignore network error; fallback state stays visible
+        }
+
+        if (data.user.role === 'OWNER') {
+          try {
+            const exRes = await fetch('/api/proxy/exceptions?status=PENDING');
+            if (active && exRes.ok) {
+              const exList = await exRes.json();
+              if (Array.isArray(exList)) {
+                setPendingExceptions(exList);
+                setExceptionsLoaded(true);
+              }
+            }
+          } catch {
+            // ignore network error
+          }
+        }
       })
       .catch(() => {});
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const pendingCount = exceptionsLoaded
+    ? pendingExceptions.length
+    : (orderSummary?.counts?.PENDING_APPROVAL ?? 0);
+  const priceOverrideCount = pendingExceptions.filter(
+    (e) => e.exception_type === 'PRICE_OVERRIDE',
+  ).length;
+  const creditBreachCount = pendingExceptions.filter(
+    (e) => e.exception_type === 'CREDIT_BREACH',
+  ).length;
+  const otherExceptionCount = Math.max(
+    0,
+    pendingCount - priceOverrideCount - creditBreachCount,
+  );
 
   const toggleTodo = (id: string) => {
     setTodoList((prev) =>
@@ -104,10 +174,14 @@ export default function RoleHomePage() {
           <span className="text-3xl">⚠️</span>
           <div>
             <h2 className="text-sm font-bold text-amber-200">
-              3 Approvals Require Attention Today
+              {pendingCount} {pendingCount === 1 ? 'Approval Requires' : 'Approvals Require'} Attention Today
             </h2>
             <p className="text-xs text-amber-300/80 mt-0.5 leading-relaxed">
-              1 price override below floor, 1 customer credit limit breach, and 1 supplier price spike.
+              {exceptionsLoaded
+                ? pendingCount === 0
+                  ? 'No pending approval exceptions right now.'
+                  : `${priceOverrideCount} price override(s), ${creditBreachCount} credit breach(es), and ${otherExceptionCount} other exception(s).`
+                : `${orderSummary?.counts?.PENDING_APPROVAL ?? 0} sales order(s) awaiting approval in database.`}
             </p>
           </div>
         </div>
@@ -146,11 +220,18 @@ export default function RoleHomePage() {
         />
         <KpiCard
           title="Actionable Exceptions"
-          value="3 Pending"
-          subtitle="2 commercial, 1 supply"
-          trend={{ direction: 'down', label: 'Action required' }}
-          sparklineValues={[7, 6, 5, 4, 3, 3]}
-          tone="danger"
+          value={`${pendingCount} Pending`}
+          subtitle={
+            exceptionsLoaded
+              ? `${priceOverrideCount + creditBreachCount} commercial, ${otherExceptionCount} operational`
+              : `${orderSummary?.counts?.PENDING_APPROVAL ?? 0} orders pending approval`
+          }
+          trend={{
+            direction: pendingCount > 0 ? 'down' : 'up',
+            label: pendingCount > 0 ? 'Action required' : 'All clear',
+          }}
+          sparklineValues={[7, 6, 5, 4, Math.max(pendingCount, 0), Math.max(pendingCount, 0)]}
+          tone={pendingCount > 0 ? 'danger' : 'good'}
         />
       </div>
 

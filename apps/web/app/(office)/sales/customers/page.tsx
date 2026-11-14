@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   DataTable,
@@ -169,6 +169,75 @@ const INITIAL_CUSTOMERS: CustomerRecord[] = [
 
 export default function CustomerMasterPage() {
   const [customers, setCustomers] = useState<CustomerRecord[]>(INITIAL_CUSTOMERS);
+
+  const loadCustomers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/proxy/customers');
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return;
+
+      const mapped: CustomerRecord[] = rows.map((c: any) => {
+        const limit = Number(c.credit_limit ?? 0);
+        const outstanding = Number(c.current_ar_balance ?? 0);
+        const creditHoldFlag = Boolean(c.credit_hold);
+        const rawWin = String(c.preferred_delivery_window || 'MORNING').toUpperCase();
+        const win: CustomerRecord['deliveryWindow'] =
+          rawWin === 'AFTERNOON' || rawWin === '13-16'
+            ? 'AFTERNOON'
+            : rawWin === 'EVENING' || rawWin === '18-21'
+              ? 'EVENING'
+              : 'MORNING';
+
+        return {
+          id: String(c.id),
+          code: String(c.customer_code || ''),
+          businessName: String(c.business_name || ''),
+          gstin: String(c.gstin || ''),
+          stateCode: String(c.state_code || '27'),
+          stateName: String(c.state_code || '27') === '27' ? 'Maharashtra' : `State ${c.state_code || ''}`,
+          billingAddress: String(c.billing_address || ''),
+          primaryContact: String(c.contact_person || c.business_name || ''),
+          phone: String(c.phone || ''),
+          whatsappPhone: String(c.whatsapp_no || c.phone || ''),
+          whatsappOptIn: Boolean(c.whatsapp_no || c.phone),
+          defaultSite: String(c.default_site_name || 'NeoCore Factory — Mumbai'),
+          deliveryWindow: win,
+          creditLimitRupees: limit,
+          creditDays: Number(c.credit_days ?? 7),
+          maxOverdueDays: Number(c.max_overdue_days ?? 15),
+          creditHold: creditHoldFlag,
+          outstandingRupees: outstanding,
+          overdueDays: 0,
+          creditStatus: creditHoldFlag
+            ? 'HOLD'
+            : limit > 0 && outstanding >= limit * 0.9
+              ? 'NEAR_LIMIT'
+              : 'OK',
+          lastOrderDate: c.updated_at
+            ? String(c.updated_at).split('T')[0]
+            : new Date().toISOString().split('T')[0],
+          contacts: [
+            {
+              id: `c-${c.id}`,
+              name: String(c.contact_person || c.business_name || 'Primary Contact'),
+              phone: String(c.phone || ''),
+              role: 'Primary',
+              isPrimary: true,
+            },
+          ],
+          active: c.is_active !== false,
+        };
+      });
+      setCustomers(mapped);
+    } catch {
+      // ignore network error; fallback remains visible
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
   const [search, setSearch] = useState('');
   const [creditStatusFilter, setCreditStatusFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -305,7 +374,7 @@ export default function CustomerMasterPage() {
     setContacts((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const handleSaveCustomer = () => {
+  const handleSaveCustomer = async () => {
     const errors: Record<string, string> = {};
     if (!code.trim()) errors.code = 'Customer Code is required.';
     if (!businessName.trim()) errors.businessName = 'Business Name is required.';
@@ -342,41 +411,70 @@ export default function CustomerMasterPage() {
       return;
     }
 
-    const newRecord: CustomerRecord = {
-      id: editingCustomer ? editingCustomer.id : `cust-${Date.now()}`,
-      code: code.trim().toUpperCase(),
-      businessName: businessName.trim(),
-      gstin: gstin.trim().toUpperCase(),
-      stateCode: stateCode || '27',
-      stateName: stateName || 'Maharashtra',
-      billingAddress: billingAddress.trim(),
-      primaryContact: primaryContact.trim() || businessName.trim(),
-      phone: phone.trim(),
-      whatsappPhone: whatsappPhone.trim() || phone.trim(),
-      whatsappOptIn,
-      defaultSite,
-      deliveryWindow,
-      creditLimitRupees: newLimit,
-      creditDays: parseInt(creditDays, 10) || 7,
-      maxOverdueDays: parseInt(maxOverdueDays, 10) || 15,
-      creditHold,
-      creditOverrideReason: newLimit !== originalCreditLimit ? creditOverrideReason.trim() : editingCustomer?.creditOverrideReason,
-      outstandingRupees: editingCustomer ? editingCustomer.outstandingRupees : 0,
-      overdueDays: editingCustomer ? editingCustomer.overdueDays : 0,
-      creditStatus: creditHold ? 'HOLD' : newLimit > 0 && (editingCustomer?.outstandingRupees || 0) >= newLimit * 0.9 ? 'NEAR_LIMIT' : 'OK',
-      lastOrderDate: editingCustomer ? editingCustomer.lastOrderDate : new Date().toISOString().split('T')[0],
-      contacts: contacts.length > 0 ? contacts : [
-        { id: `c-${Date.now()}`, name: primaryContact || businessName, phone, role: 'Primary', isPrimary: true },
-      ],
-      active: editingCustomer ? editingCustomer.active : true,
-    };
+    const preferredDeliveryWindow =
+      deliveryWindow === 'AFTERNOON'
+        ? '13-16'
+        : deliveryWindow === 'EVENING'
+          ? '18-21'
+          : '10-12';
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    if (editingCustomer) {
-      setCustomers((prev) => prev.map((c) => (c.id === editingCustomer.id ? newRecord : c)));
-    } else {
-      setCustomers((prev) => [newRecord, ...prev]);
+    try {
+      const isEditingReal = Boolean(editingCustomer && uuidRe.test(editingCustomer.id));
+      const endpoint = isEditingReal
+        ? `/api/proxy/customers/${editingCustomer!.id}`
+        : '/api/proxy/customers';
+      const method = isEditingReal ? 'PATCH' : 'POST';
+      const bodyPayload = isEditingReal
+        ? {
+            businessName: businessName.trim(),
+            contactPerson: primaryContact.trim() || businessName.trim(),
+            phone: phone.trim(),
+            whatsappNo: whatsappPhone.trim() || phone.trim(),
+            billingAddress: billingAddress.trim() || 'Mumbai',
+            gstin: gstin.trim().toUpperCase() || undefined,
+            stateCode: (stateCode || '27').slice(0, 2),
+            preferredDeliveryWindow,
+            isActive: editingCustomer!.active,
+          }
+        : {
+            customerCode: code.trim().toUpperCase(),
+            businessName: businessName.trim(),
+            contactPerson: primaryContact.trim() || businessName.trim(),
+            phone: phone.trim(),
+            whatsappNo: whatsappPhone.trim() || phone.trim(),
+            billingAddress: billingAddress.trim() || 'Mumbai',
+            gstin: gstin.trim().toUpperCase() || undefined,
+            stateCode: (stateCode || '27').slice(0, 2),
+            creditLimit: Math.round(newLimit),
+            creditDays: parseInt(creditDays, 10) || 7,
+            maxOverdueDays: parseInt(maxOverdueDays, 10) || 15,
+            preferredDeliveryWindow,
+            isActive: true,
+          };
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          resData?.error?.message ||
+          (Array.isArray(resData?.message) ? resData.message.join(', ') : resData?.message) ||
+          `Failed to save customer (${res.status})`;
+        setFormErrors({ businessName: String(msg) });
+        setActiveTab('business');
+        return;
+      }
+
+      await loadCustomers();
+      setFormOpen(false);
+    } catch {
+      setFormErrors({ businessName: 'Unable to reach backend API to save customer.' });
+      setActiveTab('business');
     }
-    setFormOpen(false);
   };
 
   const toggleCustomerActive = (id: string) => {

@@ -135,8 +135,11 @@ export class OrderService implements OnModuleInit {
     lineData: Array<{ itemId: string; qty: string; requestedPrice: string }>,
     userId: string,
     quoteId?: string,
+    deliveryDate?: string,
+    deliveryTimeWindow?: string,
   ): Promise<{
     orderId: string;
+    orderNo: string;
     status: string;
     exceptionIds: string[];
     creditEvaluation: CreditEvaluation | null;
@@ -160,6 +163,8 @@ export class OrderService implements OnModuleInit {
           order_status: newStatus,
           total_amount: '0.00',
           margin_pct: null,
+          delivery_date: deliveryDate ?? new Date().toISOString().split('T')[0],
+          delivery_time_window: deliveryTimeWindow ?? '10-12',
           created_by: userId,
           source_quote_id: quoteId ?? null,
         })
@@ -215,6 +220,15 @@ export class OrderService implements OnModuleInit {
 
       await trx('sales_order_lines').insert(linesToInsert);
 
+      const computedTotal = Money.of(
+        linesToInsert
+          .reduce((sum, l) => sum + parseFloat(l.line_total || '0'), 0)
+          .toFixed(2),
+      ).toStorageString();
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({ total_amount: computedTotal });
+
       // Create status log
       await trx('order_status_log').insert({
         order_id: orderId,
@@ -225,6 +239,7 @@ export class OrderService implements OnModuleInit {
 
       return {
         orderId,
+        orderNo,
         status: newStatus,
         exceptionIds: [],
         creditEvaluation: null, // will be called externally or after aggregates

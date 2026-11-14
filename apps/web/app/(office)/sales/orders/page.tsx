@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   DataTable,
@@ -34,30 +34,98 @@ export default function OrdersTrackerPage() {
   const [search, setSearch] = useState('');
   const [savedView, setSavedView] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedRaw = localStorage.getItem('neobus_sales_orders');
-        if (savedRaw) {
-          const parsed: SalesOrderRecord[] = JSON.parse(savedRaw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders([...parsed, ...INITIAL_SALES_ORDERS]);
-          }
-        }
-      } catch {
-        // ignore parse errors
-      }
+  const loadOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/proxy/orders');
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return;
+
+      const mapped: SalesOrderRecord[] = rows.map((r: any) => {
+        const subtotal = Number(r.total_amount ?? 0);
+        const gstTotal = Number((subtotal * 0.05).toFixed(2));
+        const grandTotal = Number((subtotal + gstTotal).toFixed(2));
+        const lineCount = Math.max(1, Number(r.lines_count ?? 1));
+        const deliveryDate = r.delivery_date
+          ? String(r.delivery_date).split('T')[0]
+          : new Date().toISOString().split('T')[0];
+        const win = r.delivery_time_window;
+        const deliveryWindow: SalesOrderRecord['deliveryWindow'] =
+          win === '04-08' || win === '10-12' || win === '13-16' || win === '18-21'
+            ? win
+            : '10-12';
+        return {
+          id: String(r.id),
+          orderNumber: String(r.order_no || r.orderNumber || ''),
+          customerId: String(r.customer_id || ''),
+          customerName: String(r.customer_name || 'Customer'),
+          siteName: String(r.site_name || 'NeoCore Factory — Mumbai'),
+          deliveryDate,
+          deliveryWindow,
+          status: (r.order_status || 'DRAFT') as SalesOrderStatus,
+          createdAt: String(r.created_at_idx || new Date().toISOString()),
+          createdBy: 'Coordinator',
+          subtotal,
+          gstTotal,
+          grandTotal,
+          marginPct: r.margin_pct != null ? Number(r.margin_pct) : 15,
+          lines: Array.from({ length: lineCount }, (_, idx) => ({
+            id: `${r.id}-line-${idx + 1}`,
+            itemId: '',
+            sku: '',
+            itemName: idx === 0 ? `${lineCount} line item${lineCount === 1 ? '' : 's'}` : `Item ${idx + 1}`,
+            category: 'PROCESSED_FG',
+            qty: 1,
+            uom: 'unit',
+            unitPrice: lineCount > 0 ? Number((subtotal / lineCount).toFixed(2)) : subtotal,
+            floorPrice: 0,
+            targetPrice: 0,
+            atpStock: 0,
+            gstPct: 5,
+            reservedQty: 0,
+          })),
+          timeline: [
+            {
+              step: String(r.order_status || 'Created'),
+              timestamp: new Date(r.created_at_idx || Date.now()).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              user: 'System',
+            },
+          ],
+        };
+      });
+      setOrders(mapped);
+    } catch {
+      // ignore network error; initial state stays visible
     }
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   // Cancel reason dialog
   const [cancelTarget, setCancelTarget] = useState<SalesOrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
 
-  const handleConfirmOrder = (id: string) => {
+  const handleConfirmOrder = async (id: string) => {
     setOrders((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: 'CONFIRMED' } : o)),
     );
+    try {
+      const res = await fetch(`/api/proxy/orders/${id}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks: 'Confirmed from Orders Tracker' }),
+      });
+      if (res.ok) {
+        await loadOrders();
+      }
+    } catch {
+      // ignore network error
+    }
   };
 
   const handleDuplicateOrder = (order: SalesOrderRecord) => {
@@ -71,14 +139,27 @@ export default function OrdersTrackerPage() {
     setOrders((prev) => [cloned, ...prev]);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!cancelTarget) return;
+    const targetId = cancelTarget.id;
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === cancelTarget.id ? { ...o, status: 'CANCELLED', cancelReason } : o,
+        o.id === targetId ? { ...o, status: 'CANCELLED', cancelReason } : o,
       ),
     );
     setCancelTarget(null);
+    try {
+      const res = await fetch(`/api/proxy/orders/${targetId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      if (res.ok) {
+        await loadOrders();
+      }
+    } catch {
+      // ignore network error
+    }
   };
 
   // Saved Views (§5)

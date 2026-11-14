@@ -15,13 +15,14 @@ export default function TodaysPricesPage() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [rows, setRows] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
-  const [initialRows] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
+  const [initialRows, setInitialRows] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [missingOnly, setMissingOnly] = useState(false);
 
   // Dialog states
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 
   useEffect(() => {
@@ -33,14 +34,49 @@ export default function TodaysPricesPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/proxy/prices/${encodeURIComponent(selectedDate)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !Array.isArray(data) || data.length === 0) return;
+        const mapped: DailyPriceRow[] = data.map((r: any) => ({
+          itemId: String(r.itemId),
+          sku: String(r.skuCode || ''),
+          itemName: String(r.itemName || ''),
+          category:
+            r.itemCategory === 'RAW_MATERIAL' ||
+            r.itemCategory === 'PROCESSED_FG' ||
+            r.itemCategory === 'TRADED_GOOD'
+              ? r.itemCategory
+              : 'PROCESSED_FG',
+          uom: String(r.primaryUom || 'KG').toLowerCase(),
+          yesterdayFloor: r.floorPrice != null ? Number(r.floorPrice) : 0,
+          yesterdayTarget: r.targetPrice != null ? Number(r.targetPrice) : 0,
+          landedCost: r.latestLandedCost != null ? Number(r.latestLandedCost) : 0,
+          minMarginPct:
+            r.minMarginPctUsed != null ? Number(r.minMarginPctUsed) * 100 : 15,
+          floorPrice: r.floorPrice != null ? Number(r.floorPrice) : null,
+          targetPrice: r.targetPrice != null ? Number(r.targetPrice) : null,
+          atpStock: 500,
+        }));
+        setRows(mapped);
+        setInitialRows(mapped);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedDate]);
+
   const isReadOnlyDate = selectedDate < todayStr;
   const isOwner = !user || canViewMarginAndCost(user.role);
   const canEdit = isOwner && !isReadOnlyDate;
 
   const missingCount = rows.filter((r) => r.floorPrice === null || r.targetPrice === null).length;
 
-  const changedRows = rows.filter((r, idx) => {
-    const orig = initialRows[idx];
+  const changedRows = rows.filter((r) => {
+    const orig = initialRows.find((o) => o.itemId === r.itemId);
     return orig && (r.floorPrice !== orig.floorPrice || r.targetPrice !== orig.targetPrice);
   });
 
@@ -99,22 +135,35 @@ export default function TodaysPricesPage() {
   };
 
   const handlePublishPrices = async () => {
+    setPublishError(null);
     try {
-      await fetch(`/api/proxy/prices/${selectedDate}`, {
+      const res = await fetch(`/api/proxy/prices/${selectedDate}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prices: rows.map((r) => ({
+          effectiveDate: selectedDate,
+          items: rows.map((r) => ({
             itemId: r.itemId,
-            floorPrice: r.floorPrice,
-            targetPrice: r.targetPrice,
+            latestLandedCost: Number(r.landedCost || 0),
+            floorPrice: r.floorPrice ?? undefined,
+            targetPrice: r.targetPrice ?? undefined,
+            source: 'MANUAL',
           })),
         }),
-      }).catch(() => {});
-    } finally {
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setPublishConfirmOpen(false);
+        setPublishError(err?.error?.message || err?.message || `Failed to publish prices (${res.status})`);
+        return;
+      }
+      setInitialRows(rows);
       setPublishConfirmOpen(false);
       setPublishSuccess(`Published daily price sheet for ${selectedDate} (${rows.length} items).`);
       setTimeout(() => setPublishSuccess(null), 5000);
+    } catch {
+      setPublishConfirmOpen(false);
+      setPublishError('Unable to reach backend API to publish prices.');
     }
   };
 
@@ -195,6 +244,12 @@ export default function TodaysPricesPage() {
       {publishSuccess && (
         <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-xs font-semibold text-emerald-300">
           ✓ {publishSuccess}
+        </div>
+      )}
+
+      {publishError && (
+        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-xs font-semibold text-rose-300">
+          ❌ {publishError}
         </div>
       )}
 
