@@ -2,6 +2,7 @@
 # Hardened non-root execution, healthchecks, resource limits, and clean client bootstrap.
 
 services:
+  # P4.5 WAL archiving: archive_mode=on
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -63,7 +64,13 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       LOG_LEVEL: ${LOG_LEVEL:-log}
       APP_TZ: ${APP_TZ:-Asia/Kolkata}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-neobus_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-neobus_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       DATABASE_URL: postgresql://${POSTGRES_USER:-neobus_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-neobus_prod}
+      REDIS_HOST: redis
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}

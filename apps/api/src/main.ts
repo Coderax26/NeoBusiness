@@ -4,9 +4,13 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { validateEnvironmentConfig } from './shared/config/env-validator.js';
+import { resolveDatabaseUrl } from './shared/database/knex-instance.js';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Ensure DATABASE_URL is normalized before config validation runs
+  resolveDatabaseUrl();
 
   // ── P4.5 Environment Configuration Validation ─────────────────────────────
   const envCheck = validateEnvironmentConfig();
