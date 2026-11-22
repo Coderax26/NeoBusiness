@@ -220,4 +220,4 @@ BEGIN
         REVOKE UPDATE, DELETE ON custody_ledger FROM neobus_app;
     END IF;
 END $$;
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_columns WHERE tablename = 'ptp_followups' AND columnname = 'updated_by') THEN ALTER TABLE ptp_followups ADD COLUMN updated_by uuid REFERENCES users(id); END IF; END $$;
+ALTER TABLE ptp_followups ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES users(id);
