@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldUseSecureCookies } from '../../../../lib/session';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
-const IS_SECURE_COOKIE =
-  process.env.COOKIE_SECURE !== undefined
-    ? process.env.COOKIE_SECURE === 'true'
-    : process.env.NODE_ENV === 'production';
 
 function buildSessionUserPayload(raw: any) {
   const role = String(raw?.role || '').toUpperCase();
@@ -92,10 +89,12 @@ export async function GET(req: NextRequest) {
       const payload = buildSessionUserPayload(rawUser);
       const response = NextResponse.json(payload, { status: 200 });
 
+      const isSecureCookie = shouldUseSecureCookies(req);
+
       if (newAccessToken) {
         response.cookies.set('neobus_access_token', newAccessToken, {
           httpOnly: true,
-          secure: IS_SECURE_COOKIE,
+          secure: isSecureCookie,
           sameSite: 'lax',
           path: '/',
           maxAge: 8 * 60 * 60,
@@ -104,7 +103,7 @@ export async function GET(req: NextRequest) {
       if (newRefreshToken) {
         response.cookies.set('neobus_refresh_token', newRefreshToken, {
           httpOnly: true,
-          secure: IS_SECURE_COOKIE,
+          secure: isSecureCookie,
           sameSite: 'lax',
           path: '/',
           maxAge: 7 * 24 * 60 * 60,

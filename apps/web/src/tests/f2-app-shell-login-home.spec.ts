@@ -54,7 +54,7 @@ describe('Phase F2 — App Shell, Login & Role Home Pages', () => {
     expect(fs.existsSync(approvalsPath)).toBe(true);
 
     const content = fs.readFileSync(approvalsPath, 'utf-8');
-    expect(content).toContain('/api/proxy/exceptions?status=OPEN');
+    expect(content).toContain('/api/proxy/exceptions?status=PENDING');
     expect(content).toContain('ExceptionCard');
     expect(content).toContain('handleApprove');
     expect(content).toContain('handleReject');

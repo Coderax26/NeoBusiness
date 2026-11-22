@@ -152,10 +152,11 @@ export default function LoginPage() {
       }
 
       const role = data?.user?.role;
-      if (role === 'PROD_MGR' || role === 'STOREKEEPER') {
-        router.push('/floor');
+      const targetRoute = role === 'PROD_MGR' || role === 'STOREKEEPER' ? '/floor' : '/home';
+      if (typeof window !== 'undefined') {
+        window.location.assign(targetRoute);
       } else {
-        router.push('/home');
+        router.push(targetRoute);
       }
     } catch {
       setError('Unable to reach server. Please check your network connection.');

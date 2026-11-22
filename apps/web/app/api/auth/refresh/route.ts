@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldUseSecureCookies } from '../../../../lib/session';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
-const IS_SECURE_COOKIE =
-  process.env.COOKIE_SECURE !== undefined
-    ? process.env.COOKIE_SECURE === 'true'
-    : process.env.NODE_ENV === 'production';
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,9 +47,11 @@ export async function POST(req: NextRequest) {
     const { accessToken, refreshToken: newRefreshToken } = data;
     const response = NextResponse.json({ success: true, accessToken });
 
+    const isSecureCookie = shouldUseSecureCookies(req);
+
     response.cookies.set('neobus_access_token', accessToken, {
       httpOnly: true,
-      secure: IS_SECURE_COOKIE,
+      secure: isSecureCookie,
       sameSite: 'lax',
       path: '/',
       maxAge: 8 * 60 * 60,
@@ -61,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (newRefreshToken) {
       response.cookies.set('neobus_refresh_token', newRefreshToken, {
         httpOnly: true,
-        secure: IS_SECURE_COOKIE,
+        secure: isSecureCookie,
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60, // 7 days

@@ -103,6 +103,7 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # neobus_prod_web
   web:
     build:
       context: .
@@ -116,7 +117,7 @@ services:
       PORT: 4000
       HOSTNAME: 0.0.0.0
       API_ORIGIN: http://api:3000
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
       NEXT_PUBLIC_SHOW_DEMO_PERSONAS: ${NEXT_PUBLIC_SHOW_DEMO_PERSONAS:-false}
     expose:
       - "4000"
