@@ -60,14 +60,13 @@ export class WastageRepository {
   }
 
   async list(
-    siteId: string,
+    siteId?: string,
     status?: string,
   ): Promise<WastageRecordWithItems[]> {
     let query = this.knex('wastage_records as wr')
       .join('items as i', 'wr.item_id', 'i.id')
       .leftJoin('inventory_batches as ib', 'wr.batch_id', 'ib.id')
       .join('production_work_orders as wo', 'wr.work_order_id', 'wo.id')
-      .where('wo.site_id', siteId)
       .select(
         'wr.*',
         'i.name as item_name',
@@ -76,10 +75,17 @@ export class WastageRepository {
       )
       .orderBy('wr.created_at', 'desc');
 
-    if (status) {
-      query = query.where('wr.status', status);
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
+      query = query.where('wo.site_id', siteId);
     }
-
+    if (status) {
+      query = query.andWhere('wr.status', status);
+    }
     return query;
   }
 

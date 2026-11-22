@@ -1,30 +1,52 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill } from '@neo/ui';
-import { generateRmRequisitionsFromPlan } from '@neo/shared';
+import { generateRmRequisitionsFromPlan, type BomRecord } from '@neo/shared';
 import {
-  INITIAL_RM_REQUISITIONS,
-  INITIAL_WORK_ORDERS,
-  INITIAL_BOMS,
   type RmRequisitionRecord,
-} from '../../../src/lib/production-data';
-import { INITIAL_STOCK_ROWS } from '../../../src/lib/inventory-data';
+  type WorkOrderRecord,
+} from '../../../../src/lib/production-data';
+import { type StockRow } from '../../../../src/lib/inventory-data';
 
 export default function ProductionRequisitionsPage() {
-  const [reqs, setReqs] = useState<RmRequisitionRecord[]>(INITIAL_RM_REQUISITIONS);
+  const [reqs, setReqs] = useState<RmRequisitionRecord[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
+  const [boms, setBoms] = useState<BomRecord[]>([]);
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/production/requisitions').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/production/work-orders').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/production/boms').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([reqRes, woRes, bomRes, stkRes]) => {
+        if (!active) return;
+        setReqs(Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : []);
+        setWorkOrders(Array.isArray(woRes) ? woRes : Array.isArray(woRes?.data) ? woRes.data : []);
+        setBoms(Array.isArray(bomRes) ? bomRes : Array.isArray(bomRes?.data) ? bomRes.data : []);
+        setStockRows(Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleGenerateFromPlan = () => {
     const stockByItemId: Record<string, number> = {};
-    for (const s of INITIAL_STOCK_ROWS) {
+    for (const s of stockRows) {
       stockByItemId[s.itemId] = (stockByItemId[s.itemId] ?? 0) + s.onHand;
     }
 
     const needs = generateRmRequisitionsFromPlan(
-      INITIAL_WORK_ORDERS,
-      INITIAL_BOMS,
+      workOrders,
+      boms,
       stockByItemId,
     );
 

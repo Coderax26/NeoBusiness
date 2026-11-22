@@ -1,33 +1,63 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { formatINR } from '@neo/shared';
-import { INITIAL_PTPS, type PromiseToPayRecord } from '../../../../src/lib/finance-data';
+import { type PromiseToPayRecord } from '../../../../src/lib/finance-data';
 
 const BUCKETS: Array<'ALL' | PromiseToPayRecord['bucket']> = ['ALL', 'TODAY', 'OVERDUE', 'UPCOMING', 'BROKEN', 'KEPT'];
 
 export default function PromisesToPayPage() {
-  const [ptps, setPtps] = useState<PromiseToPayRecord[]>(INITIAL_PTPS);
+  const [ptps, setPtps] = useState<PromiseToPayRecord[]>([]);
   const [bucketFilter, setBucketFilter] = useState<'ALL' | PromiseToPayRecord['bucket']>('ALL');
-  const [customerName, setCustomerName] = useState('Sahyadri Dairy');
-  const [invoiceNo, setInvoiceNo] = useState('INV-2026-0102');
-  const [promisedAmount, setPromisedAmount] = useState('20000');
-  const [dueDate, setDueDate] = useState('2026-11-15');
+  const [customerName, setCustomerName] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [promisedAmount, setPromisedAmount] = useState('');
+  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/ptp')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setPtps(
+          rows.map((p: any) => ({
+            id: String(p.id),
+            customerName: String(p.customerName || p.customer_name || 'Customer'),
+            invoiceNo: String(p.invoiceNo || p.invoice_no || '—'),
+            promisedAmount: Number(p.promisedAmount ?? p.promised_amount ?? p.amount ?? 0),
+            dueDate: String(p.dueDate || p.promised_date || '').slice(0, 10),
+            bucket: (p.bucket || 'UPCOMING') as PromiseToPayRecord['bucket'],
+            notes: String(p.notes || p.remarks || ''),
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filtered = useMemo(
     () => ptps.filter((p) => (bucketFilter === 'ALL' ? true : p.bucket === bucketFilter)),
     [ptps, bucketFilter],
   );
 
-  function addPtp(e: React.FormEvent) {
+  async function addPtp(e: React.FormEvent) {
     e.preventDefault();
     const val = Number(promisedAmount) || 0;
-    if (val <= 0) return;
+    if (val <= 0 || !customerName.trim()) return;
+    await fetch('/api/proxy/ptp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerName, invoiceNo, promisedAmount: val, dueDate }),
+    }).catch(() => {});
     setPtps((prev) => [
       {
         id: `ptp-${Date.now()}`,
         customerName,
-        invoiceNo,
+        invoiceNo: invoiceNo || '—',
         promisedAmount: val,
         dueDate,
         bucket: 'UPCOMING',
@@ -35,6 +65,9 @@ export default function PromisesToPayPage() {
       },
       ...prev,
     ]);
+    setCustomerName('');
+    setInvoiceNo('');
+    setPromisedAmount('');
   }
 
   function markBucket(id: string, bucket: PromiseToPayRecord['bucket']) {
@@ -44,8 +77,8 @@ export default function PromisesToPayPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Promises to Pay (PTP)</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-zinc-100">Promises to Pay (PTP)</h1>
+        <p className="text-sm text-zinc-400">
           Track customer payment commitments by due date (Today, Overdue, Upcoming, Broken, Kept).
         </p>
       </div>
@@ -59,7 +92,7 @@ export default function PromisesToPayPage() {
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
               bucketFilter === b
                 ? 'bg-emerald-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'border border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
             }`}
           >
             {b}
@@ -68,78 +101,106 @@ export default function PromisesToPayPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <form onSubmit={addPtp} className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
-          <h2 className="text-base font-bold text-slate-900">New Promise to Pay</h2>
+        <form onSubmit={addPtp} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+          <h2 className="text-base font-bold text-zinc-100">Schedule New PTP</h2>
           <input
             type="text"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            placeholder="Customer Name"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500"
+            required
           />
           <input
             type="text"
             value={invoiceNo}
             onChange={(e) => setInvoiceNo(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
+            placeholder="Invoice # (optional)"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100 placeholder:text-zinc-500"
           />
           <input
             type="number"
             value={promisedAmount}
             onChange={(e) => setPromisedAmount(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
+            placeholder="Promised Amount (₹)"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100 placeholder:text-zinc-500"
+            required
           />
           <input
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+            required
           />
-          <button type="submit" className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white">
-            Save PTP
+          <button type="submit" className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+            Save Promise
           </button>
         </form>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 lg:col-span-2">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Customer / Invoice</th>
                 <th className="px-4 py-3">Due Date</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Update</th>
+                <th className="px-4 py-3 text-right">Promised</th>
+                <th className="px-4 py-3">Bucket</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-900">{p.customerName}</div>
-                    <div className="font-mono text-xs text-slate-500">{p.invoiceNo}</div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{p.dueDate}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold">{formatINR(p.promisedAmount)}</td>
-                  <td className="px-4 py-3 text-xs font-semibold">{p.bucket}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => markBucket(p.id, 'KEPT')}
-                        className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
-                      >
-                        Kept
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => markBucket(p.id, 'BROKEN')}
-                        className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700"
-                      >
-                        Broken
-                      </button>
-                    </div>
+            <tbody className="divide-y divide-zinc-800">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
+                    No promises to pay in this bucket.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((p) => (
+                  <tr key={p.id} className="hover:bg-zinc-800/40">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-zinc-100">{p.customerName}</div>
+                      <div className="font-mono text-xs text-zinc-400">{p.invoiceNo}</div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-400">{p.dueDate}</td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-100">{formatINR(p.promisedAmount)}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          p.bucket === 'KEPT'
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : p.bucket === 'BROKEN' || p.bucket === 'OVERDUE'
+                              ? 'bg-rose-500/15 text-rose-400'
+                              : 'bg-amber-500/15 text-amber-400'
+                        }`}
+                      >
+                        {p.bucket}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right space-x-1.5">
+                      {p.bucket !== 'KEPT' && (
+                        <button
+                          type="button"
+                          onClick={() => markBucket(p.id, 'KEPT')}
+                          className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-400"
+                        >
+                          Kept
+                        </button>
+                      )}
+                      {p.bucket !== 'BROKEN' && (
+                        <button
+                          type="button"
+                          onClick={() => markBucket(p.id, 'BROKEN')}
+                          className="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-xs font-semibold text-rose-400"
+                        >
+                          Broken
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -147,4 +208,3 @@ export default function PromisesToPayPage() {
     </div>
   );
 }
-

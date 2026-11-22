@@ -80,7 +80,7 @@ export class WastageService {
   }
 
   async listWastage(
-    siteId: string,
+    siteId?: string,
     status?: string,
   ): Promise<WastageResponseDto[]> {
     const rows = await this.wastageRepo.list(siteId, status);

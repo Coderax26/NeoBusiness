@@ -68,7 +68,7 @@ export default function ProfilePage() {
           <Avatar name={user?.name || 'User'} size="lg" className="w-20 h-20 text-2xl mb-4" />
           <h3 className="text-base font-bold text-white">{user?.name || 'Authorized Staff'}</h3>
           <span className="text-xs text-teal-400 font-semibold mt-0.5">{user?.role || 'Staff Role'}</span>
-          <p className="text-xs text-zinc-400 mt-2 font-mono">{user?.phone || user?.email || '—'}</p>
+          <p className="text-xs text-zinc-400 mt-2 font-mono">{user?.phone || (user as any)?.email || '—'}</p>
 
           <div className="w-full mt-6 pt-4 border-t border-zinc-800 text-left space-y-2 text-xs">
             <div className="text-zinc-400 font-medium">Assigned Sites:</div>

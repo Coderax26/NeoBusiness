@@ -299,7 +299,9 @@ export class InvoiceService {
     offset?: number;
   }) {
     let query = this.knex('invoices');
-    if (options.siteId) query = query.where('site_id', options.siteId);
+    if (options.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.siteId)) {
+      query = query.where('site_id', options.siteId);
+    }
     if (options.customerId) query = query.where('customer_id', options.customerId);
     if (options.status) query = query.where('status', options.status);
     if (options.fromDate) query = query.where('invoice_date', '>=', options.fromDate);

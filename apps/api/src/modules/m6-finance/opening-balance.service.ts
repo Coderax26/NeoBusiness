@@ -154,12 +154,28 @@ export class OpeningBalanceService {
             updated_at: now,
           });
         } else {
+          const prevEntry = await trx('supplier_ledger_entries')
+            .where('supplier_id', row.partyId)
+            .orderBy('posted_at', 'desc')
+            .first('running_balance');
+          const prevBalance = prevEntry ? Money.of(prevEntry.running_balance) : Money.zero();
+          const newBalance = prevBalance.add(amount);
+
           await trx('supplier_ledger_entries').insert({
+            site_id: siteId,
             supplier_id: row.partyId,
             entry_type: 'OPENING',
             debit: '0.00',
             credit: amount.toStorageString(),
+            ref_no: `OB-${batchId.slice(0, 8)}`,
+            running_balance: newBalance.toStorageString(),
             posted_at: postedAt,
+            note: row.note || 'Opening balance import',
+          });
+
+          await trx('suppliers').where('id', row.partyId).update({
+            current_ap_balance: newBalance.toStorageString(),
+            updated_at: now,
           });
         }
 
@@ -238,12 +254,28 @@ export class OpeningBalanceService {
         }
 
         const reversedAmount = Money.of(openingEntry.credit);
+        const prevEntry = await trx('supplier_ledger_entries')
+          .where('supplier_id', partyId)
+          .orderBy('posted_at', 'desc')
+          .first('running_balance');
+        const prevBalance = prevEntry ? Money.of(prevEntry.running_balance) : Money.zero();
+        const newBalance = prevBalance.sub(reversedAmount);
+
         await trx('supplier_ledger_entries').insert({
+          site_id: siteId,
           supplier_id: partyId,
           entry_type: 'ADJUSTMENT',
           debit: reversedAmount.toStorageString(),
           credit: '0.00',
+          ref_no: `REV-${openingEntry.ref_no || ''}`,
+          running_balance: newBalance.toStorageString(),
           posted_at: new Date(),
+          note: `Reversal of opening balance: ${reason}`,
+        });
+
+        await trx('suppliers').where('id', partyId).update({
+          current_ap_balance: newBalance.toStorageString(),
+          updated_at: new Date(),
         });
 
         return { success: true, reversedAmount: reversedAmount.toStorageString() };

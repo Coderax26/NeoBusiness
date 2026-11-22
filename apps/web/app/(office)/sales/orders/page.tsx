@@ -13,7 +13,7 @@ import {
   exportToCsv,
 } from '@neo/ui';
 import { formatINR, CANCEL_REASONS } from '@neo/shared';
-import { INITIAL_SALES_ORDERS, type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
+import { type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'ALL', label: 'All' },
@@ -28,7 +28,7 @@ const STATUS_TABS: { key: string; label: string }[] = [
 ];
 
 export default function OrdersTrackerPage() {
-  const [orders, setOrders] = useState<SalesOrderRecord[]>(INITIAL_SALES_ORDERS);
+  const [orders, setOrders] = useState<SalesOrderRecord[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'calendar'>('table');
   const [statusTab, setStatusTab] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -39,7 +39,7 @@ export default function OrdersTrackerPage() {
       const res = await fetch('/api/proxy/orders');
       if (!res.ok) return;
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows)) return;
 
       const mapped: SalesOrderRecord[] = rows.map((r: any) => {
         const subtotal = Number(r.total_amount ?? 0);

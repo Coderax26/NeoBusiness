@@ -1,8 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
-import { INITIAL_STOCK_ROWS } from '../../../../src/lib/inventory-data';
+import React, { useEffect, useState } from 'react';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
+
+interface StockBatchRow {
+  id: string;
+  itemId: string;
+  itemName: string;
+  sku: string;
+  batchNo: string;
+  siteId: string;
+  siteName: string;
+  locationCode: string;
+  uom: string;
+  altUomLabel: string;
+  onHand: number;
+  committed: number;
+  available: number;
+  expiryDate: string;
+  daysToExpiry: number;
+}
 
 const REASONS = [
   { key: 'DAMAGE', label: 'Damaged' },
@@ -13,15 +30,54 @@ const REASONS = [
 
 export default function FloorAdjustmentsPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [rowId, setRowId] = useState(INITIAL_STOCK_ROWS[0].id);
+  const [rows, setRows] = useState<StockBatchRow[]>([]);
+  const [rowId, setRowId] = useState('');
   const [qty, setQty] = useState(5);
   const [reason, setReason] = useState<string>('DAMAGE');
   const [photoName, setPhotoName] = useState('');
   const [banner, setBanner] = useState<string | null>(null);
 
-  const selected = INITIAL_STOCK_ROWS.find((r) => r.id === rowId) || INITIAL_STOCK_ROWS[0];
+  useEffect(() => {
+    fetch('/api/proxy/inventory/stock/current')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const mapped: StockBatchRow[] = list.map((b: any) => ({
+          id: String(b.id ?? b.batchId ?? ''),
+          itemId: b.item_id ?? b.itemId ?? '',
+          itemName: b.item_name ?? b.itemName ?? 'Item',
+          sku: b.sku_code ?? b.skuCode ?? b.sku ?? '',
+          batchNo: b.batch_number ?? b.batchNumber ?? b.batchNo ?? '',
+          siteId: b.site_id ?? b.siteId ?? '',
+          siteName: b.site_name ?? b.siteName ?? 'Site',
+          locationCode: b.location_name ?? b.locationName ?? b.locationCode ?? 'WH',
+          uom: b.uom ?? 'KG',
+          altUomLabel: b.altUomLabel ?? '',
+          onHand: Number(b.qtyOnHand ?? b.qty_on_hand ?? b.onHand ?? 0),
+          committed: Number(b.qtyCommitted ?? b.qty_committed ?? b.committed ?? 0),
+          available: Number(b.qtyAvailable ?? b.qty_available ?? b.available ?? 0),
+          daysToExpiry:
+            b.daysToExpiry ??
+            (b.expiryDate || b.expiry_date
+              ? Math.ceil(
+                  (new Date(b.expiryDate ?? b.expiry_date).getTime() - Date.now()) /
+                    86_400_000,
+                )
+              : 30),
+          expiryDate: b.expiry_date ?? b.expiryDate ?? '',
+          landedCostPerUnit: Number(b.landed_cost_per_unit ?? 0),
+          status: b.status ?? 'AVAILABLE',
+        }));
+        setRows(mapped);
+        if (mapped.length > 0) setRowId(mapped[0].id);
+      })
+      .catch(() => setRows([]));
+  }, []);
+
+  const selected = rows.find((r) => r.id === rowId) || rows[0];
 
   const handleSubmit = async () => {
+    if (!selected) return;
     const res = await enqueueOrSend({
       type: 'ADJUSTMENT_REQUEST',
       endpoint: '/api/bff/inventory/adjustments',
@@ -59,7 +115,8 @@ export default function FloorAdjustmentsPage() {
             onChange={(e) => setRowId(e.target.value)}
             className="w-full min-h-[56px] bg-zinc-950 border border-zinc-700 rounded-xl px-4 text-lg text-white"
           >
-            {INITIAL_STOCK_ROWS.map((r) => (
+            {rows.length === 0 && <option value="">No active stock batches found</option>}
+            {rows.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.itemName} — {r.batchNo} ({r.siteName})
               </option>
@@ -90,7 +147,7 @@ export default function FloorAdjustmentsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-zinc-400 mb-2">
-              3. Quantity ({selected.uom})
+              3. Quantity ({selected?.uom ?? 'KG'})
             </label>
             <input
               type="number"

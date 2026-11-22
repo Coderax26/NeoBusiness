@@ -1,5 +1,4 @@
 import { Module, Global, Inject, Logger } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { KnexModule } from 'nestjs-knex';
 import { InvoiceService } from './invoice.service.js';
 import { CollectionService } from './collection.service.js';
@@ -51,7 +50,7 @@ import { ReportsController } from './reports.controller.js';
 
 @Global()
 @Module({
-  imports: [ScheduleModule.forRoot(), KnexModule],
+  imports: [KnexModule],
   controllers: [
     InvoiceController,
     CollectionController,
@@ -162,7 +161,7 @@ export class M6FinancialsModule {
                 .where('id', creditNoteId)
                 .update({
                   status: 'APPROVED',
-                  approved_by: remarks || 'OWNER',
+                  status_reason: remarks || null,
                   approved_at: new Date(),
                 });
               this.logger.log(
@@ -201,7 +200,7 @@ export class M6FinancialsModule {
 
             if (creditNoteId && counterAmount) {
               await this.knex('credit_notes').where('id', creditNoteId).update({
-                amount: counterAmount,
+                total_debit: counterAmount,
                 status: 'REQUESTED', // Back to requested for re-approval
                 counter_amount: counterAmount,
                 counter_remarks: remarks,

@@ -5,22 +5,57 @@ import Link from 'next/link';
 import { KpiCard, Badge, StatusPill, Button, Card } from '@neo/ui';
 import { formatINR, calculateTripProgress, reconcileTripCod } from '@neo/shared';
 import {
-  INITIAL_TRIPS,
-  INITIAL_DELIVERY_ISSUES,
-  READY_ORDERS_POOL,
-} from '../../../src/lib/logistics-data';
+  type TripRecord,
+} from '../../../../src/lib/logistics-data';
 
 export default function LiveDispatchBoardPage() {
-  const [trips, setTrips] = useState(INITIAL_TRIPS);
+  const [trips, setTrips] = useState<TripRecord[]>([]);
+  const [issuesCount, setIssuesCount] = useState(0);
+  const [readyOrdersCount, setReadyOrdersCount] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(30);
   const [lastRefreshed, setLastRefreshed] = useState('Just now');
+  const [deliveryIssues, setDeliveryIssues] = useState<any[]>([]);
+
+  const normalizeTrip = (t: any): TripRecord => ({
+    ...t,
+    id: String(t.id),
+    tripNo: String(t.tripNo ?? t.trip_no ?? ''),
+    tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
+    vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? ''),
+    driverName: String(t.driverName ?? t.driver_name ?? ''),
+    lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16),
+    status: (t.status ?? 'LOADING') as TripRecord['status'],
+    stops: Array.isArray(t.stops)
+      ? t.stops.map((s: any) => ({
+          ...s,
+          id: String(s.id),
+          deliveryStatus: s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING',
+          expectedCodInr: Number(s.expectedCodInr ?? s.cash_to_collect ?? 0),
+          collectedCodInr: Number(s.collectedCodInr ?? s.actual_cash_collected ?? 0),
+          valueInr: Number(s.valueInr ?? s.order_value ?? s.total_amount ?? 0),
+        }))
+      : [],
+  });
 
   const refreshBoard = () => {
-    fetch('/api/bff/trips')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (Array.isArray(d?.data) && d.data.length > 0) {
-          // keep live seed structure if backend returns empty or partial
+    Promise.allSettled([
+      fetch('/api/bff/trips').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/issues').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/orders?status=READY').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([tripsRes, issuesRes, ordersRes]) => {
+        if (tripsRes.status === 'fulfilled' && tripsRes.value) {
+          const rows = Array.isArray(tripsRes.value) ? tripsRes.value : Array.isArray(tripsRes.value?.data) ? tripsRes.value.data : [];
+          setTrips(rows.map(normalizeTrip));
+        }
+        if (issuesRes.status === 'fulfilled' && issuesRes.value) {
+          const iss = Array.isArray(issuesRes.value) ? issuesRes.value : Array.isArray(issuesRes.value?.data) ? issuesRes.value.data : [];
+          setDeliveryIssues(iss);
+          setIssuesCount(iss.filter((i: any) => i.status === 'OPEN').length);
+        }
+        if (ordersRes.status === 'fulfilled' && ordersRes.value) {
+          const ords = Array.isArray(ordersRes.value) ? ordersRes.value : Array.isArray(ordersRes.value?.data) ? ordersRes.value.data : [];
+          setReadyOrdersCount(ords.length);
         }
       })
       .catch(() => {});
@@ -29,6 +64,7 @@ export default function LiveDispatchBoardPage() {
   };
 
   useEffect(() => {
+    refreshBoard();
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -79,7 +115,7 @@ export default function LiveDispatchBoardPage() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        <KpiCard title="Ready Orders" value={String(READY_ORDERS_POOL.length)} subtitle="Pool to assign" />
+        <KpiCard title="Ready Orders" value={String(readyOrdersCount)} subtitle="Pool to assign" />
         <KpiCard title="Trips Loading" value={String(loadingCount)} subtitle="At depot dock" />
         <KpiCard title="On Road" value={String(onRoadCount)} subtitle="In transit now" />
         <KpiCard title="Delivered Stops" value={`${deliveredStops} / ${allStops.length}`} subtitle="Today's stops" />
@@ -164,7 +200,7 @@ export default function LiveDispatchBoardPage() {
               <circle cx="40" cy="95" r="8" fill="#3b82f6" />
               <text x="40" y="116" textAnchor="middle" fill="#93c5fd" fontSize="9">Depot</text>
 
-              {trips[0].stops.map((s) => (
+              {(trips[0]?.stops ?? []).map((s) => (
                 <g key={s.stopId}>
                   <line x1="40" y1="95" x2={s.gpsX} y2={s.gpsY} stroke="#1e3a8a" strokeDasharray="3 3" />
                   <circle
@@ -189,7 +225,7 @@ export default function LiveDispatchBoardPage() {
 
           <Card className="p-4 bg-zinc-900 border-zinc-800 space-y-2">
             <h3 className="text-sm font-semibold text-white">Delivery Alerts &amp; Disputes</h3>
-            {INITIAL_DELIVERY_ISSUES.map((iss) => (
+            {deliveryIssues.map((iss) => (
               <Link
                 key={iss.id}
                 href="/logistics/issues"

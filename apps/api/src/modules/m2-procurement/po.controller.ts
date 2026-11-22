@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Res,
   NotFoundException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,15 +37,23 @@ export class POController {
   @RequirePermission('po.create')
   @ApiOperation({ summary: 'Create a new purchase order (DRAFT)' })
   @ApiResponse({ status: 201, description: 'PO created' })
-  async create(@Body() dto: CreatePODto, @Query('userId') userId: string) {
-    const linesWithUser = dto.lines.map((line) => ({ ...line, userId }));
+  async create(
+    @Body() dto: CreatePODto,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
+  ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    const linesWithUser = dto.lines.map((line) => ({
+      ...line,
+      userId: actorId,
+    }));
     return this.poService.create({
       supplierId: dto.supplierId,
       receivingSiteId: dto.receivingSiteId,
       lines: linesWithUser,
       expectedDelivery: dto.expectedDelivery,
       linkedSalesOrderId: dto.linkedSalesOrderId,
-      userId,
+      userId: actorId,
     });
   }
 
@@ -87,14 +96,16 @@ export class POController {
     const buffer = await pdfGen.generatePurchaseOrder({
       poNo: po.po_no,
       poDate: new Date(po.created_at).toISOString().split('T')[0],
-      expectedDelivery: po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString().split('T')[0] : undefined,
-      supplierName: supplier?.legal_name || 'Supplier',
+      expectedDelivery: po.expected_delivery
+        ? new Date(po.expected_delivery).toISOString().split('T')[0]
+        : undefined,
+      supplierName: supplier?.company_name || 'Supplier',
       supplierGstin: supplier?.gstin,
       siteName: site?.name || 'NeoBus',
       lines: lines.map((l: any) => ({
         itemName: l.item_name || 'Item',
         qty: String(l.ordered_qty),
-        unitPrice: String(l.agreed_unit_price || '0'),
+        unitPrice: String(l.unit_price || '0'),
         lineTotal: String(l.line_total || '0'),
       })),
       totalAmount: String(po.total_amount || '0'),
@@ -122,11 +133,13 @@ export class POController {
   async confirmQuantities(
     @Param('id') poId: string,
     @Body() dto: ConfirmQuantitiesDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
     return this.poService.confirmQuantities({
       poId,
-      confirmations: dto.confirmations.map((c) => ({ ...c, userId })),
+      confirmations: dto.confirmations.map((c) => ({ ...c, userId: actorId })),
     });
   }
 
@@ -134,8 +147,13 @@ export class POController {
   @RequirePermission('po.issue')
   @ApiOperation({ summary: 'Issue PO (DRAFT/PENDING_APPROVAL -> ISSUED)' })
   @ApiResponse({ status: 200, description: 'PO issued' })
-  async issuePO(@Param('id') poId: string, @Query('userId') userId: string) {
-    return this.poService.issuePO({ poId, userId });
+  async issuePO(
+    @Param('id') poId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
+  ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.poService.issuePO({ poId, userId: actorId });
   }
 
   @Post(':id/cancel')
@@ -144,10 +162,12 @@ export class POController {
   @ApiResponse({ status: 200, description: 'PO cancelled' })
   async cancelPO(
     @Param('id') poId: string,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
     @Query('reason') reason?: string,
+    @Req() req?: any,
   ) {
-    return this.poService.cancelPO(poId, userId, reason);
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.poService.cancelPO(poId, actorId, reason);
   }
 
   @Get('sales-order/:salesOrderId')

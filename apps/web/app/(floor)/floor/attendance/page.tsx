@@ -1,13 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
-import { INITIAL_WORKERS, type WorkerMasterRecord } from '../../../../src/lib/production-data';
+import React, { useEffect, useState } from 'react';
+import { type WorkerMasterRecord } from '../../../../src/lib/production-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
 export default function FloorAttendancePage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [workers, setWorkers] = useState<WorkerMasterRecord[]>(INITIAL_WORKERS);
+  const [workers, setWorkers] = useState<WorkerMasterRecord[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/proxy/production/workers')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setWorkers(
+          list.map((w: any) => ({
+            id: w.id,
+            name: w.fullName ?? w.full_name ?? w.name ?? 'Worker',
+            station: w.role ?? w.station ?? 'Floor',
+            status: 'OUT',
+            lastPunch: '--:--',
+            assignedWoNo: w.assignedWoNo,
+          })),
+        );
+      })
+      .catch(() => setWorkers([]));
+  }, []);
 
   const handleTap = async (worker: WorkerMasterRecord) => {
     const nextStatus = worker.status === 'IN' ? 'OUT' : 'IN';

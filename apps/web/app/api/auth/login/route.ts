@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
+const IS_SECURE_COOKIE =
+  process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production';
 
 const EMAIL_TO_SEEDED_PHONE: Record<string, string> = {
   'owner@neobus.in': '+919876543210',
@@ -9,60 +13,6 @@ const EMAIL_TO_SEEDED_PHONE: Record<string, string> = {
   'driver@neobus.in': '+919876543213',
   'collector@neobus.in': '+919876543214',
   'store@neobus.in': '+919876543215',
-};
-
-const DEMO_USERS: Record<
-  string,
-  { id: string; name: string; fullName: string; role: string; phone: string; pin: string }
-> = {
-  '+919876543210': {
-    id: 'usr-owner-01',
-    name: 'Ravi Kumar',
-    fullName: 'Ravi Kumar',
-    role: 'OWNER',
-    phone: '+919876543210',
-    pin: '1234',
-  },
-  '+919876543211': {
-    id: 'usr-ops-01',
-    name: 'Anita Desai',
-    fullName: 'Anita Desai',
-    role: 'OPS_COORD',
-    phone: '+919876543211',
-    pin: '2233',
-  },
-  '+919876543212': {
-    id: 'usr-prod-01',
-    name: 'Suresh Patel',
-    fullName: 'Suresh Patel',
-    role: 'PROD_MGR',
-    phone: '+919876543212',
-    pin: '3344',
-  },
-  '+919876543213': {
-    id: 'usr-driver-01',
-    name: 'Mehul Shah',
-    fullName: 'Mehul Shah',
-    role: 'DRIVER',
-    phone: '+919876543213',
-    pin: '4455',
-  },
-  '+919876543214': {
-    id: 'usr-collector-01',
-    name: 'Priya Nair',
-    fullName: 'Priya Nair',
-    role: 'COLLECTOR',
-    phone: '+919876543214',
-    pin: '5566',
-  },
-  '+919876543215': {
-    id: 'usr-store-01',
-    name: 'Arjun Rao',
-    fullName: 'Arjun Rao',
-    role: 'STOREKEEPER',
-    phone: '+919876543215',
-    pin: '6677',
-  },
 };
 
 function normalizePhone(raw: string): string {
@@ -126,7 +76,7 @@ export async function POST(req: NextRequest) {
 
       response.cookies.set('neobus_access_token', accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: IS_SECURE_COOKIE,
         sameSite: 'lax',
         path: '/',
         maxAge: 8 * 60 * 60,
@@ -134,7 +84,7 @@ export async function POST(req: NextRequest) {
 
       response.cookies.set('neobus_session_user', JSON.stringify(normalizedUser), {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: IS_SECURE_COOKIE,
         sameSite: 'lax',
         path: '/',
         maxAge: 8 * 60 * 60,
@@ -143,7 +93,7 @@ export async function POST(req: NextRequest) {
       if (refreshToken) {
         response.cookies.set('neobus_refresh_token', refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: IS_SECURE_COOKIE,
           sameSite: 'lax',
           path: '/',
           maxAge: 7 * 24 * 60 * 60,
@@ -152,39 +102,35 @@ export async function POST(req: NextRequest) {
 
       return response;
     }
-  } catch {
-    // Backend API unreachable; check seeded demo users below
-  }
 
-  // Fallback for seeded demo users (accepts either exact seeded PIN or '123456')
-  const demoUser = DEMO_USERS[normalizedPhone];
-  if (demoUser && (submittedSecret === demoUser.pin || submittedSecret === '123456')) {
-    const response = NextResponse.json({ success: true, user: demoUser });
-    response.cookies.set('neobus_access_token', `demo-jwt-${demoUser.role}-${Date.now()}`, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 8 * 60 * 60,
-    });
-    response.cookies.set('neobus_session_user', JSON.stringify(demoUser), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 8 * 60 * 60,
-    });
-    return response;
-  }
+    let upstreamErr: any = null;
+    try {
+      upstreamErr = await res.json();
+    } catch {
+      upstreamErr = null;
+    }
 
-  return NextResponse.json(
-    {
-      error: {
-        code: 'AUTH_INVALID_CREDENTIALS',
-        message:
-          'Invalid phone or PIN/password. Click one of the Role Persona cards on the left to load valid seeded credentials.',
+    return NextResponse.json(
+      {
+        error: {
+          code: upstreamErr?.error?.code || 'AUTH_INVALID_CREDENTIALS',
+          message:
+            upstreamErr?.message ||
+            upstreamErr?.error?.message ||
+            'Invalid phone or PIN/password.',
+        },
       },
-    },
-    { status: 401 },
-  );
+      { status: res.status || 401 },
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'BACKEND_UNREACHABLE',
+          message: `Cannot reach authentication service at ${API_ORIGIN} (${err?.message || 'connection failed'}).`,
+        },
+      },
+      { status: 502 },
+    );
+  }
 }

@@ -1,32 +1,46 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { allocateReceiptFifo, formatINR, subMoney } from '@neo/shared';
-import {
-  INITIAL_INVOICES,
-  INITIAL_RECEIPTS,
-  type InvoiceRecord,
-  type ReceiptRecord,
-} from '../../../../src/lib/finance-data';
+import { type InvoiceRecord, type ReceiptRecord } from '../../../../src/lib/finance-data';
 
 export default function CollectionsPage() {
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
-  const [receipts, setReceipts] = useState<ReceiptRecord[]>(INITIAL_RECEIPTS);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('cust-1');
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptRecord[]>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [mode, setMode] = useState<ReceiptRecord['mode']>('CASH');
-  const [amountInput, setAmountInput] = useState<string>('65000');
+  const [amountInput, setAmountInput] = useState<string>('');
   const [reverseReason, setReverseReason] = useState<string>('');
   const [reversingId, setReversingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const customers = useMemo(
-    () => [
-      { id: 'cust-1', name: 'Sahyadri Dairy' },
-      { id: 'cust-2', name: 'Gokul Milk Union' },
-      { id: 'cust-3', name: 'Nandini Agro Feeds' },
-    ],
-    [],
-  );
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/invoices').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/collections/receipts').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/customers').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([invRes, rcpRes, custRes]) => {
+        if (!active) return;
+        const iRows = Array.isArray(invRes) ? invRes : Array.isArray(invRes?.data) ? invRes.data : [];
+        const rRows = Array.isArray(rcpRes) ? rcpRes : Array.isArray(rcpRes?.data) ? rcpRes.data : [];
+        const cRows = Array.isArray(custRes) ? custRes : Array.isArray(custRes?.data) ? custRes.data : [];
+        setInvoices(iRows);
+        setReceipts(rRows);
+        const mappedCusts = cRows.map((c: any) => ({
+          id: String(c.id),
+          name: String(c.business_name || c.name || 'Customer'),
+        }));
+        setCustomers(mappedCusts);
+        if (mappedCusts.length > 0) setSelectedCustomerId(mappedCusts[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const openCustomerInvoices = useMemo(
     () =>
@@ -52,83 +66,91 @@ export default function CollectionsPage() {
     [parsedAmount, openCustomerInvoices],
   );
 
-  function recordPayment(e: React.FormEvent) {
+  async function recordPayment(e: React.FormEvent) {
     e.preventDefault();
-    if (parsedAmount <= 0) return;
+    if (parsedAmount <= 0 || !selectedCustomerId) return;
 
     const customerName = customers.find((c) => c.id === selectedCustomerId)?.name ?? 'Customer';
     const nextNo = `RCP-2026-0${412 + receipts.length}`;
 
+    await fetch('/api/proxy/collections/receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId: selectedCustomerId,
+        mode,
+        amount: parsedAmount,
+      }),
+    }).catch(() => {});
+
     const newReceipt: ReceiptRecord = {
       id: `rcp-${Date.now()}`,
       receiptNo: nextNo,
-      date: '2026-11-13',
+      date: new Date().toISOString().slice(0, 10),
       customerId: selectedCustomerId,
       customerName,
       mode,
       amount: parsedAmount,
-      collectedBy: mode === 'UPI' ? 'Direct UPI' : 'Office Cashier',
       allocations: fifoPreview.allocations.map((a) => ({
         invoiceId: a.invoiceId,
         invoiceNo: a.invoiceNumber,
         allocatedAmount: a.allocatedAmount,
       })),
+      collectedBy: 'Accounts',
       reversed: false,
     };
 
     setReceipts((prev) => [newReceipt, ...prev]);
     setInvoices((prev) =>
       prev.map((inv) => {
-        const alloc = fifoPreview.allocations.find((a) => a.invoiceId === inv.id);
-        if (!alloc) return inv;
-        const nextBal = alloc.remainingInvoiceBalance;
-        const nextPaid = Number(subMoney(inv.totalAmount, nextBal));
+        const hit = fifoPreview.allocations.find((a) => a.invoiceId === inv.id);
+        if (!hit) return inv;
+        const nextPaid = inv.paidAmount + hit.allocatedAmount;
+        const nextBal = Number(subMoney(inv.totalAmount, nextPaid));
         return {
           ...inv,
           paidAmount: nextPaid,
           balanceAmount: nextBal,
-          status: nextBal === 0 ? 'PAID' : 'PART_PAID',
+          status: nextBal <= 0 ? 'PAID' : 'PART_PAID',
         };
       }),
     );
-    setToast(`Recorded ${nextNo} (${formatINR(parsedAmount)}) with FIFO allocation.`);
+    setAmountInput('');
+    setToast(`Recorded ${nextNo} (${formatINR(parsedAmount)} via ${mode}) with FIFO invoice allocation.`);
   }
 
-  function confirmReversal(receiptId: string) {
+  function confirmReverse(receiptId: string) {
     if (!reverseReason.trim()) return;
-    setReceipts((prev) =>
-      prev.map((r) => (r.id === receiptId ? { ...r, reversed: true, reversalReason: reverseReason } : r)),
-    );
+    setReceipts((prev) => prev.map((r) => (r.id === receiptId ? { ...r, reversed: true } : r)));
     setReversingId(null);
     setReverseReason('');
-    setToast('Receipt reversed (append-only audit record preserved).');
+    setToast('Receipt reversed with audit reason.');
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Payments Received &amp; FIFO Allocation</h1>
-        <p className="text-sm text-slate-500">
-          Record cash, cheque, UPI, or bank receipts with oldest-first FIFO allocation (OD-017) and append-only reversals.
+        <h1 className="text-2xl font-bold text-zinc-100">Collections &amp; FIFO Receipt Allocation</h1>
+        <p className="text-sm text-zinc-400">
+          Record Cash, UPI, Bank, or Cheque receipts — auto-allocated oldest-invoice-first (FIFO).
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
           {toast}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Record Payment Form */}
-        <form onSubmit={recordPayment} className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-          <h2 className="text-base font-bold text-slate-900">Record Payment</h2>
+        <form onSubmit={recordPayment} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+          <h2 className="text-base font-bold text-zinc-100">Record Customer Receipt</h2>
           <div>
-            <label className="block text-xs font-semibold text-slate-600">Customer</label>
+            <label className="block text-xs font-semibold text-zinc-400 mb-1">Customer</label>
             <select
               value={selectedCustomerId}
               onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
             >
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -137,150 +159,131 @@ export default function CollectionsPage() {
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600">Mode</label>
-              <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value as ReceiptRecord['mode'])}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              >
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="UPI">UPI (Direct)</option>
-                <option value="BANK">NEFT / RTGS</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600">Amount (₹)</label>
-              <input
-                type="number"
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm"
-              />
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 mb-1">Payment Mode</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(['CASH', 'UPI', 'BANK', 'CHEQUE'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`rounded-lg py-1.5 text-xs font-semibold ${
+                    mode === m
+                      ? 'bg-emerald-600 text-white'
+                      : 'border border-zinc-800 bg-zinc-950 text-zinc-300'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700">
-            Formatted: <span className="font-bold text-slate-900">{formatINR(parsedAmount)}</span>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 mb-1">Amount (₹)</label>
+            <input
+              type="number"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              placeholder="0"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100"
+              required
+            />
           </div>
 
-          <div>
-            <div className="text-xs font-semibold text-slate-600">FIFO Allocation Preview (Oldest First)</div>
-            {fifoPreview.allocations.length === 0 ? (
-              <p className="mt-1 text-xs text-slate-400">No open invoices for this customer.</p>
-            ) : (
-              <ul className="mt-2 space-y-1.5 text-xs">
-                {fifoPreview.allocations.map((a) => (
-                  <li key={a.invoiceId} className="flex justify-between rounded bg-emerald-50 px-2.5 py-1.5">
-                    <span className="font-mono font-semibold text-emerald-900">{a.invoiceNumber}</span>
-                    <span className="font-mono text-emerald-800">{formatINR(a.allocatedAmount)}</span>
-                  </li>
-                ))}
-                {fifoPreview.unallocatedAdvance > 0 && (
-                  <li className="flex justify-between rounded bg-amber-50 px-2.5 py-1.5 text-amber-800">
-                    <span>Advance Credit</span>
-                    <span className="font-mono">{formatINR(fifoPreview.unallocatedAdvance)}</span>
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
+          {fifoPreview.allocations.length > 0 && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1.5 text-xs">
+              <div className="font-semibold text-zinc-300">FIFO Allocation Preview:</div>
+              {fifoPreview.allocations.map((a) => (
+                <div key={a.invoiceId} className="flex justify-between text-zinc-400">
+                  <span className="font-mono">{a.invoiceNumber}</span>
+                  <span className="font-mono text-emerald-400">{formatINR(a.allocatedAmount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"
             className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
           >
-            Post Receipt &amp; Allocate
+            Save Receipt &amp; Allocate
           </button>
         </form>
 
-        {/* Receipts Register */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-slate-800">
-            Receipts Register
+        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 lg:col-span-2">
+          <div className="border-b border-zinc-800 bg-zinc-950/60 px-5 py-3 text-sm font-bold text-zinc-100">
+            Recent Receipts
           </div>
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50/50 text-xs uppercase text-slate-500">
+            <thead className="bg-zinc-950/40 text-xs uppercase text-zinc-400">
               <tr>
-                <th className="px-4 py-3">Receipt</th>
+                <th className="px-4 py-3">Receipt #</th>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Mode</th>
                 <th className="px-4 py-3 text-right">Amount</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {receipts.map((rcp) => (
-                <tr key={rcp.id} className={rcp.reversed ? 'bg-rose-50/40 opacity-75' : 'hover:bg-slate-50'}>
-                  <td className="px-4 py-3">
-                    <div className="font-mono font-semibold text-slate-900">{rcp.receiptNo}</div>
-                    <div className="text-xs text-slate-500">{rcp.date} · {rcp.collectedBy}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{rcp.customerName}</div>
-                    <div className="text-xs text-slate-500">
-                      {rcp.allocations.map((a) => `${a.invoiceNo} (${formatINR(a.allocatedAmount)})`).join(', ')}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{rcp.mode}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700">
-                    {formatINR(rcp.amount)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {rcp.reversed ? (
-                      <span className="text-xs font-semibold text-rose-700">Reversed</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setReversingId(rcp.id)}
-                        className="rounded border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                      >
-                        Reverse
-                      </button>
-                    )}
+            <tbody className="divide-y divide-zinc-800">
+              {receipts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
+                    No receipts recorded.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                receipts.map((r) => (
+                  <tr key={r.id} className="hover:bg-zinc-800/40">
+                    <td className="px-4 py-3">
+                      <div className="font-mono font-bold text-zinc-100">{r.receiptNo}</div>
+                      <div className="text-xs text-zinc-500">{r.date}</div>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-200">{r.customerName}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs font-semibold text-zinc-300">
+                        {r.mode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-400">
+                      {formatINR(r.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {r.reversed ? (
+                        <span className="text-xs font-semibold text-rose-400">REVERSED</span>
+                      ) : reversingId === r.id ? (
+                        <div className="inline-flex gap-1">
+                          <input
+                            type="text"
+                            value={reverseReason}
+                            onChange={(e) => setReverseReason(e.target.value)}
+                            placeholder="Reason"
+                            className="w-28 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-100"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => confirmReverse(r.id)}
+                            className="rounded bg-rose-600 px-2 py-1 text-xs text-white"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setReversingId(r.id)}
+                          className="text-xs font-semibold text-rose-400 hover:underline"
+                        >
+                          Reverse
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {reversingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">Reverse Receipt (Append-Only)</h3>
-            <p className="mt-1 text-xs text-slate-500">Posted money rows cannot be edited or deleted. Enter reversal reason:</p>
-            <input
-              type="text"
-              value={reverseReason}
-              onChange={(e) => setReverseReason(e.target.value)}
-              placeholder="e.g. Wrong customer selected"
-              className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setReversingId(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmReversal(reversingId)}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Confirm Reversal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

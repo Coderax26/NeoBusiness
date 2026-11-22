@@ -55,24 +55,14 @@ export class QuoteController {
   async list(
     @Query()
     q: {
+      siteId?: string;
       customerId?: string;
       status?: string;
       limit?: number;
       offset?: number;
     },
   ) {
-    const limit = Math.min(q.limit ?? 50, 100);
-    const offset = q.offset ?? 0;
-
-    let query = this.quoteSvc['knex']('quotes')
-      .orderBy('created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
-
-    if (q.customerId) query.andWhere('customer_id', q.customerId);
-    if (q.status) query.andWhere('status', q.status);
-
-    return query;
+    return this.quoteSvc.list(q);
   }
 
   /**
@@ -94,60 +84,9 @@ export class QuoteController {
     @Body() dto: { fulfillmentSiteId?: string },
     @Req() req: any,
   ) {
-    const quote = await this.quoteSvc.findById(id);
-
-    if (quote.status === 'EXPIRED') {
-      throw new BadRequestException(
-        'Expired quotes cannot be converted. Create a new quote.',
-      );
-    }
-    if (quote.status === 'CONVERTED') {
-      throw new BadRequestException('Quote already converted to order.');
-    }
-
-    // Re-validate quote lines against current band before conversion
-    const today = new Date().toISOString().split('T')[0];
-    const quoteLines = quote.lines as Array<{
-      item_id: string;
-      qty: string;
-      quoted_unit_price: string;
-      floor_price_snapshot: string;
-    }>;
-
-    // Check if quoted prices are still in-band against today's floor
-    const validationResults: Array<{
-      itemId: string;
-      inBand: boolean;
-      floorPrice: string;
-      quotedPrice: string;
-    }> = [];
-
-    for (const line of quoteLines) {
-      const band = await this.quoteSvc['pricing'].getBand(line.item_id, today);
-      if (band) {
-        const requested = Money.of(line.quoted_unit_price);
-        const floor = Money.of(band.floorPrice);
-        const inBand = requested.isGreaterThanOrEqual(floor);
-        validationResults.push({
-          itemId: line.item_id,
-          inBand,
-          floorPrice: band.floorPrice,
-          quotedPrice: line.quoted_unit_price,
-        });
-      }
-    }
-
-    return {
-      quoteId: id,
-      quoteNo: quote.quote_no,
-      status: quote.status,
-      totalAmount: quote.total_amount,
-      validUntil: quote.valid_until,
-      customer: quote.customer_id,
-      site: quote.site_id,
-      conversionInstructions: 'POST /orders with quoteId in body to convert',
-      priceValidation: validationResults,
-    };
+    const userId = String(req.user?.sub || req.user?.id || '');
+    const siteId = dto?.fulfillmentSiteId || req.user?.siteId || '';
+    return this.quoteSvc.convertToOrder(id, siteId, userId);
   }
 
   /**
@@ -167,7 +106,7 @@ export class QuoteController {
       quoteNo: quote.quote_no,
       quoteDate: new Date(quote.created_at).toISOString().split('T')[0],
       validUntil: quote.valid_until ? new Date(quote.valid_until).toISOString().split('T')[0] : undefined,
-      customerName: customer?.legal_name || 'Customer',
+      customerName: customer?.business_name || 'Customer',
       siteName: site?.name || 'NeoBus',
       lines: (quote.lines || []).map((l: any) => ({
         itemName: l.item_name || 'Item',

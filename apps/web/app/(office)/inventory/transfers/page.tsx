@@ -1,22 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill, Dialog } from '@neo/ui';
 import {
-  INITIAL_TRANSFERS,
-  INITIAL_STOCK_ROWS,
   type TransferRecord,
-} from '../../../src/lib/inventory-data';
+  type StockRow,
+} from '../../../../src/lib/inventory-data';
 
 export default function InventoryTransfersPage() {
-  const [transfers, setTransfers] = useState<TransferRecord[]>(INITIAL_TRANSFERS);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedBatchId, setSelectedBatchId] = useState(INITIAL_STOCK_ROWS[0].id);
+  const [selectedBatchId, setSelectedBatchId] = useState('');
   const [toSite, setToSite] = useState('Baramati Plant');
   const [qty, setQty] = useState(200);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/inventory/transfers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([trfRes, stkRes]) => {
+        if (!active) return;
+        const tRows = Array.isArray(trfRes) ? trfRes : Array.isArray(trfRes?.data) ? trfRes.data : [];
+        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+        setTransfers(tRows);
+        setStockRows(sRows);
+        if (sRows.length > 0) setSelectedBatchId(String(sRows[0].id));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -28,7 +48,8 @@ export default function InventoryTransfersPage() {
   );
 
   const handleCreate = () => {
-    const src = INITIAL_STOCK_ROWS.find((r) => r.id === selectedBatchId) || INITIAL_STOCK_ROWS[0];
+    const src = stockRows.find((r) => r.id === selectedBatchId) || stockRows[0];
+    if (!src) return;
     const created: TransferRecord = {
       id: `trf-${Date.now()}`,
       transferNo: `TRF-2026-0${Math.floor(20 + Math.random() * 79)}`,
@@ -192,7 +213,7 @@ export default function InventoryTransfersPage() {
               onChange={(e) => setSelectedBatchId(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
             >
-              {INITIAL_STOCK_ROWS.map((r) => (
+              {stockRows.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.itemName} — {r.batchNo} ({r.siteName}, Exp {r.expiryDate})
                 </option>

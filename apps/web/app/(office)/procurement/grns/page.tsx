@@ -1,30 +1,71 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Card } from '@neo/ui';
 import { formatINR, maskGrnForBlindView } from '@neo/shared';
-import { INITIAL_GRNS, type GrnRecord } from '../../../src/lib/procurement-data';
+import { type GrnRecord } from '../../../../src/lib/procurement-data';
 
 export default function GoodsReceivedPage() {
-  const [grns] = useState<GrnRecord[]>(INITIAL_GRNS);
-  const [selectedGrn, setSelectedGrn] = useState<GrnRecord>(INITIAL_GRNS[0]);
+  const [grns, setGrns] = useState<GrnRecord[]>([]);
+  const [selectedGrn, setSelectedGrn] = useState<GrnRecord | null>(null);
   const [viewRoleMode, setViewRoleMode] = useState<'OFFICE' | 'BLIND_STOREKEEPER'>('OFFICE');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/procurement/grns')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        if (!active || !Array.isArray(rows)) return;
+        const mapped: GrnRecord[] = rows.map((g: any) => ({
+          id: String(g.id),
+          grnNumber: String(g.grnNumber || g.grn_number || g.grn_no || g.id),
+          poId: String(g.poId || g.po_id || ''),
+          poNumber: String(g.poNumber || g.po_number || g.po_no || ''),
+          supplierId: String(g.supplierId || g.supplier_id || ''),
+          supplierName: String(g.supplierName || g.supplier_name || 'Supplier'),
+          siteName: String(g.siteName || g.site_name || 'Main Site'),
+          receivedDate: String(g.receivedDate || g.received_date || g.receivedAt || g.received_at || g.created_at || '').slice(0, 10),
+          receivedBy: String(g.receivedBy || g.received_by_name || 'Storekeeper'),
+          hasShortfall: Boolean(g.hasShortfall ?? g.has_shortfall),
+          lines: Array.isArray(g.lines)
+            ? g.lines.map((l: any, idx: number) => ({
+                lineId: String(l.lineId || l.id || `l-${idx}`),
+                itemId: String(l.itemId || l.item_id || ''),
+                itemSku: String(l.itemSku || l.sku_code || ''),
+                itemName: String(l.itemName || l.item_name || 'Item'),
+                uom: String(l.uom || 'kg'),
+                orderedQty: Number(l.orderedQty ?? l.ordered_qty ?? 0),
+                unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
+                receivedQty: Number(l.receivedQty ?? l.received_qty ?? 0),
+              }))
+            : [],
+        }));
+        setGrns(mapped);
+        if (mapped.length > 0) setSelectedGrn(mapped[0]);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const blindMaskedLines = useMemo(
     () =>
-      maskGrnForBlindView(
-        selectedGrn.lines.map((l) => ({
-          lineId: l.lineId,
-          itemId: l.itemId,
-          itemSku: l.itemSku,
-          itemName: l.itemName,
-          uom: l.uom,
-          orderedQty: l.orderedQty,
-          unitPrice: l.unitPrice,
-          receivedQty: l.receivedQty,
-        })),
-      ),
+      selectedGrn
+        ? maskGrnForBlindView(
+            selectedGrn.lines.map((l) => ({
+              lineId: l.lineId,
+              itemId: l.itemId,
+              itemSku: l.itemSku,
+              itemName: l.itemName,
+              uom: l.uom,
+              orderedQty: l.orderedQty,
+              unitPrice: l.unitPrice,
+              receivedQty: l.receivedQty,
+            })),
+          )
+        : [],
     [selectedGrn],
   );
 
@@ -87,7 +128,7 @@ export default function GoodsReceivedPage() {
               <tr
                 key={g.id}
                 className={`hover:bg-zinc-800/40 cursor-pointer ${
-                  selectedGrn.id === g.id ? 'bg-indigo-500/10' : ''
+                  selectedGrn?.id === g.id ? 'bg-indigo-500/10' : ''
                 }`}
                 onClick={() => setSelectedGrn(g)}
               >
@@ -125,16 +166,16 @@ export default function GoodsReceivedPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
           <div>
             <h2 className="text-base font-semibold text-white">
-              {selectedGrn.grnNumber} —{' '}
+              {selectedGrn?.grnNumber ?? '—'} —{' '}
               {viewRoleMode === 'OFFICE'
                 ? 'Office Comparison (Ordered vs Received)'
                 : 'Blind GRN View (Storekeeper — No Ordered Qty or Price)'}
             </h2>
             <p className="text-xs text-zinc-400">
-              PO: {selectedGrn.poNumber} · Supplier: {selectedGrn.supplierName} · Site: {selectedGrn.siteName}
+              PO: {selectedGrn?.poNumber ?? '—'} · Supplier: {selectedGrn?.supplierName ?? '—'} · Site: {selectedGrn?.siteName ?? '—'}
             </p>
           </div>
-          {selectedGrn.hasShortfall && viewRoleMode === 'OFFICE' && (
+          {selectedGrn?.hasShortfall && viewRoleMode === 'OFFICE' && (
             <Link href="/procurement/shortfalls">
               <Button variant="primary">Recover Shortfall →</Button>
             </Link>
@@ -155,7 +196,7 @@ export default function GoodsReceivedPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/70">
-                {selectedGrn.lines.map((line) => (
+                {(selectedGrn?.lines ?? []).map((line) => (
                   <tr key={line.lineId}>
                     <td className="py-3">
                       <div className="text-white font-medium">{line.itemName}</div>

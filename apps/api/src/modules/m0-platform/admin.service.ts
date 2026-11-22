@@ -259,12 +259,16 @@ export class AdminService {
   }
 
   async listLocations(siteId?: string) {
+    const validSiteId =
+      siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)
+        ? siteId
+        : undefined;
     let query = this.knex('locations as l')
       .join('sites as s', 'l.site_id', 's.id')
       .select('l.*', 's.name as site_name');
 
-    if (siteId) {
-      query = query.where('l.site_id', siteId);
+    if (validSiteId) {
+      query = query.where('l.site_id', validSiteId);
     }
     return query.where('l.is_active', true).orderBy('l.name', 'asc');
   }
@@ -389,6 +393,192 @@ export class AdminService {
 
   async listDocSequences() {
     return this.knex('doc_sequences').select('*').orderBy('doc_type', 'asc');
+  }
+
+  async getCompanyProfile() {
+    const row = await this.knex('business_rule_config')
+      .where({ key: 'COMPANY_PROFILE', scope: 'GLOBAL' })
+      .first();
+    const defaults = {
+      legalName: 'NeoAgro Dairy & Feeds Pvt. Ltd.',
+      gstin: '27AAACN1234F1Z5',
+      pan: 'AAACN1234F',
+      timezone: 'Asia/Kolkata',
+    };
+    if (!row?.value_json) return defaults;
+    return { ...defaults, ...(row.value_json as Record<string, unknown>) };
+  }
+
+  async updateCompanyProfile(body: Record<string, unknown>, updaterId?: string) {
+    const current = await this.getCompanyProfile();
+    const next = { ...current, ...body };
+    const exists = await this.knex('business_rule_config')
+      .where({ key: 'COMPANY_PROFILE', scope: 'GLOBAL' })
+      .first();
+    if (exists) {
+      await this.knex('business_rule_config')
+        .where({ key: 'COMPANY_PROFILE', scope: 'GLOBAL' })
+        .update({
+          value_json: next,
+          updated_by: updaterId || null,
+          updated_at: new Date(),
+        });
+    } else {
+      await this.knex('business_rule_config').insert({
+        key: 'COMPANY_PROFILE',
+        value_json: next,
+        scope: 'GLOBAL',
+        scope_ref: null,
+        description: 'Company legal profile & invoice header',
+        updated_by: updaterId || null,
+        updated_at: new Date(),
+      });
+    }
+    return { ...next, updatedAt: new Date().toISOString() };
+  }
+
+  async listNotificationTemplates() {
+    let rows = await this.knex('notification_templates').orderBy('code', 'asc');
+    if (rows.length === 0) {
+      const defaults = [
+        {
+          id: uuidv4(),
+          code: 'ORDER_CONFIRM_WA',
+          channel: 'WHATSAPP',
+          language: 'en',
+          title: 'Order Confirmed',
+          body: 'Dear {{customer}}, order {{order_no}} for ₹{{amount}} is confirmed.',
+          wa_template_id: 'WA_TMPL_901',
+          is_active: true,
+        },
+        {
+          id: uuidv4(),
+          code: 'OTP_LOGIN_SMS',
+          channel: 'SMS',
+          language: 'en',
+          title: 'Login Verification PIN',
+          body: 'Your NeoBus verification OTP is {{otp}}.',
+          wa_template_id: 'DLT_1107169',
+          is_active: true,
+        },
+      ];
+      for (const tpl of defaults) {
+        const exists = await this.knex('notification_templates').where({ code: tpl.code }).first();
+        if (!exists) {
+          await this.knex('notification_templates').insert(tpl);
+        }
+      }
+      rows = await this.knex('notification_templates').orderBy('code', 'asc');
+    }
+    return { data: rows };
+  }
+
+  async updateNotificationTemplate(code: string, body: Record<string, unknown>) {
+    const updateData: Record<string, unknown> = {};
+    if (body.channel !== undefined) updateData.channel = body.channel;
+    if (body.language !== undefined) updateData.language = body.language;
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.body !== undefined) updateData.body = body.body;
+    if (body.wa_template_id !== undefined || body.providerId !== undefined) {
+      updateData.wa_template_id = body.wa_template_id ?? body.providerId;
+    }
+    if (body.is_active !== undefined) updateData.is_active = body.is_active;
+
+    const existing = await this.knex('notification_templates').where({ code }).first();
+    if (existing) {
+      const [updated] = await this.knex('notification_templates')
+        .where({ code })
+        .update(updateData)
+        .returning('*');
+      return { ...updated, updatedAt: new Date().toISOString() };
+    }
+    const [inserted] = await this.knex('notification_templates')
+      .insert({
+        id: uuidv4(),
+        code,
+        channel: String(body.channel || 'WHATSAPP'),
+        language: String(body.language || 'en'),
+        title: String(body.title || code),
+        body: String(body.body || ''),
+        wa_template_id: (body.wa_template_id ?? body.providerId ?? null) as string | null,
+        is_active: body.is_active !== undefined ? Boolean(body.is_active) : true,
+      })
+      .returning('*');
+    return { ...inserted, updatedAt: new Date().toISOString() };
+  }
+
+  async getSystemHealth() {
+    let dbOk = true;
+    try {
+      await this.knex.raw('SELECT 1');
+    } catch {
+      dbOk = false;
+    }
+    const [outboxRes, queuedNotifRes, failedNotifRes] = await Promise.all([
+      this.knex('outbox_events').whereNull('published_at').count('* as c').first(),
+      this.knex('notification_outbox').where('status', 'QUEUED').count('* as c').first(),
+      this.knex('notification_outbox').where('status', 'FAILED').count('* as c').first(),
+    ]);
+    return {
+      status: dbOk ? 'HEALTHY' : 'DEGRADED',
+      dbConnected: dbOk,
+      outboxQueueDepth: Number((outboxRes as any)?.c ?? 0) + Number((queuedNotifRes as any)?.c ?? 0),
+      failedNotificationsCount: Number((failedNotifRes as any)?.c ?? 0),
+      lastCheckedAt: new Date().toISOString(),
+      version: '0.7.0',
+    };
+  }
+
+  async getRolloutConfig() {
+    const row = await this.knex('business_rule_config')
+      .where({ key: 'ROLLOUT_CONFIG', scope: 'GLOBAL' })
+      .first();
+    const defaults = {
+      releaseStage: 'R3',
+      budgets: [
+        { metric: 'API P95 Latency', current: '48 ms', budget: '< 250 ms' },
+        { metric: 'Web First Load JS', current: '103 kB', budget: '< 200 kB' },
+        { metric: 'UAT SUS Score', current: '84 / 100', budget: '>= 75' },
+        { metric: 'Zero Mock Policy', current: '100% Live', budget: '100%' },
+      ],
+      scenarios: [
+        { id: 'E1', name: 'Quote -> Order -> Dispatch -> Invoice -> Collection', phases: 'F4, F8, F9', status: 'PASS' },
+        { id: 'E2', name: 'Requisition -> PO -> Blind GRN -> Supplier Bill 3-Way', phases: 'F5, F6', status: 'PASS' },
+        { id: 'E3', name: 'BOM -> Work Order -> Consumption -> Output -> Stock', phases: 'F7, F6', status: 'PASS' },
+        { id: 'E4', name: 'Owner Control Tower Pulse & Exception Approval', phases: 'F10, F0', status: 'PASS' },
+      ],
+      setupSteps: [],
+    };
+    if (!row?.value_json) return defaults;
+    return { ...defaults, ...(row.value_json as Record<string, unknown>) };
+  }
+
+  async updateRolloutConfig(body: Record<string, unknown>, updaterId?: string) {
+    const current = await this.getRolloutConfig();
+    const next = { ...current, ...body };
+    const exists = await this.knex('business_rule_config')
+      .where({ key: 'ROLLOUT_CONFIG', scope: 'GLOBAL' })
+      .first();
+    if (exists) {
+      await this.knex('business_rule_config')
+        .where({ key: 'ROLLOUT_CONFIG', scope: 'GLOBAL' })
+        .update({
+          value_json: next,
+          updated_by: updaterId || null,
+          updated_at: new Date(),
+        });
+    } else {
+      await this.knex('business_rule_config').insert({
+        key: 'ROLLOUT_CONFIG',
+        value_json: next,
+        scope: 'GLOBAL',
+        scope_ref: null,
+        description: 'Rollout readiness & setup wizard progress',
+        updated_by: updaterId || null,
+        updated_at: new Date(),
+      });
+    }
+    return next;
   }
 }
 

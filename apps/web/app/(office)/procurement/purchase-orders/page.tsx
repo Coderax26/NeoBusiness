@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Dialog } from '@neo/ui';
 import {
@@ -9,12 +9,11 @@ import {
   formatPriceSpikePlainWarning,
 } from '@neo/shared';
 import {
-  INITIAL_PURCHASE_ORDERS,
   PROCUREMENT_ITEMS,
   PROCUREMENT_SUPPLIERS,
   type PurchaseOrderRecord,
   type PurchaseOrderStatus,
-} from '../../../src/lib/procurement-data';
+} from '../../../../src/lib/procurement-data';
 
 const STATUS_TABS: Array<{ key: PurchaseOrderStatus | 'ALL'; label: string }> = [
   { key: 'ALL', label: 'All' },
@@ -27,11 +26,40 @@ const STATUS_TABS: Array<{ key: PurchaseOrderStatus | 'ALL'; label: string }> = 
 ];
 
 export default function PurchaseOrdersPage() {
-  const [pos, setPos] = useState<PurchaseOrderRecord[]>(INITIAL_PURCHASE_ORDERS);
+  const [pos, setPos] = useState<PurchaseOrderRecord[]>([]);
   const [statusTab, setStatusTab] = useState<PurchaseOrderStatus | 'ALL'>('ALL');
   const [supplierFilter, setSupplierFilter] = useState('ALL');
   const [siteFilter, setSiteFilter] = useState('ALL');
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/procurement/purchase-orders')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setPos(
+          rows.map((p: any) => ({
+            id: String(p.id),
+            poNumber: String(p.poNumber || p.po_number || p.po_no || p.id),
+            supplierId: String(p.supplierId || p.supplier_id || ''),
+            supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
+            siteName: String(p.siteName || p.site_name || 'Main Site'),
+            status: (p.status || 'DRAFT') as PurchaseOrderStatus,
+            expectedDelivery: String(p.expectedDelivery || p.expected_delivery_date || '').slice(0, 10),
+            paymentTermsDays: Number(p.paymentTermsDays ?? p.payment_terms_days ?? 15),
+            priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception),
+            issuedAt: p.issuedAt || p.issued_at || undefined,
+            lines: Array.isArray(p.lines) ? p.lines : [],
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // 4-step PO Builder Wizard
   const [wizardOpen, setWizardOpen] = useState(false);

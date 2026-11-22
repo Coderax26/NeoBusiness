@@ -14,6 +14,10 @@ import { StockAlertType } from './dto/stock-alerts.dto.js';
 export class StockAlertsService {
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
+  private isUuid(v?: string): boolean {
+    return Boolean(v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v));
+  }
+
   /**
    * AC7: Stock Alerts
    * Returns alerts for low stock, expiring soon, and overcommitted batches
@@ -34,8 +38,11 @@ export class StockAlertsService {
       alertType: StockAlertType;
     }>
   > {
-    const alerts = await this.knex('mv_inventory_alerts')
-      .where('site_id', siteId)
+    let query = this.knex('mv_inventory_alerts');
+    if (this.isUuid(siteId)) {
+      query = query.where('site_id', siteId);
+    }
+    const alerts = await query
       .select(
         'site_id',
         'item_id',
@@ -88,9 +95,11 @@ export class StockAlertsService {
       alertType: StockAlertType;
     }>
   > {
-    const alerts = await this.knex('mv_inventory_alerts')
-      .where('site_id', siteId)
-      .andWhere('alert_type', alertType)
+    let query = this.knex('mv_inventory_alerts').andWhere('alert_type', alertType);
+    if (this.isUuid(siteId)) {
+      query = query.where('site_id', siteId);
+    }
+    const alerts = await query
       .select(
         'site_id',
         'item_id',
@@ -131,8 +140,11 @@ export class StockAlertsService {
     overcommitted: number;
     total: number;
   }> {
-    const counts = await this.knex('mv_inventory_alerts')
-      .where('site_id', siteId)
+    let query = this.knex('mv_inventory_alerts');
+    if (this.isUuid(siteId)) {
+      query = query.where('site_id', siteId);
+    }
+    const counts = await query
       .count('* as total')
       .count("* filter (where alert_type = 'OUT_OF_STOCK') as out_of_stock")
       .count("* filter (where alert_type = 'LOW_STOCK') as low_stock")

@@ -1,65 +1,109 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatINR } from '@neo/shared';
-import {
-  INITIAL_AR_AGING,
-  INITIAL_CHEQUES,
-  INITIAL_COD_STOPS,
-  INITIAL_HANDOVERS,
-  INITIAL_INVOICES,
-  INITIAL_PTPS,
-  INITIAL_RECEIPTS,
-} from '../../../src/lib/finance-data';
 
 export default function FinanceHomePage() {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [arAging, setArAging] = useState<any[]>([]);
+  const [handovers, setHandovers] = useState<any[]>([]);
+  const [cheques, setCheques] = useState<any[]>([]);
+  const [ptps, setPtps] = useState<any[]>([]);
+  const [codStops, setCodStops] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+    const siteQuery =
+      storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
+    Promise.allSettled([
+      fetch(`/api/proxy/invoices${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/collections/receipts${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/analytics/ar/aging${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/handovers${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/cheques${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/ptp${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/cod-settlements/pending${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([invRes, rcpRes, arRes, hndRes, chqRes, ptpRes, codRes]) => {
+        if (!active) return;
+        const pick = (r: PromiseSettledResult<any>) =>
+          r.status === 'fulfilled'
+            ? Array.isArray(r.value)
+              ? r.value
+              : Array.isArray(r.value?.data)
+                ? r.value.data
+                : []
+            : [];
+        setInvoices(pick(invRes));
+        setReceipts(pick(rcpRes));
+        setArAging(pick(arRes));
+        setHandovers(pick(hndRes));
+        setCheques(pick(chqRes));
+        setPtps(pick(ptpRes));
+        setCodStops(pick(codRes));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+
   const invoicedToday = useMemo(
-    () => INITIAL_INVOICES.filter((i) => i.invoiceDate === '2026-11-13').reduce((s, i) => s + i.totalAmount, 0),
-    [],
+    () =>
+      invoices
+        .filter((i) => String(i.invoiceDate || i.invoice_date || '').startsWith(today))
+        .reduce((s, i) => s + Number(i.totalAmount ?? i.total_amount ?? 0), 0),
+    [invoices, today],
   );
   const collectedToday = useMemo(
-    () => INITIAL_RECEIPTS.filter((r) => r.date === '2026-11-13' && !r.reversed).reduce((s, r) => s + r.amount, 0),
-    [],
+    () =>
+      receipts
+        .filter((r) => String(r.date || r.payment_date || '').startsWith(today) && !r.reversed)
+        .reduce((s, r) => s + Number(r.amount ?? 0), 0),
+    [receipts, today],
   );
   const totalToCollect = useMemo(
-    () => INITIAL_AR_AGING.reduce((s, c) => s + c.totalOutstanding, 0),
-    [],
+    () => arAging.reduce((s, c) => s + Number(c.totalOutstanding ?? c.total_outstanding ?? 0), 0),
+    [arAging],
   );
   const overdue30Plus = useMemo(
-    () => INITIAL_AR_AGING.reduce((s, c) => s + c.bucket30Plus, 0),
-    [],
+    () => arAging.reduce((s, c) => s + Number(c.bucket30Plus ?? c.aging_30_plus ?? c.bucket_30_plus ?? 0), 0),
+    [arAging],
   );
   const cashWithFieldStaff = useMemo(
-    () => INITIAL_HANDOVERS.filter((h) => h.status === 'PENDING').reduce((s, h) => s + h.expectedCash, 0),
-    [],
+    () =>
+      handovers
+        .filter((h) => h.status === 'PENDING')
+        .reduce((s, h) => s + Number(h.expectedCash ?? h.expected_cash ?? h.expected_amount ?? 0), 0),
+    [handovers],
   );
 
   const agingTotals = useMemo(() => {
-    const b0 = INITIAL_AR_AGING.reduce((s, c) => s + c.bucket0to7, 0);
-    const b8 = INITIAL_AR_AGING.reduce((s, c) => s + c.bucket8to15, 0);
-    const b16 = INITIAL_AR_AGING.reduce((s, c) => s + c.bucket16to30, 0);
-    const b30 = INITIAL_AR_AGING.reduce((s, c) => s + c.bucket30Plus, 0);
+    const b0 = arAging.reduce((s, c) => s + Number(c.bucket0to7 ?? c.aging_0_7 ?? 0), 0);
+    const b8 = arAging.reduce((s, c) => s + Number(c.bucket8to15 ?? c.aging_8_15 ?? 0), 0);
+    const b16 = arAging.reduce((s, c) => s + Number(c.bucket16to30 ?? c.aging_16_30 ?? 0), 0);
+    const b30 = arAging.reduce((s, c) => s + Number(c.bucket30Plus ?? c.aging_30_plus ?? 0), 0);
     const total = b0 + b8 + b16 + b30 || 1;
     return { b0, b8, b16, b30, total };
-  }, []);
+  }, [arAging]);
 
-  const pendingHandovers = INITIAL_HANDOVERS.filter((h) => h.status === 'PENDING').length;
-  const chequesToDeposit = INITIAL_CHEQUES.filter((c) => c.status === 'RECEIVED').length;
-  const ptpsDueToday = INITIAL_PTPS.filter((p) => p.bucket === 'TODAY' || p.bucket === 'OVERDUE').length;
-  const codToSettle = INITIAL_COD_STOPS.filter((s) => s.status === 'PENDING').length;
-
-  const openingCash = 18500;
-  const cashCollections = 30000;
-  const bankDeposits = 20000;
-  const closingCash = openingCash + cashCollections - bankDeposits;
+  const pendingHandovers = handovers.filter((h) => h.status === 'PENDING').length;
+  const chequesToDeposit = cheques.filter((c) => c.status === 'RECEIVED').length;
+  const ptpsDueToday = ptps.filter((p) => p.bucket === 'TODAY' || p.bucket === 'OVERDUE' || p.status === 'OPEN').length;
+  const codToSettle = codStops.filter((s) => s.status === 'PENDING').length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Money &amp; Finance Control</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-zinc-100">Money &amp; Finance Control</h1>
+          <p className="text-sm text-zinc-400">
             Live receivables, cash custody (BR-07), cheques, COD settlement, and guided End-of-Day close.
           </p>
         </div>
@@ -72,7 +116,7 @@ export default function FinanceHomePage() {
           </Link>
           <Link
             href="/finance/eod"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
           >
             End-of-Day Close →
           </Link>
@@ -81,128 +125,69 @@ export default function FinanceHomePage() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-medium text-slate-500">Invoiced Today</div>
-          <div className="mt-1 font-mono text-xl font-bold text-slate-900">{formatINR(invoicedToday)}</div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="text-xs font-medium text-zinc-400">Invoiced Today</div>
+          <div className="mt-1 font-mono text-xl font-bold text-zinc-100">{formatINR(invoicedToday)}</div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-medium text-slate-500">Collected Today</div>
-          <div className="mt-1 font-mono text-xl font-bold text-emerald-700">{formatINR(collectedToday)}</div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="text-xs font-medium text-zinc-400">Collected Today</div>
+          <div className="mt-1 font-mono text-xl font-bold text-emerald-400">{formatINR(collectedToday)}</div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-medium text-slate-500">Total to Collect (AR)</div>
-          <div className="mt-1 font-mono text-xl font-bold text-slate-900">{formatINR(totalToCollect)}</div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="text-xs font-medium text-zinc-400">Total To Collect</div>
+          <div className="mt-1 font-mono text-xl font-bold text-zinc-100">{formatINR(totalToCollect)}</div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-medium text-slate-500">Overdue &gt; 30 Days</div>
-          <div className="mt-1 font-mono text-xl font-bold text-rose-700">{formatINR(overdue30Plus)}</div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="text-xs font-medium text-zinc-400">Overdue 30+ Days</div>
+          <div className="mt-1 font-mono text-xl font-bold text-rose-400">{formatINR(overdue30Plus)}</div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs font-medium text-slate-500">Cash With Field Staff</div>
-          <div className="mt-1 font-mono text-xl font-bold text-amber-700">{formatINR(cashWithFieldStaff)}</div>
-        </div>
-      </div>
-
-      {/* AR Aging Stacked Bar & Cash Position */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">AR Aging Breakdown</h2>
-            <Link href="/finance/receivables" className="text-xs font-semibold text-emerald-700 hover:underline">
-              Open Receivables →
-            </Link>
-          </div>
-          <div className="mt-4 flex h-5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="bg-emerald-500"
-              style={{ width: `${(agingTotals.b0 / agingTotals.total) * 100}%` }}
-              title={`0-7 days: ${formatINR(agingTotals.b0)}`}
-            />
-            <div
-              className="bg-amber-400"
-              style={{ width: `${(agingTotals.b8 / agingTotals.total) * 100}%` }}
-              title={`8-15 days: ${formatINR(agingTotals.b8)}`}
-            />
-            <div
-              className="bg-orange-500"
-              style={{ width: `${(agingTotals.b16 / agingTotals.total) * 100}%` }}
-              title={`16-30 days: ${formatINR(agingTotals.b16)}`}
-            />
-            <div
-              className="bg-rose-600"
-              style={{ width: `${(agingTotals.b30 / agingTotals.total) * 100}%` }}
-              title={`30+ days: ${formatINR(agingTotals.b30)}`}
-            />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-            <div className="rounded-lg bg-emerald-50 p-2.5">
-              <div className="text-emerald-700">0–7 Days</div>
-              <div className="font-mono font-bold text-slate-900">{formatINR(agingTotals.b0)}</div>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-2.5">
-              <div className="text-amber-700">8–15 Days</div>
-              <div className="font-mono font-bold text-slate-900">{formatINR(agingTotals.b8)}</div>
-            </div>
-            <div className="rounded-lg bg-orange-50 p-2.5">
-              <div className="text-orange-700">16–30 Days</div>
-              <div className="font-mono font-bold text-slate-900">{formatINR(agingTotals.b16)}</div>
-            </div>
-            <div className="rounded-lg bg-rose-50 p-2.5">
-              <div className="text-rose-700">30+ Days</div>
-              <div className="font-mono font-bold text-slate-900">{formatINR(agingTotals.b30)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cashbook Position */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-bold text-slate-900">Office Cash Position</h2>
-          <p className="text-xs text-slate-500">Opening + Collections − Bank Deposits</p>
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-slate-500">Opening Balance</dt>
-              <dd className="font-mono font-semibold text-slate-800">{formatINR(openingCash)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-500">+ Cash Collections</dt>
-              <dd className="font-mono font-semibold text-emerald-700">{formatINR(cashCollections)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-500">− Bank Deposits</dt>
-              <dd className="font-mono font-semibold text-rose-700">{formatINR(bankDeposits)}</dd>
-            </div>
-            <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold">
-              <dt className="text-slate-900">Closing Cash</dt>
-              <dd className="font-mono text-slate-900">{formatINR(closingCash)}</dd>
-            </div>
-          </dl>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="text-xs font-medium text-zinc-400">Cash with Field Staff</div>
+          <div className="mt-1 font-mono text-xl font-bold text-amber-400">{formatINR(cashWithFieldStaff)}</div>
         </div>
       </div>
 
-      {/* Today's Action Tasks */}
+      {/* AR Aging Strip */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-zinc-100">AR Aging Breakdown</h2>
+          <Link href="/finance/receivables" className="text-xs font-semibold text-emerald-400 hover:underline">
+            View Full Aging →
+          </Link>
+        </div>
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-zinc-800">
+          <div className="bg-emerald-500" style={{ width: `${(agingTotals.b0 / agingTotals.total) * 100}%` }} />
+          <div className="bg-amber-400" style={{ width: `${(agingTotals.b8 / agingTotals.total) * 100}%` }} />
+          <div className="bg-orange-500" style={{ width: `${(agingTotals.b16 / agingTotals.total) * 100}%` }} />
+          <div className="bg-rose-500" style={{ width: `${(agingTotals.b30 / agingTotals.total) * 100}%` }} />
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+          <div className="text-zinc-400">0–7d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b0)}</span></div>
+          <div className="text-zinc-400">8–15d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b8)}</span></div>
+          <div className="text-zinc-400">16–30d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b16)}</span></div>
+          <div className="text-zinc-400">30+d: <span className="font-mono font-semibold text-rose-400">{formatINR(agingTotals.b30)}</span></div>
+        </div>
+      </div>
+
+      {/* Action Queues */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/finance/handovers" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="text-xs font-medium text-slate-500">Handovers to Verify</div>
-          <div className="mt-1 text-2xl font-bold text-amber-700">{pendingHandovers}</div>
-          <div className="mt-1 text-xs font-semibold text-emerald-700">Open Handover Desk →</div>
+        <Link href="/finance/handovers" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
+          <div className="text-xs text-zinc-400">Pending Cash Handovers</div>
+          <div className="mt-1 text-2xl font-bold text-amber-400">{pendingHandovers}</div>
         </Link>
-        <Link href="/finance/cheques" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="text-xs font-medium text-slate-500">Cheques to Deposit</div>
-          <div className="mt-1 text-2xl font-bold text-blue-700">{chequesToDeposit}</div>
-          <div className="mt-1 text-xs font-semibold text-emerald-700">Open Cheques Board →</div>
+        <Link href="/finance/cheques" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
+          <div className="text-xs text-zinc-400">Cheques to Deposit</div>
+          <div className="mt-1 text-2xl font-bold text-blue-400">{chequesToDeposit}</div>
         </Link>
-        <Link href="/finance/ptp" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="text-xs font-medium text-slate-500">PTPs Due / Overdue</div>
-          <div className="mt-1 text-2xl font-bold text-rose-700">{ptpsDueToday}</div>
-          <div className="mt-1 text-xs font-semibold text-emerald-700">Review Promises →</div>
+        <Link href="/finance/ptp" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
+          <div className="text-xs text-zinc-400">PTPs Due / Overdue</div>
+          <div className="mt-1 text-2xl font-bold text-rose-400">{ptpsDueToday}</div>
         </Link>
-        <Link href="/finance/cod" className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400">
-          <div className="text-xs font-medium text-slate-500">COD Stops to Settle</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">{codToSettle}</div>
-          <div className="mt-1 text-xs font-semibold text-emerald-700">Settle Trip COD →</div>
+        <Link href="/finance/cod" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
+          <div className="text-xs text-zinc-400">COD Pending Settlement</div>
+          <div className="mt-1 text-2xl font-bold text-emerald-400">{codToSettle}</div>
         </Link>
       </div>
     </div>
   );
 }
-

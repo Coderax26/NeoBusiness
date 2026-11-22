@@ -1,81 +1,116 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { calculateTripProgress, reconcileTripCod, requiresEwayBill } from '@neo/shared';
 import {
-  INITIAL_DELIVERY_ISSUES,
-  INITIAL_TRIPS,
-  INITIAL_TRIP_EXPENSES,
   type TripRecord,
   type TripStopDetail,
-} from '../../../../src/lib/logistics-data';
+  type TripExpenseRecord,
+  type DeliveryIssueRecord,
+} from '../../../../../src/lib/logistics-data';
 
 type DetailTab = 'STOPS' | 'DOCUMENTS' | 'COD' | 'EXPENSES' | 'ISSUES' | 'TIMELINE';
 
 const STATUS_BADGES: Record<TripRecord['status'], string> = {
-  DRAFT: 'bg-slate-100 text-slate-700',
-  LOADING: 'bg-amber-100 text-amber-800',
-  IN_TRANSIT: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  CLOSED: 'bg-emerald-700 text-white',
+  DRAFT: 'bg-zinc-800 text-zinc-300',
+  LOADING: 'bg-amber-500/15 text-amber-400',
+  IN_TRANSIT: 'bg-blue-500/15 text-blue-400',
+  COMPLETED: 'bg-emerald-500/15 text-emerald-400',
+  CLOSED: 'bg-emerald-600 text-white',
 };
 
 const STOP_STATUS_STYLES: Record<TripStopDetail['deliveryStatus'], string> = {
-  PENDING: 'bg-slate-100 text-slate-700',
-  DELIVERED: 'bg-emerald-100 text-emerald-700',
-  PARTIAL: 'bg-amber-100 text-amber-800',
-  FAILED: 'bg-rose-100 text-rose-700',
+  PENDING: 'bg-zinc-800 text-zinc-300',
+  DELIVERED: 'bg-emerald-500/15 text-emerald-400',
+  PARTIAL: 'bg-amber-500/15 text-amber-400',
+  FAILED: 'bg-rose-500/15 text-rose-400',
 };
 
 export default function TripDetailPage() {
   const params = useParams<{ id: string }>();
-  const tripId = params?.id ?? 'trp-501';
+  const tripId = params?.id ?? '';
 
-  const initialTrip = useMemo(
-    () => INITIAL_TRIPS.find((t) => t.id === tripId) ?? INITIAL_TRIPS[0],
-    [tripId],
-  );
-
-  const [trip, setTrip] = useState<TripRecord>(initialTrip);
+  const [trip, setTrip] = useState<TripRecord | null>(null);
+  const [tripExpenses, setTripExpenses] = useState<TripExpenseRecord[]>([]);
+  const [tripIssues, setTripIssues] = useState<DeliveryIssueRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DetailTab>('STOPS');
   const [selectedStopEpod, setSelectedStopEpod] = useState<TripStopDetail | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const progress = useMemo(() => calculateTripProgress(trip.stops), [trip.stops]);
-  const codSummary = useMemo(() => reconcileTripCod(trip.stops), [trip.stops]);
+  useEffect(() => {
+    if (!tripId) return;
+    let active = true;
+    Promise.all([
+      fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`).then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/trip-expenses').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/issues').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([tData, expData, issData]) => {
+        if (!active) return;
+        const t = tData?.data || tData;
+        if (t && t.id) setTrip(t);
+        const eRows = Array.isArray(expData) ? expData : Array.isArray(expData?.data) ? expData.data : [];
+        setTripExpenses(eRows.filter((e: any) => String(e.tripId || e.trip_id) === tripId));
+        const iRows = Array.isArray(issData) ? issData : Array.isArray(issData?.data) ? issData.data : [];
+        setTripIssues(iRows.filter((i: any) => String(i.tripId || i.trip_id) === tripId));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [tripId]);
 
-  const tripExpenses = useMemo(
-    () => INITIAL_TRIP_EXPENSES.filter((e) => e.tripId === trip.id),
-    [trip.id],
-  );
-  const tripIssues = useMemo(
-    () => INITIAL_DELIVERY_ISSUES.filter((i) => i.tripId === trip.id),
-    [trip.id],
-  );
+  const progress = useMemo(() => calculateTripProgress(trip?.stops ?? []), [trip?.stops]);
+  const codSummary = useMemo(() => reconcileTripCod(trip?.stops ?? []), [trip?.stops]);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-zinc-400">Loading trip details...</div>;
+  }
+
+  if (!trip) {
+    return (
+      <div className="p-6 space-y-3">
+        <Link href="/logistics/trips" className="text-xs text-zinc-400 hover:text-white inline-block">
+          ← Back to Trips
+        </Link>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+          Trip not found.
+        </div>
+      </div>
+    );
+  }
 
   function updateStopStatus(stopId: string, nextStatus: TripStopDetail['deliveryStatus']) {
-    setTrip((prev) => ({
-      ...prev,
-      lastUpdated: 'Just now',
-      stops: prev.stops.map((s) =>
-        s.stopId === stopId
-          ? {
-              ...s,
-              deliveryStatus: nextStatus,
-              collectedCodInr:
-                nextStatus === 'DELIVERED' ? s.expectedCodInr : nextStatus === 'FAILED' ? 0 : s.collectedCodInr,
-              epodSignedBy: nextStatus === 'DELIVERED' ? s.epodSignedBy ?? 'Receiver Verified' : s.epodSignedBy,
-            }
-          : s,
-      ),
-    }));
+    setTrip((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        lastUpdated: 'Just now',
+        stops: prev.stops.map((s) =>
+          s.stopId === stopId
+            ? {
+                ...s,
+                deliveryStatus: nextStatus,
+                collectedCodInr:
+                  nextStatus === 'DELIVERED' ? s.expectedCodInr : nextStatus === 'FAILED' ? 0 : s.collectedCodInr,
+                epodSignedBy: nextStatus === 'DELIVERED' ? s.epodSignedBy ?? 'Receiver Verified' : s.epodSignedBy,
+              }
+            : s,
+        ),
+      };
+    });
     setStatusMessage(`Updated stop status to ${nextStatus}.`);
   }
 
   function toggleCodHandover() {
-    setTrip((prev) => ({ ...prev, codHandedOver: !prev.codHandedOver }));
+    if (!trip) return;
+    setTrip((prev) => (prev ? { ...prev, codHandedOver: !prev.codHandedOver } : prev));
     setStatusMessage(!trip.codHandedOver ? 'Marked COD handed over for F9 settlement.' : 'Reverted COD handover flag.');
   }
 

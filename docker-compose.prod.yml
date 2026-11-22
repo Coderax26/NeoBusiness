@@ -1,24 +1,18 @@
-version: '3.9'
-
-# P4.5 Production Hardened Stack — Non-root execution, CPU/Memory limits, healthchecks
+# Production & Pre-Production Stack for Coolify / Docker Compose
+# Hardened non-root execution, healthchecks, resource limits, and clean client bootstrap.
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: neobus_prod_postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-neobus_prod}
       POSTGRES_USER: ${POSTGRES_USER:-neobus_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
-      - postgres_wal_archive:/var/lib/postgresql/wal_archive
     command: >
       postgres
-      -c wal_level=replica
-      -c archive_mode=on
-      -c archive_command='test ! -f /var/lib/postgresql/wal_archive/%f && cp %p /var/lib/postgresql/wal_archive/%f'
       -c max_connections=100
       -c shared_buffers=256MB
     deploy:
@@ -36,8 +30,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: neobus_prod_redis
-    restart: always
+    restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
     volumes:
       - redis_prod_data:/data
@@ -58,8 +51,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    container_name: neobus_prod_api
-    restart: always
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,15 +60,34 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      LOG_FORMAT: json
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      REDIS_URL: redis://redis:6379
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_LEVEL: ${LOG_LEVEL:-log}
+      APP_TZ: ${APP_TZ:-Asia/Kolkata}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-neobus_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-neobus_prod}}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
+      JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
-      APP_TZ: Asia/Kolkata
-    ports:
-      - "127.0.0.1:3000:3000"
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      DB_POOL_MAX: ${DB_POOL_MAX:-25}
+      BOOTSTRAP_CLIENT: ${BOOTSTRAP_CLIENT:-true}
+      BOOTSTRAP_SITE_NAME: ${BOOTSTRAP_SITE_NAME:-Primary Office & Warehouse}
+      BOOTSTRAP_SITE_TYPE: ${BOOTSTRAP_SITE_TYPE:-OFFICE}
+      BOOTSTRAP_SITE_ADDRESS: ${BOOTSTRAP_SITE_ADDRESS:-Head Office}
+      BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME:-System Owner}
+      BOOTSTRAP_OWNER_PHONE: ${BOOTSTRAP_OWNER_PHONE:-+919999999999}
+      BOOTSTRAP_OWNER_PIN: ${BOOTSTRAP_OWNER_PIN:-123456}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -89,16 +100,25 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    container_name: neobus_prod_web
-    restart: always
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 4000
+      HOSTNAME: 0.0.0.0
       API_ORIGIN: http://api:3000
-    ports:
-      - "127.0.0.1:4000:4000"
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      NEXT_PUBLIC_SHOW_DEMO_PERSONAS: ${NEXT_PUBLIC_SHOW_DEMO_PERSONAS:-false}
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -109,6 +129,4 @@ services:
 
 volumes:
   postgres_prod_data:
-  postgres_wal_archive:
   redis_prod_data:
-

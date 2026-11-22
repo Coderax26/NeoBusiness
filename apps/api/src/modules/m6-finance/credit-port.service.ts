@@ -161,5 +161,5 @@ export class CreditPortService implements CreditPort {
 // Export the provider for module wiring
 export const CreditPortProvider = {
   provide: CREDIT_PORT,
-  useClass: CreditPortService,
+  useExisting: CreditPortService,
 };

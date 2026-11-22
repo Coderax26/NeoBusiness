@@ -1,90 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
-
-const DEFAULT_SITES = [
-  { id: 'site-factory-01', name: 'NeoCore Factory — Mumbai', siteType: 'FACTORY' },
-  { id: 'site-wh-01', name: 'Central Warehouse — Navi Mumbai', siteType: 'WAREHOUSE' },
-  { id: 'site-office-01', name: 'NeoCore Office — Corporate', siteType: 'OFFICE' },
-];
-
-const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
-  OWNER: ['*'],
-  OPS_COORD: [
-    'order.view',
-    'order.create',
-    'quote.view',
-    'customer.view',
-    'price.set_daily',
-    'supplier.read',
-    'po.create',
-    'po.read',
-    'grn.read',
-    'requisition.read',
-    'inventory.read',
-    'inventory.transfer',
-    'inventory.adjust',
-    'stock.adjust_request',
-    'wo.read',
-    'wo.start',
-    'fleet.manage',
-    'fleet.read',
-    'fleet.view',
-    'fleet.resolve_issue',
-    'invoice.read',
-    'analytics.read_ar',
-    'receipt.verify_handover',
-    'finance.view',
-    'report.view',
-  ],
-  STOREKEEPER: [
-    'inventory.read',
-    'inventory.transfer',
-    'stock.transfer',
-    'stock.adjust_request',
-    'grn.record_blind',
-    'trip.load',
-  ],
-  PROD_MGR: ['wo.read', 'wo.start', 'requisition.create', 'inventory.read'],
-  DRIVER: ['fleet.read', 'fleet.view', 'trip.load'],
-  COLLECTOR: ['invoice.read', 'finance.view', 'receipt.verify_handover'],
-};
-
-const ROLE_FALLBACK_PROFILES: Record<string, { id: string; name: string; phone: string }> = {
-  OWNER: { id: 'usr-owner-01', name: 'Ravi Kumar', phone: '+919876543210' },
-  OPS_COORD: { id: 'usr-ops-01', name: 'Anita Desai', phone: '+919876543211' },
-  PROD_MGR: { id: 'usr-prod-01', name: 'Suresh Patel', phone: '+919876543212' },
-  DRIVER: { id: 'usr-driver-01', name: 'Mehul Shah', phone: '+919876543213' },
-  COLLECTOR: { id: 'usr-collector-01', name: 'Priya Nair', phone: '+919876543214' },
-  STOREKEEPER: { id: 'usr-store-01', name: 'Arjun Rao', phone: '+919876543215' },
-};
+const IS_SECURE_COOKIE =
+  process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production';
 
 function buildSessionUserPayload(raw: any) {
-  const role = String(raw?.role || 'OWNER').toUpperCase();
-  const profile = ROLE_FALLBACK_PROFILES[role] || ROLE_FALLBACK_PROFILES.OWNER;
-  const sites =
-    Array.isArray(raw?.sites) && raw.sites.length > 0 ? raw.sites : DEFAULT_SITES;
+  const role = String(raw?.role || '').toUpperCase();
+  const sites = Array.isArray(raw?.sites)
+    ? raw.sites.map((s: any) => ({
+        id: String(s.id),
+        name: s.name,
+        type: s.type || s.siteType || 'OFFICE',
+        siteType: s.siteType || s.type || 'OFFICE',
+      }))
+    : [];
   const siteIds =
     Array.isArray(raw?.siteIds) && raw.siteIds.length > 0
       ? raw.siteIds
       : sites.map((s: any) => s.id);
 
-  const defaultPerms = ROLE_DEFAULT_PERMISSIONS[role] || ['*'];
-  const rawPerms = Array.isArray(raw?.permissions) ? raw.permissions : [];
-  const permissions = Array.from(new Set([...defaultPerms, ...rawPerms]));
+  const permissions = Array.isArray(raw?.permissions)
+    ? Array.from(new Set(raw.permissions))
+    : role === 'OWNER'
+      ? ['*']
+      : [];
 
-  const fullName = raw?.fullName || raw?.full_name || raw?.name || profile.name;
+  const fullName = raw?.fullName || raw?.full_name || raw?.name || raw?.phone || 'User';
 
   const user = {
-    id: raw?.id || profile.id,
+    id: raw?.id || '',
     name: fullName,
     fullName,
-    phone: raw?.phone || profile.phone,
+    phone: raw?.phone || '',
     role,
     siteIds,
     sites,
-    activeSiteId: sites[0]?.id || 'all',
-    preferredLanguage: raw?.preferredLanguage || 'en',
+    activeSiteId: raw?.assigned_site_id || sites[0]?.id || '',
+    preferredLanguage: raw?.preferredLanguage || raw?.preferred_language || 'en',
     permissions,
   };
 
@@ -92,57 +46,90 @@ function buildSessionUserPayload(raw: any) {
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get('neobus_access_token')?.value;
-  const cachedUserCookie = req.cookies.get('neobus_session_user')?.value;
+  let token = req.cookies.get('neobus_access_token')?.value;
+  const refreshToken = req.cookies.get('neobus_refresh_token')?.value;
 
-  if (!token) {
+  if (!token && !refreshToken) {
     return NextResponse.json(
       { error: { code: 'UNAUTHORIZED', message: 'No active session' } },
       { status: 401 },
     );
   }
 
-  // 1. Handle local demo JWT tokens directly without hitting backend /auth/me
-  if (token.startsWith('demo-jwt-')) {
-    if (cachedUserCookie) {
-      try {
-        const parsed = JSON.parse(cachedUserCookie);
-        return NextResponse.json(buildSessionUserPayload(parsed), { status: 200 });
-      } catch {
-        // continue to role extraction
+  let newAccessToken: string | undefined;
+  let newRefreshToken: string | undefined;
+
+  try {
+    let res = token
+      ? await fetch(`${API_ORIGIN}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      : null;
+
+    if ((!res || res.status === 401) && refreshToken) {
+      const refreshRes = await fetch(`${API_ORIGIN}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        newAccessToken = refreshData.accessToken;
+        newRefreshToken = refreshData.refreshToken;
+        token = newAccessToken;
+        if (token) {
+          res = await fetch(`${API_ORIGIN}/api/v1/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
       }
     }
-    const parts = token.split('-');
-    const role = parts[2] || 'OWNER';
-    return NextResponse.json(buildSessionUserPayload({ role }), { status: 200 });
-  }
 
-  // 2. Call backend /api/v1/auth/me with real JWT
-  try {
-    const res = await fetch(`${API_ORIGIN}/api/v1/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (res.ok) {
+    if (res && res.ok) {
       const data = await res.json();
       const rawUser = data?.user || data;
-      return NextResponse.json(buildSessionUserPayload(rawUser), { status: 200 });
-    }
-  } catch {
-    // Backend temporarily unreachable; fall back to cached session cookie if present
-  }
+      const payload = buildSessionUserPayload(rawUser);
+      const response = NextResponse.json(payload, { status: 200 });
 
-  // 3. Graceful fallback if neobus_session_user cookie exists
-  if (cachedUserCookie) {
-    try {
-      const parsed = JSON.parse(cachedUserCookie);
-      return NextResponse.json(buildSessionUserPayload(parsed), { status: 200 });
-    } catch {
-      // fall through
+      if (newAccessToken) {
+        response.cookies.set('neobus_access_token', newAccessToken, {
+          httpOnly: true,
+          secure: IS_SECURE_COOKIE,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 8 * 60 * 60,
+        });
+      }
+      if (newRefreshToken) {
+        response.cookies.set('neobus_refresh_token', newRefreshToken, {
+          httpOnly: true,
+          secure: IS_SECURE_COOKIE,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      }
+      return response;
     }
-  }
 
-  return NextResponse.json(buildSessionUserPayload({ role: 'OWNER' }), { status: 200 });
+    const unauthorized = NextResponse.json(
+      { error: { code: 'UNAUTHORIZED', message: 'Session invalid or expired' } },
+      { status: 401 },
+    );
+    unauthorized.cookies.delete('neobus_access_token');
+    unauthorized.cookies.delete('neobus_refresh_token');
+    unauthorized.cookies.delete('neobus_session_user');
+    return unauthorized;
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'BACKEND_UNREACHABLE',
+          message: `Cannot reach API at ${API_ORIGIN} (${err?.message || 'connection failed'})`,
+        },
+      },
+      { status: 502 },
+    );
+  }
 }

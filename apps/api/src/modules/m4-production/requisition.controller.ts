@@ -97,7 +97,7 @@ export class RequisitionController {
     type: [RequisitionResponseDto],
   })
   async listRequisitions(
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
     @Query('status') status?: string,
   ): Promise<RequisitionResponseDto[]> {
     return this.reqService.listRequisitions(siteId, status);

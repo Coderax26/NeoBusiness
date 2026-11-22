@@ -54,7 +54,7 @@ export const LockScreenOverlay: React.FC<LockScreenOverlayProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier: user?.phone || user?.email || '',
+          identifier: user?.phone || (user as { email?: string } | null)?.email || '',
           password: secret,
           pin: secret,
         }),

@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,10 +36,16 @@ export class RequisitionController {
   @ApiResponse({ status: 201, description: 'Requisition created' })
   async create(
     @Body() dto: CreateRequisitionDto,
-    @Query('userId') userId: string,
-    @Query('requestedBy') requestedBy: string,
+    @Query('userId') userId?: string,
+    @Query('requestedBy') requestedBy?: string,
+    @Req() req?: any,
   ) {
-    return this.requisitionService.create({ ...dto, requestedBy, userId });
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.requisitionService.create({
+      ...dto,
+      requestedBy: requestedBy || actorId,
+      userId: actorId,
+    });
   }
 
   @Get()
@@ -89,12 +96,14 @@ export class RequisitionController {
   @ApiResponse({ status: 201, description: 'PO created from requisitions' })
   async convertToPO(
     @Body() dto: ConvertToPODto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
     return this.requisitionService.convertToPO(
       dto.supplierId,
       dto.requisitionIds,
-      userId,
+      actorId,
     );
   }
 
@@ -102,8 +111,13 @@ export class RequisitionController {
   @RequirePermission('requisition.update')
   @ApiOperation({ summary: 'Cancel requisition' })
   @ApiResponse({ status: 200, description: 'Requisition cancelled' })
-  async cancel(@Param('id') id: string, @Query('userId') userId: string) {
-    return this.requisitionService.cancel(id, userId);
+  async cancel(
+    @Param('id') id: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
+  ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.requisitionService.cancel(id, actorId);
   }
 
   @Get('source/:source/:sourceRefId')

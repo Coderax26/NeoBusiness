@@ -106,16 +106,11 @@ export class ReportsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    return {
+    return this.reportsService.getPnlSnapshot({
       siteId,
       dateFrom,
       dateTo,
-      salesInr: '2965000.00',
-      cogsInr: '2540000.00',
-      wastageInr: '18500.00',
-      expensesInr: '64000.00',
-      netProfitInr: '342500.00',
-    };
+    });
   }
 
   @Post('export')

@@ -33,6 +33,7 @@ import type { NotifyPort } from '../../shared/ports/ports.interface.js';
 @Injectable()
 export class TallyExportService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TallyExportService.name);
+  private isExporting = false;
 
   constructor(
     @InjectKnex() private readonly knex: Knex,
@@ -56,7 +57,20 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
    * Cron expression: '0 2 * * *' = 2:00 AM daily
    */
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  async exportTallyXml(): Promise<void> {
+  async handleNightlyExport(): Promise<void> {
+    try {
+      await this.exportTallyXml(null);
+    } catch {
+      // Logged inside exportTallyXml; do not rethrow into @nestjs/schedule
+    }
+  }
+
+  async exportTallyXml(actorId: string | null = null): Promise<void> {
+    if (this.isExporting) {
+      this.logger.warn('Tally XML export skipped: previous run still in progress');
+      return;
+    }
+    this.isExporting = true;
     this.logger.log('Starting nightly Tally XML export...');
 
     try {
@@ -77,8 +91,8 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
             status: 'PROCESSING',
             total_vouchers: 0,
             xml_content: null,
-            created_by: 'SYSTEM',
-            updated_by: 'SYSTEM',
+            created_by: actorId,
+            updated_by: actorId,
           })
           .returning('*');
 
@@ -92,7 +106,11 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
           // No new vouchers - mark batch as completed with 0 vouchers
           await trx('tally_export_batches')
             .where('id', batchId)
-            .update({ status: 'COMPLETED', total_vouchers: 0 });
+            .update({
+              status: 'COMPLETED',
+              total_vouchers: 0,
+              updated_by: actorId,
+            });
           this.logger.log('No new vouchers to export');
           return;
         }
@@ -119,7 +137,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
           total_vouchers: vouchers.length,
           xml_content: xmlContent,
           updated_at: new Date(),
-          updated_by: 'SYSTEM',
+          updated_by: actorId,
         });
 
         this.logger.log(
@@ -149,6 +167,8 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       this.logger.error(`Tally export failed: ${(err as Error).message}`);
       throw err;
+    } finally {
+      this.isExporting = false;
     }
   }
 
@@ -193,7 +213,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
     for (const inv of invoices) {
       const customer = await trx('customers')
         .where('id', inv.customer_id)
-        .first('name', 'gstin', 'state_code');
+        .first('business_name', 'gstin', 'state_code');
 
       const lines = await trx('invoice_lines')
         .where('invoice_id', inv.id)
@@ -205,7 +225,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
         refNo: inv.invoice_no,
         date: new Date(inv.invoice_date),
         amount: inv.total_amount,
-        partyName: customer?.name ?? 'Unknown',
+        partyName: customer?.business_name ?? 'Unknown',
         partyGstin: customer?.gstin,
         partyStateCode: customer?.state_code,
         lines: lines.map((line) => ({
@@ -236,7 +256,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
     for (const rec of receipts) {
       const customer = await trx('customers')
         .where('id', rec.customer_id)
-        .first('name', 'gstin', 'state_code');
+        .first('business_name', 'gstin', 'state_code');
 
       vouchers.push({
         voucherType: 'RECEIPT',
@@ -244,7 +264,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
         refNo: rec.receipt_no,
         date: new Date(rec.collected_at ?? new Date()),
         amount: rec.amount,
-        partyName: customer?.name ?? 'Unknown',
+        partyName: customer?.business_name ?? 'Unknown',
         partyGstin: customer?.gstin,
         partyStateCode: customer?.state_code,
         lines: [
@@ -276,7 +296,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
     for (const cn of creditNotes) {
       const customer = await trx('customers')
         .where('id', cn.customer_id)
-        .first('name', 'gstin', 'state_code');
+        .first('business_name', 'gstin', 'state_code');
 
       const lines = await trx('credit_note_lines')
         .where('credit_note_id', cn.id)
@@ -288,7 +308,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
         refNo: cn.credit_note_no,
         date: new Date(cn.created_at),
         amount: cn.total_debit,
-        partyName: customer?.name ?? 'Unknown',
+        partyName: customer?.business_name ?? 'Unknown',
         partyGstin: customer?.gstin,
         partyStateCode: customer?.state_code,
         lines: lines.map((line) => ({
@@ -513,5 +533,5 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
 // Export the provider for module wiring
 export const TallyExportProvider = {
   provide: 'TALLY_EXPORT_SERVICE',
-  useClass: TallyExportService,
+  useExisting: TallyExportService,
 };

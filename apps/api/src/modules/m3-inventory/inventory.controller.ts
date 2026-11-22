@@ -137,8 +137,10 @@ export class InventoryController {
     @Param('id') reservationId: string,
     @Body() body: ReleaseReservationDto,
   ) {
-    await this.inventoryPort.release(reservationId);
-    return { success: true };
+    return this.inventoryService.releaseReservation(
+      reservationId,
+      (body as any)?.idempotencyKey || `release:${reservationId}`,
+    );
   }
 
   /**
@@ -353,17 +355,9 @@ export class InventoryController {
   @RequirePermission('inventory.read')
   @ApiOperation({ summary: 'ATP projection including incoming POs and planned WOs (G-INV-2)' })
   async getStockProjection(
-    @Query('itemId') itemId: string,
-    @Query('siteId') siteId: string,
+    @Query('itemId') itemId?: string,
+    @Query('siteId') siteId?: string,
   ) {
-    return {
-      itemId,
-      siteId,
-      onHandQty: '420',
-      reservedQty: '60',
-      incomingPoQty: '200',
-      plannedWoQty: '150',
-      projectedAvailableQty: '710',
-    };
+    return this.inventoryService.getStockProjection(itemId, siteId);
   }
 }

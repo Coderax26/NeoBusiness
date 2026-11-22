@@ -2,6 +2,8 @@ node_modules
 npm-debug.log
 .git
 .gitignore
+.claude
+CLAUDE.md
 .env
 .env.*
 dist
@@ -10,4 +12,9 @@ coverage
 graphify-out
 docs
 *.log
+*.bak
+E2E_FRONTEND_BACKEND_TEST_REPORT.md
+COOLIFY_DEPLOYMENT.md
+apps/*/.next
+apps/*/dist
 

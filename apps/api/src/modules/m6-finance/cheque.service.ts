@@ -498,7 +498,6 @@ export class ChequeService {
         'cheque_register.receipt_id',
         'collection_receipts.id',
       )
-      .where('collection_receipts.site_id', siteId)
       .orderBy('cheque_register.created_at', 'desc')
       .limit(limit)
       .select(
@@ -506,6 +505,10 @@ export class ChequeService {
         'collection_receipts.receipt_no',
         'collection_receipts.customer_id',
       );
+
+    if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {
+      query = query.where('collection_receipts.site_id', siteId);
+    }
 
     if (status) {
       query = query.andWhere('cheque_register.status', status);
@@ -524,13 +527,12 @@ export class ChequeService {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysThreshold);
 
-    return this.knex('cheque_register')
+    let query = this.knex('cheque_register')
       .join(
         'collection_receipts',
         'cheque_register.receipt_id',
         'collection_receipts.id',
       )
-      .where('collection_receipts.site_id', siteId)
       .andWhere('cheque_register.status', 'DEPOSITED')
       .andWhere('cheque_register.deposited_at', '<', cutoffDate)
       .orderBy('cheque_register.deposited_at', 'asc')
@@ -539,11 +541,17 @@ export class ChequeService {
         'collection_receipts.receipt_no',
         'collection_receipts.customer_id',
       );
+
+    if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {
+      query = query.where('collection_receipts.site_id', siteId);
+    }
+
+    return query;
   }
 }
 
 // Export the provider for module wiring
 export const ChequeProvider = {
   provide: 'CHEQUE_SERVICE',
-  useClass: ChequeService,
+  useExisting: ChequeService,
 };

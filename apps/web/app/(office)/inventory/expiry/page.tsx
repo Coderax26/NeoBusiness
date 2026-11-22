@@ -1,20 +1,63 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Card } from '@neo/ui';
 import { classifyExpiryBucket } from '@neo/shared';
-import { INITIAL_STOCK_ROWS } from '../../../src/lib/inventory-data';
+import { type StockRow } from '../../../../src/lib/inventory-data';
 
 export default function ExpiryWatchlistPage() {
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
   const [daysThreshold, setDaysThreshold] = useState(30);
   const [actionedIds, setActionedIds] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/inventory/stock/current')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setStockRows(
+          rows.map((r: any) => {
+            const expiryDate = String(r.expiryDate ?? r.expiry_date ?? '').slice(0, 10);
+            const computedDays = expiryDate
+              ? Math.ceil((new Date(expiryDate).getTime() - Date.now()) / 86_400_000)
+              : 999;
+            return {
+              ...r,
+              id: String(r.id ?? r.batchId ?? r.itemId ?? ''),
+              itemId: String(r.itemId ?? r.item_id ?? ''),
+              sku: String(r.sku ?? r.skuCode ?? r.sku_code ?? ''),
+              itemName: String(r.itemName ?? r.item_name ?? r.name ?? ''),
+              category: (r.category ?? 'RAW_MATERIAL') as any,
+              siteId: String(r.siteId ?? r.site_id ?? ''),
+              siteName: String(r.siteName ?? r.site_name ?? ''),
+              locationCode: String(r.locationCode ?? r.locationName ?? r.location_name ?? ''),
+              batchNo: String(r.batchNo ?? r.batchNumber ?? r.batch_number ?? ''),
+              onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
+              reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? 0),
+              minStock: Number(r.minStock ?? 0),
+              uom: String(r.uom ?? 'kg'),
+              altUomLabel: String(r.altUomLabel ?? ''),
+              unitCost: Number(r.unitCost ?? r.unitCostInr ?? 0),
+              daysToExpiry: r.daysToExpiry !== undefined ? Number(r.daysToExpiry) : computedDays,
+              expiryDate,
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const filteredBatches = useMemo(() => {
-    return INITIAL_STOCK_ROWS.filter((r) => r.daysToExpiry <= daysThreshold).sort(
+    return stockRows.filter((r) => r.daysToExpiry <= daysThreshold).sort(
       (a, b) => a.daysToExpiry - b.daysToExpiry,
     );
-  }, [daysThreshold]);
+  }, [stockRows, daysThreshold]);
 
   const counts = useMemo(() => {
     const expired = filteredBatches.filter((b) => b.daysToExpiry <= 0).length;

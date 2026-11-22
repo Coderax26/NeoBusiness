@@ -407,7 +407,7 @@ export class RequisitionService {
   }
 
   async listRequisitions(
-    siteId: string,
+    siteId?: string,
     status?: string,
   ): Promise<RequisitionResponseDto[]> {
     const headers = await this.reqRepo.getHeaders(siteId, status);

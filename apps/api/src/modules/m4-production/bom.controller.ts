@@ -61,8 +61,8 @@ export class BomController {
     type: [BomHeaderResponseDto],
   })
   async listBoms(
-    @Query('itemId') itemId: string,
-    @Query('siteId') siteId: string,
+    @Query('itemId') itemId?: string,
+    @Query('siteId') siteId?: string,
   ): Promise<BomHeaderResponseDto[]> {
     return this.bomService.listBoms(itemId, siteId);
   }
@@ -154,10 +154,6 @@ export class BomController {
   @RequirePermission('production.bom.read')
   @ApiOperation({ summary: 'Calculate estimated ingredient cost per unit of finished good (G-M4-1)' })
   async getBomCostRollup(@Param('id') id: string) {
-    return {
-      bomId: id,
-      estimatedCostPerUnitInr: '1340.00',
-      currency: 'INR',
-    };
+    return this.bomService.getBomCostRollup(id);
   }
 }

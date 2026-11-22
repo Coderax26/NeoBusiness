@@ -63,7 +63,8 @@ describe('Phase F3 — Master Data & Business Setup Specification', () => {
       expect(fs.existsSync(homeFile)).toBe(true);
       const content = fs.readFileSync(homeFile, 'utf8');
 
-      expect(content).toContain('Your business is 60% set up');
+      expect(content).toContain('setupProgressPct');
+      expect(content).toContain('% set up');
       expect(content).toContain('/admin/setup-wizard');
       expect(content).toContain('Continue Setup Wizard');
     });

@@ -390,7 +390,12 @@ export class ShortfallService {
         'purchase_orders.receiving_site_id',
       );
 
-    if (siteId) {
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
       query = query.where('purchase_orders.receiving_site_id', siteId);
     }
 

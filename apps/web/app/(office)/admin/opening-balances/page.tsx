@@ -1,16 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { formatINR, transitionOpeningBalanceBatch } from '@neo/shared';
-import { INITIAL_OPENING_BATCH, type OpeningBalanceBatch } from '../../../../src/lib/finance-data';
+import { type OpeningBalanceBatch } from '../../../../src/lib/finance-data';
 
 export default function OpeningBalancesWizardPage() {
-  const [batch, setBatch] = useState<OpeningBalanceBatch>(INITIAL_OPENING_BATCH);
+  const [batch, setBatch] = useState<OpeningBalanceBatch>({
+    batchNo: 'OB-DRAFT',
+    cutoffDate: new Date().toISOString().split('T')[0],
+    status: 'DRAFT',
+    rows: [],
+  } as unknown as OpeningBalanceBatch);
   const [toast, setToast] = useState<string | null>(null);
 
-  function runAction(action: 'SIGN_OFF' | 'IMPORT' | 'REVERSE') {
+  useEffect(() => {
+    fetch('/api/proxy/finance/opening-balances/template')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (res?.data || res?.rows) {
+          const rows = res.data?.rows ?? res.rows ?? [];
+          setBatch((prev) => ({
+            ...prev,
+            batchNo: res.data?.batchNo ?? res.batchNo ?? prev.batchNo,
+            cutoffDate: res.data?.cutoffDate ?? prev.cutoffDate,
+            status: res.data?.status ?? prev.status,
+            rows,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function runAction(action: 'SIGN_OFF' | 'IMPORT' | 'REVERSE') {
     const nextStatus = transitionOpeningBalanceBatch(batch.status, action, batch.cutoffDate);
     setBatch((prev) => ({ ...prev, status: nextStatus }));
+    const endpoint =
+      action === 'SIGN_OFF'
+        ? '/api/proxy/finance/opening-balances/draft'
+        : action === 'IMPORT'
+          ? '/api/proxy/finance/opening-balances/import'
+          : '/api/proxy/finance/opening-balances/reverse';
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cutoffDate: batch.cutoffDate, rows: batch.rows }),
+    }).catch(() => {});
     setToast(`Opening balance batch ${batch.batchNo} transitioned to ${nextStatus}.`);
   }
 
@@ -18,34 +52,34 @@ export default function OpeningBalancesWizardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Opening Balances Wizard (OD-023)</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-zinc-100">Opening Balances Wizard (OD-023)</h1>
+          <p className="text-sm text-zinc-400">
             CSV import lifecycle: DRAFT → Owner SIGNED_OFF (with cut-off date) → IMPORTED → REVERSED.
           </p>
         </div>
-        <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800">
+        <span className="rounded-full bg-purple-500/20 px-3 py-1 text-xs font-bold text-purple-300">
           Status: {batch.status}
         </span>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-medium text-purple-900">
+        <div className="rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-2.5 text-sm font-medium text-purple-200">
           {toast}
         </div>
       )}
 
       {/* Lifecycle Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
         <div className="flex items-center gap-3 text-sm">
-          <span className="font-mono font-bold text-slate-900">{batch.batchNo}</span>
-          <label className="text-xs font-semibold text-slate-600">
+          <span className="font-mono font-bold text-zinc-100">{batch.batchNo}</span>
+          <label className="text-xs font-semibold text-zinc-400">
             Cut-off Date:{' '}
             <input
               type="date"
               value={batch.cutoffDate}
               onChange={(e) => setBatch((prev) => ({ ...prev, cutoffDate: e.target.value }))}
               disabled={batch.status !== 'DRAFT'}
-              className="rounded border border-slate-200 px-2 py-1"
+              className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-100"
             />
           </label>
         </div>
@@ -54,7 +88,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('SIGN_OFF')}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
             >
               Owner Sign-off
             </button>
@@ -63,7 +97,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('IMPORT')}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
             >
               Import Atomic CSV
             </button>
@@ -72,7 +106,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('REVERSE')}
-              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500"
             >
               Reverse Batch
             </button>
@@ -81,9 +115,9 @@ export default function OpeningBalancesWizardPage() {
       </div>
 
       {/* Preview Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-zinc-950 text-xs uppercase text-zinc-400">
             <tr>
               <th className="px-4 py-3">Party Type</th>
               <th className="px-4 py-3">Party Name</th>
@@ -91,14 +125,21 @@ export default function OpeningBalancesWizardPage() {
               <th className="px-4 py-3">Validation</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-zinc-800">
+            {batch.rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-zinc-400">
+                  No opening balance rows staged yet.
+                </td>
+              </tr>
+            )}
             {batch.rows.map((r) => (
               <tr key={r.id}>
-                <td className="px-4 py-3 text-xs font-semibold text-slate-600">{r.partyType}</td>
-                <td className="px-4 py-3 font-semibold text-slate-900">{r.partyName}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold">{formatINR(r.openingBalance)}</td>
+                <td className="px-4 py-3 text-xs font-semibold text-zinc-400">{r.partyType}</td>
+                <td className="px-4 py-3 font-semibold text-zinc-100">{r.partyName}</td>
+                <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-100">{formatINR(r.openingBalance)}</td>
                 <td className="px-4 py-3">
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                  <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
                     Valid
                   </span>
                 </td>

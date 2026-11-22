@@ -167,6 +167,7 @@ export class SupplierBillController {
       id,
       {
         status: BillStatus.REJECTED,
+        reason: dto.reason as any,
       },
       req.user.id,
     );
@@ -178,8 +179,15 @@ export class SupplierBillController {
   @ApiOperation({ summary: 'List supplier bills with filters and pagination' })
   @ApiResponse({ status: 200, description: 'Supplier bills list' })
   async list(@Query() query: ListSupplierBillsQueryDto, @Req() req: any) {
-    const siteId =
+    const rawSiteId =
       query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+    const siteId =
+      rawSiteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        rawSiteId,
+      )
+        ? rawSiteId
+        : undefined;
     const result = await this.billService.list({
       supplier_id: query.supplierId,
       site_id: siteId,
@@ -194,7 +202,14 @@ export class SupplierBillController {
   @ApiOperation({ summary: 'Accounts Payable aging buckets by supplier' })
   @ApiResponse({ status: 200, description: 'AP aging summary' })
   async getApAging(@Query('siteId') siteId?: string) {
-    const result = await this.billService.getApAging(siteId);
+    const normalizedSiteId =
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+        ? siteId
+        : undefined;
+    const result = await this.billService.getApAging(normalizedSiteId);
     return wrapResponse(result);
   }
 

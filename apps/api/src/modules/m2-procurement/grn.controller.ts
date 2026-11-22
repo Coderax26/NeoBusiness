@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,8 +37,13 @@ export class GRNController {
     status: 201,
     description: 'GRN created with shortfalls if any',
   })
-  async create(@Body() dto: CreateGRNDto, @Query('userId') userId: string) {
-    return this.grnService.createBlindGRN({ ...dto, userId });
+  async create(
+    @Body() dto: CreateGRNDto,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
+  ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.grnService.createBlindGRN({ ...dto, userId: actorId });
   }
 
   @Get()

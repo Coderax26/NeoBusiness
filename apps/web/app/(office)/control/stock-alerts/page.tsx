@@ -1,21 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Card, Button } from '@neo/ui';
-import { INITIAL_STOCK_ALERTS } from '../../../src/lib/inventory-data';
+import { type StockAlertItem } from '../../../../src/lib/inventory-data';
 
 export default function StockAlertsControlPage() {
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [alerts, setAlerts] = useState<StockAlertItem[]>([]);
+
+  useEffect(() => {
+    fetch('/api/proxy/stock-alerts')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setAlerts(
+          list.map((a: any, idx: number) => ({
+            id: a.id ?? `sa-${idx}`,
+            type: a.alertType ?? a.type ?? 'LOW_STOCK',
+            severity: a.severity ?? 'HIGH',
+            itemName: a.itemName ?? a.item_name ?? 'Item',
+            siteName: a.siteName ?? a.site_name ?? 'Site',
+            detail: a.detail ?? a.message ?? '',
+          })),
+        );
+      })
+      .catch(() => setAlerts([]));
+  }, []);
 
   const counts = {
-    LOW_STOCK: INITIAL_STOCK_ALERTS.filter((a) => a.type === 'LOW_STOCK').length,
-    EXPIRING: INITIAL_STOCK_ALERTS.filter((a) => a.type === 'EXPIRING').length,
-    NEGATIVE: INITIAL_STOCK_ALERTS.filter((a) => a.type === 'NEGATIVE').length,
-    DRIFT: INITIAL_STOCK_ALERTS.filter((a) => a.type === 'DRIFT').length,
+    LOW_STOCK: alerts.filter((a) => a.type === 'LOW_STOCK').length,
+    EXPIRING: alerts.filter((a) => a.type === 'EXPIRING').length,
+    NEGATIVE: alerts.filter((a) => a.type === 'NEGATIVE').length,
+    DRIFT: alerts.filter((a) => a.type === 'DRIFT').length,
   };
 
-  const visible = INITIAL_STOCK_ALERTS.filter((a) =>
+  const visible = alerts.filter((a) =>
     filterType === 'ALL' ? true : a.type === filterType,
   );
 

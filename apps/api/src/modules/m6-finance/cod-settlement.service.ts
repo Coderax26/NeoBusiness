@@ -14,6 +14,7 @@ import { Money } from '../../shared/utils/money.util.js';
 import { LedgerService } from './ledger.service.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
+import { getRedisConnection } from '../../shared/config/redis-connection.js';
 import {
   LEDGER_PORT,
   NOTIFY_PORT,
@@ -65,7 +66,7 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(
       'domain-events',
       async (job) => this.handle(job.data as DomainJob),
-      { connection: { host: 'localhost', port: 6379 } },
+      { connection: getRedisConnection() },
     );
     this.worker.on('failed', (job, error) => {
       this.logger.error(
@@ -164,16 +165,16 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
           .whereRaw('reference_id = ds.id');
       });
 
-    if (siteId) {
+    if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {
       query = query.where('dt.site_id', siteId);
     }
 
     return query.select(
       'ds.id as stopId',
       'ds.trip_id as tripId',
-      'dt.trip_number as tripNumber',
+      'dt.trip_no as tripNumber',
       'ds.customer_id as customerId',
-      'c.name as customerName',
+      'c.business_name as customerName',
       'ds.sales_order_id as salesOrderId',
       'ds.cod_amount as codAmount',
       'ds.cod_collected_amount as codCollectedAmount',
@@ -444,5 +445,5 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
 // Export the provider for module wiring
 export const CodSettlementProvider = {
   provide: 'COD_SETTLEMENT_SERVICE',
-  useClass: CodSettlementService,
+  useExisting: CodSettlementService,
 };

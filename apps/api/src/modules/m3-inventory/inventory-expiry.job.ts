@@ -28,6 +28,7 @@ import { LedgerPostingService } from './ledger-posting.service.js';
 export class InventoryExpiryJob implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(InventoryExpiryJob.name);
   private interval: NodeJS.Timeout | undefined;
+  private isSweeping = false;
 
   constructor(
     @InjectKnex() private readonly knex: Knex,
@@ -40,6 +41,7 @@ export class InventoryExpiryJob implements OnModuleInit, OnModuleDestroy {
     const intervalMs =
       this.config.get<number>('inventory.expiry_sweep_interval_ms') ?? 60_000;
     this.interval = setInterval(() => {
+      if (this.isSweeping) return;
       this.sweep().catch((err) =>
         this.logger.error(
           `Inventory expiry sweep error: ${(err as Error).message}`,
@@ -64,50 +66,56 @@ export class InventoryExpiryJob implements OnModuleInit, OnModuleDestroy {
    * Returns the number of batches processed.
    */
   async sweep(): Promise<number> {
-    const now = Clock.todayKolkata();
-    await this.inventoryService.releaseExpiredReservations();
+    if (this.isSweeping) return 0;
+    this.isSweeping = true;
+    try {
+      const now = Clock.todayKolkata();
+      await this.inventoryService.releaseExpiredReservations();
 
-    // Find batches that are AVAILABLE and have expiry_date < today
-    const expiredBatches = await this.knex('inventory_batches')
-      .where({ status: 'AVAILABLE' })
-      .andWhere('expiry_date', '<', now)
-      .whereNotNull('expiry_date')
-      .select(
-        'id',
-        'site_id',
-        'item_id',
-        'batch_number',
-        'qty_on_hand',
-        'qty_committed',
-        'created_by',
-        'expiry_date',
-      )
-      .limit(100); // Process in batches of 100
+      // Find batches that are AVAILABLE and have expiry_date < today
+      const expiredBatches = await this.knex('inventory_batches')
+        .where({ status: 'AVAILABLE' })
+        .andWhere('expiry_date', '<', now)
+        .whereNotNull('expiry_date')
+        .select(
+          'id',
+          'site_id',
+          'item_id',
+          'batch_number',
+          'qty_on_hand',
+          'qty_committed',
+          'created_by',
+          'expiry_date',
+        )
+        .limit(100); // Process in batches of 100
 
-    if (expiredBatches.length === 0) {
-      this.logger.debug('Inventory expiry sweep: no expired batches found');
-      return 0;
-    }
-
-    let processed = 0;
-    for (const batch of expiredBatches) {
-      try {
-        await this.processExpiredBatch(batch);
-        processed++;
-      } catch (err) {
-        this.logger.error(
-          `Failed to process expired batch ${batch.batch_number}: ${(err as Error).message}`,
-        );
-        // Continue with other batches rather than stopping
+      if (expiredBatches.length === 0) {
+        this.logger.debug('Inventory expiry sweep: no expired batches found');
+        return 0;
       }
-    }
 
-    if (processed > 0) {
-      this.logger.log(
-        `Inventory expiry sweep: processed ${processed} expired batch(es)`,
-      );
+      let processed = 0;
+      for (const batch of expiredBatches) {
+        try {
+          await this.processExpiredBatch(batch);
+          processed++;
+        } catch (err) {
+          this.logger.error(
+            `Failed to process expired batch ${batch.batch_number}: ${(err as Error).message}`,
+          );
+          // Continue with other batches rather than stopping
+        }
+      }
+
+      if (processed > 0) {
+        this.logger.log(
+          `Inventory expiry sweep: processed ${processed} expired batch(es)`,
+        );
+      }
+      return processed;
+    } finally {
+      this.isSweeping = false;
     }
-    return processed;
   }
 
   private async processExpiredBatch(batch: {

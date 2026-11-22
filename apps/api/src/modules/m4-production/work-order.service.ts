@@ -646,7 +646,7 @@ export class WorkOrderService {
    * List work orders for a site.
    */
   async listWorkOrders(
-    siteId: string,
+    siteId?: string,
     status?: string,
   ): Promise<WorkOrderResponseDto[]> {
     const headers = await this.woRepo.getHeaders(siteId, status);

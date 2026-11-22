@@ -206,7 +206,12 @@ export class CustomerController {
   @RequirePermission('customer.view')
   @ApiOperation({ summary: 'List customer follow-up reminders (G-M1-4)' })
   async listFollowups(@Param('id') id: string) {
-    return { customerId: id, data: [] };
+    const rows = await this.customerSvc['knex']('ptp_followups as pf')
+      .leftJoin('users as u', 'pf.logged_by_user_id', 'u.id')
+      .where('pf.customer_id', id)
+      .select('pf.*', 'u.full_name as logged_by_name')
+      .orderBy('pf.promised_date', 'asc');
+    return { customerId: id, data: rows };
   }
 
   @Post(':id/followups')
@@ -214,9 +219,26 @@ export class CustomerController {
   @ApiOperation({ summary: 'Schedule a customer follow-up reminder (G-M1-4)' })
   async createFollowup(
     @Param('id') id: string,
-    @Body() body: { dueDate: string; note: string },
+    @Body() body: { dueDate: string; note: string; reasonCode?: string },
+    @Req() req: any,
   ) {
-    return { id: `flw-${Date.now()}`, customerId: id, ...body, status: 'PENDING' };
+    const knex = this.customerSvc['knex'];
+    const cust = await knex('customers').where('id', id).first('id', 'default_site_id');
+    const siteId = cust?.default_site_id || req.user?.siteId;
+    const userId = String(req.user?.sub || req.user?.id);
+    const [inserted] = await knex('ptp_followups')
+      .insert({
+        site_id: siteId,
+        customer_id: id,
+        promised_date: body.dueDate || new Date().toISOString().split('T')[0],
+        reason_code: body.reasonCode || 'FOLLOWUP',
+        note: body.note || '',
+        logged_by_user_id: userId,
+        status: 'OPEN',
+        updated_by: userId,
+      })
+      .returning('*');
+    return inserted;
   }
 
   @Patch(':id/followups/:followupId')
@@ -226,7 +248,16 @@ export class CustomerController {
     @Param('id') id: string,
     @Param('followupId') followupId: string,
     @Body() body: { status?: string; note?: string },
+    @Req() req: any,
   ) {
-    return { id: followupId, customerId: id, ...body };
+    const userId = String(req.user?.sub || req.user?.id || '');
+    const updates: Record<string, unknown> = { updated_at: new Date(), updated_by: userId || null };
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.note !== undefined) updates.note = body.note;
+    const [updated] = await this.customerSvc['knex']('ptp_followups')
+      .where({ id: followupId, customer_id: id })
+      .update(updates)
+      .returning('*');
+    return updated ?? { id: followupId, customerId: id, ...body };
   }
 }

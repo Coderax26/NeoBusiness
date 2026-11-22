@@ -5,16 +5,16 @@ import Link from 'next/link';
 import { Button, Badge, StatusPill, Dialog } from '@neo/ui';
 import { formatINR, canViewMarginAndCost, type SessionUser } from '@neo/shared';
 import {
-  INITIAL_ADJUSTMENTS,
-  INITIAL_STOCK_ROWS,
   type AdjustmentRecord,
-} from '../../../src/lib/inventory-data';
+  type StockRow,
+} from '../../../../src/lib/inventory-data';
 
 export default function InventoryAdjustmentsPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [adjustments, setAdjustments] = useState<AdjustmentRecord[]>(INITIAL_ADJUSTMENTS);
+  const [adjustments, setAdjustments] = useState<AdjustmentRecord[]>([]);
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [stockRowId, setStockRowId] = useState(INITIAL_STOCK_ROWS[0].id);
+  const [stockRowId, setStockRowId] = useState('');
   const [qtyDelta, setQtyDelta] = useState(-10);
   const [reason, setReason] = useState<AdjustmentRecord['reason']>('DAMAGE');
   const [notes, setNotes] = useState('');
@@ -22,12 +22,30 @@ export default function InventoryAdjustmentsPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setUser(d.user);
+        if (active && d?.user) setUser(d.user);
       })
       .catch(() => {});
+
+    Promise.all([
+      fetch('/api/proxy/inventory/adjustments').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([adjRes, stkRes]) => {
+        if (!active) return;
+        const aRows = Array.isArray(adjRes) ? adjRes : Array.isArray(adjRes?.data) ? adjRes.data : [];
+        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+        setAdjustments(aRows);
+        setStockRows(sRows);
+        if (sRows.length > 0) setStockRowId(String(sRows[0].id));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   const showValuation = !user || canViewMarginAndCost(user.role);
@@ -38,7 +56,8 @@ export default function InventoryAdjustmentsPage() {
   };
 
   const handleSubmit = () => {
-    const row = INITIAL_STOCK_ROWS.find((r) => r.id === stockRowId) || INITIAL_STOCK_ROWS[0];
+    const row = stockRows.find((r) => r.id === stockRowId) || stockRows[0];
+    if (!row) return;
     const valueImpact = Number((qtyDelta * row.unitCost).toFixed(2));
     const isLarge = Math.abs(valueImpact) >= 5000;
     const created: AdjustmentRecord = {
@@ -202,7 +221,7 @@ export default function InventoryAdjustmentsPage() {
               onChange={(e) => setStockRowId(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
             >
-              {INITIAL_STOCK_ROWS.map((r) => (
+              {stockRows.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.itemName} — {r.batchNo} ({r.siteName})
                 </option>

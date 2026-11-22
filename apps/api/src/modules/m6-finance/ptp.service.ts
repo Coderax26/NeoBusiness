@@ -101,13 +101,16 @@ export class PTPService {
     },
   ) {
     let query = this.knex('ptp_followups')
-      .where('site_id', siteId)
       .join('customers', 'ptp_followups.customer_id', 'customers.id')
       .select(
         'ptp_followups.*',
-        'customers.name as customerName',
+        'customers.business_name as customerName',
         'customers.phone',
       );
+
+    if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {
+      query = query.where('ptp_followups.site_id', siteId);
+    }
 
     if (filters?.status)
       query = query.andWhere('ptp_followups.status', filters.status);
@@ -142,7 +145,7 @@ export class PTPService {
       .join('customers', 'ptp_followups.customer_id', 'customers.id')
       .select(
         'ptp_followups.*',
-        'customers.name as customerName',
+        'customers.business_name as customerName',
         'customers.phone',
       );
   }

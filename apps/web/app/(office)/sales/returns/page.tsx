@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { DataTable, type ColumnDef, Button, KpiCard, Badge, StatusPill, Dialog } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import { INITIAL_RETURNS, INITIAL_SALES_ORDERS, type SalesReturnRecord } from '../../../../src/lib/sales-data';
+import { type SalesReturnRecord, type SalesOrderRecord } from '../../../../src/lib/sales-data';
 
 const RETURN_REASONS = [
   'Damaged in transit',
@@ -15,17 +15,94 @@ const RETURN_REASONS = [
 ];
 
 export default function SalesReturnsPage() {
-  const [returns, setReturns] = useState<SalesReturnRecord[]>(INITIAL_RETURNS);
+  const [returns, setReturns] = useState<SalesReturnRecord[]>([]);
+  const [orders, setOrders] = useState<SalesOrderRecord[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const deliveredOrders = INITIAL_SALES_ORDERS.filter((o) => o.status === 'DELIVERED');
-  const [selectedOrderId, setSelectedOrderId] = useState(deliveredOrders[0]?.id || INITIAL_SALES_ORDERS[0].id);
+  const deliveredOrders = orders.filter((o) => o.status === 'DELIVERED');
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState(RETURN_REASONS[0]);
   const [condition, setCondition] = useState<'RESALEABLE' | 'DAMAGED'>('RESALEABLE');
 
-  const selectedOrder = INITIAL_SALES_ORDERS.find((o) => o.id === selectedOrderId) || INITIAL_SALES_ORDERS[0];
-  const firstLine = selectedOrder.lines[0];
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/credit-notes').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/orders').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([cnData, ordData]) => {
+        if (!active) return;
+        if (Array.isArray(cnData)) {
+          setReturns(
+            cnData.map((r: any) => ({
+              id: String(r.id),
+              returnNumber: String(r.creditNoteNumber || r.credit_note_number || r.returnNumber || r.id),
+              orderId: String(r.orderId || r.order_id || ''),
+              orderNumber: String(r.orderNumber || r.order_number || r.invoiceNumber || '—'),
+              customerId: String(r.customerId || r.customer_id || ''),
+              customerName: String(r.customerName || r.customer_name || 'Customer'),
+              itemName: String(r.itemName || r.item_name || r.reason || 'Returned Goods'),
+              qty: Number(r.qty ?? r.returnedQty ?? 1),
+              uom: String(r.uom || 'kg'),
+              reason: String(r.reason || 'Customer return'),
+              condition: (r.condition === 'DAMAGED' ? 'DAMAGED' : 'RESALEABLE') as SalesReturnRecord['condition'],
+              creditAmount: Number(r.amount ?? r.creditAmount ?? r.totalAmount ?? 0),
+              status: (r.status === 'STOCK_RECEIVED' ? 'STOCK_RECEIVED' : 'PENDING_RECEIPT') as SalesReturnRecord['status'],
+              createdAt: String(r.createdAt || r.created_at || new Date().toISOString()).slice(0, 10),
+            })),
+          );
+        }
+        if (Array.isArray(ordData)) {
+          const mappedOrders: SalesOrderRecord[] = ordData.map((o: any) => ({
+            id: String(o.id),
+            orderNumber: String(o.orderNumber || o.order_no || o.order_number || o.id),
+            customerId: String(o.customerId || o.customer_id || ''),
+            customerName: String(o.customerName || o.customer_name || 'Customer'),
+            siteName: String(o.site_name || o.siteName || 'Main Site'),
+            deliveryDate: String(o.delivery_date || o.deliveryDate || '').slice(0, 10),
+            deliveryWindow: '10-12',
+            status: (o.order_status || o.status || 'DELIVERED') as SalesOrderRecord['status'],
+            createdAt: String(o.created_at_idx || o.createdAt || '').slice(0, 10),
+            createdBy: 'Sales',
+            subtotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+            gstTotal: 0,
+            grandTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+            marginPct: 15,
+            timeline: [],
+            lines: [
+              {
+                id: '1',
+                itemId: '',
+                sku: '',
+                itemName: 'Order Item',
+                category: 'PROCESSED_FG',
+                qty: 1,
+                uom: 'kg',
+                unitPrice: Number(o.total_amount ?? o.totalAmount ?? 0),
+                gstPct: 5,
+                floorPrice: 0,
+                targetPrice: 0,
+                landedCost: 0,
+                lineTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+                atpStock: 0,
+                reservedQty: 0,
+              },
+            ],
+          }));
+          setOrders(mappedOrders);
+          const firstDel = mappedOrders.find((x) => x.status === 'DELIVERED') || mappedOrders[0];
+          if (firstDel) setSelectedOrderId(firstDel.id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedOrder = orders.find((o) => o.id === selectedOrderId) || deliveredOrders[0] || orders[0];
+  const firstLine = selectedOrder?.lines?.[0] || { itemName: 'Item', uom: 'kg', unitPrice: 0, gstPct: 5 };
 
   const handleCreateReturn = async () => {
     const returnQty = parseFloat(qty) || 1;
@@ -152,9 +229,9 @@ export default function SalesReturnsPage() {
               onChange={(e) => setSelectedOrderId(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
             >
-              {INITIAL_SALES_ORDERS.map((o) => (
+              {(deliveredOrders.length > 0 ? deliveredOrders : orders).map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.orderNumber} — {o.customerName} ({o.lines[0].itemName})
+                  {o.orderNumber} — {o.customerName} ({o.lines[0]?.itemName || 'Item'})
                 </option>
               ))}
             </select>
@@ -210,3 +287,4 @@ export default function SalesReturnsPage() {
     </div>
   );
 }
+

@@ -1,17 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NumericKeypad } from '@neo/ui';
 import { evaluateWoYieldStatus, maskWorkOrderForProdMgr } from '@neo/shared';
-import { INITIAL_WORK_ORDERS, type WorkOrderRecord } from '../../../../src/lib/production-data';
+import { type WorkOrderRecord } from '../../../../src/lib/production-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
 export default function FloorProductionKanbanPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>(() =>
-    INITIAL_WORK_ORDERS.map((w) => maskWorkOrderForProdMgr(w as any) as WorkOrderRecord),
-  );
+  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/proxy/production/work-orders')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setWorkOrders(
+          list.map((w: any) =>
+            maskWorkOrderForProdMgr({
+              id: w.id,
+              woNumber: w.wo_no ?? w.woNumber ?? w.id.slice(0, 8),
+              fgItemName: w.fg_item_name ?? w.itemName ?? 'Production Item',
+              uom: w.uom ?? 'KG',
+              plannedQty: Number(w.planned_qty ?? 0),
+              issuedRmQty: Number(w.issued_rm_qty ?? 0),
+              actualOutputQty: Number(w.actual_output_qty ?? 0),
+              scrapQty: Number(w.scrap_qty ?? 0),
+              status: w.status ?? 'PLANNED',
+              startedAt: w.started_at ?? '',
+              packagingLot: w.packaging_lot ?? '',
+            } as any) as WorkOrderRecord,
+          ),
+        );
+      })
+      .catch(() => setWorkOrders([]));
+  }, []);
 
   // Active modals
   const [outputTarget, setOutputTarget] = useState<WorkOrderRecord | null>(null);

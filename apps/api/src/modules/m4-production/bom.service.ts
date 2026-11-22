@@ -233,8 +233,8 @@ export class BomService {
   }
 
   async listBoms(
-    itemId: string,
-    siteId: string,
+    itemId?: string,
+    siteId?: string,
   ): Promise<BomHeaderResponseDto[]> {
     const headers = await this.bomRepo.getHeadersByItem(itemId, siteId);
     const results: BomHeaderResponseDto[] = [];
@@ -336,11 +336,72 @@ export class BomService {
     await this.bomRepo.deleteHeader(bomId);
   }
 
+  async getBomCostRollup(bomId: string): Promise<{
+    bomId: string;
+    bomNo: string;
+    estimatedCostPerUnitInr: string;
+    currency: string;
+    breakdown: Array<{
+      itemId: string;
+      itemName: string;
+      qtyPerUnit: string;
+      uom: string;
+      unitCostInr: string;
+      lineCostInr: string;
+    }>;
+  }> {
+    const header = await this.bomRepo.getHeaderById(bomId);
+    if (!header) throw new NotFoundException(`BOM ${bomId} not found`);
+    const lines = await this.bomRepo.getLinesWithItems(bomId);
+    const breakdown = [];
+    let totalCost = 0;
+
+    for (const line of lines) {
+      const rateRow = await this.knex('supplier_rate_quotes')
+        .where('item_id', line.item_id)
+        .orderBy('effective_from', 'desc')
+        .orderBy('created_at', 'desc')
+        .first('unit_price');
+      let unitCost = Number(rateRow?.unit_price ?? 0);
+      if (unitCost === 0) {
+        const poRow = await this.knex('purchase_order_lines')
+          .where('item_id', line.item_id)
+          .orderBy('created_at', 'desc')
+          .first('unit_price');
+        unitCost = Number(poRow?.unit_price ?? 0);
+      }
+      const qty = Number(line.qty_per_unit || 0);
+      const lineCost = qty * unitCost;
+      totalCost += lineCost;
+      breakdown.push({
+        itemId: String(line.item_id),
+        itemName: line.item_name,
+        qtyPerUnit: String(line.qty_per_unit),
+        uom: line.uom,
+        unitCostInr: unitCost.toFixed(2),
+        lineCostInr: lineCost.toFixed(2),
+      });
+    }
+
+    return {
+      bomId: header.id,
+      bomNo: header.bom_no,
+      estimatedCostPerUnitInr: totalCost.toFixed(2),
+      currency: 'INR',
+      breakdown,
+    };
+  }
+
   private async getBomResponse(bomId: string): Promise<BomHeaderResponseDto> {
     const header = await this.bomRepo.getHeaderById(bomId);
     if (!header) throw new NotFoundException('BOM not found');
 
-    const linesWithItems = await this.bomRepo.getLinesWithItems(bomId);
+    const [fgItem, linesWithItems] = await Promise.all([
+      this.knex('items')
+        .where('id', header.item_id)
+        .first('name', 'sku_code'),
+      this.bomRepo.getLinesWithItems(bomId),
+    ]);
 
     const formatDate = (d: Date | null | undefined): string | null => {
       if (!d) return null;
@@ -353,8 +414,8 @@ export class BomService {
       id: header.id,
       bomNo: header.bom_no,
       itemId: header.item_id,
-      itemName: linesWithItems[0]?.item_name ?? '',
-      itemSkuCode: linesWithItems[0]?.item_sku_code ?? '',
+      itemName: fgItem?.name ?? linesWithItems[0]?.item_name ?? '',
+      itemSkuCode: fgItem?.sku_code ?? linesWithItems[0]?.item_sku_code ?? '',
       siteId: header.site_id,
       version: header.version,
       status: header.status as BomStatus,

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
+const IS_SECURE_COOKIE =
+  process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production';
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,16 +52,16 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set('neobus_access_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: IS_SECURE_COOKIE,
       sameSite: 'lax',
       path: '/',
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: 8 * 60 * 60,
     });
 
     if (newRefreshToken) {
       response.cookies.set('neobus_refresh_token', newRefreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: IS_SECURE_COOKIE,
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60, // 7 days

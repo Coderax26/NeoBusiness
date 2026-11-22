@@ -5,6 +5,7 @@ export interface NumericKeypadProps {
   onChange: (value: string) => void;
   onSubmit?: () => void;
   allowDecimals?: boolean;
+  submitLabel?: string;
   className?: string;
 }
 

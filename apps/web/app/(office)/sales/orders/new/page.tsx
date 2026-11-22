@@ -13,8 +13,6 @@ import {
   type SessionUser,
 } from '@neo/shared';
 import {
-  INITIAL_CUSTOMERS_SUMMARY,
-  INITIAL_DAILY_PRICES,
   type DailyPriceRow,
   type SalesOrderLine,
 } from '../../../../../src/lib/sales-data';
@@ -42,36 +40,18 @@ export default function QuickOrderEntryPage() {
   const [mode, setMode] = useState<'GUIDED' | 'EXPRESS'>('GUIDED');
   const [guidedStep, setGuidedStep] = useState<1 | 2 | 3>(1);
 
-  const [customers, setCustomers] = useState<CustomerSummaryOption[]>(
-    INITIAL_CUSTOMERS_SUMMARY,
-  );
-  const [dailyPrices, setDailyPrices] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
+  const [customers, setCustomers] = useState<CustomerSummaryOption[]>([]);
+  const [dailyPrices, setDailyPrices] = useState<DailyPriceRow[]>([]);
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState(INITIAL_CUSTOMERS_SUMMARY[0].id);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedSiteId, setSelectedSiteId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryWindow, setDeliveryWindow] = useState<'10-12' | '04-08' | '13-16' | '18-21'>('10-12');
   const [siteName, setSiteName] = useState('NeoCore Factory — Mumbai');
 
-  const [lines, setLines] = useState<SalesOrderLine[]>([
-    {
-      id: 'line-1',
-      itemId: INITIAL_DAILY_PRICES[0].itemId,
-      sku: INITIAL_DAILY_PRICES[0].sku,
-      itemName: INITIAL_DAILY_PRICES[0].itemName,
-      category: INITIAL_DAILY_PRICES[0].category,
-      qty: 500,
-      uom: INITIAL_DAILY_PRICES[0].uom,
-      unitPrice: INITIAL_DAILY_PRICES[0].floorPrice || 90,
-      floorPrice: INITIAL_DAILY_PRICES[0].floorPrice || 90,
-      targetPrice: INITIAL_DAILY_PRICES[0].targetPrice || 95,
-      atpStock: INITIAL_DAILY_PRICES[0].atpStock,
-      gstPct: 5,
-      reservedQty: 0,
-    },
-  ]);
+  const [lines, setLines] = useState<SalesOrderLine[]>([]);
 
-  const [focusedItemId, setFocusedItemId] = useState<string>(INITIAL_DAILY_PRICES[0].itemId);
+  const [focusedItemId, setFocusedItemId] = useState<string>('');
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -188,10 +168,10 @@ export default function QuickOrderEntryPage() {
             const firstItem = mappedPrices[0];
             setFocusedItemId(firstItem.itemId);
             setLines((prev) =>
-              prev.map((l, idx) =>
-                idx === 0 && !UUID_RE.test(l.itemId)
-                  ? {
-                      ...l,
+              prev.length === 0
+                ? [
+                    {
+                      id: 'line-1',
                       itemId: firstItem.itemId,
                       sku: firstItem.sku,
                       itemName: firstItem.itemName,
@@ -202,9 +182,27 @@ export default function QuickOrderEntryPage() {
                       floorPrice: firstItem.floorPrice ?? firstItem.yesterdayFloor ?? 90,
                       targetPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
                       atpStock: firstItem.atpStock,
-                    }
-                  : l,
-              ),
+                      gstPct: 5,
+                      reservedQty: 0,
+                    },
+                  ]
+                : prev.map((l, idx) =>
+                    idx === 0 && !UUID_RE.test(l.itemId)
+                      ? {
+                          ...l,
+                          itemId: firstItem.itemId,
+                          sku: firstItem.sku,
+                          itemName: firstItem.itemName,
+                          category: firstItem.category,
+                          qty: 50,
+                          uom: firstItem.uom,
+                          unitPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                          floorPrice: firstItem.floorPrice ?? firstItem.yesterdayFloor ?? 90,
+                          targetPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                          atpStock: firstItem.atpStock,
+                        }
+                      : l,
+                  ),
             );
           }
         }
@@ -220,8 +218,21 @@ export default function QuickOrderEntryPage() {
   }, []);
 
   const isOwner = !user || canViewMarginAndCost(user.role);
-  const customer =
-    customers.find((c) => c.id === selectedCustomerId) || customers[0];
+  const customer: CustomerSummaryOption = customers.find((c) => c.id === selectedCustomerId) ||
+    customers[0] || {
+      id: '',
+      code: '',
+      name: 'Select Customer',
+      phone: '',
+      gstin: '',
+      site: siteName,
+      window: deliveryWindow,
+      creditLimit: 0,
+      outstanding: 0,
+      overdueDays: 0,
+      creditHold: false,
+      lastOrderDate: '',
+    };
 
   // Duplicate order guard (§4.2)
   useEffect(() => {
@@ -277,7 +288,8 @@ export default function QuickOrderEntryPage() {
   const approvalEval = evaluateOrderApprovalNeed(lines, creditEval);
 
   const handleAddLine = useCallback(() => {
-    const sourceList = dailyPrices.length > 0 ? dailyPrices : INITIAL_DAILY_PRICES;
+    const sourceList = dailyPrices;
+    if (sourceList.length === 0) return;
     const nextItem = sourceList[lines.length % sourceList.length];
     const newLine: SalesOrderLine = {
       id: `line-${Date.now()}`,
@@ -430,7 +442,7 @@ export default function QuickOrderEntryPage() {
   }, [handleSubmitOrder, handleSaveDraft]);
 
   const focusedItemMeta =
-    dailyPrices.find((p) => p.itemId === focusedItemId) || dailyPrices[0] || INITIAL_DAILY_PRICES[0];
+    dailyPrices.find((p) => p.itemId === focusedItemId) || dailyPrices[0] || null;
 
   // After submit success screen (§4.2)
   if (submittedOrder) {

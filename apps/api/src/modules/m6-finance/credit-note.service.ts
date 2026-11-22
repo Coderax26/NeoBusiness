@@ -12,6 +12,7 @@ import { Worker } from 'bullmq';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { Money } from '../../shared/utils/money.util.js';
 import { ConfigService } from '../m0-platform/config.service.js';
+import { getRedisConnection } from '../../shared/config/redis-connection.js';
 import {
   LEDGER_PORT,
   EXCEPTION_PORT,
@@ -68,7 +69,7 @@ export class CreditNoteService implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(
       'domain-events',
       async (job) => this.handle(job.data as DomainJob),
-      { connection: { host: 'localhost', port: 6379 } },
+      { connection: getRedisConnection() },
     );
     this.worker.on('failed', (job, error) => {
       this.logger.error(
@@ -273,8 +274,9 @@ export class CreditNoteService implements OnModuleInit, OnModuleDestroy {
   async listCreditNotes(customerId?: string, siteId?: string, status?: string) {
     let query = this.knex('credit_notes').orderBy('created_at', 'desc');
 
-    if (customerId) query = query.where('customer_id', customerId);
-    if (siteId) query = query.where('site_id', siteId);
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (customerId && uuidRe.test(customerId)) query = query.where('customer_id', customerId);
+    if (siteId && uuidRe.test(siteId)) query = query.where('site_id', siteId);
     if (status) query = query.where('status', status);
 
     return query.select('*');

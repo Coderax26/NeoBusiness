@@ -16,22 +16,40 @@ import type { Knex } from 'knex';
 @Injectable()
 export class MvRefreshJob {
   private readonly logger = new Logger(MvRefreshJob.name);
+  private readonly running = new Set<string>();
 
   constructor(@InjectKnex() private readonly knex: Knex) {}
+
+  private async runGuarded(
+    key: string,
+    errorContext: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    if (this.running.has(key)) {
+      this.logger.debug(`Skipping ${key}: previous refresh still in progress`);
+      return;
+    }
+    this.running.add(key);
+    try {
+      await fn();
+    } catch (error) {
+      this.logger.error(
+        `Failed to refresh ${errorContext}: ${(error as Error).message}`,
+      );
+    } finally {
+      this.running.delete(key);
+    }
+  }
 
   /**
    * Refresh mv_pulse_today — every 30 seconds
    */
   @Cron(CronExpression.EVERY_30_SECONDS)
   async refreshPulse(): Promise<void> {
-    try {
+    await this.runGuarded('mv_pulse_today', 'mv_pulse_today', async () => {
       await this.knex.raw('SELECT refresh_mv_pulse_today()');
       this.logger.debug('Refreshed mv_pulse_today');
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh mv_pulse_today: ${(error as Error).message}`,
-      );
-    }
+    });
   }
 
   /**
@@ -39,14 +57,10 @@ export class MvRefreshJob {
    */
   @Cron('*/2 * * * *')
   async refreshOpsStatus(): Promise<void> {
-    try {
+    await this.runGuarded('mv_ops_status', 'mv_ops_status', async () => {
       await this.knex.raw('SELECT refresh_mv_ops_status()');
       this.logger.debug('Refreshed mv_ops_status');
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh mv_ops_status: ${(error as Error).message}`,
-      );
-    }
+    });
   }
 
   /**
@@ -54,14 +68,14 @@ export class MvRefreshJob {
    */
   @Cron('*/5 * * * *')
   async refreshInventoryAlerts(): Promise<void> {
-    try {
-      await this.knex.raw('SELECT refresh_mv_inventory_alerts()');
-      this.logger.debug('Refreshed mv_inventory_alerts');
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh mv_inventory_alerts: ${(error as Error).message}`,
-      );
-    }
+    await this.runGuarded(
+      'mv_inventory_alerts',
+      'mv_inventory_alerts',
+      async () => {
+        await this.knex.raw('SELECT refresh_mv_inventory_alerts()');
+        this.logger.debug('Refreshed mv_inventory_alerts');
+      },
+    );
   }
 
   /**
@@ -69,17 +83,17 @@ export class MvRefreshJob {
    */
   @Cron('0 2 * * *')
   async refreshAnalyticsNightly(): Promise<void> {
-    try {
-      await this.knex.raw('SELECT refresh_mv_customer_profitability()');
-      await this.knex.raw('SELECT refresh_mv_supplier_scorecard()');
-      this.logger.debug(
-        'Refreshed customer profitability & supplier scorecard',
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh analytics (customer/supplier): ${(error as Error).message}`,
-      );
-    }
+    await this.runGuarded(
+      'analytics_nightly',
+      'analytics (customer/supplier)',
+      async () => {
+        await this.knex.raw('SELECT refresh_mv_customer_profitability()');
+        await this.knex.raw('SELECT refresh_mv_supplier_scorecard()');
+        this.logger.debug(
+          'Refreshed customer profitability & supplier scorecard',
+        );
+      },
+    );
   }
 
   /**
@@ -87,15 +101,11 @@ export class MvRefreshJob {
    */
   @Cron('0 3 * * *')
   async refreshYieldAndAR(): Promise<void> {
-    try {
+    await this.runGuarded('yield_and_ar', 'yield/AR', async () => {
       await this.knex.raw('SELECT refresh_mv_yield_trend()');
       await this.knex.raw('SELECT refresh_mv_ar_aging()');
       this.logger.debug('Refreshed yield trend & AR aging');
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh yield/AR: ${(error as Error).message}`,
-      );
-    }
+    });
   }
 
   /**

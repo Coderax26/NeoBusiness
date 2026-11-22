@@ -450,7 +450,7 @@ export const INITIAL_PURCHASE_ORDERS: PurchaseOrderRecord[] = [
     supplierPhone: '+91 98220 33003',
     receivingSiteId: 'site-2',
     receivingSiteName: 'Baramati Plant',
-    status: 'PARTIALLY_RECEIVED',
+    status: 'PARTLY_RECEIVED',
     expectedDelivery: '2026-11-14',
     paymentTermsDays: 30,
     priceSpikeException: false,

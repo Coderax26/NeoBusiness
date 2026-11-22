@@ -8,18 +8,61 @@ import {
   type ExceptionItem,
   type ExceptionType,
 } from '@neo/shared';
-import { INITIAL_EXCEPTIONS } from '../../../../src/lib/control-tower-data';
 
 export default function ControlApprovalsPage() {
-  const [exceptions, setExceptions] = useState<ExceptionItem[]>(INITIAL_EXCEPTIONS);
+  const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [tab, setTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
   const [typeFilter, setTypeFilter] = useState<'ALL' | ExceptionType>('ALL');
   const [focusedIdx, setFocusedIdx] = useState<number>(0);
-  const [counterDraft, setCounterDraft] = useState<Record<string, string>>({ 'exc-1': '89.50' });
+  const [counterDraft, setCounterDraft] = useState<Record<string, string>>({});
   const [remarksDraft, setRemarksDraft] = useState<Record<string, string>>({});
   const [stepUpTarget, setStepUpTarget] = useState<{ exc: ExceptionItem; action: 'APPROVE' | 'COUNTER' } | null>(null);
   const [stepUpPassword, setStepUpPassword] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/proxy/exceptions')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setExceptions(
+          list.map((e: any) => {
+            const payload =
+              typeof e.context_payload_json === 'string'
+                ? (() => {
+                    try {
+                      return JSON.parse(e.context_payload_json);
+                    } catch {
+                      return {};
+                    }
+                  })()
+                : (e.context_payload_json ?? e.payload_json ?? {});
+            return {
+              id: e.id,
+              type: (e.exception_type ?? e.type ?? 'PRICE_OVERRIDE') as ExceptionType,
+              status: e.status ?? 'PENDING',
+              title:
+                payload?.title ??
+                e.title ??
+                e.reason ??
+                `${e.exception_type ?? 'Exception'} (${e.reference_id ?? e.entity_id ?? ''})`,
+              siteId: e.site_id ?? 'all',
+              siteName: e.site_name ?? 'Site',
+              amountInr: Number(e.value_at_risk ?? e.amount_inr ?? e.amount ?? 0),
+              waitingMinutes: Number(e.waiting_minutes ?? 0),
+              escalatesInMinutes: Number(e.escalates_in_minutes ?? 30),
+              delegatedTo: e.delegated_to,
+              originOrderNo: e.reference_id ?? e.entity_no ?? e.originOrderNo ?? '',
+              facts: typeof payload === 'object' && payload ? payload : {},
+              resolvedBy: e.resolved_by,
+              resolvedAt: e.resolved_at,
+              remarks: e.owner_remarks ?? e.remarks,
+            };
+          }),
+        );
+      })
+      .catch(() => setExceptions([]));
+  }, []);
 
   const visibleList = useMemo(() => {
     return exceptions.filter((e) => {
@@ -29,7 +72,7 @@ export default function ControlApprovalsPage() {
     });
   }, [exceptions, tab, typeFilter]);
 
-  function attemptResolve(exc: ExceptionItem, action: 'APPROVE' | 'COUNTER' | 'REJECT', pwd?: string) {
+  async function attemptResolve(exc: ExceptionItem, action: 'APPROVE' | 'COUNTER' | 'REJECT', pwd?: string) {
     const res = resolveExceptionWithConcurrency({
       exceptions,
       exceptionId: exc.id,
@@ -49,14 +92,51 @@ export default function ControlApprovalsPage() {
       return;
     }
 
-    setExceptions(res.exceptions);
-    setStepUpTarget(null);
-    setStepUpPassword('');
-    setToast(
-      res.originOrderUnlocked
-        ? `${res.friendlyMessage} Originating order ${exc.originOrderNo} unlocked!`
-        : res.friendlyMessage,
-    );
+    const counterValue =
+      action === 'COUNTER' ? Number(counterDraft[exc.id]) || undefined : undefined;
+    const mappedAction =
+      action === 'APPROVE'
+        ? 'APPROVED'
+        : action === 'REJECT'
+          ? 'REJECTED'
+          : 'COUNTERED';
+    const defaultRemarks =
+      action === 'APPROVE'
+        ? 'Approved via Control Tower'
+        : action === 'REJECT'
+          ? 'Rejected via Control Tower'
+          : 'Counter-offer proposed';
+
+    try {
+      const apiRes = await fetch(`/api/proxy/exceptions/${encodeURIComponent(exc.id)}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: mappedAction,
+          remarks: remarksDraft[exc.id]?.trim() || defaultRemarks,
+          ...(counterValue !== undefined
+            ? { counter: { price: counterValue, amount: counterValue } }
+            : {}),
+        }),
+      });
+      if (!apiRes.ok) {
+        const errBody = await apiRes.json().catch(() => null);
+        throw new Error(
+          errBody?.message || errBody?.error?.message || `HTTP ${apiRes.status}`,
+        );
+      }
+
+      setExceptions(res.exceptions);
+      setStepUpTarget(null);
+      setStepUpPassword('');
+      setToast(
+        res.originOrderUnlocked
+          ? `${res.friendlyMessage} Originating order ${exc.originOrderNo} unlocked!`
+          : res.friendlyMessage,
+      );
+    } catch (err) {
+      setToast(`Failed to resolve exception: ${(err as Error).message}`);
+    }
   }
 
   useEffect(() => {
@@ -79,12 +159,12 @@ export default function ControlApprovalsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Approvals Centre</h1>
-          <p className="text-sm text-slate-500">
-            Keyboard shortcuts: <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">J/K</kbd> navigate,{' '}
-            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">A</kbd> approve,{' '}
-            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">C</kbd> counter,{' '}
-            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">R</kbd> reject. Step-up auth required ≥ ₹5,000.
+          <h1 className="text-2xl font-bold text-zinc-100">Approvals Centre</h1>
+          <p className="text-sm text-zinc-400">
+            Keyboard shortcuts: <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">J/K</kbd> navigate,{' '}
+            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">A</kbd> approve,{' '}
+            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">C</kbd> counter,{' '}
+            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">R</kbd> reject. Step-up auth required ≥ ₹5,000.
           </p>
         </div>
 
@@ -93,7 +173,7 @@ export default function ControlApprovalsPage() {
             type="button"
             onClick={() => setTab('PENDING')}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-              tab === 'PENDING' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'
+              tab === 'PENDING' ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
             }`}
           >
             Pending ({exceptions.filter((e) => e.status === 'PENDING').length})
@@ -102,7 +182,7 @@ export default function ControlApprovalsPage() {
             type="button"
             onClick={() => setTab('HISTORY')}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-              tab === 'HISTORY' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'
+              tab === 'HISTORY' ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
             }`}
           >
             History ({exceptions.filter((e) => e.status !== 'PENDING').length})
@@ -111,7 +191,7 @@ export default function ControlApprovalsPage() {
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-2.5 text-sm font-medium text-emerald-300">
           {toast}
         </div>
       )}
@@ -136,7 +216,7 @@ export default function ControlApprovalsPage() {
               setFocusedIdx(0);
             }}
             className={`rounded-lg px-3 py-1 text-xs font-semibold ${
-              typeFilter === t ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700'
+              typeFilter === t ? 'bg-teal-600 text-white' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
             }`}
           >
             {t.replace(/_/g, ' ')}
@@ -146,6 +226,11 @@ export default function ControlApprovalsPage() {
 
       {/* Cards */}
       <div className="space-y-4">
+        {visibleList.length === 0 && (
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-400">
+            No {tab.toLowerCase()} exceptions found.
+          </div>
+        )}
         {visibleList.map((exc, idx) => {
           const isFocused = tab === 'PENDING' && idx === focusedIdx;
           const stepUp = requiresStepUpAuth(exc.amountInr);
@@ -153,45 +238,45 @@ export default function ControlApprovalsPage() {
             <div
               key={exc.id}
               onClick={() => setFocusedIdx(idx)}
-              className={`rounded-2xl border bg-white p-5 transition ${
-                isFocused ? 'border-teal-600 ring-2 ring-teal-100' : 'border-slate-200'
+              className={`rounded-2xl border bg-zinc-900 p-5 transition ${
+                isFocused ? 'border-teal-500 ring-1 ring-teal-500/40' : 'border-zinc-800'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-amber-100 px-2 py-0.5 font-bold text-amber-900">
+                  <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold text-amber-300">
                     {exc.type.replace(/_/g, ' ')}
                   </span>
-                  <span className="text-slate-500">{exc.siteName}</span>
+                  <span className="text-zinc-400">{exc.siteName}</span>
                   {stepUp && (
-                    <span className="rounded bg-purple-100 px-2 py-0.5 font-semibold text-purple-800">
+                    <span className="rounded bg-purple-500/20 px-2 py-0.5 font-semibold text-purple-300">
                       🔒 Step-up Auth
                     </span>
                   )}
                 </div>
-                <div className="text-slate-500">
+                <div className="text-zinc-400">
                   Waiting {exc.waitingMinutes} min · Escalates in {exc.escalatesInMinutes} min
                   {exc.delegatedTo && ` · Delegated to ${exc.delegatedTo}`}
                 </div>
               </div>
 
-              <h2 className="mt-2 text-base font-bold text-slate-900">{exc.title}</h2>
+              <h2 className="mt-2 text-base font-bold text-zinc-100">{exc.title}</h2>
 
               <div className="mt-3 flex flex-wrap gap-3">
                 {Object.entries(exc.facts).map(([k, v]) => (
-                  <div key={k} className="rounded-lg bg-slate-50 px-3 py-1.5 text-xs">
-                    <span className="text-slate-500">{k}: </span>
-                    <span className="font-semibold text-slate-900">{v}</span>
+                  <div key={k} className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs">
+                    <span className="text-zinc-400">{k}: </span>
+                    <span className="font-semibold text-zinc-100">{String(v)}</span>
                   </div>
                 ))}
               </div>
 
               {exc.status === 'PENDING' ? (
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-4">
                   <button
                     type="button"
                     onClick={() => attemptResolve(exc, 'APPROVE')}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                   >
                     ✓ Approve ({formatINR(exc.amountInr)})
                   </button>
@@ -200,14 +285,15 @@ export default function ControlApprovalsPage() {
                       <input
                         type="number"
                         step="0.5"
-                        value={counterDraft[exc.id] ?? '89.50'}
+                        value={counterDraft[exc.id] ?? ''}
                         onChange={(e) => setCounterDraft((p) => ({ ...p, [exc.id]: e.target.value }))}
-                        className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                        placeholder="Counter ₹"
+                        className="w-24 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-100"
                       />
                       <button
                         type="button"
                         onClick={() => attemptResolve(exc, 'COUNTER')}
-                        className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900"
+                        className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-300"
                       >
                         ↔ Counter
                       </button>
@@ -216,7 +302,7 @@ export default function ControlApprovalsPage() {
                   <button
                     type="button"
                     onClick={() => attemptResolve(exc, 'REJECT')}
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700"
+                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500"
                   >
                     ✕ Reject
                   </button>
@@ -225,11 +311,11 @@ export default function ControlApprovalsPage() {
                     value={remarksDraft[exc.id] ?? ''}
                     onChange={(e) => setRemarksDraft((p) => ({ ...p, [exc.id]: e.target.value }))}
                     placeholder="Optional remarks..."
-                    className="ml-auto w-full sm:w-56 rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                    className="ml-auto w-full sm:w-56 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100"
                   />
                 </div>
               ) : (
-                <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                <div className="mt-3 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-zinc-300">
                   Resolved as <strong>{exc.status}</strong> by {exc.resolvedBy} at {exc.resolvedAt}
                   {exc.remarks && ` — "${exc.remarks}"`}
                   {exc.originOrderUnlocked && ` · Order ${exc.originOrderNo} unlocked`}
@@ -242,16 +328,16 @@ export default function ControlApprovalsPage() {
 
       {/* Step-up Auth Modal */}
       {stepUpTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               attemptResolve(stepUpTarget.exc, stepUpTarget.action, stepUpPassword);
             }}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
           >
-            <h3 className="text-lg font-bold text-slate-900">Owner Step-Up Verification (OD-002)</h3>
-            <p className="mt-1 text-xs text-slate-500">
+            <h3 className="text-lg font-bold text-zinc-100">Owner Step-Up Verification (OD-002)</h3>
+            <p className="mt-1 text-xs text-zinc-400">
               High-value exception ({formatINR(stepUpTarget.exc.amountInr)} ≥ ₹5,000) requires Owner password.
             </p>
             <input
@@ -259,14 +345,14 @@ export default function ControlApprovalsPage() {
               value={stepUpPassword}
               onChange={(e) => setStepUpPassword(e.target.value)}
               placeholder="Enter Owner password"
-              className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="mt-4 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
               required
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setStepUpTarget(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300"
               >
                 Cancel
               </button>

@@ -1,13 +1,68 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { classifyExpiryBucket } from '@neo/shared';
-import { INITIAL_STOCK_ROWS } from '../../../../src/lib/inventory-data';
+
+interface StockBatchRow {
+  id: string;
+  itemId: string;
+  itemName: string;
+  sku: string;
+  batchNo: string;
+  siteId: string;
+  siteName: string;
+  locationCode: string;
+  uom: string;
+  altUomLabel: string;
+  onHand: number;
+  committed: number;
+  available: number;
+  expiryDate: string;
+  daysToExpiry: number;
+}
 
 export default function FloorCheckStockPage() {
   const [query, setQuery] = useState('');
+  const [rows, setRows] = useState<StockBatchRow[]>([]);
 
-  const filtered = INITIAL_STOCK_ROWS.filter((r) => {
+  useEffect(() => {
+    fetch('/api/proxy/inventory/stock/current')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setRows(
+          list.map((b: any) => ({
+            id: String(b.id ?? b.batchId ?? ''),
+            itemId: b.item_id ?? b.itemId ?? '',
+            itemName: b.item_name ?? b.itemName ?? 'Item',
+            sku: b.sku_code ?? b.skuCode ?? b.sku ?? '',
+            batchNo: b.batch_number ?? b.batchNumber ?? b.batchNo ?? '',
+            siteId: b.site_id ?? b.siteId ?? '',
+            siteName: b.site_name ?? b.siteName ?? 'Site',
+            locationCode: b.location_name ?? b.locationName ?? b.locationCode ?? 'WH',
+            uom: b.uom ?? 'KG',
+            altUomLabel: b.altUomLabel ?? '',
+            onHand: Number(b.qtyOnHand ?? b.qty_on_hand ?? b.onHand ?? 0),
+            committed: Number(b.qtyCommitted ?? b.qty_committed ?? b.committed ?? 0),
+            available: Number(b.qtyAvailable ?? b.qty_available ?? b.available ?? 0),
+            daysToExpiry:
+              b.daysToExpiry ??
+              (b.expiryDate || b.expiry_date
+                ? Math.ceil(
+                    (new Date(b.expiryDate ?? b.expiry_date).getTime() - Date.now()) /
+                      86_400_000,
+                  )
+                : 30),
+            expiryDate: b.expiry_date ?? b.expiryDate ?? '',
+            landedCostPerUnit: Number(b.landed_cost_per_unit ?? 0),
+            status: b.status ?? 'AVAILABLE',
+          })),
+        );
+      })
+      .catch(() => setRows([]));
+  }, []);
+
+  const filtered = rows.filter((r) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (

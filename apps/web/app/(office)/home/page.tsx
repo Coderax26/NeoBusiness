@@ -10,10 +10,39 @@ import {
   ExceptionCard,
   Badge,
 } from '@neo/ui';
-import type { SessionUser } from '@neo/shared';
+import { formatINR, type SessionUser } from '@neo/shared';
+
+interface HomeSummary {
+  todaySalesInr: number;
+  todayInvoiceCount: number;
+  grossMarginPct: number | null;
+  cashCollectedInr: number;
+  activeTripsCount: number;
+  stagedOrdersCount: number;
+  readyOrdersCount: number;
+  activeBatchesCount: number;
+  pendingHandoversCount: number;
+  pendingChequesCount: number;
+  pendingExceptionsCount: number;
+  topException: {
+    id: string;
+    exception_type?: string;
+    reason?: string;
+    entity_id?: string;
+    entity_type?: string;
+  } | null;
+  setupProgressPct: number;
+  arAging: Array<{
+    label: string;
+    amount: string;
+    count: number;
+    tone: 'info' | 'warning' | 'danger';
+  }>;
+}
 
 export default function RoleHomePage() {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
   const [orderSummary, setOrderSummary] = useState<{
     counts: Record<string, number>;
     totalOrders: number;
@@ -23,70 +52,118 @@ export default function RoleHomePage() {
   >([]);
   const [exceptionsLoaded, setExceptionsLoaded] = useState(false);
   const [todoList, setTodoList] = useState([
-    { id: 'todo-1', label: 'Verify today’s base & floor prices', count: '1 missing', href: '/sales/prices', done: false },
+    { id: 'todo-1', label: 'Verify today’s base & floor prices', count: 'Check prices', href: '/sales/prices', done: false },
     { id: 'todo-2', label: 'Confirm draft sales orders', count: '0 pending', href: '/sales/orders', done: false },
     { id: 'todo-3', label: 'Build dispatch trips for ready orders', count: '0 ready', href: '/logistics/trips', done: false },
-    { id: 'todo-4', label: 'Verify driver cash handovers', count: '3 waiting', href: '/finance/handovers', done: false },
-    { id: 'todo-5', label: 'Bank cheque deposit register', count: '2 cheques', href: '/finance/cheques', done: false },
-    { id: 'todo-6', label: 'Customer promises to pay (PTP) due today', count: '5 due', href: '/finance/invoices', done: false },
-    { id: 'todo-7', label: 'Raw material procurement shortfall', count: '1 open', href: '/procurement/shortfalls', done: false },
-    { id: 'todo-8', label: 'Sign off yesterday’s EOD reconciliation', count: 'Pending', href: '/finance/eod', done: false },
+    { id: 'todo-4', label: 'Verify driver cash handovers', count: '0 waiting', href: '/finance/handovers', done: false },
+    { id: 'todo-5', label: 'Bank cheque deposit register', count: '0 cheques', href: '/finance/cheques', done: false },
+    { id: 'todo-6', label: 'Customer promises to pay (PTP) due today', count: 'Check PTPs', href: '/finance/invoices', done: false },
+    { id: 'todo-7', label: 'Raw material procurement shortfall', count: 'Check shortfalls', href: '/procurement/shortfalls', done: false },
+    { id: 'todo-8', label: 'Sign off yesterday’s EOD reconciliation', count: 'Check EOD', href: '/finance/eod', done: false },
   ]);
 
   useEffect(() => {
     let active = true;
+
+    const loadDashboard = async (userData: any, overrideSiteId?: string) => {
+      const storedSite =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('neobus_active_site_id')
+          : null;
+      const effectiveSite =
+        overrideSiteId ??
+        storedSite ??
+        userData?.activeSiteId ??
+        userData?.assigned_site_id ??
+        userData?.sites?.[0]?.id ??
+        '';
+      const siteQuery =
+        effectiveSite && effectiveSite !== 'all'
+          ? `?siteId=${encodeURIComponent(effectiveSite)}`
+          : '';
+
+      try {
+        const [summaryRes, homeRes] = await Promise.all([
+          fetch(`/api/proxy/orders/summary${siteQuery}`),
+          fetch(`/api/proxy/dashboard/home-summary${siteQuery}`),
+        ]);
+
+        if (active && homeRes.ok) {
+          const h: HomeSummary = await homeRes.json();
+          if (h && typeof h === 'object') {
+            setHomeSummary(h);
+            setTodoList((prev) =>
+              prev.map((item) => {
+                if (item.id === 'todo-3') return { ...item, count: `${h.readyOrdersCount} ready` };
+                if (item.id === 'todo-4') return { ...item, count: `${h.pendingHandoversCount} waiting` };
+                if (item.id === 'todo-5') return { ...item, count: `${h.pendingChequesCount} cheques` };
+                return item;
+              }),
+            );
+          }
+        }
+
+        if (active && summaryRes.ok) {
+          const summary = await summaryRes.json();
+          if (summary && typeof summary === 'object') {
+            setOrderSummary(summary);
+            const draftOrPending =
+              (summary.counts?.DRAFT ?? 0) +
+              (summary.counts?.PENDING_APPROVAL ?? 0);
+            const readyCount = summary.counts?.READY ?? 0;
+            setTodoList((prev) =>
+              prev.map((item) => {
+                if (item.id === 'todo-2') {
+                  return { ...item, count: `${draftOrPending} pending` };
+                }
+                if (item.id === 'todo-3') {
+                  return { ...item, count: `${readyCount} ready` };
+                }
+                return item;
+              }),
+            );
+          }
+        }
+      } catch {
+        // ignore network error; empty-state defaults stay visible
+      }
+
+      if (userData?.role === 'OWNER') {
+        try {
+          const exRes = await fetch('/api/proxy/exceptions?status=PENDING');
+          if (active && exRes.ok) {
+            const exList = await exRes.json();
+            if (Array.isArray(exList)) {
+              setPendingExceptions(exList);
+              setExceptionsLoaded(true);
+            }
+          }
+        } catch {
+          // ignore network error
+        }
+      }
+    };
+
+    let currentUser: any = null;
+    const onSiteChanged = (ev: Event) => {
+      const nextSiteId = (ev as CustomEvent<string>).detail;
+      if (currentUser) void loadDashboard(currentUser, nextSiteId);
+    };
+    window.addEventListener('neobus-site-changed', onSiteChanged);
+
     fetch('/api/auth/me')
       .then((res) => (res.ok ? res.json() : null))
       .then(async (data) => {
         if (!active || !data?.user) return;
+        currentUser = data.user;
         setUser(data.user);
-
-        try {
-          const summaryRes = await fetch('/api/proxy/orders/summary');
-          if (active && summaryRes.ok) {
-            const summary = await summaryRes.json();
-            if (summary && typeof summary === 'object') {
-              setOrderSummary(summary);
-              const draftOrPending =
-                (summary.counts?.DRAFT ?? 0) +
-                (summary.counts?.PENDING_APPROVAL ?? 0);
-              const readyCount = summary.counts?.READY ?? 0;
-              setTodoList((prev) =>
-                prev.map((item) => {
-                  if (item.id === 'todo-2') {
-                    return { ...item, count: `${draftOrPending} pending` };
-                  }
-                  if (item.id === 'todo-3') {
-                    return { ...item, count: `${readyCount} ready` };
-                  }
-                  return item;
-                }),
-              );
-            }
-          }
-        } catch {
-          // ignore network error; fallback state stays visible
-        }
-
-        if (data.user.role === 'OWNER') {
-          try {
-            const exRes = await fetch('/api/proxy/exceptions?status=PENDING');
-            if (active && exRes.ok) {
-              const exList = await exRes.json();
-              if (Array.isArray(exList)) {
-                setPendingExceptions(exList);
-                setExceptionsLoaded(true);
-              }
-            }
-          } catch {
-            // ignore network error
-          }
-        }
+        await loadDashboard(data.user);
       })
       .catch(() => {});
 
     return () => {
       active = false;
+      window.removeEventListener('neobus-site-changed', onSiteChanged);
     };
   }, []);
 
@@ -151,7 +228,7 @@ export default function RoleHomePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-white">
-                  Your business is 60% set up
+                  Your business is {homeSummary?.setupProgressPct ?? 0}% set up
                 </h2>
                 <Badge tone="brand">Setup in progress</Badge>
               </div>
@@ -196,26 +273,27 @@ export default function RoleHomePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Today's Sales (OD-020)"
-          value="₹4,82,450"
-          subtitle="42 invoices issued today"
-          trend={{ direction: 'up', label: '+14% vs yesterday' }}
-          sparklineValues={[310, 340, 290, 420, 390, 450, 482]}
+          value={formatINR(homeSummary?.todaySalesInr ?? 0)}
+          subtitle={`${homeSummary?.todayInvoiceCount ?? 0} invoices in system`}
+          trend={{ direction: 'neutral', label: 'Live DB' }}
           tone="default"
         />
         <KpiCard
           title="Gross Margin"
-          value="18.4%"
-          subtitle="Target: 18.0%"
-          trend={{ direction: 'up', label: '+0.4% in band' }}
-          sparklineValues={[16.2, 17.1, 17.5, 17.9, 18.2, 18.4]}
+          value={
+            isOwner
+              ? `${Number(homeSummary?.grossMarginPct ?? 0).toFixed(1)}%`
+              : 'Owner Only'
+          }
+          subtitle="Live materialized pulse"
+          trend={{ direction: 'neutral', label: isOwner ? 'Owner view' : 'Restricted' }}
           tone="success"
         />
         <KpiCard
           title="Cash & Cheques in Custody"
-          value="₹1,24,500"
-          subtitle="8 drivers on active routes"
+          value={formatINR(homeSummary?.cashCollectedInr ?? 0)}
+          subtitle={`${homeSummary?.activeTripsCount ?? 0} active routes`}
           trend={{ direction: 'neutral', label: 'EOD handover' }}
-          sparklineValues={[90, 95, 100, 105, 110, 124]}
           tone="warning"
         />
         <KpiCard
@@ -230,7 +308,6 @@ export default function RoleHomePage() {
             direction: pendingCount > 0 ? 'down' : 'up',
             label: pendingCount > 0 ? 'Action required' : 'All clear',
           }}
-          sparklineValues={[7, 6, 5, 4, Math.max(pendingCount, 0), Math.max(pendingCount, 0)]}
           tone={pendingCount > 0 ? 'danger' : 'good'}
         />
       </div>
@@ -250,31 +327,31 @@ export default function RoleHomePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans">
               <StatCompare
                 label="Orders Staged for Dispatch"
-                expected="18 Orders"
-                actual="14 Orders"
-                variance="-4 Pending"
-                isFavorable={false}
+                expected={`${homeSummary?.stagedOrdersCount ?? 0} Staged`}
+                actual={`${homeSummary?.readyOrdersCount ?? 0} Ready`}
+                variance={`${homeSummary?.stagedOrdersCount ?? 0} in pipeline`}
+                isFavorable={(homeSummary?.readyOrdersCount ?? 0) > 0}
               />
               <StatCompare
                 label="Active Production Batches"
-                expected="6 Batches"
-                actual="6 Batches"
-                variance="On Schedule"
+                expected="Work Orders"
+                actual={`${homeSummary?.activeBatchesCount ?? 0} Active`}
+                variance="Live factory status"
                 isFavorable={true}
               />
               <StatCompare
                 label="Fleet Trucks on Road"
-                expected="8 Trucks"
-                actual="8 Active"
-                variance="100% En Route"
+                expected="Dispatched"
+                actual={`${homeSummary?.activeTripsCount ?? 0} Active`}
+                variance="Live trips"
                 isFavorable={true}
               />
               <StatCompare
-                label="Procurement Shortfall"
-                expected="0 Items"
-                actual="1 Item"
-                variance="Alphonso 2MT"
-                isFavorable={false}
+                label="Pending Cash Handovers"
+                expected="0 Pending"
+                actual={`${homeSummary?.pendingHandoversCount ?? 0} Pending`}
+                variance={`${homeSummary?.pendingChequesCount ?? 0} cheques`}
+                isFavorable={(homeSummary?.pendingHandoversCount ?? 0) === 0}
               />
             </div>
 
@@ -283,12 +360,14 @@ export default function RoleHomePage() {
                 Accounts Receivable Aging Breakdown
               </h4>
               <AgingBuckets
-                buckets={[
-                  { label: '0 – 7 Days', amount: '340000.00', count: 18, tone: 'info' },
-                  { label: '8 – 15 Days', amount: '124000.00', count: 8, tone: 'warning' },
-                  { label: '16 – 30 Days', amount: '68000.00', count: 4, tone: 'warning' },
-                  { label: '30+ Days (Overdue)', amount: '32000.00', count: 2, tone: 'danger' },
-                ]}
+                buckets={
+                  homeSummary?.arAging ?? [
+                    { label: '0 – 7 Days', amount: '0.00', count: 0, tone: 'info' },
+                    { label: '8 – 15 Days', amount: '0.00', count: 0, tone: 'warning' },
+                    { label: '16 – 30 Days', amount: '0.00', count: 0, tone: 'warning' },
+                    { label: '30+ Days (Overdue)', amount: '0.00', count: 0, tone: 'danger' },
+                  ]
+                }
               />
             </div>
           </div>
@@ -304,15 +383,35 @@ export default function RoleHomePage() {
               </Link>
             </div>
 
-            <ExceptionCard
-              id="EXP-001"
-              type="PRICE_BELOW_FLOOR"
-              title="SO-2611-0042 Price Override"
-              summary="Quoted ₹420/kg for Alphonso Pulp (Floor: ₹435/kg). 1,200 kg."
-              impact="Gross margin drops to 12.8% (-₹18,000)."
-              onApprove={() => alert('Approved')}
-              onReject={() => alert('Rejected')}
-            />
+            {homeSummary?.topException ? (
+              <ExceptionCard
+                id={homeSummary.topException.id}
+                type={homeSummary.topException.exception_type ?? 'APPROVAL_REQUIRED'}
+                title={`${homeSummary.topException.entity_type ?? 'Order'} ${homeSummary.topException.entity_id ?? homeSummary.topException.id}`}
+                summary={homeSummary.topException.reason ?? 'Requires owner approval.'}
+                impact="Pending review in Approvals Inbox."
+                onApprove={async () => {
+                  await fetch(`/api/proxy/exceptions/${encodeURIComponent(homeSummary.topException!.id)}/resolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ decision: 'APPROVE' }),
+                  });
+                  setHomeSummary((prev) => (prev ? { ...prev, topException: null } : prev));
+                }}
+                onReject={async () => {
+                  await fetch(`/api/proxy/exceptions/${encodeURIComponent(homeSummary.topException!.id)}/resolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ decision: 'REJECT' }),
+                  });
+                  setHomeSummary((prev) => (prev ? { ...prev, topException: null } : prev));
+                }}
+              />
+            ) : (
+              <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 text-xs text-zinc-400">
+                No open exceptions in database.
+              </div>
+            )}
           </div>
         </div>
       ) : (

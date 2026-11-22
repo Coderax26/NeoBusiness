@@ -80,10 +80,15 @@ export class CustomerService {
     isActive?: boolean;
     search?: string;
   }) {
+    const validSiteId =
+      filters.siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.siteId)
+        ? filters.siteId
+        : undefined;
     const query = this.knex('customers').select('*');
 
-    if (filters.siteId) {
-      query.where('default_site_id', filters.siteId);
+    if (validSiteId) {
+      query.where('default_site_id', validSiteId);
     }
     if (filters.isActive !== undefined) {
       query.where('is_active', filters.isActive);
@@ -124,6 +129,9 @@ export class CustomerService {
       stateCode: string;
       preferredDeliveryWindow: string;
       priceTier: string;
+      creditLimit: string | number;
+      creditDays: number;
+      creditHold: boolean;
       isActive: boolean;
       gpsLatLng: string;
       userId: string;
@@ -142,6 +150,9 @@ export class CustomerService {
     if (data.preferredDeliveryWindow !== undefined)
       updateData.preferred_delivery_window = data.preferredDeliveryWindow;
     if (data.priceTier) updateData.price_tier = data.priceTier;
+    if (data.creditLimit !== undefined) updateData.credit_limit = String(data.creditLimit);
+    if (data.creditDays !== undefined) updateData.credit_days = Number(data.creditDays);
+    if (data.creditHold !== undefined) updateData.credit_hold = Boolean(data.creditHold);
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
     if (data.gpsLatLng !== undefined)
       updateData.gps_lat_lng = data.gpsLatLng

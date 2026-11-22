@@ -5,16 +5,19 @@ export type BadgeTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 
 export interface BadgeProps {
   children: React.ReactNode;
   tone?: BadgeTone;
+  variant?: BadgeTone | string;
   size?: 'sm' | 'md';
   className?: string;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
   children,
-  tone = 'neutral',
+  tone,
+  variant,
   size = 'md',
   className = '',
 }) => {
+  const resolvedTone: BadgeTone = ((tone ?? variant ?? 'neutral') as BadgeTone);
   const toneClasses: Record<BadgeTone, string> = {
     brand: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
     success: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
@@ -31,7 +34,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-medium rounded-full border ${toneClasses[tone]} ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center gap-1.5 font-medium rounded-full border ${toneClasses[resolvedTone] ?? toneClasses.neutral} ${sizeClasses[size]} ${className}`}
     >
       {children}
     </span>

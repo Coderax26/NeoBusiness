@@ -146,13 +146,19 @@ export class OrderController {
     q: {
       status?: string;
       siteId?: string;
+      customerId?: string;
+      deliveryDate?: string;
       date?: string;
       limit?: number;
       offset?: number;
     },
   ) {
-    const limit = Math.min(q.limit ?? 50, 100);
-    const offset = q.offset ?? 0;
+    const limit = Math.min(Number(q.limit) || 50, 100);
+    const offset = Number(q.offset) || 0;
+    const validSiteId =
+      q.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q.siteId)
+        ? q.siteId
+        : undefined;
 
     const knex = this.orderSvc['knex'];
     const query = knex('sales_orders as so')
@@ -172,7 +178,9 @@ export class OrderController {
       .offset(offset);
 
     if (q.status) query.andWhere('so.order_status', q.status);
-    if (q.siteId) query.andWhere('so.fulfillment_site_id', q.siteId);
+    if (validSiteId) query.andWhere('so.fulfillment_site_id', validSiteId);
+    if (q.customerId) query.andWhere('so.customer_id', q.customerId);
+    if (q.deliveryDate) query.andWhere('so.delivery_date', q.deliveryDate);
     if (q.date) {
       const date = new Date(q.date);
       const nextDate = new Date(date);
@@ -180,7 +188,26 @@ export class OrderController {
       query.andWhereBetween('so.created_at_idx', [date, nextDate]);
     }
 
-    return query;
+    const orders = await query;
+    if (orders.length === 0) return [];
+
+    const orderIds = orders.map((o: any) => o.id);
+    const allLines = await knex('sales_order_lines as sol')
+      .leftJoin('items as i', 'sol.item_id', 'i.id')
+      .whereIn('sol.order_id', orderIds)
+      .select('sol.*', 'i.name as item_name', 'i.sku_code', 'i.primary_uom');
+
+    const linesByOrder = new Map<string, any[]>();
+    for (const l of allLines) {
+      const k = String(l.order_id);
+      if (!linesByOrder.has(k)) linesByOrder.set(k, []);
+      linesByOrder.get(k)!.push(l);
+    }
+
+    return orders.map((o: any) => ({
+      ...o,
+      lines: linesByOrder.get(String(o.id)) || [],
+    }));
   }
 
   /**
@@ -189,9 +216,13 @@ export class OrderController {
   @Get('summary')
   @RequirePermission('order.view')
   async getSummary(@Query('siteId') siteId?: string) {
+    const validSiteId =
+      siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)
+        ? siteId
+        : undefined;
     const knex = this.orderSvc['knex'];
     let query = knex('sales_orders');
-    if (siteId) query = query.where('fulfillment_site_id', siteId);
+    if (validSiteId) query = query.where('fulfillment_site_id', validSiteId);
 
     const rows = await query
       .select('order_status')
@@ -228,13 +259,13 @@ export class OrderController {
     const buffer = await pdfGen.generateOrder({
       orderNo: order.order_no,
       orderDate: new Date(order.created_at_idx).toISOString().split('T')[0],
-      customerName: customer?.legal_name || 'Customer',
+      customerName: customer?.business_name || 'Customer',
       customerGstin: customer?.gstin,
       siteName: site?.name || 'NeoBus',
       lines: lines.map((l: any) => ({
         itemName: l.item_name || 'Item',
-        qty: String(l.qty),
-        unitPrice: String(l.agreed_unit_price || l.requested_unit_price || '0'),
+        qty: String(l.ordered_qty ?? 0),
+        unitPrice: String(l.quoted_unit_price ?? '0'),
         lineTotal: String(l.line_total || '0'),
       })),
       totalAmount: String(order.total_amount || '0'),

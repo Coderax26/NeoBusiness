@@ -8,16 +8,17 @@ import {
   formatINR,
   type SessionUser,
 } from '@neo/shared';
-import { INITIAL_DAILY_PRICES, type DailyPriceRow } from '../../../../src/lib/sales-data';
+import { type DailyPriceRow } from '../../../../src/lib/sales-data';
 
 export default function TodaysPricesPage() {
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [rows, setRows] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
-  const [initialRows, setInitialRows] = useState<DailyPriceRow[]>(INITIAL_DAILY_PRICES);
+  const [rows, setRows] = useState<DailyPriceRow[]>([]);
+  const [initialRows, setInitialRows] = useState<DailyPriceRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [missingOnly, setMissingOnly] = useState(false);
+  const [openQuotesCount, setOpenQuotesCount] = useState<number>(0);
 
   // Dialog states
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
@@ -32,6 +33,14 @@ export default function TodaysPricesPage() {
         if (data?.user) setUser(data.user);
       })
       .catch(() => {});
+
+    fetch('/api/proxy/quotes')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setOpenQuotesCount(list.filter((q: any) => q.status === 'OPEN' || q.status === 'DRAFT' || q.status === 'SENT').length);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -39,7 +48,7 @@ export default function TodaysPricesPage() {
     fetch(`/api/proxy/prices/${encodeURIComponent(selectedDate)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!active || !Array.isArray(data) || data.length === 0) return;
+        if (!active || !Array.isArray(data)) return;
         const mapped: DailyPriceRow[] = data.map((r: any) => ({
           itemId: String(r.itemId),
           sku: String(r.skuCode || ''),
@@ -257,7 +266,7 @@ export default function TodaysPricesPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard title="Catalog Items Priced" value={`${rows.length - missingCount} / ${rows.length}`} subtitle="Ready for Quick Order" tone="default" />
         <KpiCard title="Modified in Draft" value={String(changedRows.length)} subtitle="Unsaved price adjustments" tone={changedRows.length > 0 ? 'warning' : 'success'} />
-        <KpiCard title="Open Quotes Impacted" value="2" subtitle="Active quotes referencing items" tone="default" />
+        <KpiCard title="Open Quotes Impacted" value={String(openQuotesCount)} subtitle="Active quotes referencing items" tone="default" />
       </div>
 
       {/* Bulk Tools Bar */}

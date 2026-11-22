@@ -231,7 +231,7 @@ export class RequisitionService {
   ): Promise<RequisitionGroupBySupplier[]> {
     // Get open requisitions
     let reqQuery = this.knex('purchase_requisitions')
-      .where('status', 'OPEN')
+      .where('purchase_requisitions.status', 'OPEN')
       .join('items', 'items.id', 'purchase_requisitions.item_id')
       .select(
         'purchase_requisitions.*',
@@ -239,24 +239,33 @@ export class RequisitionService {
         'items.name as item_name',
       );
 
-    if (siteId) {
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
+      const knex = this.knex;
       // Filter by site through source_ref_id (production_requisitions or sales_orders)
-      reqQuery = reqQuery
-        .whereExists(
-          this.knex('production_requisitions')
+      reqQuery = reqQuery.andWhere(function () {
+        this.whereExists(
+          knex('production_requisitions')
             .where(
               'production_requisitions.id',
-              'purchase_requisitions.source_ref_id',
+              knex.ref('purchase_requisitions.source_ref_id'),
             )
             .where('production_requisitions.site_id', siteId)
             .where('purchase_requisitions.source', 'PRODUCTION'),
-        )
-        .orWhereExists(
-          this.knex('sales_orders')
-            .where('sales_orders.id', 'purchase_requisitions.source_ref_id')
+        ).orWhereExists(
+          knex('sales_orders')
+            .where(
+              'sales_orders.id',
+              knex.ref('purchase_requisitions.source_ref_id'),
+            )
             .where('sales_orders.fulfillment_site_id', siteId)
             .where('purchase_requisitions.source', 'SALES_ORDER'),
         );
+      });
     }
 
     const requisitions = await reqQuery;

@@ -1,70 +1,172 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Card, Dialog } from '@neo/ui';
-import { evaluateWoYieldStatus } from '@neo/shared';
+import { evaluateWoYieldStatus, type BomRecord } from '@neo/shared';
 import {
-  INITIAL_WORK_ORDERS,
-  INITIAL_BOMS,
   type WorkOrderRecord,
-} from '../../../src/lib/production-data';
+} from '../../../../src/lib/production-data';
 
 export default function WorkOrdersPage() {
-  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>(INITIAL_WORK_ORDERS);
+  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
+  const [boms, setBoms] = useState<BomRecord[]>([]);
   const [viewMode, setViewMode] = useState<'LIST' | 'KANBAN'>('LIST');
   const [selectedWo, setSelectedWo] = useState<WorkOrderRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newBomId, setNewBomId] = useState(INITIAL_BOMS[0].id);
+  const [newBomId, setNewBomId] = useState('');
   const [newQty, setNewQty] = useState(500);
-  const [newRequiredBy, setNewRequiredBy] = useState('2026-11-16 14:00');
+  const [newRequiredBy, setNewRequiredBy] = useState(new Date().toISOString().slice(0, 10) + ' 14:00');
   const [cancelTarget, setCancelTarget] = useState<WorkOrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [activeSiteId, setActiveSiteId] = useState<string>('');
 
-  const handleCreateWo = () => {
-    const bom = INITIAL_BOMS.find((b) => b.id === newBomId) || INITIAL_BOMS[0];
-    const created: WorkOrderRecord = {
-      id: `wo-${Date.now()}`,
-      woNumber: `WO-2026-0${Math.floor(92 + Math.random() * 90)}`,
-      finishedItemId: bom.finishedItemId,
-      finishedItemName: bom.finishedItemName,
-      bomId: bom.id,
-      bomCode: bom.code,
-      siteName: 'Baramati Plant',
-      plannedQty: newQty,
-      issuedRmQty: 0,
-      actualOutputQty: 0,
-      scrapQty: 0,
-      uom: bom.outputUom,
-      status: 'PLANNED',
-      requiredBy: newRequiredBy,
+  useEffect(() => {
+    let active = true;
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    const effectiveSite = storedSite && storedSite !== 'all' ? storedSite : '';
+    setActiveSiteId(effectiveSite);
+    const siteQuery = effectiveSite ? `?siteId=${encodeURIComponent(effectiveSite)}` : '';
+
+    if (!effectiveSite) {
+      fetch('/api/auth/me')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me) => {
+          const fallbackSite = me?.user?.activeSiteId || me?.user?.sites?.[0]?.id || '';
+          if (active && fallbackSite) setActiveSiteId(String(fallbackSite));
+        })
+        .catch(() => { });
+    }
+
+    Promise.all([
+      fetch(`/api/proxy/production/work-orders${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/production/boms${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([woRes, bomRes]) => {
+        if (!active) return;
+        const wos = Array.isArray(woRes) ? woRes : Array.isArray(woRes?.data) ? woRes.data : [];
+        const bRows = Array.isArray(bomRes) ? bomRes : Array.isArray(bomRes?.data) ? bomRes.data : [];
+        setWorkOrders(
+          wos.map((w: any) => ({
+            ...w,
+            id: String(w.id),
+            woNumber: String(w.woNumber ?? w.woNo ?? w.wo_no ?? ''),
+            finishedItemId: String(w.finishedItemId ?? ''),
+            finishedItemName: String(w.finishedItemName ?? 'Item'),
+            bomId: String(w.bomId ?? w.bomHeaderId ?? ''),
+            bomCode: String(w.bomCode ?? w.bomNo ?? ''),
+            siteName: String(w.siteName ?? 'Plant'),
+            plannedQty: Number(w.plannedQty ?? 0),
+            issuedRmQty: Number(w.issuedRmQty ?? 0),
+            actualOutputQty: Number(
+              w.actualOutputQty ??
+              (Array.isArray(w.outputs)
+                ? w.outputs.reduce(
+                  (s: number, o: any) => s + Number(o.qtyProduced ?? o.qty_produced ?? 0),
+                  0,
+                )
+                : 0),
+            ),
+            scrapQty: Number(w.scrapQty ?? 0),
+            uom: String(w.uom ?? 'kg'),
+            status: (w.status ?? 'PLANNED') as WorkOrderRecord['status'],
+            requiredBy: String(w.requiredBy ?? w.createdAt ?? ''),
+          })),
+        );
+        const normalizedBoms: BomRecord[] = bRows.map((b: any) => ({
+          ...b,
+          id: String(b.id),
+          code: String(b.code ?? b.bomNo ?? 'BOM'),
+          finishedItemId: String(b.finishedItemId ?? b.itemId ?? ''),
+          finishedItemName: String(b.finishedItemName ?? b.itemName ?? 'Item'),
+          outputUom: String(b.outputUom ?? b.uom ?? 'kg'),
+          ingredients: Array.isArray(b.ingredients) ? b.ingredients : Array.isArray(b.lines) ? b.lines : [],
+        }));
+        setBoms(normalizedBoms);
+        if (normalizedBoms.length > 0) setNewBomId(normalizedBoms[0].id);
+      })
+      .catch(() => { });
+    return () => {
+      active = false;
     };
-    fetch('/api/bff/production/work-orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created),
-    }).catch(() => {});
-    setWorkOrders((prev) => [created, ...prev]);
-    setCreateOpen(false);
-    setToast(`Created Work Order ${created.woNumber}.`);
+  }, []);
+
+  const handleCreateWo = async () => {
+    const bom: any = boms.find((b) => b.id === newBomId) || boms[0];
+    if (!bom) return;
+    if (!activeSiteId) {
+      setToast('Active site is required to create a Work Order.');
+      return;
+    }
+    const woNo = `WO-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.floor(1000 + Math.random() * 8999)}`;
+    const uom = String(bom.outputUom || bom.uom || 'KG');
+    try {
+      const res = await fetch('/api/bff/production/work-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          woNo,
+          siteId: activeSiteId,
+          bomHeaderId: bom.id,
+          plannedQty: String(newQty),
+          uom,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      const saved = await res.json().catch(() => null);
+      const d = saved?.data ?? saved;
+      const created: WorkOrderRecord = {
+        id: String(d?.id ?? `wo-${Date.now()}`),
+        woNumber: String(d?.woNo ?? woNo),
+        finishedItemId: String(d?.finishedItemId ?? bom.finishedItemId ?? ''),
+        finishedItemName: String(d?.finishedItemName ?? bom.finishedItemName ?? 'Item'),
+        bomId: String(d?.bomHeaderId ?? bom.id),
+        bomCode: String(d?.bomNo ?? bom.code ?? ''),
+        siteName: 'Plant',
+        plannedQty: Number(d?.plannedQty ?? newQty),
+        issuedRmQty: 0,
+        actualOutputQty: 0,
+        scrapQty: 0,
+        uom: String(d?.uom ?? uom),
+        status: (d?.status ?? 'PLANNED') as WorkOrderRecord['status'],
+        requiredBy: newRequiredBy,
+      };
+      setWorkOrders((prev) => [created, ...prev]);
+      setCreateOpen(false);
+      setToast(`Created Work Order ${created.woNumber}.`);
+    } catch (err) {
+      setToast(`Failed to create Work Order: ${(err as Error).message}`);
+    }
   };
 
-  const handleCancelWo = () => {
+  const handleCancelWo = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-    fetch(`/api/bff/production/work-orders/${cancelTarget.id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: cancelReason }),
-    }).catch(() => {});
-    setWorkOrders((prev) =>
-      prev.map((w) =>
-        w.id === cancelTarget.id ? { ...w, status: 'CANCELLED', cancelReason } : w,
-      ),
-    );
-    setCancelTarget(null);
-    setCancelReason('');
-    setToast(`Cancelled ${cancelTarget.woNumber}.`);
+    try {
+      const res = await fetch(`/api/bff/production/work-orders/${encodeURIComponent(cancelTarget.id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setWorkOrders((prev) =>
+        prev.map((w) =>
+          w.id === cancelTarget.id ? { ...w, status: 'CANCELLED', cancelReason } : w,
+        ),
+      );
+      setCancelTarget(null);
+      setCancelReason('');
+      setToast(`Cancelled Work Order ${cancelTarget.woNumber}.`);
+    } catch (err) {
+      setToast(`Failed to cancel Work Order: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -263,9 +365,9 @@ export default function WorkOrdersPage() {
               onChange={(e) => setNewBomId(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
             >
-              {INITIAL_BOMS.filter((b) => b.status === 'ACTIVE').map((b) => (
+              {boms.filter((b: any) => b.status === 'ACTIVE').map((b: any) => (
                 <option key={b.id} value={b.id}>
-                  {b.finishedItemName} ({b.code})
+                  {b.finishedItemName || b.outputItemName || b.name} ({b.code})
                 </option>
               ))}
             </select>

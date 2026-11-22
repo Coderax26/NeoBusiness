@@ -290,7 +290,7 @@ export class HandoverService {
       .where('site_id', siteId)
       .andWhere('status', 'PENDING')
       .join('users as h', 'cash_handovers.handed_by_user_id', 'h.id')
-      .select('cash_handovers.*', 'h.name as handedByName')
+      .select('cash_handovers.*', 'h.full_name as handedByName')
       .orderBy('created_at', 'asc');
   }
 
@@ -308,7 +308,9 @@ export class HandoverService {
       .leftJoin('users as h', 'cash_handovers.handed_by_user_id', 'h.id')
       .leftJoin('users as r', 'cash_handovers.received_by_user_id', 'r.id');
 
-    if (options.siteId) query = query.where('cash_handovers.site_id', options.siteId);
+    if (options.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.siteId)) {
+      query = query.where('cash_handovers.site_id', options.siteId);
+    }
     if (options.status) query = query.where('cash_handovers.status', options.status);
     if (options.handedByUserId) query = query.where('cash_handovers.handed_by_user_id', options.handedByUserId);
 
@@ -316,7 +318,7 @@ export class HandoverService {
     const limit = options.limit ?? 50;
     const offset = options.offset ?? 0;
     const items = await query
-      .select('cash_handovers.*', 'h.name as handedByName', 'r.name as receivedByName')
+      .select('cash_handovers.*', 'h.full_name as handedByName', 'r.full_name as receivedByName')
       .orderBy('cash_handovers.created_at', 'desc')
       .limit(limit)
       .offset(offset);

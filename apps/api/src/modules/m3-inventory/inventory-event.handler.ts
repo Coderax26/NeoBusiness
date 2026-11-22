@@ -15,6 +15,7 @@ import {
 } from '../../shared/ports/ports.interface.js';
 import { InventoryService } from './inventory.service.js';
 import { Clock } from '../../shared/utils/clock.util.js';
+import { getRedisConnection } from '../../shared/config/redis-connection.js';
 
 interface DomainJob {
   event_type: string;
@@ -47,7 +48,7 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(
       'domain-events',
       async (job) => this.handle(job.data as DomainJob),
-      { connection: { host: 'localhost', port: 6379 } },
+      { connection: getRedisConnection() },
     );
     this.worker.on('failed', (job, error) => {
       this.logger.error(

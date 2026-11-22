@@ -41,8 +41,8 @@ export class TallyExportController {
       'Trigger Tally XML export batch generation for sales invoices, purchase bills, and receipts',
   })
   @ApiResponse({ status: 201, description: 'Export job executed' })
-  async triggerExport(@Body() dto: TriggerTallyExportDto) {
-    await this.tallyService.exportTallyXml();
+  async triggerExport(@Body() dto: TriggerTallyExportDto, @Req() req: any) {
+    await this.tallyService.exportTallyXml(req.user?.id ?? null);
     return wrapResponse({ message: 'Tally export triggered successfully' });
   }
 

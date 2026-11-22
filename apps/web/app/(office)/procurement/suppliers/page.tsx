@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   DataTable,
   type ColumnDef,
@@ -56,146 +56,46 @@ export interface SupplierRecord {
   active: boolean;
 }
 
-const INITIAL_SUPPLIERS: SupplierRecord[] = [
-  {
-    id: 'sup-1',
-    code: 'SUP-001',
-    name: 'Ganga Dairy Farmers Cooperative',
-    gstin: '27AABCG1234F1Z5',
-    contactPerson: 'Kailash Patil',
-    phone: '9822112233',
-    email: 'ganga.coop@example.com',
-    address: 'Village Bori, Baramati, Dist Pune',
-    paymentTermsDays: 7,
-    leadTimeDays: 1,
-    reliabilityScore: 4.8,
-    fillRatePct: 98.2,
-    onTimePct: 96.0,
-    shortfallCount: 1,
-    lastPoDate: '2026-11-12',
-    hasMissingRates: false,
-    items: [
-      {
-        itemId: 'itm-3',
-        itemSku: 'RM-RAW-MILK',
-        itemName: 'Raw Chilled Buffalo Milk (6.5% Fat)',
-        supplierSku: 'GDC-MILK-BUF',
-        packSize: '40L Can',
-        approved: true,
-        latestRate: 56.5,
-      },
-    ],
-    rates: [
-      {
-        id: 'r-1',
-        itemId: 'itm-3',
-        itemName: 'Raw Chilled Buffalo Milk',
-        ratePerUnit: 56.5,
-        validFrom: '2026-11-01',
-        notes: 'Winter contract rate',
-      },
-      {
-        id: 'r-2',
-        itemId: 'itm-3',
-        itemName: 'Raw Chilled Buffalo Milk',
-        ratePerUnit: 54.0,
-        validFrom: '2026-10-01',
-        validTo: '2026-10-31',
-        notes: 'Pre-diwali baseline',
-      },
-    ],
-    active: true,
-  },
-  {
-    id: 'sup-2',
-    code: 'SUP-002',
-    name: 'Apex Packaging Industries',
-    gstin: '27AAACA9999M1Z2',
-    contactPerson: 'Sameer Joshi',
-    phone: '9823001122',
-    email: 'orders@apexpack.com',
-    address: 'MIDC Bhosari, Pune',
-    paymentTermsDays: 30,
-    leadTimeDays: 5,
-    reliabilityScore: 4.2,
-    fillRatePct: 92.0,
-    onTimePct: 89.5,
-    shortfallCount: 4,
-    lastPoDate: '2026-11-05',
-    hasMissingRates: false,
-    items: [
-      {
-        itemId: 'itm-p1',
-        itemSku: 'PK-TUB-500G',
-        itemName: 'Curd 500g IML Tubs & Lids',
-        supplierSku: 'APX-TUB-500',
-        packSize: 'Box of 500',
-        approved: true,
-        latestRate: 4.2,
-      },
-      {
-        itemId: 'itm-p2',
-        itemSku: 'PK-POUCH-200G',
-        itemName: 'Paneer 200g Vacuum Pouches',
-        supplierSku: 'APX-PCH-200',
-        packSize: 'Pack of 1000',
-        approved: true,
-        latestRate: 1.85,
-      },
-    ],
-    rates: [
-      {
-        id: 'r-3',
-        itemId: 'itm-p1',
-        itemName: 'Curd 500g IML Tubs',
-        ratePerUnit: 4.2,
-        validFrom: '2026-09-01',
-      },
-      {
-        id: 'r-4',
-        itemId: 'itm-p2',
-        itemName: 'Paneer 200g Vacuum Pouches',
-        ratePerUnit: 1.85,
-        validFrom: '2026-09-01',
-      },
-    ],
-    active: true,
-  },
-  {
-    id: 'sup-3',
-    code: 'SUP-003',
-    name: 'Siddhi Spices & Ingredients',
-    gstin: '27AABCS5544N1ZX',
-    contactPerson: 'Mahesh Deshmukh',
-    phone: '9822554411',
-    address: 'Market Yard, Gultekdi, Pune',
-    paymentTermsDays: 15,
-    leadTimeDays: 2,
-    reliabilityScore: 3.5,
-    fillRatePct: 84.0,
-    onTimePct: 82.0,
-    shortfallCount: 7,
-    lastPoDate: '2026-10-20',
-    hasMissingRates: true, // Missing rate alert!
-    items: [
-      {
-        itemId: 'itm-sp1',
-        itemSku: 'RM-SALT-IOD',
-        itemName: 'Refined Iodised Salt 50kg',
-        supplierSku: 'SSI-SALT-50',
-        packSize: '50kg Bag',
-        approved: true,
-        latestRate: undefined, // Missing current rate
-      },
-    ],
-    rates: [],
-    active: true,
-  },
-];
 
 export default function SupplierMasterPage() {
-  const [suppliers, setSuppliers] = useState<SupplierRecord[]>(INITIAL_SUPPLIERS);
+  const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/procurement/suppliers')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        if (!active || !Array.isArray(rows)) return;
+        setSuppliers(
+          rows.map((s: any) => ({
+            id: String(s.id),
+            code: String(s.supplier_code || s.code || ''),
+            name: String(s.company_name || s.name || 'Supplier'),
+            gstin: String(s.gstin || ''),
+            contactPerson: String(s.contact_person || s.contactPerson || ''),
+            phone: String(s.phone || ''),
+            email: String(s.email || ''),
+            address: String(s.address || ''),
+            paymentTermsDays: Number(s.payment_terms_days ?? s.paymentTermsDays ?? 15),
+            leadTimeDays: Number(s.lead_time_days ?? s.leadTimeDays ?? 2),
+            reliabilityScore: Number(s.reliability_score ?? s.reliabilityScore ?? 4.5),
+            fillRatePct: Number(s.fill_rate_pct ?? s.fillRatePct ?? 95),
+            onTimePct: Number(s.on_time_pct ?? s.onTimePct ?? 92),
+            shortfallCount: Number(s.shortfall_count ?? s.shortfallCount ?? 0),
+            lastPoDate: s.last_po_date || undefined,
+            hasMissingRates: Boolean(s.has_missing_rates),
+            items: Array.isArray(s.items) ? s.items : [],
+            rates: Array.isArray(s.rates) ? s.rates : [],
+            active: s.is_active !== false,
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [missingRateOnly, setMissingRateOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
@@ -536,8 +436,8 @@ export default function SupplierMasterPage() {
           tone="success"
         />
         <KpiCard
-          title="Avg Fulfilment Time"
-          value="2.1 days"
+          title="Avg Payment Terms"
+          value={`${suppliers.length > 0 ? Math.round(suppliers.reduce((sum, s) => sum + (s.paymentTermsDays || 0), 0) / suppliers.length) : 0} days`}
           subtitle="Across active suppliers"
           tone="default"
         />

@@ -107,14 +107,53 @@ export class QuoteService {
     });
   }
 
+  async list(filters: { siteId?: string; customerId?: string; status?: string; limit?: number; offset?: number }) {
+    const validSiteId =
+      filters.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.siteId)
+        ? filters.siteId
+        : undefined;
+    let query = this.knex('quotes as q')
+      .leftJoin('customers as c', 'q.customer_id', 'c.id')
+      .select('q.*', 'c.business_name as customer_name', 'c.customer_code');
+    if (validSiteId) query = query.where('q.site_id', validSiteId);
+    if (filters.customerId) query = query.where('q.customer_id', filters.customerId);
+    if (filters.status) query = query.where('q.status', filters.status);
+
+    const rows = await query
+      .orderBy('q.created_at', 'desc')
+      .limit(filters.limit || 50)
+      .offset(filters.offset || 0);
+
+    if (rows.length === 0) return [];
+    const quoteIds = rows.map((r: any) => r.id);
+    const allLines = await this.knex('quote_lines as ql')
+      .leftJoin('items as i', 'ql.item_id', 'i.id')
+      .whereIn('ql.quote_id', quoteIds)
+      .select('ql.*', 'i.name as item_name', 'i.sku_code', 'i.primary_uom');
+    const linesByQuote = new Map<string, any[]>();
+    for (const l of allLines) {
+      const k = String(l.quote_id);
+      if (!linesByQuote.has(k)) linesByQuote.set(k, []);
+      linesByQuote.get(k)!.push(l);
+    }
+    return rows.map((r: any) => ({ ...r, lines: linesByQuote.get(String(r.id)) || [] }));
+  }
+
   /**
    * Get quote detail.
    */
   async findById(id: string) {
-    const quote = await this.knex('quotes').where('id', id).first();
+    const quote = await this.knex('quotes as q')
+      .leftJoin('customers as c', 'q.customer_id', 'c.id')
+      .where('q.id', id)
+      .select('q.*', 'c.business_name as customer_name', 'c.customer_code')
+      .first();
     if (!quote) throw new NotFoundException(`Quote ${id} not found`);
 
-    const lines = await this.knex('quote_lines').where('quote_id', id);
+    const lines = await this.knex('quote_lines as ql')
+      .leftJoin('items as i', 'ql.item_id', 'i.id')
+      .where('ql.quote_id', id)
+      .select('ql.*', 'i.name as item_name', 'i.sku_code', 'i.primary_uom');
     return { ...quote, lines };
   }
 
@@ -147,6 +186,8 @@ export class QuoteService {
   ): Promise<{
     quoteId: string;
     quoteNo: string;
+    orderId: string;
+    orderNo: string;
     status: string;
     totalAmount: string;
     validUntil: Date;
@@ -176,6 +217,9 @@ export class QuoteService {
       qty: string;
       quoted_unit_price: string;
       floor_price_snapshot: string;
+      target_price_snapshot?: string;
+      landed_cost_snapshot?: string;
+      margin_pct_snapshot?: string;
     }>;
 
     // Re-validate quote lines against today's band (or specified date)
@@ -202,29 +246,79 @@ export class QuoteService {
       } else {
         validationResults.push({
           itemId: String(line.item_id),
-          inBand: true, // No band today, allow with warning
-          floorPrice: 'N/A',
+          inBand: true,
+          floorPrice: String(line.floor_price_snapshot || '0.00'),
           quotedPrice: String(line.quoted_unit_price),
         });
       }
     }
 
-    // Update quote status to CONVERTED
-    await this.knex('quotes').where('id', quoteId).update({
-      status: 'CONVERTED',
-      updated_by: userId,
-      updated_at: new Date(),
+    const targetSiteId =
+      siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)
+        ? siteId
+        : String(quote.site_id);
+
+    const { orderId, orderNo } = await this.knex.transaction(async (trx) => {
+      const genOrderNo = await this.docNumber.next('SALES_ORDER', targetSiteId, null, trx);
+      const anyBelowFloor = validationResults.some((r) => !r.inBand);
+      const orderStatus = anyBelowFloor ? 'PENDING_APPROVAL' : 'CONFIRMED';
+
+      const [newOrder] = await trx('sales_orders')
+        .insert({
+          order_no: genOrderNo,
+          customer_id: quote.customer_id,
+          fulfillment_site_id: targetSiteId,
+          order_status: orderStatus,
+          total_amount: String(quote.total_amount || '0.00'),
+          delivery_date: today,
+          delivery_time_window: '10-12',
+          credit_flag: 'OK',
+          payment_terms: 'CREDIT',
+          source_quote_id: quoteId,
+          confirmed_at: orderStatus === 'CONFIRMED' ? new Date() : null,
+          created_by: userId,
+          updated_by: userId,
+        })
+        .returning(['id', 'order_no']);
+
+      for (const line of quoteLines) {
+        const lineTotal = Money.of(line.quoted_unit_price).mul(line.qty);
+        await trx('sales_order_lines').insert({
+          order_id: newOrder.id,
+          item_id: line.item_id,
+          ordered_qty: line.qty,
+          quoted_unit_price: line.quoted_unit_price,
+          floor_price_snapshot: line.floor_price_snapshot || line.quoted_unit_price,
+          target_price_snapshot: line.target_price_snapshot || line.quoted_unit_price,
+          landed_cost_snapshot: line.landed_cost_snapshot || '0.00',
+          margin_pct_snapshot: line.margin_pct_snapshot ?? null,
+          line_margin_pct: line.margin_pct_snapshot ?? null,
+          line_total: lineTotal.toStorageString(),
+          created_by: userId,
+          updated_by: userId,
+        });
+      }
+
+      await trx('quotes').where('id', quoteId).update({
+        status: 'CONVERTED',
+        updated_by: userId,
+        updated_at: new Date(),
+      });
+
+      return { orderId: String(newOrder.id), orderNo: String(newOrder.order_no) };
     });
 
     return {
-      quoteId: quoteId,
+      quoteId,
       quoteNo: quote.quote_no,
+      orderId,
+      orderNo,
       status: 'CONVERTED',
       totalAmount: quote.total_amount,
       validUntil: quote.valid_until,
       customer: String(quote.customer_id),
-      site: String(quote.site_id),
-      conversionInstructions: 'POST /orders with quoteId in body to convert',
+      site: targetSiteId,
+      conversionInstructions: `Converted to Sales Order ${orderNo}`,
       priceValidation: validationResults,
     };
   }

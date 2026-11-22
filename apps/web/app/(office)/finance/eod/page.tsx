@@ -1,20 +1,124 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { evaluateEodChecklist, formatINR } from '@neo/shared';
+import { evaluateEodChecklist } from '@neo/shared';
 
 export default function EodClosingPage() {
-  const [selectedDate, setSelectedDate] = useState('2026-11-13');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [started, setStarted] = useState(true);
   const [openTripsCount, setOpenTripsCount] = useState(0);
-  const [nonZeroFieldWalletsCount, setNonZeroFieldWalletsCount] = useState(1);
+  const [nonZeroFieldWalletsCount, setNonZeroFieldWalletsCount] = useState(0);
   const [uninvoicedDeliveriesCount, setUninvoicedDeliveriesCount] = useState(0);
-  const [pendingHandoversCount, setPendingHandoversCount] = useState(1);
+  const [pendingHandoversCount, setPendingHandoversCount] = useState(0);
   const [undepositedChequesCount, setUndepositedChequesCount] = useState(0);
   const [depositSlipPrepared, setDepositSlipPrepared] = useState(true);
   const [ownerPassword, setOwnerPassword] = useState('');
   const [signedOff, setSignedOff] = useState(false);
+  const [eodError, setEodError] = useState<string | null>(null);
+  const [activeSiteId, setActiveSiteId] = useState<string>('');
+
+  const loadEodData = async (date: string, siteId: string) => {
+    setEodError(null);
+    const siteQuery = siteId && siteId !== 'all' ? `&siteId=${encodeURIComponent(siteId)}` : '';
+    const [chkRes, trpRes, hndRes, chqRes] = await Promise.allSettled([
+      fetch(`/api/proxy/eod/${encodeURIComponent(date)}/checklist`).then(async (r) =>
+        r.ok ? r.json() : r.status === 404 ? { __notStarted: true } : null,
+      ),
+      fetch(`/api/proxy/trips?tripDate=${encodeURIComponent(date)}${siteQuery}`).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+      fetch(`/api/proxy/handovers?date=${encodeURIComponent(date)}${siteQuery}`).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+      fetch(`/api/proxy/cheques${siteId && siteId !== 'all' ? `?siteId=${encodeURIComponent(siteId)}` : ''}`).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+    ]);
+
+    if (chkRes.status === 'fulfilled' && chkRes.value) {
+      const chk = chkRes.value?.data ?? chkRes.value;
+      if (chk?.__notStarted) {
+        setStarted(false);
+        setSignedOff(false);
+      } else {
+        setStarted(true);
+        if (chk.status === 'SIGNED_OFF' || chk.status === 'CLOSED') {
+          setSignedOff(true);
+        } else {
+          setSignedOff(false);
+        }
+        if (chk.checks) {
+          setOpenTripsCount(Number(chk.checks.trips?.count ?? 0));
+          setNonZeroFieldWalletsCount(Number(chk.checks.handover?.nonZeroWallets ?? 0));
+          setUninvoicedDeliveriesCount(Number(chk.checks.uninvoiced?.count ?? 0));
+        }
+      }
+    }
+    if (trpRes.status === 'fulfilled') {
+      const rows = Array.isArray(trpRes.value)
+        ? trpRes.value
+        : Array.isArray(trpRes.value?.data)
+          ? trpRes.value.data
+          : [];
+      setOpenTripsCount(
+        rows.filter((t: any) => !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(String(t.status))).length,
+      );
+    }
+    if (hndRes.status === 'fulfilled') {
+      const rows = Array.isArray(hndRes.value)
+        ? hndRes.value
+        : Array.isArray(hndRes.value?.data)
+          ? hndRes.value.data
+          : [];
+      const pending = rows.filter((h: any) => h.status === 'PENDING').length;
+      setPendingHandoversCount(pending);
+      setNonZeroFieldWalletsCount(pending);
+    }
+    if (chqRes.status === 'fulfilled') {
+      const rows = Array.isArray(chqRes.value)
+        ? chqRes.value
+        : Array.isArray(chqRes.value?.data)
+          ? chqRes.value.data
+          : [];
+      setUndepositedChequesCount(rows.filter((c: any) => c.status === 'RECEIVED').length);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    setActiveSiteId(storedSite);
+    loadEodData(selectedDate, storedSite).catch(() => {
+      if (active) setEodError('Failed to load EOD checklist data.');
+    });
+    return () => {
+      active = false;
+    };
+  }, [selectedDate]);
+
+  async function handleStartEod() {
+    setEodError(null);
+    try {
+      const res = await fetch('/api/proxy/eod/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          ...(activeSiteId && activeSiteId !== 'all' ? { siteId: activeSiteId } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setStarted(true);
+      await loadEodData(selectedDate, activeSiteId);
+    } catch (err) {
+      setEodError(`Failed to start EOD: ${(err as Error).message}`);
+    }
+  }
 
   const checklist = useMemo(
     () =>
@@ -36,27 +140,32 @@ export default function EodClosingPage() {
     ],
   );
 
-  function resolveAllBlockers() {
-    setOpenTripsCount(0);
-    setNonZeroFieldWalletsCount(0);
-    setUninvoicedDeliveriesCount(0);
-    setPendingHandoversCount(0);
-    setUndepositedChequesCount(0);
-    setDepositSlipPrepared(true);
-  }
-
-  function handleOwnerSignOff(e: React.FormEvent) {
+  async function handleOwnerSignOff(e: React.FormEvent) {
     e.preventDefault();
     if (!checklist.canSignOff || !ownerPassword.trim()) return;
-    setSignedOff(true);
+    setEodError(null);
+    try {
+      const res = await fetch(`/api/proxy/eod/${encodeURIComponent(selectedDate)}/signoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks: 'Owner sign-off', password: ownerPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setSignedOff(true);
+    } catch (err) {
+      setEodError(`EOD sign-off failed: ${(err as Error).message}`);
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Guided End-of-Day (EOD) Close</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-zinc-100">Guided End-of-Day (EOD) Close</h1>
+          <p className="text-sm text-zinc-400">
             All 6 checklist preconditions must be green before Owner sign-off becomes available.
           </p>
         </div>
@@ -65,96 +174,100 @@ export default function EodClosingPage() {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
           />
           {!started && (
             <button
               type="button"
-              onClick={() => setStarted(true)}
+              onClick={handleStartEod}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
             >
               Start EOD
             </button>
           )}
-          <button
-            type="button"
-            onClick={resolveAllBlockers}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Simulate All Cleared
-          </button>
         </div>
       </div>
 
-      {signedOff && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-          ✓ EOD for {selectedDate} signed off by Owner. Day closed in 14 mins.
+      {eodError && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300">
+          {eodError}
         </div>
       )}
 
-      {/* Checklist */}
-      <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {checklist.rows.map((row) => (
-          <div key={row.key} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+      {signedOff && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-300">
+          ✓ EOD Close for {selectedDate} signed off by Owner. Day ledger is locked.
+        </div>
+      )}
+
+      <div className="divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+        {checklist.rows.map((item) => (
+          <div key={item.key} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
             <div className="flex items-center gap-3">
               <span
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
-                  row.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                  item.passed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
                 }`}
               >
-                {row.passed ? '✓' : '✕'}
+                {item.passed ? '✓' : '✕'}
               </span>
               <div>
-                <div className="font-semibold text-slate-900">{row.label}</div>
-                <div className={`text-xs ${row.passed ? 'text-emerald-700' : 'text-rose-700'}`}>{row.detail}</div>
+                <div className="font-semibold text-zinc-100">{item.label}</div>
+                <div className={`text-xs ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {item.passed ? 'Passed' : item.detail}
+                </div>
               </div>
             </div>
-            {!row.passed && (
+            {!item.passed && (
               <Link
-                href={row.fixHref}
-                className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                href={item.fixHref}
+                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20"
               >
-                Go to Fix Screen →
+                Resolve →
               </Link>
             )}
           </div>
         ))}
       </div>
 
-      {/* Bank Deposit Slip Preview */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-900">Bank Deposit Slip Preview</h2>
-          <span className="font-mono text-sm font-bold text-emerald-700">Net Cash to Bank: {formatINR(28500)}</span>
-        </div>
-        <p className="mt-1 text-xs text-slate-500">
-          Denomination summary prepared for SBI Baramati Current Account · Slip #DEP-{selectedDate.replace(/-/g, '')}.
-        </p>
-      </div>
-
-      {/* Owner Sign-off: visible ONLY when all green */}
-      {checklist.canSignOff && !signedOff && (
-        <form onSubmit={handleOwnerSignOff} className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 space-y-3">
-          <div className="text-sm font-bold text-emerald-900">All EOD Checks Green — Owner Sign-off Ready</div>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="password"
-              value={ownerPassword}
-              onChange={(e) => setOwnerPassword(e.target.value)}
-              placeholder="Enter Owner step-up password"
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-              required
-            />
-            <button
-              type="submit"
-              className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-            >
-              Owner Sign-off &amp; Close Day
-            </button>
+      <form onSubmit={handleOwnerSignOff} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-bold text-zinc-100">Owner Sign-off</div>
+            <div className="text-xs text-zinc-400">
+              {checklist.canSignOff
+                ? 'All checks passed. Enter Owner password to lock EOD.'
+                : `${checklist.rows.filter((r) => !r.passed).length} blocker(s) remaining before sign-off.`}
+            </div>
           </div>
-        </form>
-      )}
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <input
+              type="checkbox"
+              checked={depositSlipPrepared}
+              onChange={(e) => setDepositSlipPrepared(e.target.checked)}
+              className="rounded border-zinc-700 bg-zinc-950"
+            />
+            Deposit slip prepared
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="password"
+            value={ownerPassword}
+            onChange={(e) => setOwnerPassword(e.target.value)}
+            placeholder="Owner password"
+            disabled={!checklist.canSignOff || signedOff}
+            className="flex-1 min-w-[200px] rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!checklist.canSignOff || signedOff || !ownerPassword.trim()}
+            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+          >
+            {signedOff ? 'Signed Off' : 'Sign Off & Lock Day'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
-

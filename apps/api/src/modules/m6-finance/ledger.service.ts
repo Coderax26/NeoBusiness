@@ -362,8 +362,9 @@ export class LedgerService implements LedgerPort {
       .whereIn('status', ['UNPAID', 'PARTIAL', 'OVERDUE'])
       .orderBy('due_date', 'asc');
 
-    if (customerId) query = query.where('customer_id', customerId);
-    if (siteId) query = query.where('site_id', siteId);
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (customerId && uuidRe.test(customerId)) query = query.where('customer_id', customerId);
+    if (siteId && uuidRe.test(siteId)) query = query.where('site_id', siteId);
 
     return query.select('*');
   }
@@ -376,7 +377,9 @@ export class LedgerService implements LedgerPort {
     let query = this.knex('invoices')
       .whereIn('status', ['UNPAID', 'PARTIAL', 'OVERDUE']);
 
-    if (siteId) query = query.where('site_id', siteId);
+    if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {
+      query = query.where('site_id', siteId);
+    }
 
     const invoices = await query.select(
       'id',

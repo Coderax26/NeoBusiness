@@ -13,36 +13,6 @@ export interface PendingException {
   createdAt: string;
 }
 
-const DEFAULT_EXCEPTIONS: PendingException[] = [
-  {
-    id: 'EXP-001',
-    type: 'PRICE_BELOW_FLOOR',
-    title: 'Order SO-2611-0042 Price Below Floor',
-    summary: 'Sales coordinator quoted ₹420/kg for Alphonso Pulp (Daily Floor: ₹435/kg). Volume: 1,200 kg.',
-    impact: 'Gross margin drops from 16.2% to 12.8% (-₹18,000 on order). Customer is Tier-1 Distributor.',
-    requestedBy: 'Priya (Ops Coordinator)',
-    createdAt: '2026-11-13T09:15:00.000Z',
-  },
-  {
-    id: 'EXP-002',
-    type: 'CREDIT_LIMIT_BREACH',
-    title: 'Credit Limit Breach for Sai Supermart',
-    summary: 'Order value ₹85,000 exceeds available credit limit of ₹20,000 (Current AR: ₹1,80,000 / Limit: ₹2,00,000).',
-    impact: 'Exposure increases to ₹2,65,000. Customer has 1 overdue invoice past 15 days.',
-    requestedBy: 'Amit (Sales Desk)',
-    createdAt: '2026-11-13T09:30:00.000Z',
-  },
-  {
-    id: 'EXP-003',
-    type: 'SUPPLIER_RATE_SPIKE',
-    title: 'Raw Mango Purchase Rate Spike',
-    summary: 'PO-2611-0018 rate quoted at ₹38/kg vs standard contract rate of ₹32/kg due to local market shortage.',
-    impact: 'Batch production cost increases by ₹14,400 across 2.4 MT lot.',
-    requestedBy: 'Kiran (Procurement Desk)',
-    createdAt: '2026-11-13T09:45:00.000Z',
-  },
-];
-
 const RESOLVED_IDS_STORAGE_KEY = 'neobus_resolved_exception_ids_v1';
 
 export const ApprovalsDrawer: React.FC<{
@@ -67,7 +37,7 @@ export const ApprovalsDrawer: React.FC<{
       }
 
       try {
-        const res = await fetch('/api/proxy/exceptions?status=OPEN');
+        const res = await fetch('/api/proxy/exceptions?status=PENDING');
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data?.data)
@@ -75,17 +45,49 @@ export const ApprovalsDrawer: React.FC<{
             : Array.isArray(data)
             ? data
             : null;
-          if (active && list && list.length > 0) {
-            setExceptions(list.filter((e: PendingException) => !resolvedIds.includes(e.id)));
+          if (active && Array.isArray(list)) {
+            const normalized: PendingException[] = list.map((raw: any) => {
+              const payload =
+                typeof raw.context_payload_json === 'string'
+                  ? (() => {
+                      try {
+                        return JSON.parse(raw.context_payload_json);
+                      } catch {
+                        return {};
+                      }
+                    })()
+                  : (raw.context_payload_json ?? {});
+              const type = String(raw.exception_type ?? raw.type ?? 'EXCEPTION');
+              const refLabel =
+                raw.reference_table && raw.reference_id
+                  ? `${raw.reference_table} (${raw.reference_id})`
+                  : '';
+              const impactVal =
+                raw.value_at_risk !== null && raw.value_at_risk !== undefined
+                  ? `₹${Number(raw.value_at_risk).toLocaleString('en-IN')}`
+                  : '';
+              return {
+                id: String(raw.id),
+                type,
+                title: String(payload?.title ?? raw.title ?? type.replace(/_/g, ' ')),
+                summary: String(payload?.summary ?? raw.summary ?? refLabel),
+                impact: String(raw.impact ?? impactVal),
+                requestedBy: String(
+                  payload?.requestedBy ?? raw.requestedBy ?? raw.requested_by ?? 'System',
+                ),
+                createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
+              };
+            });
+            setExceptions(normalized.filter((e) => !resolvedIds.includes(e.id)));
             return;
           }
         }
       } catch {
-        // Fall back to seeded pending exceptions filtered by resolved IDs
+        setDecisionError('Failed to load pending exceptions.');
       }
 
       if (active) {
-        setExceptions(DEFAULT_EXCEPTIONS.filter((e) => !resolvedIds.includes(e.id)));
+        setExceptions([]);
       }
     };
 
@@ -117,11 +119,18 @@ export const ApprovalsDrawer: React.FC<{
     counterOfferPrice?: number,
   ) => {
     setDecisionError(null);
+    const mappedAction = decision === 'COUNTER_OFFERED' ? 'COUNTERED' : decision;
     try {
       const res = await fetch(`/api/proxy/exceptions/${encodeURIComponent(id)}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, counterOfferPrice }),
+        body: JSON.stringify({
+          action: mappedAction,
+          remarks: `Decision ${mappedAction} from Approvals Drawer`,
+          ...(counterOfferPrice !== undefined
+            ? { counter: { price: counterOfferPrice, amount: counterOfferPrice } }
+            : {}),
+        }),
       });
       if (!res.ok) {
         setDecisionError(`Failed to persist ${decision.toLowerCase()} decision for ${id}. Please retry.`);

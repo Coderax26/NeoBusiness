@@ -38,22 +38,29 @@ export class FleetController {
   @Get('vehicles')
   @RequirePermission('fleet.read')
   @ApiOperation({ summary: 'List active vehicles' })
-  listVehicles(@Query('siteId') siteId: string) {
+  listVehicles(@Query('siteId') siteId?: string) {
     return this.fleet.listVehicles(siteId);
+  }
+
+  @Get('vehicles/monitoring')
+  @RequirePermission('fleet.read')
+  @ApiOperation({ summary: 'Live vehicle status & active trip monitoring' })
+  listVehicleMonitoring(@Query('siteId') siteId?: string) {
+    return this.fleet.listVehicleMonitoring(siteId);
   }
 
   @Post('vehicles')
   @RequirePermission('fleet.manage')
   @ApiOperation({ summary: 'Register a vehicle' })
   createVehicle(@Body() dto: CreateVehicleDto, @Req() req: any) {
-    return this.fleet.createVehicle(dto, req.user.id);
+    return this.fleet.createVehicle(dto, req.user.sub || req.user.id);
   }
 
   @Get('trips')
   @RequirePermission('fleet.read')
   @ApiOperation({ summary: 'List delivery trips' })
   listTrips(
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
     @Query('status') status?: string,
     @Query('tripDate') tripDate?: string,
   ) {
@@ -219,314 +226,368 @@ export class FleetController {
     return this.fleet.listExpenses({ siteId, tripId });
   }
 
+  @Post('trips/issues/:issueId/resolve')
+  @RequirePermission('fleet.dispatch')
+  @ApiOperation({ summary: 'Resolve a delivery issue report (alias route)' })
+  resolveTripIssueAlias(
+    @Param('issueId') issueId: string,
+    @Body() dto: ResolveIssueDto,
+    @Req() req: any,
+  ) {
+    return this.fleet.resolveIssue(issueId, dto, req.user?.sub || req.user?.id);
+  }
+
   @Patch('vehicles/:id')
   @RequirePermission('fleet.manage')
   @ApiOperation({ summary: 'Update vehicle capacity, status, and compliance expiry dates (G-FLT-1)' })
-  updateVehicle(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body, updatedAt: new Date().toISOString() };
+  updateVehicle(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.updateVehicle(id, body, req.user?.sub || req.user?.id);
   }
 
   @Get('trips/:id/location')
   @RequirePermission('fleet.read')
   @ApiOperation({ summary: 'Read latest GPS ping for a trip (G-FLT-3)' })
   getTripLocation(@Param('id') id: string) {
-    return { tripId: id, lat: 18.1516, lng: 74.5777, updatedAt: new Date().toISOString() };
+    return this.fleet.getTripLocation(id);
   }
 
   @Post('trips/:id/location')
   @RequirePermission('fleet.read')
   @ApiOperation({ summary: 'Record latest GPS ping from driver app (G-FLT-3)' })
-  postTripLocation(@Param('id') id: string, @Body() body: { lat: number; lng: number }) {
-    return { tripId: id, ...body, updatedAt: new Date().toISOString() };
+  postTripLocation(
+    @Param('id') id: string,
+    @Body() body: { lat: number; lng: number },
+    @Req() req: any,
+  ) {
+    return this.fleet.postTripLocation(
+      id,
+      body?.lat,
+      body?.lng,
+      req.user?.sub || req.user?.id,
+    );
   }
 
   @Get('me/preferences')
   @ApiOperation({ summary: 'Get current user UI & dashboard preferences (G-PREF-1)' })
   getPreferences(@Req() req: any) {
-    return { userId: req.user?.id, density: 'comfortable', pinnedRoutes: [] };
+    return this.fleet.getPreferences(req.user?.sub || req.user?.id);
   }
 
   @Put('me/preferences')
   @ApiOperation({ summary: 'Save current user UI & dashboard preferences (G-PREF-1)' })
   savePreferences(@Body() body: Record<string, unknown>, @Req() req: any) {
-    return { userId: req.user?.id, ...body, savedAt: new Date().toISOString() };
+    return this.fleet.savePreferences(req.user?.sub || req.user?.id, body);
   }
 
   @Post('import/:entity/validate')
   @ApiOperation({ summary: 'Dry-run validate CSV/Excel rows for items/customers/suppliers (G-IMP-1)' })
-  validateImport(@Param('entity') entity: string, @Body() body: { rows?: unknown[] }) {
-    return { entity, validCount: body?.rows?.length ?? 0, errors: [] };
+  validateImport(
+    @Param('entity') entity: string,
+    @Body() body: { rows?: Array<Record<string, unknown>> },
+  ) {
+    return this.fleet.validateImport(entity, body?.rows ?? []);
   }
 
   @Post('import/:entity/commit')
   @ApiOperation({ summary: 'Transactional batch commit of validated master rows (G-IMP-1)' })
-  commitImport(@Param('entity') entity: string, @Body() body: { rows?: unknown[] }) {
-    return { entity, importedCount: body?.rows?.length ?? 0, committedAt: new Date().toISOString() };
+  commitImport(
+    @Param('entity') entity: string,
+    @Body() body: { rows?: Array<Record<string, unknown>> },
+    @Req() req: any,
+  ) {
+    return this.fleet.commitImport(entity, body?.rows ?? [], req.user?.sub || req.user?.id);
   }
 
   @Get('sales-returns')
   @RequirePermission('order.view')
   @ApiOperation({ summary: 'List sales returns (G-M1-3)' })
-  listSalesReturns() {
-    return { data: [], meta: { total: 0, limit: 50, offset: 0 } };
+  listSalesReturns(@Query('siteId') siteId?: string) {
+    return this.fleet.listSalesReturns(siteId);
   }
 
   @Post('sales-returns')
   @RequirePermission('order.create')
   @ApiOperation({ summary: 'Create a sales return linked to stock receipt & credit note (G-M1-3)' })
-  createSalesReturn(@Body() body: Record<string, unknown>) {
-    return { id: `sr-${Date.now()}`, ...body, status: 'LOGGED' };
+  createSalesReturn(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createSalesReturn(body, req.user?.sub || req.user?.id);
   }
 
   @Get('production/workers')
   @ApiOperation({ summary: 'List factory workers for attendance tiles (G-M4-2)' })
   listWorkers(@Query('siteId') siteId?: string) {
-    return { siteId, data: [] };
+    return this.fleet.listWorkers(siteId);
   }
 
   @Post('production/workers')
   @ApiOperation({ summary: 'Create a factory worker record (G-M4-2)' })
-  createWorker(@Body() body: Record<string, unknown>) {
-    return { id: `wrk-${Date.now()}`, ...body };
+  createWorker(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createWorker(body, req.user?.sub || req.user?.id);
   }
 
   @Patch('production/workers/:id')
   @ApiOperation({ summary: 'Update a factory worker record (G-M4-2)' })
-  updateWorker(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body };
+  updateWorker(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.updateWorker(id, body, req.user?.sub || req.user?.id);
   }
 
   @Post('procurement/supplier-payments')
   @ApiOperation({ summary: 'Record payment against approved supplier bills (G-AP-1)' })
-  createSupplierPayment(@Body() body: Record<string, unknown>) {
-    return { id: `spay-${Date.now()}`, ...body, status: 'PAID' };
+  createSupplierPayment(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createSupplierPayment(body, req.user?.sub || req.user?.id);
   }
 
   @Get('procurement/ap/aging')
   @ApiOperation({ summary: 'Accounts Payable aging buckets by supplier (G-AP-2)' })
   getApAging(@Query('siteId') siteId?: string) {
-    return { siteId, buckets: [] };
+    return this.fleet.getApAging(siteId);
   }
 
   @Post('files/presign-upload')
   @ApiOperation({ summary: 'Presign object storage upload URL (G-FILE-1)' })
   presignFileUpload(@Body() body: { fileName: string; mimeType: string }) {
-    return { uploadUrl: `https://storage.neobus.local/upload/${body?.fileName ?? 'file'}`, fileKey: `key-${Date.now()}` };
+    return this.fleet.presignFileUpload(body);
   }
 
   @Post('files/confirm')
   @ApiOperation({ summary: 'Confirm attachment upload against entity (G-FILE-1)' })
-  confirmFileUpload(@Body() body: Record<string, unknown>) {
-    return { id: `att-${Date.now()}`, ...body, confirmedAt: new Date().toISOString() };
+  confirmFileUpload(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.confirmFileUpload(body, req.user?.sub || req.user?.id);
   }
 
   @Get('files/:entityType/:entityId')
   @ApiOperation({ summary: 'List attachments for an entity (G-FILE-1)' })
   listEntityFiles(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
-    return { entityType, entityId, files: [] };
+    return this.fleet.listEntityFiles(entityType, entityId);
   }
 
   @Post('admin/users/:id/revoke-sessions')
   @ApiOperation({ summary: 'Revoke active sessions for user (G-ADM-1)' })
   revokeUserSessions(@Param('id') id: string) {
-    return { userId: id, revoked: true };
+    return this.fleet.revokeUserSessions(id);
   }
 
   @Get('admin/permissions')
   @ApiOperation({ summary: 'Inspect all system permission keys (G-ADM-2)' })
   listAdminPermissions() {
-    return { permissions: [] };
+    return this.fleet.listAdminPermissions();
   }
 
   @Get('warehouses')
   @ApiOperation({ summary: 'List warehouses (G-ADM-3)' })
-  listWarehouses() {
-    return { data: [] };
+  listWarehouses(@Query('siteId') siteId?: string) {
+    return this.fleet.listWarehouses(siteId);
   }
 
   @Post('warehouses')
   @ApiOperation({ summary: 'Create warehouse (G-ADM-3)' })
-  createWarehouse(@Body() body: Record<string, unknown>) {
-    return { id: `wh-${Date.now()}`, ...body };
+  createWarehouse(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createWarehouse(body, req.user?.sub || req.user?.id);
   }
 
   @Patch('warehouses/:id')
   @ApiOperation({ summary: 'Update warehouse (G-ADM-3)' })
-  updateWarehouse(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body };
+  updateWarehouse(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.updateWarehouse(id, body, req.user?.sub || req.user?.id);
   }
 
   @Get('warehouses/:id/bins')
   @ApiOperation({ summary: 'List bins in warehouse (G-ADM-3)' })
   listWarehouseBins(@Param('id') id: string) {
-    return { warehouseId: id, bins: [] };
+    return this.fleet.listWarehouseBins(id);
   }
 
   @Post('warehouses/:id/bins')
   @ApiOperation({ summary: 'Create bin in warehouse (G-ADM-3)' })
-  createWarehouseBin(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id: `bin-${Date.now()}`, warehouseId: id, ...body };
+  createWarehouseBin(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.createWarehouseBin(id, body, req.user?.sub || req.user?.id);
   }
 
   @Get('admin/numbering-series')
   @ApiOperation({ summary: 'List document numbering series (G-ADM-5)' })
-  listNumberingSeries() {
-    return { data: [] };
+  listNumberingSeries(@Query('siteId') siteId?: string) {
+    return this.fleet.listNumberingSeries(siteId);
   }
 
   @Patch('admin/numbering-series/:id')
   @ApiOperation({ summary: 'Update document numbering series (G-ADM-5)' })
   updateNumberingSeries(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body };
+    return this.fleet.updateNumberingSeries(id, body);
   }
 
   @Get('admin/feature-flags')
   @ApiOperation({ summary: 'List feature flags (G-ADM-8)' })
   listFeatureFlags() {
-    return { flags: [] };
+    return this.fleet.listFeatureFlags();
   }
 
   @Patch('admin/feature-flags/:key')
   @ApiOperation({ summary: 'Toggle feature flag (G-ADM-8)' })
-  updateFeatureFlag(@Param('key') key: string, @Body() body: { enabled: boolean }) {
-    return { key, enabled: body?.enabled ?? true };
+  updateFeatureFlag(
+    @Param('key') key: string,
+    @Body() body: { enabled: boolean },
+    @Req() req: any,
+  ) {
+    return this.fleet.updateFeatureFlag(
+      key,
+      body?.enabled ?? true,
+      req.user?.sub || req.user?.id,
+    );
   }
 
   @Get('audit-logs/:id')
   @ApiOperation({ summary: 'Get single audit log entry with before/after diff (G-AUD-1)' })
   getAuditLogById(@Param('id') id: string) {
-    return { id, beforeJson: {}, afterJson: {} };
+    return this.fleet.getAuditLogById(id);
   }
 
   @Get('notifications/logs')
   @ApiOperation({ summary: 'List notification delivery logs (G-NOTIF-1)' })
   listNotificationDeliveryLogs() {
-    return { data: [] };
+    return this.fleet.listNotificationLogs();
   }
 
   @Post('notifications/logs/:id/retry')
   @ApiOperation({ summary: 'Retry failed notification delivery (G-NOTIF-1)' })
   retryNotificationDelivery(@Param('id') id: string) {
-    return { id, status: 'RETRIED' };
+    return this.fleet.retryNotificationDelivery(id);
   }
 
   @Post('orders/preview')
   @ApiOperation({ summary: 'Dry-run order price & GST preview (G-M1-1)' })
   previewOrder(@Body() body: Record<string, unknown>) {
-    return { ...body, previewedAt: new Date().toISOString() };
+    return this.fleet.previewOrder(body);
   }
 
   @Get('quotations')
   @ApiOperation({ summary: 'List sales quotations (G-M1-2)' })
-  listQuotations() {
-    return { data: [] };
+  listQuotations(@Query('siteId') siteId?: string) {
+    return this.fleet.listQuotations(siteId);
   }
 
   @Post('quotations')
   @ApiOperation({ summary: 'Create sales quotation (G-M1-2)' })
-  createQuotation(@Body() body: Record<string, unknown>) {
-    return { id: `qt-${Date.now()}`, ...body, status: 'DRAFT' };
+  createQuotation(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createQuotation(body, req.user?.sub || req.user?.id);
   }
 
   @Post('quotations/:id/convert-to-order')
   @ApiOperation({ summary: 'Convert quotation to sales order (G-M1-2)' })
-  convertQuotationToOrder(@Param('id') id: string) {
-    return { quotationId: id, orderId: `ord-${Date.now()}`, status: 'CONVERTED' };
+  convertQuotationToOrder(@Param('id') id: string, @Req() req: any) {
+    return this.fleet.convertQuotationToOrder(id, req.user?.sub || req.user?.id);
   }
 
   @Post('inventory/putaway')
   @ApiOperation({ summary: 'Assign received GRN batch to warehouse bin (G-INV-3)' })
-  putawayInventory(@Body() body: Record<string, unknown>) {
-    return { id: `put-${Date.now()}`, ...body, status: 'STORED' };
+  putawayInventory(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.putawayInventory(body, req.user?.sub || req.user?.id);
   }
 
   @Get('drivers')
   @ApiOperation({ summary: 'List driver roster (G-FLT-2)' })
-  listDrivers() {
-    return { data: [] };
+  listDrivers(@Query('siteId') siteId?: string) {
+    return this.fleet.listDrivers(siteId);
   }
 
   @Post('drivers')
   @ApiOperation({ summary: 'Create driver record (G-FLT-2)' })
-  createDriver(@Body() body: Record<string, unknown>) {
-    return { id: `drv-${Date.now()}`, ...body };
+  createDriver(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.createDriver(body, req.user?.sub || req.user?.id);
   }
 
   @Patch('drivers/:id')
   @ApiOperation({ summary: 'Update driver record (G-FLT-2)' })
-  updateDriver(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body };
+  updateDriver(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.updateDriver(id, body, req.user?.sub || req.user?.id);
   }
 
   @Post('trips/:id/settle')
   @ApiOperation({ summary: 'Driver cash/UPI/crate trip settlement sign-off (G-FLT-4)' })
-  settleTrip(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { tripId: id, ...body, status: 'SETTLED' };
-  }
-
-  @Get('credit-notes')
-  @ApiOperation({ summary: 'List credit notes (G-FIN-2)' })
-  listCreditNotes() {
-    return { data: [] };
-  }
-
-  @Post('credit-notes')
-  @ApiOperation({ summary: 'Create credit note (G-FIN-2)' })
-  createCreditNote(@Body() body: Record<string, unknown>) {
-    return { id: `cn-${Date.now()}`, ...body, status: 'ISSUED' };
+  settleTrip(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.settleTrip(id, body, req.user?.sub || req.user?.id);
   }
 
   @Post('credit-notes/:id/apply')
   @ApiOperation({ summary: 'Apply credit note against open invoice (G-FIN-2)' })
-  applyCreditNote(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { creditNoteId: id, ...body, status: 'APPLIED' };
+  applyCreditNote(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.fleet.applyCreditNote(id, body, req.user?.sub || req.user?.id);
   }
 
   @Post('finance/reconciliation/import')
   @ApiOperation({ summary: 'Import bank/UPI statement rows for reconciliation (G-FIN-3)' })
-  importReconciliationStatement(@Body() body: { rows?: unknown[] }) {
-    return { importedCount: body?.rows?.length ?? 0 };
+  importReconciliationStatement(
+    @Body() body: { rows?: Array<Record<string, unknown>> },
+    @Req() req: any,
+  ) {
+    return this.fleet.importReconciliationStatement(
+      body?.rows ?? [],
+      req.user?.sub || req.user?.id,
+    );
   }
 
   @Post('finance/reconciliation/match')
   @ApiOperation({ summary: 'Auto/manual match statement lines to collections/payments (G-FIN-3)' })
-  matchReconciliationStatement(@Body() body: Record<string, unknown>) {
-    return { matched: true, ...body };
+  matchReconciliationStatement(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.fleet.matchReconciliationStatement(
+      body,
+      req.user?.sub || req.user?.id,
+    );
   }
 
   @Get('reports/catalog')
   @ApiOperation({ summary: 'List available reports & parameter schemas (G-RPT-1)' })
   getReportCatalog() {
-    return { reports: [] };
+    return this.fleet.getReportCatalog();
   }
 
   @Post('reports/:reportKey/run')
   @ApiOperation({ summary: 'Execute parameterized report query (G-RPT-1)' })
   runParameterizedReport(@Param('reportKey') reportKey: string, @Body() body: Record<string, unknown>) {
-    return { reportKey, params: body, rows: [] };
-  }
-
-  @Get('invoices/:id/pdf')
-  @ApiOperation({ summary: 'Generate GST Tax Invoice PDF (G-DOC-1)' })
-  getInvoicePdf(@Param('id') id: string) {
-    return { invoiceId: id, format: 'application/pdf' };
-  }
-
-  @Get('orders/:id/pdf')
-  @ApiOperation({ summary: 'Generate Order Confirmation / Proforma PDF (G-DOC-2)' })
-  getOrderPdf(@Param('id') id: string) {
-    return { orderId: id, format: 'application/pdf' };
+    return this.fleet.runParameterizedReport(reportKey, body);
   }
 
   @Get('trips/:id/manifest-pdf')
   @ApiOperation({ summary: 'Generate Dispatch Manifest & Loading Sheet PDF (G-DOC-3)' })
-  getTripManifestPdf(@Param('id') id: string) {
-    return { tripId: id, format: 'application/pdf' };
+  async getTripManifestPdf(@Param('id') id: string, @Res() res: Response) {
+    const { buffer, tripNo } = await this.fleet.getTripManifestPdf(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Manifest-${tripNo}.pdf"`);
+    res.end(buffer);
   }
 
   @Get('procurement/pos/:id/pdf')
   @ApiOperation({ summary: 'Generate Purchase Order PDF (G-DOC-4)' })
-  getPurchaseOrderPdf(@Param('id') id: string) {
-    return { poId: id, format: 'application/pdf' };
+  async getPurchaseOrderPdf(@Param('id') id: string, @Res() res: Response) {
+    const { buffer, poNo } = await this.fleet.getPurchaseOrderPdf(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="PO-${poNo}.pdf"`);
+    res.end(buffer);
   }
 }

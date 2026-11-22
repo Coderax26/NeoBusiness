@@ -1,33 +1,81 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { KpiCard, Badge, Button, Card } from '@neo/ui';
 import {
-  INITIAL_WORK_ORDERS,
-  INITIAL_RM_REQUISITIONS,
-  INITIAL_YIELD_TREND,
-  INITIAL_WASTAGE_LOGS,
+  type WorkOrderRecord,
+  type RmRequisitionRecord,
+  type WastageRecord,
 } from '../../../src/lib/production-data';
 
 export default function ProductionOverviewPage() {
-  const planned = INITIAL_WORK_ORDERS.filter((w) => w.status === 'PLANNED').length;
-  const running = INITIAL_WORK_ORDERS.filter((w) => w.status === 'IN_PROGRESS').length;
-  const done = INITIAL_WORK_ORDERS.filter((w) => w.status === 'COMPLETED').length;
+  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
+  const [rmReqs, setRmReqs] = useState<RmRequisitionRecord[]>([]);
+  const [wastageLogs, setWastageLogs] = useState<WastageRecord[]>([]);
 
-  const totalPlannedKg = INITIAL_YIELD_TREND.reduce((s, d) => s + d.plannedKg, 0);
-  const totalOutputKg = INITIAL_YIELD_TREND.reduce((s, d) => s + d.outputKg, 0);
-  const outputVsPlanPct = ((totalOutputKg / totalPlannedKg) * 100).toFixed(1);
-  const avgYieldPct = (
-    INITIAL_YIELD_TREND.reduce((s, d) => s + d.yieldPct, 0) / INITIAL_YIELD_TREND.length
-  ).toFixed(1);
-  const totalWastageKg = INITIAL_WASTAGE_LOGS.reduce((s, w) => s + w.qty, 0);
-  const wastagePct = ((totalWastageKg / totalOutputKg) * 100).toFixed(2);
+  useEffect(() => {
+    let active = true;
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+    const siteQuery =
+      storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
+    Promise.all([
+      fetch(`/api/proxy/production/work-orders${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/production/requisitions${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/production/wastage${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([woRes, reqRes, wstRes]) => {
+        if (!active) return;
+        const woRows = Array.isArray(woRes) ? woRes : Array.isArray(woRes?.data) ? woRes.data : [];
+        setWorkOrders(
+          woRows.map((w: any) => {
+            const outputFromArray = Array.isArray(w.outputs)
+              ? w.outputs.reduce(
+                  (s: number, o: any) => s + Number(o.qtyProduced ?? o.qty_produced ?? 0),
+                  0,
+                )
+              : 0;
+            return {
+              ...w,
+              id: String(w.id),
+              woNumber: String(w.woNumber ?? w.woNo ?? w.wo_no ?? ''),
+              plannedQty: Number(w.plannedQty ?? w.planned_qty ?? 0),
+              actualOutputQty: Number(w.actualOutputQty ?? outputFromArray),
+            };
+          }),
+        );
+        setRmReqs(Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : []);
+        setWastageLogs(Array.isArray(wstRes) ? wstRes : Array.isArray(wstRes?.data) ? wstRes.data : []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const varianceAlerts = INITIAL_WORK_ORDERS.filter((w) => w.yieldVarianceException);
-  const openShortages = INITIAL_RM_REQUISITIONS.filter((r) => r.status === 'OPEN');
+  const planned = workOrders.filter((w) => w.status === 'PLANNED').length;
+  const running = workOrders.filter((w) => w.status === 'IN_PROGRESS').length;
+  const done = workOrders.filter((w) => w.status === 'COMPLETED').length;
 
-  const maxKg = Math.max(...INITIAL_YIELD_TREND.map((d) => Math.max(d.plannedKg, d.outputKg)));
+  const totalPlannedKg = workOrders.reduce((s, w) => s + Number(w.plannedQty || 0), 0);
+  const totalOutputKg = workOrders.reduce((s, w) => s + Number(w.actualOutputQty || 0), 0);
+  const outputVsPlanPct = totalPlannedKg > 0 ? ((totalOutputKg / totalPlannedKg) * 100).toFixed(1) : '0.0';
+  const avgYieldPct = workOrders.length > 0
+    ? (workOrders.reduce((s, w) => s + (w.plannedQty > 0 ? (w.actualOutputQty / w.plannedQty) * 100 : 100), 0) / workOrders.length).toFixed(1)
+    : '0.0';
+  const totalWastageKg = wastageLogs.reduce((s, w) => s + Number(w.qty || 0), 0);
+  const wastagePct = totalOutputKg > 0 ? ((totalWastageKg / totalOutputKg) * 100).toFixed(2) : '0.00';
+
+  const varianceAlerts = workOrders.filter((w) => w.yieldVarianceException);
+  const openShortages = rmReqs.filter((r) => r.status === 'OPEN');
+
+  const yieldTrend = workOrders.slice(0, 7).map((w, idx) => ({
+    day: w.woNumber || `WO-${idx + 1}`,
+    plannedKg: Number(w.plannedQty || 0),
+    outputKg: Number(w.actualOutputQty || 0),
+  }));
+  const maxKg = Math.max(1, ...yieldTrend.map((d) => Math.max(d.plannedKg, d.outputKg)));
 
   return (
     <div className="space-y-6">
@@ -75,7 +123,7 @@ export default function ProductionOverviewPage() {
           title="Wastage %"
           value={`${wastagePct}%`}
           subtitle={`${totalWastageKg} kg logged`}
-          trend={{ value: '2 events', direction: 'down' }}
+          trend={{ value: `${wastageLogs.length} events`, direction: wastageLogs.length > 0 ? 'down' : 'up' }}
         />
       </div>
 
@@ -93,7 +141,7 @@ export default function ProductionOverviewPage() {
           </div>
         </div>
         <div className="grid grid-cols-7 gap-3 items-end h-44 pt-4">
-          {INITIAL_YIELD_TREND.map((d) => (
+          {yieldTrend.map((d) => (
             <div key={d.day} className="flex flex-col items-center gap-1.5 h-full justify-end">
               <div className="flex items-end gap-1 h-32 w-full justify-center">
                 <div
@@ -120,7 +168,7 @@ export default function ProductionOverviewPage() {
             <h3 className="text-sm font-semibold text-white">Orders Waiting for Production</h3>
             <Badge variant="info">IN_PRODUCTION_SOURCING</Badge>
           </div>
-          {INITIAL_WORK_ORDERS.filter((w) => w.linkedSalesOrderNo && w.status !== 'COMPLETED').map(
+          {workOrders.filter((w) => w.linkedSalesOrderNo && w.status !== 'COMPLETED').map(
             (w) => (
               <div
                 key={w.id}

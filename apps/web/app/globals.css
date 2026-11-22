@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-devanagari: 'Noto Sans Devanagari', sans-serif;
@@ -19,6 +20,18 @@ body {
   min-height: 100vh;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: #18181b;
+  color: #f4f4f5;
 }
 
 /* Glass Card */

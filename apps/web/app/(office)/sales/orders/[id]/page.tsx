@@ -9,103 +9,196 @@ import {
   evaluatePriceBand,
   formatINR,
 } from '@neo/shared';
-import { INITIAL_SALES_ORDERS, type SalesOrderRecord } from '../../../../../src/lib/sales-data';
+import { type SalesOrderRecord } from '../../../../../src/lib/sales-data';
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const initial = INITIAL_SALES_ORDERS.find((o) => o.id === id) || INITIAL_SALES_ORDERS[0];
-  const [order, setOrder] = useState<SalesOrderRecord>(initial);
+  const [order, setOrder] = useState<SalesOrderRecord | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'lines' | 'timeline' | 'docs' | 'approvals' | 'audit'>('lines');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
 
+  const mapOrderDetail = (r: any): SalesOrderRecord => {
+    const rawLines = Array.isArray(r.lines) ? r.lines : [];
+    const subtotal = Number(r.total_amount ?? r.subtotal ?? 0);
+    const gstTotal = Number(r.gst_total ?? r.tax_total ?? Number((subtotal * 0.05).toFixed(2)));
+    const grandTotal = Number(r.grand_total ?? r.grandTotal ?? subtotal + gstTotal);
+    return {
+      id: String(r.id),
+      orderNumber: String(r.order_no || r.orderNumber || r.id),
+      customerId: String(r.customer_id || r.customerId || ''),
+      customerName: String(r.customer_name || r.customerName || 'Customer'),
+      siteName: String(r.site_name || r.siteName || 'Main Site'),
+      deliveryDate: String(r.delivery_date || r.deliveryDate || new Date().toISOString()).split('T')[0],
+      deliveryWindow: (r.delivery_time_window || r.deliveryWindow || '10-12') as SalesOrderRecord['deliveryWindow'],
+      status: (r.order_status || r.status || 'DRAFT') as SalesOrderRecord['status'],
+      createdAt: String(r.created_at || r.createdAt || new Date().toISOString()),
+      createdBy: String(r.created_by_name || r.createdBy || 'Coordinator'),
+      subtotal,
+      gstTotal,
+      grandTotal,
+      marginPct: r.margin_pct != null ? Number(r.margin_pct) : 15,
+      counterOfferPrice: r.counter_offer_price != null ? Number(r.counter_offer_price) : undefined,
+      counterOfferNote: r.counter_offer_note || undefined,
+      cancelReason: r.cancel_reason || undefined,
+      lines: rawLines.map((l: any, idx: number) => ({
+        id: String(l.id || `${r.id}-line-${idx}`),
+        itemId: String(l.item_id || l.itemId || ''),
+        sku: String(l.sku_code || l.sku || ''),
+        itemName: String(l.item_name || l.itemName || 'Item'),
+        category: (l.item_category || l.category || 'PROCESSED_FG') as any,
+        qty: Number(l.qty || l.ordered_qty || 0),
+        uom: String(l.uom || 'kg'),
+        unitPrice: Number(l.unit_price ?? l.quoted_unit_price ?? l.unitPrice ?? 0),
+        gstPct: Number(l.gst_pct ?? l.gstPct ?? 5),
+        floorPrice: Number(l.floor_price ?? l.floor_price_snapshot ?? l.floorPrice ?? 0),
+        targetPrice: Number(l.target_price ?? l.target_price_snapshot ?? l.targetPrice ?? 0),
+        atpStock: Number(l.atp_stock ?? l.atpStock ?? 0),
+        reservedQty: Number(l.reserved_qty ?? l.reservedQty ?? 0),
+        lineTotal: Number(
+          l.line_total ??
+            l.lineTotal ??
+            Number(l.qty || l.ordered_qty || 0) * Number(l.unit_price ?? l.quoted_unit_price ?? l.unitPrice ?? 0),
+        ),
+      })),
+      timeline: Array.isArray(r.timeline)
+        ? r.timeline
+        : [
+            {
+              step: String(r.order_status || r.status || 'Created'),
+              timestamp: new Date(r.created_at || Date.now()).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              user: String(r.created_by_name || 'Coordinator'),
+            },
+          ],
+    };
+  };
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedRaw = localStorage.getItem('neobus_sales_orders');
-        if (savedRaw) {
-          const parsed: SalesOrderRecord[] = JSON.parse(savedRaw);
-          const match = parsed.find((o) => o.id === id);
-          if (match) {
-            setOrder(match);
-          }
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
+    let active = true;
+    fetch(`/api/proxy/orders/${encodeURIComponent(id)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((r) => {
+        if (!active || !r || !r.id) return;
+        setOrder(mapOrderDetail(r));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   // Poll every 30s for live approval/counter updates (§4.2, OD-021)
   useEffect(() => {
-    if (order.status !== 'PENDING_APPROVAL') return;
+    if (!order || order.status !== 'PENDING_APPROVAL') return;
+    let active = true;
     const timer = setInterval(() => {
-      fetch(`/api/proxy/orders/${order.id}`).catch(() => {});
+      fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((r) => {
+          if (active && r && r.id) setOrder(mapOrderDetail(r));
+        })
+        .catch(() => {});
     }, 30000);
-    return () => clearInterval(timer);
-  }, [order.id, order.status]);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [order?.id, order?.status]);
 
   const handleAcceptCounter = async () => {
+    if (!order) return;
     const suggested = order.counterOfferPrice || 89.5;
     try {
-      await fetch(`/api/proxy/orders/${order.id}/accept-counter`, { method: 'POST' }).catch(() => {});
-    } finally {
-      setOrder((prev) => ({
-        ...prev,
-        status: 'CONFIRMED',
-        lines: prev.lines.map((l, i) => (i === 0 ? { ...l, unitPrice: suggested } : l)),
-        timeline: [
-          ...prev.timeline,
-          {
-            step: 'Confirmed',
-            timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-            user: 'Coordinator',
-            note: `Accepted Owner counter offer ₹${suggested}`,
-          },
-        ],
-      }));
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}/accept-counter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks: 'Counter-offer accepted by customer' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'CONFIRMED',
+              lines: prev.lines.map((l, i) => (i === 0 ? { ...l, unitPrice: suggested } : l)),
+              timeline: [
+                ...prev.timeline,
+                {
+                  step: 'Confirmed',
+                  timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                  user: 'Coordinator',
+                  note: `Accepted Owner counter offer ₹${suggested}`,
+                },
+              ],
+            }
+          : prev,
+      );
+    } catch (err) {
+      alert(`Failed to accept counter-offer: ${(err as Error).message}`);
     }
   };
 
   const handleSimulateCounterOffer = () => {
-    setOrder((prev) => ({
-      ...prev,
-      status: 'COUNTER_OFFERED',
-      counterOfferPrice: 89.5,
-      counterOfferNote: 'Owner suggests ₹89.50 (meets split margin target)',
-    }));
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'COUNTER_OFFERED',
+            counterOfferPrice: 89.5,
+            counterOfferNote: 'Owner suggests ₹89.50 (meets split margin target)',
+          }
+        : prev,
+    );
   };
 
   const handleOwnerApprove = () => {
-    setOrder((prev) => ({
-      ...prev,
-      status: 'CONFIRMED',
-      timeline: [
-        ...prev.timeline,
-        {
-          step: 'Approved & Confirmed',
-          timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-          user: 'Ravi Kumar (Owner)',
-        },
-      ],
-    }));
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'CONFIRMED',
+            timeline: [
+              ...prev.timeline,
+              {
+                step: 'Approved & Confirmed',
+                timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                user: 'Owner',
+              },
+            ],
+          }
+        : prev,
+    );
   };
 
   const handleConfirmCancel = () => {
-    setOrder((prev) => ({
-      ...prev,
-      status: 'CANCELLED',
-      cancelReason,
-      timeline: [
-        ...prev.timeline,
-        {
-          step: 'Cancelled',
-          timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-          user: 'Coordinator',
-          note: cancelReason,
-        },
-      ],
-    }));
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'CANCELLED',
+            cancelReason,
+            timeline: [
+              ...prev.timeline,
+              {
+                step: 'Cancelled',
+                timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                user: 'Coordinator',
+                note: cancelReason,
+              },
+            ],
+          }
+        : prev,
+    );
     setCancelOpen(false);
   };
 
@@ -122,6 +215,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     INVOICED: 7,
     PAID: 8,
   };
+  if (loading) {
+    return <div className="max-w-6xl mx-auto p-6 text-sm text-zinc-400">Loading order...</div>;
+  }
+
+  if (!order) {
+    return (
+      <div className="max-w-6xl mx-auto p-6 space-y-3">
+        <Link href="/sales/orders" className="text-xs text-zinc-400 hover:text-white inline-block">
+          ← Back to Orders
+        </Link>
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400">
+          Order not found.
+        </div>
+      </div>
+    );
+  }
+
   const currentStepIdx = statusToStepIndex[order.status] ?? 0;
 
   return (

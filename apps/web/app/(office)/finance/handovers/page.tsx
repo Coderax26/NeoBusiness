@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { evaluateHandoverVariance, formatINR } from '@neo/shared';
-import { INITIAL_HANDOVERS, type HandoverRecord } from '../../../../src/lib/finance-data';
+import { type HandoverRecord } from '../../../../src/lib/finance-data';
 
 const STATUS_BADGE: Record<HandoverRecord['status'], string> = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  VERIFIED: 'bg-emerald-100 text-emerald-700',
-  DISPUTED: 'bg-rose-100 text-rose-700',
-  RESOLVED: 'bg-blue-100 text-blue-700',
+  PENDING: 'bg-amber-500/15 text-amber-400',
+  VERIFIED: 'bg-emerald-500/15 text-emerald-400',
+  DISPUTED: 'bg-rose-500/15 text-rose-400',
+  RESOLVED: 'bg-blue-500/15 text-blue-400',
 };
 
 export default function CashHandoversPage() {
-  const [handovers, setHandovers] = useState<HandoverRecord[]>(INITIAL_HANDOVERS);
-  const [selectedId, setSelectedId] = useState<string>(INITIAL_HANDOVERS[0].id);
+  const [handovers, setHandovers] = useState<HandoverRecord[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
   const [countedInput, setCountedInput] = useState<string>('');
   const [n500, setN500] = useState<number>(0);
   const [n200, setN200] = useState<number>(0);
@@ -21,15 +21,52 @@ export default function CashHandoversPage() {
   const [showDenom, setShowDenom] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/handovers')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.data)
+            ? res.data
+            : Array.isArray(res?.items)
+              ? res.items
+              : [];
+        const normalized: HandoverRecord[] = rows.map((h: any) => ({
+          id: String(h.id),
+          staffName: String(h.staffName ?? h.handedByName ?? h.handed_by_user_id ?? 'Staff'),
+          date: String(h.date ?? h.handoverDate ?? h.created_at ?? '').slice(0, 10),
+          expectedCash: Number(h.expectedCash ?? h.expected_cash ?? h.expected_amount ?? 0),
+          countedCash:
+            h.countedCash !== undefined && h.countedCash !== null
+              ? Number(h.countedCash)
+              : h.counted_amount !== undefined && h.counted_amount !== null
+                ? Number(h.counted_amount)
+                : null,
+          variance: Number(h.variance ?? 0),
+          status: (h.status ?? 'PENDING') as HandoverRecord['status'],
+          cheques: Array.isArray(h.cheques) ? h.cheques : [],
+        }));
+        setHandovers(normalized);
+        if (normalized.length > 0) setSelectedId(normalized[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selected = useMemo(
-    () => handovers.find((h) => h.id === selectedId) ?? handovers[0],
+    () => handovers.find((h) => h.id === selectedId) ?? handovers[0] ?? null,
     [handovers, selectedId],
   );
 
   const parsedCounted = countedInput.trim() === '' ? null : Number(countedInput);
   const evaluation = useMemo(
-    () => evaluateHandoverVariance(selected.expectedCash, parsedCounted),
-    [selected.expectedCash, parsedCounted],
+    () => evaluateHandoverVariance(selected?.expectedCash ?? 0, parsedCounted),
+    [selected?.expectedCash, parsedCounted],
   );
 
   function applyDenominationTotal() {
@@ -38,6 +75,7 @@ export default function CashHandoversPage() {
   }
 
   function toggleCheque(chequeId: string) {
+    if (!selected) return;
     setHandovers((prev) =>
       prev.map((h) =>
         h.id === selected.id
@@ -50,26 +88,39 @@ export default function CashHandoversPage() {
     );
   }
 
-  function verifyHandover() {
-    if (!evaluation.canVerify || evaluation.countedCash === null) return;
+  async function verifyHandover() {
+    if (!selected || !evaluation.canVerify || evaluation.countedCash === null) return;
     const nextStatus: HandoverRecord['status'] = evaluation.isDisputed ? 'DISPUTED' : 'VERIFIED';
-    setHandovers((prev) =>
-      prev.map((h) =>
-        h.id === selected.id
-          ? {
-              ...h,
-              countedCash: evaluation.countedCash,
-              variance: evaluation.cashVariance,
-              status: nextStatus,
-            }
-          : h,
-      ),
-    );
-    setToast(
-      evaluation.isDisputed
-        ? `Handover marked DISPUTED (${formatINR(evaluation.cashVariance)}) — CASH_HANDOVER_VARIANCE sent to Owner approvals.`
-        : `Handover for ${selected.staffName} VERIFIED with zero variance.`,
-    );
+    try {
+      const res = await fetch(`/api/proxy/handovers/${encodeURIComponent(selected.id)}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ countedAmount: String(evaluation.countedCash) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setHandovers((prev) =>
+        prev.map((h) =>
+          h.id === selected.id
+            ? {
+                ...h,
+                countedCash: evaluation.countedCash,
+                variance: evaluation.cashVariance,
+                status: nextStatus,
+              }
+            : h,
+        ),
+      );
+      setToast(
+        evaluation.isDisputed
+          ? `Handover marked DISPUTED (${formatINR(evaluation.cashVariance)}) — CASH_HANDOVER_VARIANCE sent to Owner approvals.`
+          : `Handover for ${selected.staffName} VERIFIED with zero variance.`,
+      );
+    } catch (err) {
+      setToast(`Failed to verify handover: ${(err as Error).message}`);
+    }
   }
 
   function resolveDispute(id: string) {
@@ -80,212 +131,138 @@ export default function CashHandoversPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Cash Handover Desk (BR-07)</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-zinc-100">Cash Handover Desk (BR-07)</h1>
+        <p className="text-sm text-zinc-400">
           Verify field staff cash &amp; cheques (OD-015: UPI settles direct). Non-zero variance raises an Owner dispute.
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-900">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-medium text-amber-300">
           {toast}
         </div>
       )}
 
-      {/* Active Handover Verification Card */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-500">Select Staff Handover</label>
-            <select
-              value={selected.id}
-              onChange={(e) => {
-                setSelectedId(e.target.value);
-                setCountedInput('');
-              }}
-              className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold"
-            >
-              {handovers.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.staffName} ({h.staffRole}) — {h.status}
-                </option>
-              ))}
-            </select>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE[selected.status]}`}>
-            {selected.status}
-          </span>
+      {handovers.length === 0 ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-500">
+          No pending cash handovers.
         </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-xl bg-slate-50 p-4">
-            <div className="text-xs text-slate-500">Expected Cash in Wallet</div>
-            <div className="mt-1 font-mono text-2xl font-bold text-slate-900">{formatINR(selected.expectedCash)}</div>
-            <div className="mt-2 text-xs text-slate-600">
-              Expected Cheques: {selected.cheques.length} (
-              {formatINR(selected.cheques.reduce((s, c) => s + c.amount, 0))})
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-600">Counted Cash (₹)</label>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-3">
+            {handovers.map((h) => (
               <button
+                key={h.id}
                 type="button"
-                onClick={() => setShowDenom((v) => !v)}
-                className="text-xs font-semibold text-emerald-700 hover:underline"
-              >
-                {showDenom ? 'Hide Denomination Helper' : 'Denomination Helper ▸'}
-              </button>
-            </div>
-            <input
-              type="number"
-              value={countedInput}
-              onChange={(e) => setCountedInput(e.target.value)}
-              placeholder="Enter counted cash"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-lg font-bold"
-            />
-            {evaluation.canVerify && (
-              <div
-                className={`text-sm font-semibold ${
-                  evaluation.isDisputed ? 'text-rose-700' : 'text-emerald-700'
+                onClick={() => setSelectedId(h.id)}
+                className={`w-full rounded-xl border p-4 text-left transition ${
+                  selected?.id === h.id
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
                 }`}
               >
-                Variance: {formatINR(evaluation.cashVariance)}
-                {evaluation.isDisputed && ' ⚠ Will mark Disputed & notify Owner'}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {showDenom && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-            <div className="text-xs font-bold text-slate-700">Denomination Counter</div>
-            <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
-              <label>
-                ₹500 ×{' '}
-                <input
-                  type="number"
-                  min={0}
-                  value={n500}
-                  onChange={(e) => setN500(Number(e.target.value) || 0)}
-                  className="w-16 rounded border border-slate-300 bg-white px-2 py-1 font-mono"
-                />
-              </label>
-              <label>
-                ₹200 ×{' '}
-                <input
-                  type="number"
-                  min={0}
-                  value={n200}
-                  onChange={(e) => setN200(Number(e.target.value) || 0)}
-                  className="w-16 rounded border border-slate-300 bg-white px-2 py-1 font-mono"
-                />
-              </label>
-              <label>
-                ₹100 ×{' '}
-                <input
-                  type="number"
-                  min={0}
-                  value={n100}
-                  onChange={(e) => setN100(Number(e.target.value) || 0)}
-                  className="w-16 rounded border border-slate-300 bg-white px-2 py-1 font-mono"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={applyDenominationTotal}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 font-semibold text-white"
-              >
-                Apply Total ({formatINR(n500 * 500 + n200 * 200 + n100 * 100)})
-              </button>
-            </div>
-          </div>
-        )}
-
-        {selected.cheques.length > 0 && (
-          <div>
-            <div className="text-xs font-semibold text-slate-600">Cheques Received</div>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {selected.cheques.map((c) => (
-                <label
-                  key={c.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs"
-                >
-                  <input type="checkbox" checked={c.checked} onChange={() => toggleCheque(c.id)} />
-                  <span className="font-mono font-semibold">{c.chequeNo}</span>
-                  <span>{formatINR(c.amount)}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={!evaluation.canVerify}
-            onClick={verifyHandover}
-            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-              evaluation.canVerify
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'cursor-not-allowed bg-slate-200 text-slate-500'
-            }`}
-          >
-            Verify Cash Handover
-          </button>
-        </div>
-      </div>
-
-      {/* History List */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-slate-800">
-          Handover History
-        </div>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Staff</th>
-              <th className="px-4 py-3 text-right">Expected</th>
-              <th className="px-4 py-3 text-right">Counted</th>
-              <th className="px-4 py-3 text-right">Variance</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {handovers.map((h) => (
-              <tr key={h.id}>
-                <td className="px-4 py-3 font-semibold text-slate-900">
-                  {h.staffName} <span className="text-xs font-normal text-slate-500">({h.staffRole})</span>
-                </td>
-                <td className="px-4 py-3 text-right font-mono">{formatINR(h.expectedCash)}</td>
-                <td className="px-4 py-3 text-right font-mono">
-                  {h.countedCash === null ? '—' : formatINR(h.countedCash)}
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-rose-700">{formatINR(h.variance)}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status]}`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-zinc-100">{h.staffName}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[h.status]}`}>
                     {h.status}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {h.status === 'DISPUTED' && (
+                </div>
+                <div className="mt-1 text-xs text-zinc-400">
+                  Expected Cash: <span className="font-mono text-zinc-200">{formatINR(h.expectedCash)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {selected && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-5 lg:col-span-2">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-100">{selected.staffName}</h2>
+                  <p className="text-xs text-zinc-400">Date: {(selected as any).date || (selected as any).handoverDate || ''}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-zinc-400">Expected Cash</div>
+                  <div className="font-mono text-xl font-bold text-zinc-100">{formatINR(selected.expectedCash)}</div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-zinc-400">Counted Cash (₹)</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowDenom((v) => !v)}
+                    className="text-xs font-semibold text-emerald-400 hover:underline"
+                  >
+                    {showDenom ? 'Hide Denominations' : 'Use Note Counter'}
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  value={countedInput}
+                  onChange={(e) => setCountedInput(e.target.value)}
+                  placeholder="Enter physically counted cash"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100"
+                />
+                {showDenom && (
+                  <div className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs">
+                    <input type="number" value={n500} onChange={(e) => setN500(Number(e.target.value))} placeholder="₹500" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
+                    <input type="number" value={n200} onChange={(e) => setN200(Number(e.target.value))} placeholder="₹200" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
+                    <input type="number" value={n100} onChange={(e) => setN100(Number(e.target.value))} placeholder="₹100" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
+                    <button type="button" onClick={applyDenominationTotal} className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white">
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {selected.cheques?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-zinc-400">Cheques Collected</div>
+                  {selected.cheques.map((c) => (
+                    <label key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs">
+                      <span className="flex items-center gap-2 text-zinc-200">
+                        <input type="checkbox" checked={c.checked} onChange={() => toggleCheque(c.id)} />
+                        <span className="font-mono">{c.chequeNo}</span>
+                      </span>
+                      <span className="font-mono text-zinc-100">{formatINR(c.amount)}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 pt-4">
+                <div className="text-xs text-zinc-400">
+                  Variance:{' '}
+                  <span className={`font-mono font-bold ${evaluation.isDisputed ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {formatINR(evaluation.cashVariance)}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {selected.status === 'DISPUTED' && (
                     <button
                       type="button"
-                      onClick={() => resolveDispute(h.id)}
-                      className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                      onClick={() => resolveDispute(selected.id)}
+                      className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-400"
                     >
                       Owner Resolve
                     </button>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  <button
+                    type="button"
+                    disabled={!evaluation.canVerify}
+                    onClick={verifyHandover}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                  >
+                    Verify Handover
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-

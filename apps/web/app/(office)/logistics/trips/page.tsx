@@ -1,12 +1,48 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill } from '@neo/ui';
 import { formatINR, reconcileTripCod } from '@neo/shared';
-import { INITIAL_TRIPS } from '../../../src/lib/logistics-data';
+import { type TripRecord } from '../../../../src/lib/logistics-data';
 
 export default function TripsListPage() {
+  const [trips, setTrips] = useState<TripRecord[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/trips')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setTrips(
+          rows.map((t: any) => ({
+            ...t,
+            id: String(t.id),
+            tripNo: String(t.tripNo ?? t.trip_no ?? ''),
+            tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
+            vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? ''),
+            driverName: String(t.driverName ?? t.driver_name ?? ''),
+            status: (t.status ?? 'LOADING') as TripRecord['status'],
+            stops: Array.isArray(t.stops)
+              ? t.stops.map((s: any) => ({
+                  ...s,
+                  id: String(s.id),
+                  deliveryStatus: s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING',
+                  expectedCodInr: Number(s.expectedCodInr ?? s.cash_to_collect ?? 0),
+                  collectedCodInr: Number(s.collectedCodInr ?? s.actual_cash_collected ?? 0),
+                  valueInr: Number(s.valueInr ?? s.order_value ?? s.total_amount ?? 0),
+                }))
+              : [],
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -40,7 +76,7 @@ export default function TripsListPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/70">
-            {INITIAL_TRIPS.map((trip) => {
+            {trips.map((trip) => {
               const totalValue = trip.stops.reduce((s, st) => s + st.valueInr, 0);
               const cod = reconcileTripCod(trip.stops);
               return (

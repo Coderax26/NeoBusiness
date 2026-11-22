@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Dialog, Card } from '@neo/ui';
 import { formatINR, evaluateThreeWayMatch } from '@neo/shared';
 import {
-  INITIAL_SUPPLIER_BILLS,
-  INITIAL_SUPPLIER_PAYMENTS,
-  INITIAL_PURCHASE_ORDERS,
   type SupplierBillRecord,
   type SupplierBillStatus,
   type SupplierPaymentRecord,
-} from '../../../src/lib/procurement-data';
+  type PurchaseOrderRecord,
+} from '../../../../src/lib/procurement-data';
 
 const BILL_TABS: Array<{ key: SupplierBillStatus | 'ALL'; label: string }> = [
   { key: 'ALL', label: 'All Bills' },
@@ -33,20 +31,42 @@ const THREE_WAY_CHIP_MAP: Record<
 };
 
 export default function SupplierBillsPage() {
-  const [bills, setBills] = useState<SupplierBillRecord[]>(INITIAL_SUPPLIER_BILLS);
-  const [payments, setPayments] = useState<SupplierPaymentRecord[]>(INITIAL_SUPPLIER_PAYMENTS);
+  const [bills, setBills] = useState<SupplierBillRecord[]>([]);
+  const [payments, setPayments] = useState<SupplierPaymentRecord[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderRecord[]>([]);
   const [statusTab, setStatusTab] = useState<SupplierBillStatus | 'ALL'>('ALL');
-  const [selectedBill, setSelectedBill] = useState<SupplierBillRecord>(INITIAL_SUPPLIER_BILLS[0]);
+  const [selectedBill, setSelectedBill] = useState<SupplierBillRecord | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Enter Bill dialog
   const [enterOpen, setEnterOpen] = useState(false);
-  const [newPoId, setNewPoId] = useState(INITIAL_PURCHASE_ORDERS[2].id);
+  const [newPoId, setNewPoId] = useState('');
   const [newBillNo, setNewBillNo] = useState('');
-  const [newBillDate, setNewBillDate] = useState('2026-11-13');
-  const [newBillQty, setNewBillQty] = useState(800);
-  const [newBillRate, setNewBillRate] = useState(26);
+  const [newBillDate, setNewBillDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newBillQty, setNewBillQty] = useState(0);
+  const [newBillRate, setNewBillRate] = useState(0);
   const [newScanName, setNewScanName] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/procurement/purchase-orders').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([billsRes, posRes]) => {
+        if (!active) return;
+        const bRows = Array.isArray(billsRes) ? billsRes : Array.isArray(billsRes?.data) ? billsRes.data : [];
+        const pRows = Array.isArray(posRes) ? posRes : Array.isArray(posRes?.data) ? posRes.data : [];
+        setBills(bRows);
+        if (bRows.length > 0) setSelectedBill(bRows[0]);
+        setPurchaseOrders(pRows);
+        if (pRows.length > 0) setNewPoId(String(pRows[0].id));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Reject dialog
   const [rejectTarget, setRejectTarget] = useState<SupplierBillRecord | null>(null);
@@ -72,7 +92,7 @@ export default function SupplierBillsPage() {
   }, [bills, statusTab]);
 
   const threeWayEval = useMemo(
-    () => evaluateThreeWayMatch(selectedBill.lines),
+    () => (selectedBill ? evaluateThreeWayMatch(selectedBill.lines) : { lines: [], allMatched: false }),
     [selectedBill],
   );
 
@@ -94,7 +114,8 @@ export default function SupplierBillsPage() {
 
   const handleEnterBill = () => {
     const po =
-      INITIAL_PURCHASE_ORDERS.find((p) => p.id === newPoId) || INITIAL_PURCHASE_ORDERS[0];
+      purchaseOrders.find((p) => p.id === newPoId) || purchaseOrders[0];
+    if (!po || !po.lines?.[0]) return;
     const poLine = po.lines[0];
     const grnQty = poLine.receivedQty > 0 ? poLine.receivedQty : poLine.orderedQty;
 
@@ -161,7 +182,7 @@ export default function SupplierBillsPage() {
     setBills((prev) =>
       prev.map((b) => (b.id === bill.id ? { ...b, status: nextStatus } : b)),
     );
-    if (selectedBill.id === bill.id) {
+    if (selectedBill?.id === bill.id) {
       setSelectedBill({ ...bill, status: nextStatus });
     }
     showToast(`Bill ${bill.billNumber} marked ${nextStatus}.`);
@@ -202,7 +223,7 @@ export default function SupplierBillsPage() {
         b.id === payTarget.id ? { ...b, paidAmount: newPaid, status: nextStatus } : b,
       ),
     );
-    if (selectedBill.id === payTarget.id) {
+    if (selectedBill?.id === payTarget.id) {
       setSelectedBill({ ...payTarget, paidAmount: newPaid, status: nextStatus });
     }
     setPayments((prev) => [
@@ -354,7 +375,7 @@ export default function SupplierBillsPage() {
                   key={b.id}
                   onClick={() => setSelectedBill(b)}
                   className={`hover:bg-zinc-800/40 cursor-pointer ${
-                    selectedBill.id === b.id ? 'bg-indigo-500/10' : ''
+                    selectedBill?.id === b.id ? 'bg-indigo-500/10' : ''
                   }`}
                 >
                   <td className="p-3 font-mono text-xs text-indigo-400 font-semibold">
@@ -439,15 +460,17 @@ export default function SupplierBillsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
           <div>
             <h2 className="text-base font-semibold text-white">
-              3-Way Comparison: {selectedBill.billNumber} ({selectedBill.supplierName})
+              3-Way Comparison: {selectedBill?.billNumber ?? '—'} ({selectedBill?.supplierName ?? 'Select a bill'})
             </h2>
             <p className="text-xs text-zinc-400">
-              PO ({selectedBill.poNumber}) vs GRN ({selectedBill.grnNumber}) vs Supplier Bill
+              PO ({selectedBill?.poNumber ?? '—'}) vs GRN ({selectedBill?.grnNumber ?? '—'}) vs Supplier Bill
             </p>
           </div>
-          <Badge variant={THREE_WAY_CHIP_MAP[selectedBill.three_way_status].variant}>
-            {THREE_WAY_CHIP_MAP[selectedBill.three_way_status].label}
-          </Badge>
+          {selectedBill && (
+            <Badge variant={THREE_WAY_CHIP_MAP[selectedBill.three_way_status].variant}>
+              {THREE_WAY_CHIP_MAP[selectedBill.three_way_status].label}
+            </Badge>
+          )}
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -515,7 +538,7 @@ export default function SupplierBillsPage() {
               value={newPoId}
               onChange={(e) => {
                 setNewPoId(e.target.value);
-                const po = INITIAL_PURCHASE_ORDERS.find((p) => p.id === e.target.value);
+                const po = purchaseOrders.find((p) => p.id === e.target.value);
                 if (po?.lines[0]) {
                   setNewBillQty(po.lines[0].receivedQty || po.lines[0].orderedQty);
                   setNewBillRate(po.lines[0].unitRate);
@@ -523,7 +546,7 @@ export default function SupplierBillsPage() {
               }}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
             >
-              {INITIAL_PURCHASE_ORDERS.map((po) => (
+              {purchaseOrders.map((po) => (
                 <option key={po.id} value={po.id}>
                   {po.poNumber} — {po.supplierName}
                 </option>

@@ -142,4 +142,11 @@ export class AnalyticsController {
   async getFleetPerformance(@Query('siteId') siteId?: string) {
     return { siteId, onTimePct: 96.4, costPerDeliveryInr: '185.00', failureReasons: [] };
   }
+
+  @Get('summary')
+  @RequirePermission('analytics.read_customers')
+  @ApiOperation({ summary: 'Aggregated analytics summary for Owner Control Tower' })
+  async getSummary(@Query('siteId') siteId?: string) {
+    return this.analytics.getSummary(siteId);
+  }
 }

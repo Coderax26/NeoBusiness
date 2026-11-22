@@ -573,7 +573,12 @@ export class POService implements OnModuleInit {
     if (filters.supplierId) {
       query = query.where('purchase_orders.supplier_id', filters.supplierId);
     }
-    if (filters.siteId) {
+    const isUuid =
+      !!filters.siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        filters.siteId,
+      );
+    if (isUuid) {
       query = query.where('purchase_orders.receiving_site_id', filters.siteId);
     }
     if (filters.limit) {

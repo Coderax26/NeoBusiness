@@ -1,7 +1,18 @@
 import React from 'react';
 import { getHumanStatus } from '@neo/i18n';
 
-export type StatusPillTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+export type StatusPillTone =
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'neutral'
+  | 'emerald'
+  | 'amber'
+  | 'rose'
+  | 'slate'
+  | 'sky'
+  | 'indigo';
 
 export interface StatusPillProps {
   entity?: string; // e.g. 'ORDER', 'INVOICE', 'PO', 'EXCEPTION', 'THREE_WAY_MATCH'
@@ -15,18 +26,30 @@ export interface StatusPillProps {
 
 const TONE_CLASSES: Record<StatusPillTone, string> = {
   success: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   warning: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   danger: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  rose: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
   info: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  sky: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  indigo: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
   neutral: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  slate: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
 };
 
 const SYMBOLS: Record<StatusPillTone, string> = {
   success: '✓',
+  emerald: '✓',
   warning: '▲',
+  amber: '▲',
   danger: '✕',
+  rose: '✕',
   info: '●',
+  sky: '●',
+  indigo: '●',
   neutral: '○',
+  slate: '○',
 };
 
 export const StatusPill: React.FC<StatusPillProps> = ({

@@ -1,20 +1,66 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, Badge } from '@neo/ui';
 import { computeAtp } from '@neo/shared';
-import { INITIAL_ATP_PROJECTIONS } from '../../../src/lib/inventory-data';
+
+type AtpRow = {
+  itemId: string;
+  sku: string;
+  itemName: string;
+  uom: string;
+  onHand: number;
+  reserved: number;
+  incomingPoQty: number;
+  plannedProductionQty: number;
+};
 
 export default function CheckAvailabilityPage() {
-  const [selectedItemId, setSelectedItemId] = useState(INITIAL_ATP_PROJECTIONS[0].itemId);
-  const [targetDate, setTargetDate] = useState('2026-11-16');
+  const [projections, setProjections] = useState<AtpRow[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState('');
+  const [targetDate, setTargetDate] = useState(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/inventory/stock/current')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const mapped: AtpRow[] = rows.map((r: any) => ({
+          itemId: String(r.itemId || r.item_id || r.id),
+          sku: String(r.sku || r.skuCode || r.sku_code || ''),
+          itemName: String(r.itemName || r.item_name || 'Item'),
+          uom: String(r.uom || 'kg'),
+          onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
+          reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? r.qty_reserved ?? 0),
+          incomingPoQty: Number(r.incomingPoQty ?? 0),
+          plannedProductionQty: Number(r.plannedProductionQty ?? 0),
+        }));
+        setProjections(mapped);
+        if (mapped.length > 0) setSelectedItemId(mapped[0].itemId);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const proj = useMemo(
     () =>
-      INITIAL_ATP_PROJECTIONS.find((p) => p.itemId === selectedItemId) ||
-      INITIAL_ATP_PROJECTIONS[0],
-    [selectedItemId],
+      projections.find((p) => p.itemId === selectedItemId) ||
+      projections[0] || {
+        itemId: '',
+        sku: '—',
+        itemName: 'No items loaded',
+        uom: 'kg',
+        onHand: 0,
+        reserved: 0,
+        incomingPoQty: 0,
+        plannedProductionQty: 0,
+      },
+    [projections, selectedItemId],
   );
 
   const currentAtp = computeAtp(proj.onHand, proj.reserved);
@@ -42,7 +88,7 @@ export default function CheckAvailabilityPage() {
             onChange={(e) => setSelectedItemId(e.target.value)}
             className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
           >
-            {INITIAL_ATP_PROJECTIONS.map((p) => (
+            {projections.map((p) => (
               <option key={p.itemId} value={p.itemId}>
                 {p.itemName} ({p.sku})
               </option>
@@ -54,7 +100,7 @@ export default function CheckAvailabilityPage() {
           <input
             type="text"
             readOnly
-            value={proj.siteName}
+            value={(proj as any).siteName ?? 'Main Site'}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm text-zinc-300"
           />
         </div>
@@ -93,14 +139,14 @@ export default function CheckAvailabilityPage() {
           <div className="text-2xl font-bold text-indigo-400 font-mono mt-1">
             +{proj.incomingPoQty} {proj.uom}
           </div>
-          <div className="text-[11px] text-zinc-500 mt-1">{proj.incomingPoRef}</div>
+          <div className="text-[11px] text-zinc-500 mt-1">{(proj as any).incomingPoRef ?? ''}</div>
         </Card>
         <Card className="p-4 bg-zinc-900 border-zinc-800">
           <div className="text-xs text-zinc-400">Planned Production</div>
           <div className="text-2xl font-bold text-sky-400 font-mono mt-1">
             +{proj.plannedProductionQty} {proj.uom}
           </div>
-          <div className="text-[11px] text-zinc-500 mt-1">{proj.plannedProductionRef}</div>
+          <div className="text-[11px] text-zinc-500 mt-1">{(proj as any).plannedProductionRef ?? ''}</div>
         </Card>
       </div>
 

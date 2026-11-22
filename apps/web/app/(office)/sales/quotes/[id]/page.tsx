@@ -1,38 +1,121 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { Button, Card, StatusPill, Badge, Dialog } from '@neo/ui';
 import { evaluatePriceBand, formatINR } from '@neo/shared';
-import { INITIAL_QUOTES, INITIAL_DAILY_PRICES, type QuoteRecord } from '../../../../../src/lib/sales-data';
+import { type QuoteRecord } from '../../../../../src/lib/sales-data';
 
 export default function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const initial = INITIAL_QUOTES.find((q) => q.id === id) || INITIAL_QUOTES[0];
-  const [quote, setQuote] = useState<QuoteRecord>(initial);
+  const [quote, setQuote] = useState<QuoteRecord | null>(null);
+  const [dailyPrices, setDailyPrices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [lostOpen, setLostOpen] = useState(false);
   const [lostReason, setLostReason] = useState('Price higher than competitor');
   const [reminderSent, setReminderSent] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      fetch(`/api/proxy/quotes/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/prices/${encodeURIComponent(today)}`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([qData, pData]) => {
+        if (!active) return;
+        if (qData && qData.id) {
+          setQuote({
+            id: String(qData.id),
+            quoteNumber: String(qData.quoteNumber || qData.quote_number || qData.id),
+            customerId: String(qData.customerId || qData.customer_id || ''),
+            customerName: String(qData.customerName || qData.customer_name || 'Customer'),
+            status: (qData.status || 'OPEN') as QuoteRecord['status'],
+            validUntil: String(qData.validUntil || qData.valid_until || today).slice(0, 10),
+            createdAt: String(qData.createdAt || qData.created_at || today).slice(0, 10),
+            totalAmount: Number(qData.totalAmount ?? qData.total_amount ?? 0),
+            lines: Array.isArray(qData.lines)
+              ? qData.lines.map((l: any) => ({
+                  itemId: String(l.itemId || l.item_id || ''),
+                  sku: String(l.sku || l.skuCode || ''),
+                  itemName: String(l.itemName || l.item_name || 'Item'),
+                  uom: String(l.uom || 'kg'),
+                  qty: Number(l.qty || 0),
+                  quotedPrice: Number(l.quotedPrice ?? l.quoted_price ?? l.unitPrice ?? 0),
+                }))
+              : [],
+          });
+        }
+        if (Array.isArray(pData)) setDailyPrices(pData);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const handleConvertToOrder = async () => {
+    if (!quote) return;
+    setActionError(null);
     try {
-      await fetch(`/api/proxy/quotes/${quote.id}/convert`, { method: 'POST' }).catch(() => {});
-    } finally {
-      setQuote((prev) => ({
-        ...prev,
-        status: 'CONVERTED',
-        convertedOrderId: 'ord-101',
-      }));
+      const res = await fetch(`/api/proxy/quotes/${encodeURIComponent(quote.id)}/convert`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json().catch(() => null);
+      const converted = data?.data ?? data;
+      setQuote((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'CONVERTED',
+              convertedOrderId: String(
+                converted?.orderId ?? converted?.id ?? prev.convertedOrderId ?? '',
+              ),
+            }
+          : prev,
+      );
+    } catch (err) {
+      setActionError(`Failed to convert quote: ${(err as Error).message}`);
     }
   };
 
   const handleMarkLost = () => {
-    setQuote((prev) => ({ ...prev, status: 'LOST', lostReason }));
+    setQuote((prev) => (prev ? { ...prev, status: 'LOST', lostReason } : prev));
     setLostOpen(false);
   };
 
+  if (loading) {
+    return <div className="max-w-4xl mx-auto p-6 text-sm text-zinc-400">Loading quote...</div>;
+  }
+
+  if (!quote) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 space-y-3">
+        <Link href="/sales/quotes" className="text-xs text-zinc-400 hover:text-white inline-block">
+          ← Back to Quotes
+        </Link>
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400">
+          Quote not found.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {actionError && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-xs font-medium text-rose-300">
+          {actionError}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
@@ -109,10 +192,10 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           </thead>
           <tbody className="divide-y divide-zinc-800/70">
             {quote.lines.map((l, idx) => {
-              const todayItem = INITIAL_DAILY_PRICES.find((p) => p.itemId === l.itemId);
-              const floor = todayItem?.floorPrice ?? 90;
-              const target = todayItem?.targetPrice ?? 95;
-              const cost = todayItem?.landedCost ?? 75;
+              const todayItem = dailyPrices.find((p) => String(p.itemId) === String(l.itemId));
+              const floor = todayItem?.floorPrice != null ? Number(todayItem.floorPrice) : 90;
+              const target = todayItem?.targetPrice != null ? Number(todayItem.targetPrice) : 95;
+              const cost = todayItem?.latestLandedCost != null ? Number(todayItem.latestLandedCost) : 75;
               const band = evaluatePriceBand(l.quotedPrice, floor, target, cost);
               return (
                 <tr key={idx}>

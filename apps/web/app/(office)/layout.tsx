@@ -47,8 +47,8 @@ export default function OfficeLayout({
   const [tourActive, setTourActive] = useState(false);
 
   // Badge counts
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(3);
-  const [unreadNotifsCount, setUnreadNotifsCount] = useState(3);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -62,8 +62,16 @@ export default function OfficeLayout({
       .then((data) => {
         if (data && data.user) {
           setUser(data.user);
-          if (data.user.sites?.[0]) {
-            setActiveSite(data.user.sites[0].id);
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+          const validStored =
+            stored && (stored === 'all' || data.user.sites?.some((s: any) => s.id === stored));
+          const initialSite = validStored
+            ? stored!
+            : data.user.activeSiteId || data.user.sites?.[0]?.id || 'all';
+          setActiveSite(initialSite);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('neobus_active_site_id', initialSite);
+            window.dispatchEvent(new CustomEvent('neobus-site-changed', { detail: initialSite }));
           }
         }
       })
@@ -87,6 +95,10 @@ export default function OfficeLayout({
 
   const handleSiteChange = (newSiteId: string) => {
     setActiveSite(newSiteId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('neobus_active_site_id', newSiteId);
+      window.dispatchEvent(new CustomEvent('neobus-site-changed', { detail: newSiteId }));
+    }
     const siteObj = user?.sites?.find((s) => s.id === newSiteId);
     const siteName = newSiteId === 'all' ? 'All Sites' : siteObj?.name || newSiteId;
     setSiteToast(`Active site switched to: ${siteName}`);
@@ -105,7 +117,13 @@ export default function OfficeLayout({
       items: [
         { label: 'Today Board', href: '/home', icon: '🏠' },
         { label: 'Control Tower', href: '/control/dashboard', icon: '🗼', permission: 'dashboard.read_pulse' },
-        { label: 'Approvals Centre', href: '/control/approvals', icon: '⚖️', permission: 'exception.resolve', badge: '4' },
+        {
+          label: 'Approvals Centre',
+          href: '/control/approvals',
+          icon: '⚖️',
+          permission: 'exception.resolve',
+          ...(pendingApprovalsCount > 0 ? { badge: String(pendingApprovalsCount) } : {}),
+        },
         { label: 'Executive Analytics', href: '/control/analytics', icon: '📈', permission: 'analytics.read_customers' },
         { label: 'Notifications Log', href: '/control/notifications', icon: '🔔', permission: 'audit.view' },
       ],

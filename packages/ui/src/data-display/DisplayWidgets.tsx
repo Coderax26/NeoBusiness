@@ -10,7 +10,8 @@ export interface KpiCardProps {
   subtitle?: string;
   trend?: {
     direction: 'up' | 'down' | 'neutral';
-    label: string;
+    label?: string;
+    value?: string | number;
   };
   sparklineValues?: number[];
   tone?: 'default' | 'success' | 'warning' | 'danger' | 'brand' | 'info' | string;

@@ -177,14 +177,24 @@ export class SupplierService {
    * Update supplier
    */
   async update(id: string, input: SupplierUpdateInput): Promise<void> {
-    const { userId, ...data } = input;
-    await this.knex('suppliers')
-      .where('id', id)
-      .update({
-        ...data,
-        updated_by: userId,
-        updated_at: new Date(),
-      });
+    const patch: Record<string, any> = {
+      updated_by: input.userId,
+      updated_at: new Date(),
+    };
+    if (input.companyName !== undefined) patch.company_name = input.companyName;
+    if (input.phone !== undefined) patch.phone = input.phone;
+    if (input.whatsappNo !== undefined) patch.whatsapp_no = input.whatsappNo;
+    if (input.paymentTermsDays !== undefined)
+      patch.payment_terms_days = input.paymentTermsDays;
+    if (input.gstin !== undefined) patch.gstin = input.gstin;
+    if (input.reliabilityScorePct !== undefined)
+      patch.reliability_score_pct = input.reliabilityScorePct;
+    if (input.leadTimeDaysAvg !== undefined)
+      patch.lead_time_days_avg = input.leadTimeDaysAvg;
+    if (input.isApproved !== undefined) patch.is_approved = input.isApproved;
+    if (input.isActive !== undefined) patch.is_active = input.isActive;
+
+    await this.knex('suppliers').where('id', id).update(patch);
 
     this.logger.log(`Updated supplier: ${id}`);
   }

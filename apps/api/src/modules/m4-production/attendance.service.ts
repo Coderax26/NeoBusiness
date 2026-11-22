@@ -63,7 +63,7 @@ export class AttendanceService {
 
   async getAttendanceByWorker(
     workerId: string,
-    siteId: string,
+    siteId?: string,
   ): Promise<AttendanceResponseDto[]> {
     const rows = await this.attendanceRepo.getByWorker(workerId, siteId);
     return rows.map((r) => this.toResponseDto(r));
@@ -75,7 +75,7 @@ export class AttendanceService {
   }
 
   async listAttendance(
-    siteId: string,
+    siteId?: string,
     date?: string,
   ): Promise<AttendanceResponseDto[]> {
     const rows = await this.attendanceRepo.list(siteId, date);

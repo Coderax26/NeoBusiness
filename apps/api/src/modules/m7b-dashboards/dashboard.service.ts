@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
@@ -28,7 +29,13 @@ import { RequirePermission } from '../m0-platform/rbac.service.js';
 
 @Injectable()
 export class DashboardService implements DashboardPort {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(@InjectKnex() private readonly knex: Knex) {}
+
+  private isUuid(v?: string): boolean {
+    return Boolean(v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v));
+  }
 
   /**
    * AC1: Pulse Header — Owner's real-time dashboard
@@ -44,6 +51,41 @@ export class DashboardService implements DashboardPort {
       throw new ForbiddenException(
         'OPS_COORD role cannot access pulse financials',
       );
+    }
+
+    if (!this.isUuid(siteId)) {
+      const rows = await this.knex('mv_pulse_today').select(
+        'todays_sales',
+        'gross_margin_pct',
+        'cash_collected_today',
+        'pending_exceptions',
+      );
+      if (rows.length === 0) {
+        return {
+          siteId: 'all',
+          todaysSales: '0.00',
+          grossMarginPct: '0.00',
+          cashCollectedToday: '0.00',
+          pendingExceptions: 0,
+        };
+      }
+      const totalSales = rows.reduce((s, r) => s + Number(r.todays_sales || 0), 0);
+      const totalCash = rows.reduce((s, r) => s + Number(r.cash_collected_today || 0), 0);
+      const totalExceptions = rows.reduce((s, r) => s + Number(r.pending_exceptions || 0), 0);
+      const weightedMargin =
+        totalSales > 0
+          ? rows.reduce(
+              (s, r) => s + Number(r.todays_sales || 0) * Number(r.gross_margin_pct || 0),
+              0,
+            ) / totalSales
+          : rows.reduce((s, r) => s + Number(r.gross_margin_pct || 0), 0) / rows.length;
+      return {
+        siteId: 'all',
+        todaysSales: totalSales.toFixed(2),
+        grossMarginPct: weightedMargin.toFixed(2),
+        cashCollectedToday: totalCash.toFixed(2),
+        pendingExceptions: totalExceptions,
+      };
     }
 
     const pulse = await this.knex('mv_pulse_today')
@@ -85,6 +127,22 @@ export class DashboardService implements DashboardPort {
     siteId: string,
     options?: { role?: string },
   ): Promise<StatusMatrixResponse> {
+    if (!this.isUuid(siteId)) {
+      const rows = await this.knex('mv_ops_status').select(
+        'orders_pending_dispatch',
+        'batches_running',
+        'trucks_on_road',
+        'supplier_shortfalls',
+      );
+      return {
+        siteId: 'all',
+        ordersPendingDispatch: rows.reduce((s, r) => s + Number(r.orders_pending_dispatch || 0), 0),
+        batchesRunning: rows.reduce((s, r) => s + Number(r.batches_running || 0), 0),
+        trucksOnRoad: rows.reduce((s, r) => s + Number(r.trucks_on_road || 0), 0),
+        supplierShortfalls: rows.reduce((s, r) => s + Number(r.supplier_shortfalls || 0), 0),
+      };
+    }
+
     // OPS_COORD CAN see status matrix (non-financial)
     const matrix = await this.knex('mv_ops_status')
       .where('site_id', siteId)
@@ -125,12 +183,15 @@ export class DashboardService implements DashboardPort {
       throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
     }
 
+    const siteFilter = this.isUuid(siteId) ? siteId : undefined;
+
     // 1. Get wallet summaries for all agents (collectors, drivers) at this site
-    const walletRows = await this.knex('custody_ledger as cl')
+    let walletQuery = this.knex('custody_ledger as cl')
       .join('users as u', 'cl.user_id', 'u.id')
-      .where('cl.site_id', siteId)
       .where('cl.posted_at', '>=', date)
-      .where('cl.posted_at', '<', `${date} 23:59:59.999`)
+      .where('cl.posted_at', '<', `${date} 23:59:59.999`);
+    if (siteFilter) walletQuery = walletQuery.where('cl.site_id', siteFilter);
+    const walletRows = await walletQuery
       .select(
         'u.id as user_id',
         'u.full_name as user_name',
@@ -151,11 +212,12 @@ export class DashboardService implements DashboardPort {
       .groupBy('u.id', 'u.full_name');
 
     // 2. Get handovers for the date
-    const handoverRows = await this.knex('custody_ledger as cl')
-      .where('cl.site_id', siteId)
+    let handoverQuery = this.knex('custody_ledger as cl')
       .where('cl.posted_at', '>=', date)
       .where('cl.posted_at', '<', `${date} 23:59:59.999`)
-      .whereIn('cl.entry_type', ['HANDOVER_OUT', 'HANDOVER_IN'])
+      .whereIn('cl.entry_type', ['HANDOVER_OUT', 'HANDOVER_IN']);
+    if (siteFilter) handoverQuery = handoverQuery.where('cl.site_id', siteFilter);
+    const handoverRows = await handoverQuery
       .select(
         'cl.id as handover_id',
         'cl.user_id as from_user_id',
@@ -176,9 +238,9 @@ export class DashboardService implements DashboardPort {
     }));
 
     // 3. Get deposit slip (cashbook summary for the date)
-    const cashbook = await this.knex('cashbook_entries')
-      .where('site_id', siteId)
-      .where('date', date)
+    let cashbookQuery = this.knex('cashbook_entries').where('date', date);
+    if (siteFilter) cashbookQuery = cashbookQuery.where('site_id', siteFilter);
+    const cashbook = await cashbookQuery
       .select(
         this.knex.raw(
           `SUM(CASE WHEN entry_type = 'CASH' THEN amount ELSE 0 END) as total_cash`,
@@ -194,10 +256,9 @@ export class DashboardService implements DashboardPort {
       .first();
 
     // 4. Get EOD sign-off status
-    const eod = await this.knex('eod_closings')
-      .where('site_id', siteId)
-      .where('date', date)
-      .first('id', 'signed_off_by_user_id', 'signed_off_at');
+    let eodQuery = this.knex('eod_closings').where('date', date);
+    if (siteFilter) eodQuery = eodQuery.where('site_id', siteFilter);
+    const eod = await eodQuery.first('id', 'signed_off_by_user_id', 'signed_off_at');
 
     const wallets = walletRows.map((row) => ({
       userId: String(row.user_id),
@@ -238,21 +299,22 @@ export class DashboardService implements DashboardPort {
       throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
     }
 
+    const siteFilter = this.isUuid(siteId) ? siteId : undefined;
+
     // 1. Owner call volume = exceptions resolved today
-    const exceptionsResolved = await this.knex('exception_approvals')
-      .where('site_id', siteId)
+    let exceptionsQuery = this.knex('exception_approvals')
       .where('resolved_at', '>=', date)
       .where('resolved_at', '<', `${date} 23:59:59.999`)
-      .whereIn('status', ['APPROVED', 'REJECTED'])
-      .count('* as count')
-      .first();
+      .whereIn('status', ['APPROVED', 'REJECTED']);
+    if (siteFilter) exceptionsQuery = exceptionsQuery.where('site_id', siteFilter);
+    const exceptionsResolved = await exceptionsQuery.count('* as count').first();
 
     // 2. EOD time = initiated_at to signed_off_at
-    const eod = await this.knex('eod_closings')
-      .where('site_id', siteId)
+    let eodQuery = this.knex('eod_closings')
       .where('date', date)
-      .whereNotNull('signed_off_at')
-      .first('initiated_at', 'signed_off_at');
+      .whereNotNull('signed_off_at');
+    if (siteFilter) eodQuery = eodQuery.where('site_id', siteFilter);
+    const eod = await eodQuery.first('initiated_at', 'signed_off_at');
 
     let eodTimeMinutes = 0;
     if (eod?.initiated_at && eod?.signed_off_at) {
@@ -268,9 +330,9 @@ export class DashboardService implements DashboardPort {
       SELECT
         COUNT(*) FILTER (WHERE cr.idempotency_key IS NULL) * 100.0 / NULLIF(COUNT(*), 0) as missed_pct
       FROM collection_receipts cr
-      WHERE cr.site_id = ? AND cr.collected_at >= ?::date AND cr.collected_at < (?::date + INTERVAL '1 day')
+      WHERE ${siteFilter ? 'cr.site_id = ? AND ' : ''}cr.collected_at >= ?::date AND cr.collected_at < (?::date + INTERVAL '1 day')
     `,
-      [siteId, date, date],
+      siteFilter ? [siteFilter, date, date] : [date, date],
     );
     const missedEntriesPct = Number(missed.rows[0]?.missed_pct ?? 0).toFixed(2);
 
@@ -293,8 +355,7 @@ export class DashboardService implements DashboardPort {
         ON ea.reference_table = 'sales_orders'
         AND ea.reference_id = so.id::text
         AND ea.exception_type = 'PRICE_OVERRIDE'
-      WHERE so.fulfillment_site_id = ?
-        AND so.created_at >= ?::date
+      WHERE ${siteFilter ? 'so.fulfillment_site_id = ? AND ' : ''}so.created_at >= ?::date
         AND so.created_at < (?::date + INTERVAL '1 day')
         AND so.margin_pct < (
           SELECT COALESCE(CAST(value_json AS numeric), 0.10)
@@ -302,7 +363,7 @@ export class DashboardService implements DashboardPort {
           WHERE key = 'min_margin_pct_default' AND scope = 'GLOBAL'
         )
     `,
-      [siteId, date, date],
+      siteFilter ? [siteFilter, date, date] : [date, date],
     );
     const marginRow = marginErosion.rows[0];
     const marginErosionVisibilityPct =
@@ -325,11 +386,10 @@ export class DashboardService implements DashboardPort {
             AND ds.delivered_at IS NOT NULL)
         ) as good
       FROM delivery_trips dt
-      WHERE dt.site_id = ?
-        AND dt.trip_date = ?
+      WHERE ${siteFilter ? 'dt.site_id = ? AND ' : ''}dt.trip_date = ?
         AND dt.status = 'COMPLETED'
     `,
-      [siteId, date],
+      siteFilter ? [siteFilter, date] : [date],
     );
     const epodRow = epod.rows[0];
     const epodVisibilityPct =
@@ -342,8 +402,7 @@ export class DashboardService implements DashboardPort {
       `
       SELECT AVG(EXTRACT(EPOCH FROM (so.updated_at - so.created_at))/60) as avg_minutes
       FROM sales_orders so
-      WHERE so.fulfillment_site_id = ?
-        AND so.created_at >= ?::date
+      WHERE ${siteFilter ? 'so.fulfillment_site_id = ? AND ' : ''}so.created_at >= ?::date
         AND so.created_at < (?::date + INTERVAL '1 day')
         AND so.margin_pct >= (
           SELECT COALESCE(CAST(value_json AS numeric), 0.10)
@@ -352,7 +411,7 @@ export class DashboardService implements DashboardPort {
         )
         AND so.order_status IN ('CONFIRMED', 'DISPATCHED', 'DELIVERED_FULL')
     `,
-      [siteId, date, date],
+      siteFilter ? [siteFilter, date, date] : [date, date],
     );
     const routineOrderConfirmationMinutes = Math.round(
       Number(routineTime.rows[0]?.avg_minutes ?? 0),
@@ -367,6 +426,307 @@ export class DashboardService implements DashboardPort {
       marginErosionVisibilityPct,
       epodVisibilityPct,
       routineOrderConfirmationMinutes,
+    };
+  }
+
+  async getHomeSummary(role?: string, siteId?: string) {
+    const validSiteId = this.isUuid(siteId) ? siteId : undefined;
+    const runQuery = async <T>(
+      label: string,
+      fn: () => Promise<T>,
+      fallback: T,
+    ): Promise<T> => {
+      try {
+        return await fn();
+      } catch (err) {
+        this.logger.error(
+          `getHomeSummary(${label}) failed: ${(err as Error).message}`,
+        );
+        return fallback;
+      }
+    };
+
+    const runCount = async (
+      label: string,
+      fn: () => Promise<any>,
+    ): Promise<number> => {
+      try {
+        const res = await fn();
+        return Number(res?.c ?? res?.count ?? 0);
+      } catch (err) {
+        this.logger.error(
+          `getHomeSummary(${label}) failed: ${(err as Error).message}`,
+        );
+        return 0;
+      }
+    };
+
+    const arSiteClause = validSiteId ? ' AND site_id = ?' : '';
+    const arBindings = validSiteId ? [validSiteId] : [];
+
+    const [
+      salesTodayRow,
+      invTodayCount,
+      cashTodayRow,
+      activeTripsCount,
+      stagedOrdersCount,
+      readyOrdersCount,
+      activeBatchesCount,
+      pendingHandoversCount,
+      pendingChequesCount,
+      openExceptionsRows,
+      arRows,
+      rolloutRow,
+    ] = await Promise.all([
+      runQuery(
+        'salesTodayRow',
+        () =>
+          this.knex('sales_orders')
+            .whereIn('order_status', [
+              'CONFIRMED',
+              'IN_PRODUCTION_SOURCING',
+              'READY',
+              'DISPATCHED',
+              'DELIVERED_FULL',
+              'DELIVERED_PARTIAL',
+              'CLOSED',
+            ])
+            .whereRaw(
+              "(created_at AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date",
+            )
+            .modify((qb) => {
+              if (validSiteId) qb.where('fulfillment_site_id', validSiteId);
+            })
+            .sum('total_amount as total')
+            .first(),
+        { total: 0 },
+      ),
+      runCount('invTodayCount', () =>
+        this.knex('invoices')
+          .whereNot('status', 'CANCELLED')
+          .whereRaw(
+            "invoice_date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date",
+          )
+          .modify((qb) => {
+            if (validSiteId) qb.where('site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runQuery(
+        'cashTodayRow',
+        () =>
+          this.knex('collection_receipts')
+            .whereRaw(
+              "(collected_at AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date",
+            )
+            .modify((qb) => {
+              if (validSiteId) qb.where('site_id', validSiteId);
+            })
+            .sum('amount as total')
+            .first(),
+        { total: 0 },
+      ),
+      runCount('activeTripsCount', () =>
+        this.knex('delivery_trips')
+          .whereIn('status', ['LOADING', 'IN_TRANSIT'])
+          .modify((qb) => {
+            if (validSiteId) qb.where('site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runCount('stagedOrdersCount', () =>
+        this.knex('sales_orders')
+          .whereIn('order_status', [
+            'CONFIRMED',
+            'IN_PRODUCTION_SOURCING',
+            'READY',
+          ])
+          .modify((qb) => {
+            if (validSiteId) qb.where('fulfillment_site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runCount('readyOrdersCount', () =>
+        this.knex('sales_orders')
+          .where('order_status', 'READY')
+          .modify((qb) => {
+            if (validSiteId) qb.where('fulfillment_site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runCount('activeBatchesCount', () =>
+        this.knex('production_work_orders')
+          .whereIn('status', ['PLANNED', 'IN_PROGRESS'])
+          .modify((qb) => {
+            if (validSiteId) qb.where('site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runCount('pendingHandoversCount', () =>
+        this.knex('cash_handovers')
+          .where('status', 'PENDING')
+          .modify((qb) => {
+            if (validSiteId) qb.where('site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runCount('pendingChequesCount', () =>
+        this.knex('cheque_register as crg')
+          .join('collection_receipts as cr', 'crg.receipt_id', 'cr.id')
+          .whereIn('crg.status', ['RECEIVED', 'DEPOSITED'])
+          .modify((qb) => {
+            if (validSiteId) qb.where('cr.site_id', validSiteId);
+          })
+          .count('* as c')
+          .first(),
+      ),
+      runQuery(
+        'openExceptionsRows',
+        () =>
+          this.knex('exception_approvals')
+            .where('status', 'PENDING')
+            .modify((qb) => {
+              if (validSiteId) qb.where('site_id', validSiteId);
+            })
+            .select(
+              'id',
+              'exception_type',
+              'reference_table',
+              'reference_id',
+              'context_payload_json',
+              'value_at_risk',
+              'created_at',
+            )
+            .orderBy('created_at', 'desc')
+            .limit(10),
+        [] as any[],
+      ),
+      runQuery(
+        'arRows',
+        () =>
+          this.knex.raw(
+            `
+        SELECT
+          COALESCE(SUM(balance_due) FILTER (WHERE due_date >= CURRENT_DATE - INTERVAL '7 days'), 0)::numeric(14,2) as a0_7,
+          COUNT(*) FILTER (WHERE balance_due > 0 AND due_date >= CURRENT_DATE - INTERVAL '7 days')::int as c0_7,
+          COALESCE(SUM(balance_due) FILTER (WHERE due_date < CURRENT_DATE - INTERVAL '7 days' AND due_date >= CURRENT_DATE - INTERVAL '15 days'), 0)::numeric(14,2) as a8_15,
+          COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '7 days' AND due_date >= CURRENT_DATE - INTERVAL '15 days')::int as c8_15,
+          COALESCE(SUM(balance_due) FILTER (WHERE due_date < CURRENT_DATE - INTERVAL '15 days' AND due_date >= CURRENT_DATE - INTERVAL '30 days'), 0)::numeric(14,2) as a16_30,
+          COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '15 days' AND due_date >= CURRENT_DATE - INTERVAL '30 days')::int as c16_30,
+          COALESCE(SUM(balance_due) FILTER (WHERE due_date < CURRENT_DATE - INTERVAL '30 days'), 0)::numeric(14,2) as a30p,
+          COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '30 days')::int as c30p
+        FROM invoices
+        WHERE balance_due > 0 AND status NOT IN ('CANCELLED', 'PAID')${arSiteClause}
+      `,
+            arBindings,
+          ),
+        { rows: [{}] } as any,
+      ),
+      runQuery(
+        'rolloutRow',
+        () =>
+          this.knex('business_rule_config')
+            .where({ key: 'ROLLOUT_CONFIG', scope: 'GLOBAL' })
+            .first(),
+        null as any,
+      ),
+    ]);
+
+    const mappedExceptions = (openExceptionsRows as any[]).map((row) => {
+      const payload =
+        typeof row.context_payload_json === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(row.context_payload_json);
+              } catch {
+                return {};
+              }
+            })()
+          : (row.context_payload_json ?? {});
+      return {
+        id: row.id,
+        exception_type: row.exception_type,
+        reason: payload?.summary ?? payload?.title ?? row.exception_type,
+        entity_id: row.reference_id,
+        entity_type: row.reference_table,
+        value_at_risk: row.value_at_risk,
+        created_at: row.created_at,
+      };
+    });
+
+    let grossMarginPct: number | null = null;
+    if (role === 'OWNER') {
+      const pulse = await runQuery(
+        'mv_pulse_today',
+        async () => {
+          if (validSiteId) {
+            return this.knex('mv_pulse_today')
+              .where('site_id', validSiteId)
+              .select('gross_margin_pct')
+              .first();
+          }
+          const rows = await this.knex('mv_pulse_today').select(
+            'todays_sales',
+            'gross_margin_pct',
+          );
+          if (rows.length === 0) return null;
+          const totalSales = rows.reduce(
+            (s, r) => s + Number(r.todays_sales ?? 0),
+            0,
+          );
+          const avgMargin =
+            totalSales > 0
+              ? rows.reduce(
+                  (s, r) =>
+                    s +
+                    Number(r.todays_sales ?? 0) *
+                      Number(r.gross_margin_pct ?? 0),
+                  0,
+                ) / totalSales
+              : rows.reduce(
+                  (s, r) => s + Number(r.gross_margin_pct ?? 0),
+                  0,
+                ) / rows.length;
+          return { gross_margin_pct: Number(avgMargin.toFixed(2)) };
+        },
+        null as any,
+      );
+      grossMarginPct = pulse ? Number(pulse.gross_margin_pct ?? 0) : 0;
+    }
+
+    const ar = arRows?.rows?.[0] || {};
+    const setupSteps: Array<{ status?: string }> = Array.isArray(rolloutRow?.value_json?.setupSteps)
+      ? rolloutRow.value_json.setupSteps
+      : [];
+    const completedSteps = setupSteps.filter((s) => s.status === 'COMPLETED').length;
+    const setupProgressPct = setupSteps.length > 0 ? Math.round((completedSteps / setupSteps.length) * 100) : 0;
+
+    return {
+      todaySalesInr: Number((salesTodayRow as any)?.total ?? 0),
+      todayInvoiceCount: invTodayCount,
+      grossMarginPct,
+      cashCollectedInr: Number((cashTodayRow as any)?.total ?? 0),
+      activeTripsCount,
+      stagedOrdersCount,
+      readyOrdersCount,
+      activeBatchesCount,
+      pendingHandoversCount,
+      pendingChequesCount,
+      pendingExceptionsCount: mappedExceptions.length,
+      topException: mappedExceptions[0] ?? null,
+      setupProgressPct,
+      arAging: [
+        { label: '0 – 7 Days', amount: String(ar.a0_7 ?? '0.00'), count: Number(ar.c0_7 ?? 0), tone: 'info' },
+        { label: '8 – 15 Days', amount: String(ar.a8_15 ?? '0.00'), count: Number(ar.c8_15 ?? 0), tone: 'warning' },
+        { label: '16 – 30 Days', amount: String(ar.a16_30 ?? '0.00'), count: Number(ar.c16_30 ?? 0), tone: 'warning' },
+        { label: '30+ Days (Overdue)', amount: String(ar.a30p ?? '0.00'), count: Number(ar.c30p ?? 0), tone: 'danger' },
+      ],
     };
   }
 }

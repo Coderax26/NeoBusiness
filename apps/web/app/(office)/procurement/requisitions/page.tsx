@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Dialog, Card } from '@neo/ui';
 import { formatINR, groupRequisitionsBySupplier } from '@neo/shared';
 import {
-  INITIAL_REQUISITIONS,
   PROCUREMENT_ITEMS,
   PROCUREMENT_SUPPLIERS,
   type RequisitionRecord,
   type RequisitionSource,
   type RequisitionStatus,
-} from '../../../src/lib/procurement-data';
+} from '../../../../src/lib/procurement-data';
 
 const SOURCE_LABELS: Record<RequisitionSource, string> = {
   SALES_ORDER_BACK_TO_BACK: 'Sales Order (Back-to-Back)',
@@ -21,12 +20,27 @@ const SOURCE_LABELS: Record<RequisitionSource, string> = {
 };
 
 export default function RequisitionsPage() {
-  const [requisitions, setRequisitions] = useState<RequisitionRecord[]>(INITIAL_REQUISITIONS);
+  const [requisitions, setRequisitions] = useState<RequisitionRecord[]>([]);
   const [viewMode, setViewMode] = useState<'LIST' | 'GROUPED'>('LIST');
   const [statusFilter, setStatusFilter] = useState<RequisitionStatus | 'ALL'>('ALL');
   const [sourceFilter, setSourceFilter] = useState<RequisitionSource | 'ALL'>('ALL');
-  const [selectedIds, setSelectedIds] = useState<string[]>(['req-1', 'req-2']);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/procurement/requisitions')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setRequisitions(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Create Manual Requisition modal
   const [createOpen, setCreateOpen] = useState(false);

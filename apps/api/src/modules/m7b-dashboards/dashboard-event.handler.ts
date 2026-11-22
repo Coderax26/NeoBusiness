@@ -14,6 +14,7 @@ import {
   type ExceptionPort,
 } from '../../shared/ports/ports.interface.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
+import { getRedisConnection } from '../../shared/config/redis-connection.js';
 import type {
   DomainEvent,
   EventType,
@@ -103,7 +104,7 @@ export class DashboardEventHandler implements OnModuleInit, OnModuleDestroy {
       this.worker = new Worker(
         'dashboard-events',
         async (job) => this.handleJob(job.data as DomainJob),
-        { connection: { host: 'localhost', port: 6379 } },
+        { connection: getRedisConnection() },
       );
 
       this.worker.on('failed', (job, error) => {

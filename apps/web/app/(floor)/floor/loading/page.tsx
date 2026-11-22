@@ -1,15 +1,53 @@
 'use client';
 
-import React, { useState } from 'react';
-import { INITIAL_FLOOR_TRIPS, type FloorLoadingTrip } from '../../../../src/lib/inventory-data';
+import React, { useEffect, useState } from 'react';
+import { type FloorLoadingTrip } from '../../../../src/lib/inventory-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
 export default function FloorVehicleLoadingPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [trips, setTrips] = useState<FloorLoadingTrip[]>(INITIAL_FLOOR_TRIPS);
+  const [trips, setTrips] = useState<FloorLoadingTrip[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch('/api/proxy/trips')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setTrips(
+          list.map((t: any) => ({
+            tripId: t.id,
+            tripNo: t.trip_no ?? t.tripNo ?? t.id.slice(0, 8),
+            vehicleNo: t.vehicle_reg_no ?? t.vehicleNo ?? 'Vehicle',
+            driverName: t.driver_name ?? t.driverName ?? 'Driver',
+            status: t.status ?? 'LOADING',
+            stops: Array.isArray(t.stops)
+              ? t.stops.map((s: any) => ({
+                  stopId: s.id,
+                  customerName: s.customer_name ?? s.customerName ?? 'Customer',
+                  itemName: s.item_name ?? 'Order Items',
+                  requiredQty: Number(s.required_qty ?? 1),
+                  loadedQty: 0,
+                  uom: 'CRATE',
+                  suggestedBatch: s.batch_number ?? 'FEFO',
+                  checked: false,
+                }))
+              : [],
+          })),
+        );
+      })
+      .catch(() => setTrips([]));
+  }, []);
+
   const trip = trips[0];
+
+  if (!trip) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-400">
+        No trips queued for loading.
+      </div>
+    );
+  }
 
   const toggleStop = (stopId: string) => {
     setTrips((prev) =>

@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v7 as uuidv7 } from 'uuid';
 
@@ -36,8 +38,9 @@ export interface BomLineWithItem extends BomLineRow {
   item_primary_uom: string;
 }
 
+@Injectable()
 export class BomRepository {
-  constructor(private readonly knex: Knex) {}
+  constructor(@InjectKnex() private readonly knex: Knex) {}
 
   async createHeader(
     data: Omit<BomHeaderRow, 'id' | 'created_at' | 'updated_at'> & {
@@ -89,14 +92,19 @@ export class BomRepository {
   }
 
   async getHeadersByItem(
-    itemId: string,
-    siteId: string,
+    itemId?: string,
+    siteId?: string,
   ): Promise<BomHeaderRow[]> {
-    return this.knex('bom_headers')
-      .where('item_id', itemId)
-      .andWhere('site_id', siteId)
-      .orderBy('version', 'desc')
-      .select('*');
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let query = this.knex('bom_headers');
+    if (itemId && uuidRe.test(itemId)) {
+      query = query.where('item_id', itemId);
+    }
+    if (siteId && uuidRe.test(siteId)) {
+      query = query.andWhere('site_id', siteId);
+    }
+    return query.orderBy('version', 'desc').select('*');
   }
 
   async getLines(bomHeaderId: string): Promise<BomLineRow[]> {

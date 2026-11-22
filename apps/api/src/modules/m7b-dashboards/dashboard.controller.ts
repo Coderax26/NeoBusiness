@@ -94,4 +94,19 @@ export class DashboardController {
     const kpis = await this.dashboard.getKPIs(siteId, date);
     return kpis;
   }
+
+  @Get('home-summary')
+  @RequirePermission('orders.read')
+  @ApiOperation({
+    summary: 'Get live role-aware summary for /home (KPIs, ops matrix, AR aging, todo counts)',
+  })
+  @ApiQuery({ name: 'siteId', required: false, description: 'Optional site UUID filter' })
+  async getHomeSummary(
+    @Query('siteId') querySiteId: string | undefined,
+    @Req() req: any,
+  ) {
+    const siteId =
+      querySiteId || (req.user?.role === 'OWNER' ? undefined : req.user?.siteId);
+    return this.dashboard.getHomeSummary(req.user?.role, siteId);
+  }
 }

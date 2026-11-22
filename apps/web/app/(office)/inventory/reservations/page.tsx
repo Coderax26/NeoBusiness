@@ -1,15 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill, Dialog } from '@neo/ui';
-import { INITIAL_RESERVATIONS, type ReservationRecord } from '../../../src/lib/inventory-data';
+import { type ReservationRecord } from '../../../../src/lib/inventory-data';
 
 export default function InventoryReservationsPage() {
-  const [reservations, setReservations] = useState<ReservationRecord[]>(INITIAL_RESERVATIONS);
+  const [reservations, setReservations] = useState<ReservationRecord[]>([]);
   const [releaseTarget, setReleaseTarget] = useState<ReservationRecord | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/inventory/reservations')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setReservations(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleRelease = () => {
     if (!releaseTarget || !releaseReason.trim()) return;

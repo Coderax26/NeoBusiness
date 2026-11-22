@@ -12,12 +12,11 @@ import {
   type BomRecord,
   type SessionUser,
 } from '@neo/shared';
-import { INITIAL_BOMS } from '../../../src/lib/production-data';
 
 export default function BomsPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [boms, setBoms] = useState<BomRecord[]>(INITIAL_BOMS);
-  const [selectedBomId, setSelectedBomId] = useState<string>(INITIAL_BOMS[0].id);
+  const [boms, setBoms] = useState<BomRecord[]>([]);
+  const [selectedBomId, setSelectedBomId] = useState<string>('');
   const [scaleTargetQty, setScaleTargetQty] = useState<number>(500);
   const [toast, setToast] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -25,16 +24,75 @@ export default function BomsPage() {
   const [newOutputQty, setNewOutputQty] = useState(100);
 
   useEffect(() => {
+    let active = true;
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setUser(d.user);
+        if (active && d?.user) setUser(d.user);
       })
       .catch(() => {});
+
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+    const siteQuery =
+      storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
+
+    fetch(`/api/proxy/production/boms${siteQuery}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const normalized: BomRecord[] = rows.map((b: any) => ({
+          id: String(b.id),
+          code: String(b.code ?? b.bomNo ?? b.bom_no ?? 'BOM'),
+          name: String(b.name ?? b.itemName ?? b.bomNo ?? 'BOM'),
+          version: Number(b.version ?? 1),
+          outputItemId: String(b.outputItemId ?? b.itemId ?? ''),
+          outputItemName: String(b.outputItemName ?? b.itemName ?? 'Item'),
+          outputQty: Number(b.outputQty ?? b.batch_size ?? 100),
+          outputUom: String(b.outputUom ?? b.uom ?? 'kg'),
+          finishedItemId: String(b.finishedItemId ?? b.itemId ?? ''),
+          finishedItemName: String(b.finishedItemName ?? b.itemName ?? 'Item'),
+          steps: Array.isArray(b.steps) ? b.steps : [],
+          status: (b.status ?? 'ACTIVE') as BomRecord['status'],
+          ingredients: Array.isArray(b.ingredients)
+            ? b.ingredients
+            : Array.isArray(b.lines)
+              ? b.lines.map((l: any) => ({
+                  itemId: String(l.itemId ?? l.componentItemId ?? ''),
+                  itemName: String(l.itemName ?? l.componentItemName ?? 'Ingredient'),
+                  qtyPerBatch: Number(l.qtyPerBatch ?? l.qtyPerUnit ?? l.qty ?? 0),
+                  uom: String(l.uom ?? 'kg'),
+                  unitCost: Number(l.unitCost ?? 0),
+                  wastagePct: Number(l.wastagePct ?? l.scrapPct ?? 0),
+                }))
+              : [],
+        }));
+        setBoms(normalized);
+        if (normalized.length > 0) setSelectedBomId(normalized[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   const showCostRollup = !user || canViewMarginAndCost(user.role);
-  const selectedBom = boms.find((b) => b.id === selectedBomId) || boms[0];
+  const selectedBom = boms.find((b) => b.id === selectedBomId) || boms[0] || {
+    id: '',
+    code: '—',
+    name: 'No BOMs loaded',
+    version: 1,
+    outputItemId: '',
+    outputItemName: '—',
+    outputQty: 1,
+    outputUom: 'kg',
+    finishedItemId: '',
+    finishedItemName: '—',
+    steps: [],
+    status: 'DRAFT',
+    ingredients: [],
+  } as BomRecord;
 
   const scaledIngredients = useMemo(
     () =>
@@ -85,7 +143,7 @@ export default function BomsPage() {
       outputUom: 'kg',
       status: 'DRAFT',
       steps: ['Standard batch mix & pack'],
-      ingredients: INITIAL_BOMS[0].ingredients,
+      ingredients: boms[0]?.ingredients ?? [],
     };
     setBoms((prev) => [draft, ...prev]);
     setSelectedBomId(draft.id);

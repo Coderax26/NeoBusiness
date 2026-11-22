@@ -1,79 +1,103 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { INITIAL_ADMIN_USERS, ROLE_MATRIX } from '../../../../src/lib/admin-data';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ROLE_MATRIX, type AdminUserRecord } from '../../../../src/lib/admin-data';
 
 export default function AdminRolesPage() {
-  const [selectedUserId, setSelectedUserId] = useState(INITIAL_ADMIN_USERS[2].id);
+  const [users, setUsers] = useState<AdminUserRecord[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+
+  useEffect(() => {
+    fetch('/api/proxy/admin/users')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const mapped: AdminUserRecord[] = list.map((u: any) => ({
+          id: u.id,
+          name: u.full_name ?? u.fullName ?? u.name ?? 'User',
+          phone: u.phone ?? '',
+          role: u.role ?? 'OPS_COORD',
+          siteIds: u.assigned_site_id ? [u.assigned_site_id] : [],
+          language: 'en',
+          status: u.is_active === false ? 'DISABLED' : 'ACTIVE',
+          lastLogin: u.last_login_at ?? '-',
+          devicesCount: 0,
+        }));
+        setUsers(mapped);
+        if (mapped.length > 0) setSelectedUserId(mapped[0].id);
+      })
+      .catch(() => setUsers([]));
+  }, []);
 
   const selectedUser = useMemo(
-    () => INITIAL_ADMIN_USERS.find((u) => u.id === selectedUserId) ?? INITIAL_ADMIN_USERS[0],
-    [selectedUserId],
+    () => users.find((u) => u.id === selectedUserId) ?? users[0],
+    [users, selectedUserId],
   );
 
   const userRoleSpec = useMemo(
-    () => ROLE_MATRIX.find((r) => r.role === selectedUser.role) ?? ROLE_MATRIX[0],
+    () => ROLE_MATRIX.find((r) => r.role === selectedUser?.role) ?? ROLE_MATRIX[0],
     [selectedUser],
   );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Roles &amp; Access Matrix</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-zinc-100">Roles &amp; Access Matrix</h1>
+        <p className="text-sm text-zinc-400">
           Seeded 6-role RBAC permissions with plain descriptions and a &ldquo;What can this person see?&rdquo; preview.
         </p>
       </div>
 
       {/* View As Preview */}
-      <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-5 space-y-3">
+      <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm font-bold text-purple-900">What can this person see?</div>
+          <div className="text-sm font-bold text-purple-200">What can this person see?</div>
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
-            className="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-sm font-semibold"
+            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-zinc-100"
           >
-            {INITIAL_ADMIN_USERS.map((u) => (
+            {users.length === 0 && <option value="">No users loaded</option>}
+            {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name} ({u.role})
               </option>
             ))}
           </select>
         </div>
-        <p className="text-xs text-slate-700">{userRoleSpec.summary}</p>
+        <p className="text-xs text-zinc-300">{userRoleSpec.summary}</p>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="font-semibold text-emerald-700">Allowed:</span>
+          <span className="font-semibold text-emerald-400">Allowed:</span>
           {userRoleSpec.permissions.map((p) => (
-            <span key={p} className="rounded bg-emerald-100 px-2 py-0.5 font-mono text-emerald-800">{p}</span>
+            <span key={p} className="rounded bg-emerald-500/20 px-2 py-0.5 font-mono text-emerald-300">{p}</span>
           ))}
         </div>
         {userRoleSpec.maskedFields.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="font-semibold text-rose-700">Masked / Hidden:</span>
+            <span className="font-semibold text-rose-400">Masked / Hidden:</span>
             {userRoleSpec.maskedFields.map((m) => (
-              <span key={m} className="rounded bg-rose-100 px-2 py-0.5 font-mono text-rose-800">{m}</span>
+              <span key={m} className="rounded bg-rose-500/20 px-2 py-0.5 font-mono text-rose-300">{m}</span>
             ))}
           </div>
         )}
       </div>
 
       {/* Matrix Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-zinc-950 text-xs uppercase text-zinc-400">
             <tr>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Plain Description</th>
               <th className="px-4 py-3">Masked Fields</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-zinc-800">
             {ROLE_MATRIX.map((r) => (
               <tr key={r.role}>
-                <td className="px-4 py-3 font-mono font-bold text-purple-800">{r.role}</td>
-                <td className="px-4 py-3 text-slate-700">{r.summary}</td>
-                <td className="px-4 py-3 font-mono text-xs text-rose-700">
+                <td className="px-4 py-3 font-mono font-bold text-purple-300">{r.role}</td>
+                <td className="px-4 py-3 text-zinc-300">{r.summary}</td>
+                <td className="px-4 py-3 font-mono text-xs text-rose-300">
                   {r.maskedFields.length ? r.maskedFields.join(', ') : 'None (Full Visibility)'}
                 </td>
               </tr>

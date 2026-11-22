@@ -1,14 +1,16 @@
 import {
   formatINR,
   parseINR,
-  formatDateIST,
-  formatDateTimeIST,
+  formatISTDate,
   addMoney,
   subMoney,
   mulMoney,
   pctOf,
   cmpMoney,
 } from '@neo/shared';
+
+const formatDateIST = (isoOrDate: string | Date) => formatISTDate(isoOrDate, false);
+const formatDateTimeIST = (isoOrDate: string | Date) => formatISTDate(isoOrDate, true);
 
 export {
   formatINR,

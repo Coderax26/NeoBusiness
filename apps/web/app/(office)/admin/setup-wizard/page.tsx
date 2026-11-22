@@ -24,25 +24,46 @@ export default function SetupWizardPage() {
     })),
   );
 
-  // Form mock state for Step 1
-  const [companyName, setCompanyName] = useState('NeoFresh Foods Pvt Ltd');
-  const [gstin, setGstin] = useState('27ABCDE1234F1Z5');
+  const [companyName, setCompanyName] = useState('');
+  const [gstin, setGstin] = useState('');
   const [gstinError, setGstinError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('neobus_setup_wizard_progress');
-      if (saved) {
-        setSteps(JSON.parse(saved));
-      }
-    } catch {}
+    let active = true;
+    Promise.allSettled([
+      fetch('/api/proxy/admin/company-profile').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/admin/rollout').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([compRes, rollRes]) => {
+        if (!active) return;
+        if (compRes.status === 'fulfilled' && compRes.value) {
+          const c = compRes.value.data || compRes.value;
+          if (c.legalName) setCompanyName(String(c.legalName));
+          if (c.gstin) setGstin(String(c.gstin));
+        }
+        if (rollRes.status === 'fulfilled' && rollRes.value) {
+          const r = rollRes.value.data || rollRes.value;
+          if (Array.isArray(r.setupSteps) && r.setupSteps.length > 0) {
+            setSteps(r.setupSteps);
+          }
+        }
+      })
+      .catch(() => { });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const saveProgress = (updated: SetupStep[]) => {
     setSteps(updated);
     try {
       localStorage.setItem('neobus_setup_wizard_progress', JSON.stringify(updated));
-    } catch {}
+    } catch { }
+    fetch('/api/proxy/admin/rollout', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ setupSteps: updated }),
+    }).catch(() => { });
   };
 
   const completedCount = steps.filter((s) => s.status === 'COMPLETED').length;
@@ -112,11 +133,10 @@ export default function SetupWizardPage() {
               <button
                 key={s.id}
                 onClick={() => setCurrentStepIdx(idx)}
-                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
-                  isActive
-                    ? 'bg-zinc-800 border-teal-500/80 shadow-md ring-1 ring-teal-500/40'
-                    : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/60'
-                }`}
+                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${isActive
+                  ? 'bg-zinc-800 border-teal-500/80 shadow-md ring-1 ring-teal-500/40'
+                  : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/60'
+                  }`}
               >
                 <div className="mt-0.5">
                   {s.status === 'COMPLETED' ? (
@@ -128,9 +148,8 @@ export default function SetupWizardPage() {
                       ⏭
                     </span>
                   ) : (
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${
-                      isActive ? 'bg-teal-500/20 text-teal-400 border-teal-500/50' : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                    }`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${isActive ? 'bg-teal-500/20 text-teal-400 border-teal-500/50' : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                      }`}>
                       {s.id}
                     </span>
                   )}
@@ -161,8 +180,8 @@ export default function SetupWizardPage() {
                     activeStep.status === 'COMPLETED'
                       ? 'success'
                       : activeStep.status === 'SKIPPED'
-                      ? 'warning'
-                      : 'neutral'
+                        ? 'warning'
+                        : 'neutral'
                   }
                 >
                   {activeStep.status}

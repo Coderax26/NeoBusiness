@@ -18,6 +18,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import * as bcrypt from 'bcrypt';
 import { AuthService, JwtPayload } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
@@ -108,9 +109,37 @@ export class AuthController {
     @Body() body: { name?: string; preferredLanguage?: 'en' | 'mr'; uiPreferences?: Record<string, unknown> },
     @Req() req: any,
   ) {
+    const userId = String(req.user?.sub || req.user?.id || '');
+    const knex = this.authService['knex'];
+    const updates: Record<string, unknown> = { updated_at: new Date(), updated_by: userId };
+    if (body.name !== undefined) updates.full_name = body.name.trim();
+    if (body.preferredLanguage !== undefined) updates.preferred_language = body.preferredLanguage;
+    await knex('users').where('id', userId).update(updates);
+
+    if (body.uiPreferences !== undefined) {
+      const prefKey = `USER_PREFS_${userId}`;
+      const existingPref = await knex('business_rule_config').where({ key: prefKey, scope: 'GLOBAL' }).first();
+      if (existingPref) {
+        await knex('business_rule_config')
+          .where({ key: prefKey, scope: 'GLOBAL' })
+          .update({ value_json: body.uiPreferences, updated_by: userId, updated_at: new Date() });
+      } else {
+        await knex('business_rule_config').insert({
+          key: prefKey,
+          value_json: body.uiPreferences,
+          scope: 'GLOBAL',
+          scope_ref: null,
+          description: `UI preferences for user ${userId}`,
+          updated_by: userId,
+          updated_at: new Date(),
+        });
+      }
+    }
+
+    const profile = await this.authService.getUserWithSites(userId);
     return {
-      id: req.user?.sub,
-      ...body,
+      ...profile,
+      uiPreferences: body.uiPreferences,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -124,8 +153,26 @@ export class AuthController {
     @Body() body: { currentCredential: string; newCredential: string },
     @Req() req: any,
   ) {
+    const userId = String(req.user?.sub || req.user?.id || '');
+    const knex = this.authService['knex'];
+    const user = await knex('users').where('id', userId).first('id', 'password_hash', 'pin_hash');
+    if (user && body?.currentCredential) {
+      const currentHash = user.password_hash || user.pin_hash;
+      if (currentHash) {
+        const matches = await bcrypt.compare(body.currentCredential, currentHash);
+        if (!matches) {
+          throw new UnauthorizedException('Current PIN or password is incorrect');
+        }
+      }
+    }
+    if (body?.newCredential) {
+      const newHash = await bcrypt.hash(String(body.newCredential), 10);
+      await knex('users')
+        .where('id', userId)
+        .update({ pin_hash: newHash, password_hash: null, updated_at: new Date(), updated_by: userId });
+    }
     return {
-      userId: req.user?.sub,
+      userId,
       changed: Boolean(body?.newCredential),
       message: 'Credential updated successfully',
     };
@@ -147,6 +194,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP and set new PIN/password (G-M0-5)' })
   async resetPin(@Body() body: { phone: string; otp: string; newPin: string }) {
+    const knex = this.authService['knex'];
+    if (body?.phone && body?.newPin && body?.otp) {
+      const newHash = await bcrypt.hash(String(body.newPin), 10);
+      await knex('users')
+        .where('phone', body.phone)
+        .update({
+          pin_hash: newHash,
+          password_hash: null,
+          failed_attempts: 0,
+          locked_until: null,
+          updated_at: new Date(),
+        });
+    }
     return {
       phone: body.phone,
       reset: Boolean(body.otp && body.newPin),

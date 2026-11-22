@@ -45,16 +45,24 @@ export class AttendanceRepository {
 
   async getByWorker(
     workerId: string,
-    siteId: string,
+    siteId?: string,
   ): Promise<AttendanceLogWithDetails[]> {
-    return this.knex('labour_attendance_logs as la')
+    let query = this.knex('labour_attendance_logs as la')
       .join('users as u', 'la.worker_id', 'u.id')
       .leftJoin('production_work_orders as wo', 'la.work_order_id', 'wo.id')
       .where('la.worker_id', workerId)
-      .andWhere('la.site_id', siteId)
       .select('la.*', 'u.full_name as worker_name', 'wo.wo_no as work_order_no')
       .orderBy('la.date', 'desc')
       .orderBy('la.created_at', 'desc');
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
+      query = query.andWhere('la.site_id', siteId);
+    }
+    return query;
   }
 
   async getByWorkOrder(
@@ -69,15 +77,23 @@ export class AttendanceRepository {
   }
 
   async list(
-    siteId: string,
+    siteId?: string,
     date?: string,
   ): Promise<AttendanceLogWithDetails[]> {
     let query = this.knex('labour_attendance_logs as la')
       .join('users as u', 'la.worker_id', 'u.id')
       .leftJoin('production_work_orders as wo', 'la.work_order_id', 'wo.id')
-      .where('la.site_id', siteId)
       .select('la.*', 'u.full_name as worker_name', 'wo.wo_no as work_order_no')
       .orderBy('la.date', 'desc');
+
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
+      query = query.where('la.site_id', siteId);
+    }
 
     if (date) {
       query = query.where('la.date', date);

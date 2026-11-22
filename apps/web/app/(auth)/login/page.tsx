@@ -56,8 +56,9 @@ const DEMO_PERSONAS: DemoPersona[] = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const [identifier, setIdentifier] = useState('+919876543210');
-  const [secret, setSecret] = useState('1234');
+  const [identifier, setIdentifier] = useState('');
+  const [secret, setSecret] = useState('');
+  const showDemoPersonas = process.env.NEXT_PUBLIC_SHOW_DEMO_PERSONAS === 'true';
   const [usePin, setUsePin] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
@@ -213,11 +214,11 @@ export default function LoginPage() {
             <div className="p-4 rounded-2xl bg-zinc-900/75 border border-zinc-800/90 backdrop-blur-md">
               <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                 <span>Today&apos;s Dispatch Pulse</span>
-                <span className="text-emerald-400 font-semibold">+14.2%</span>
+                <span className="text-emerald-400 font-semibold">Live</span>
               </div>
-              <div className="text-xl font-black text-white font-mono">₹18,42,500</div>
+              <div className="text-xl font-black text-white font-mono">PostgreSQL</div>
               <div className="text-[11px] text-zinc-500 mt-1">
-                42 Confirmed Orders · 6 Active Trips
+                Role-Scoped Orders · Active Trips
               </div>
             </div>
 
@@ -235,7 +236,7 @@ export default function LoginPage() {
             <div className="p-4 rounded-2xl bg-zinc-900/75 border border-zinc-800/90 backdrop-blur-md">
               <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                 <span>Pending Approvals</span>
-                <span className="text-amber-400 font-semibold">3 SLA Alerts</span>
+                <span className="text-amber-400 font-semibold">Live SLA Tracking</span>
               </div>
               <div className="text-xl font-black text-white font-mono">&lt; 4 min</div>
               <div className="text-[11px] text-zinc-500 mt-1">
@@ -244,7 +245,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Interactive 1-Click Demo Role Switcher */}
+          {/* Interactive 1-Click Demo Role Switcher (only when NEXT_PUBLIC_SHOW_DEMO_PERSONAS=true) */}
+          {showDemoPersonas && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
@@ -289,6 +291,7 @@ export default function LoginPage() {
               })}
             </div>
           </div>
+          )}
         </div>
 
         {/* Footer Compliance Note */}

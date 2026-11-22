@@ -59,11 +59,9 @@ export class WastageController {
     type: [WastageResponseDto],
   })
   async listWastage(
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
     @Query('status') status?: string,
   ): Promise<WastageResponseDto[]> {
-    // Note: siteId from query is not used directly due to RLS middleware
-    // The service will resolve site from work_order site
     return this.wastageService.listWastage(siteId, status);
   }
 

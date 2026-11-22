@@ -51,131 +51,16 @@ export interface CustomerRecord {
   active: boolean;
 }
 
-const INITIAL_CUSTOMERS: CustomerRecord[] = [
-  {
-    id: 'cust-1',
-    code: 'CUST-001',
-    businessName: 'Sharma Sweets & Dairy',
-    gstin: '27AABCS1429B1ZB',
-    stateCode: '27',
-    stateName: 'Maharashtra',
-    billingAddress: 'Shop 4, MG Road, Pune 411001',
-    gpsCoords: '18.5204,73.8567',
-    primaryContact: 'Ramesh Sharma',
-    phone: '9822012345',
-    whatsappPhone: '9822012345',
-    whatsappOptIn: true,
-    defaultSite: 'Pune Central Depot',
-    deliveryWindow: 'MORNING',
-    creditLimitRupees: 50000,
-    creditDays: 7,
-    maxOverdueDays: 15,
-    creditHold: false,
-    outstandingRupees: 28400,
-    overdueDays: 0,
-    creditStatus: 'OK',
-    lastOrderDate: '2026-11-11',
-    contacts: [
-      { id: 'c-1', name: 'Ramesh Sharma', phone: '9822012345', role: 'Owner', isPrimary: true },
-      { id: 'c-2', name: 'Vijay Sharma', phone: '9822098765', role: 'Manager', isPrimary: false },
-    ],
-    active: true,
-  },
-  {
-    id: 'cust-2',
-    code: 'CUST-002',
-    businessName: 'Hotel Royal Palace Catering',
-    gstin: '27AAACH2849C1ZA',
-    stateCode: '27',
-    stateName: 'Maharashtra',
-    billingAddress: 'Plot 12, Senapati Bapat Marg, Pune',
-    gpsCoords: '18.5312,73.8299',
-    primaryContact: 'Anand Kulkarni',
-    phone: '9823055443',
-    whatsappPhone: '9823055443',
-    whatsappOptIn: true,
-    defaultSite: 'Pune Central Depot',
-    deliveryWindow: 'MORNING',
-    creditLimitRupees: 100000,
-    creditDays: 14,
-    maxOverdueDays: 21,
-    creditHold: false,
-    outstandingRupees: 94000,
-    overdueDays: 12,
-    creditStatus: 'NEAR_LIMIT',
-    lastOrderDate: '2026-11-10',
-    contacts: [
-      { id: 'c-3', name: 'Anand Kulkarni', phone: '9823055443', role: 'Purchase Head', isPrimary: true },
-    ],
-    active: true,
-  },
-  {
-    id: 'cust-3',
-    code: 'CUST-003',
-    businessName: 'Modern Grocers Supermarket',
-    gstin: '27AABCM9988D1Z8',
-    stateCode: '27',
-    stateName: 'Maharashtra',
-    billingAddress: 'Commercial Complex, Baner, Pune',
-    gpsCoords: '18.5590,73.7868',
-    primaryContact: 'Pooja Patil',
-    phone: '9823199887',
-    whatsappPhone: '9823199887',
-    whatsappOptIn: false,
-    defaultSite: 'Baner Transit Depot',
-    deliveryWindow: 'AFTERNOON',
-    creditLimitRupees: 40000,
-    creditDays: 7,
-    maxOverdueDays: 14,
-    creditHold: true,
-    creditOverrideReason: 'Cheque bounce on 02-Nov; hold until RTGS clears.',
-    outstandingRupees: 48500,
-    overdueDays: 34,
-    creditStatus: 'HOLD',
-    lastOrderDate: '2026-10-28',
-    contacts: [
-      { id: 'c-4', name: 'Pooja Patil', phone: '9823199887', role: 'Store Owner', isPrimary: true },
-    ],
-    active: true,
-  },
-  {
-    id: 'cust-4',
-    code: 'CUST-004',
-    businessName: 'Krishna Dairy Parlour',
-    gstin: '27AABCK5544E1ZY',
-    stateCode: '27',
-    stateName: 'Maharashtra',
-    billingAddress: 'Station Road, Hadapsar, Pune',
-    primaryContact: 'Sachin Jagtap',
-    phone: '9822477665',
-    whatsappPhone: '9822477665',
-    whatsappOptIn: true,
-    defaultSite: 'Hadapsar Warehouse',
-    deliveryWindow: 'MORNING',
-    creditLimitRupees: 30000,
-    creditDays: 3,
-    maxOverdueDays: 7,
-    creditHold: false,
-    outstandingRupees: 12000,
-    overdueDays: 0,
-    creditStatus: 'OK',
-    lastOrderDate: '2026-11-12',
-    contacts: [
-      { id: 'c-5', name: 'Sachin Jagtap', phone: '9822477665', role: 'Proprietor', isPrimary: true },
-    ],
-    active: true,
-  },
-];
 
 export default function CustomerMasterPage() {
-  const [customers, setCustomers] = useState<CustomerRecord[]>(INITIAL_CUSTOMERS);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
 
   const loadCustomers = useCallback(async () => {
     try {
       const res = await fetch('/api/proxy/customers');
       if (!res.ok) return;
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows)) return;
 
       const mapped: CustomerRecord[] = rows.map((c: any) => {
         const limit = Number(c.credit_limit ?? 0);

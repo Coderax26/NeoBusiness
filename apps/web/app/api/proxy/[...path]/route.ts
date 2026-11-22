@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:3000';
+const IS_SECURE_COOKIE =
+  process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production';
 
 async function handleProxy(
   req: NextRequest,
@@ -16,7 +20,7 @@ async function handleProxy(
   headers.delete('host');
   headers.delete('connection');
 
-  if (token && !token.startsWith('demo-jwt-')) {
+  if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -24,18 +28,68 @@ async function handleProxy(
   const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
 
   try {
-    const upstream = await fetch(targetUrl, {
+    let upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
       body: bodyBuffer,
     });
 
+    let newAccessToken: string | undefined;
+    let newRefreshToken: string | undefined;
+
+    if (upstream.status === 401) {
+      const refreshToken = req.cookies.get('neobus_refresh_token')?.value;
+      if (refreshToken) {
+        try {
+          const refreshRes = await fetch(`${API_ORIGIN}/api/v1/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            newAccessToken = refreshData.accessToken;
+            newRefreshToken = refreshData.refreshToken;
+            headers.set('Authorization', `Bearer ${newAccessToken}`);
+            upstream = await fetch(targetUrl, {
+              method: req.method,
+              headers,
+              body: bodyBuffer,
+            });
+          }
+        } catch {
+          // Return original 401 response
+        }
+      }
+    }
+
     const contentType = upstream.headers.get('content-type') || 'application/json';
     const upstreamData = await upstream.arrayBuffer();
-    return new NextResponse(upstreamData, {
+    const response = new NextResponse(upstreamData, {
       status: upstream.status,
       headers: { 'Content-Type': contentType },
     });
+
+    if (newAccessToken) {
+      response.cookies.set('neobus_access_token', newAccessToken, {
+        httpOnly: true,
+        secure: IS_SECURE_COOKIE,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 8 * 60 * 60,
+      });
+    }
+    if (newRefreshToken) {
+      response.cookies.set('neobus_refresh_token', newRefreshToken, {
+        httpOnly: true,
+        secure: IS_SECURE_COOKIE,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+    }
+
+    return response;
   } catch (err: any) {
     return NextResponse.json(
       {

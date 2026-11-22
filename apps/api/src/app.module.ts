@@ -30,6 +30,9 @@ import { M7bDashboardsModule } from './modules/m7b-dashboards/m7b-dashboards.mod
       envFilePath: '.env',
     }),
 
+    // ── Scheduling ────────────────────────────────────────────────────────────
+    ScheduleModule.forRoot(),
+
     // ── Rate limiting ──────────────────────────────────────────────────────────
     ThrottlerModule.forRoot([
       {

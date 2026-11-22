@@ -61,8 +61,15 @@ export class InventoryService implements InventoryPort {
     return Qty.of(String(row?.total ?? '0'), 'KG').toStorageString();
   }
 
+  private isUuid(v?: string): boolean {
+    return (
+      !!v &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    );
+  }
+
   async listStock(
-    siteId: string,
+    siteId?: string,
     locationId?: string,
     itemId?: string,
   ): Promise<
@@ -77,25 +84,38 @@ export class InventoryService implements InventoryPort {
       qtyCommitted: string;
       qtyAvailable: string;
       expiryDate: string | null;
+      skuCode?: string | null;
+      itemName?: string | null;
+      uom?: string | null;
+      siteName?: string | null;
+      locationName?: string | null;
     }>
   > {
-    const query = this.knex('inventory_batches')
-      .where('site_id', siteId)
+    const query = this.knex('inventory_batches as ib')
+      .leftJoin('items as i', 'ib.item_id', 'i.id')
+      .leftJoin('sites as s', 'ib.site_id', 's.id')
+      .leftJoin('locations as l', 'ib.location_id', 'l.id')
       .select(
-        'id as batchId',
-        'item_id as itemId',
-        'site_id as siteId',
-        'location_id as locationId',
-        'batch_number as batchNumber',
-        'status',
-        'qty_on_hand as qtyOnHand',
-        'qty_committed as qtyCommitted',
-        'qty_available as qtyAvailable',
-        'expiry_date as expiryDate',
+        'ib.id as batchId',
+        'ib.item_id as itemId',
+        'ib.site_id as siteId',
+        'ib.location_id as locationId',
+        'ib.batch_number as batchNumber',
+        'ib.status',
+        'ib.qty_on_hand as qtyOnHand',
+        'ib.qty_committed as qtyCommitted',
+        'ib.qty_available as qtyAvailable',
+        'ib.expiry_date as expiryDate',
+        'i.sku_code as skuCode',
+        'i.name as itemName',
+        'i.primary_uom as uom',
+        's.name as siteName',
+        'l.name as locationName',
       )
-      .orderBy([{ column: 'expiry_date', order: 'asc', nulls: 'last' }]);
-    if (locationId) query.where('location_id', locationId);
-    if (itemId) query.where('item_id', itemId);
+      .orderBy([{ column: 'ib.expiry_date', order: 'asc', nulls: 'last' }]);
+    if (this.isUuid(siteId)) query.where('ib.site_id', siteId);
+    if (this.isUuid(locationId)) query.where('ib.location_id', locationId);
+    if (this.isUuid(itemId)) query.where('ib.item_id', itemId);
     return query;
   }
 
@@ -109,47 +129,65 @@ export class InventoryService implements InventoryPort {
     if (filters.from && filters.to && filters.from > filters.to) {
       throw new BadRequestException('Ledger date range is invalid');
     }
-    const query = this.knex('stock_ledger_txns')
+    const query = this.knex('stock_ledger_txns as slt')
+      .leftJoin('items as i', 'slt.item_id', 'i.id')
+      .leftJoin('sites as s', 'slt.site_id', 's.id')
       .select(
-        'id',
-        'site_id as siteId',
-        'item_id as itemId',
-        'batch_id as batchId',
-        'txn_type as txnType',
-        'qty',
-        'uom',
-        'reference_table as referenceTable',
-        'reference_id as referenceId',
-        'reference_no as referenceNo',
-        'posted_at as postedAt',
-        'note',
+        'slt.id',
+        'slt.site_id as siteId',
+        's.name as siteName',
+        'slt.item_id as itemId',
+        'i.sku_code as skuCode',
+        'i.name as itemName',
+        'slt.batch_id as batchId',
+        'slt.txn_type as txnType',
+        'slt.qty',
+        'slt.uom',
+        'slt.reference_table as referenceTable',
+        'slt.reference_id as referenceId',
+        'slt.reference_no as referenceNo',
+        'slt.posted_at as postedAt',
+        'slt.note',
+        'slt.reverses_txn_id as reversesTxnId',
       )
-      .orderBy('posted_at', 'desc')
+      .orderBy('slt.posted_at', 'desc')
       .limit(500);
-    if (filters.siteId) query.where('site_id', filters.siteId);
-    if (filters.itemId) query.where('item_id', filters.itemId);
-    if (filters.batchId) query.where('batch_id', filters.batchId);
-    if (filters.from) query.where('posted_at', '>=', filters.from);
-    if (filters.to) query.where('posted_at', '<=', filters.to);
+    if (this.isUuid(filters.siteId)) query.where('slt.site_id', filters.siteId);
+    if (this.isUuid(filters.itemId)) query.where('slt.item_id', filters.itemId);
+    if (this.isUuid(filters.batchId))
+      query.where('slt.batch_id', filters.batchId);
+    if (filters.from) query.where('slt.posted_at', '>=', filters.from);
+    if (filters.to) query.where('slt.posted_at', '<=', filters.to);
     return query;
   }
 
-  async listExpiryWatchlist(siteId: string, days = 30): Promise<unknown[]> {
+  async listExpiryWatchlist(siteId?: string, days = 30): Promise<unknown[]> {
     const horizon = new Date(Clock.nowUtc());
     horizon.setUTCDate(horizon.getUTCDate() + days);
-    return this.knex('inventory_batches')
-      .where({ site_id: siteId, status: 'AVAILABLE' })
-      .whereNotNull('expiry_date')
-      .where('expiry_date', '<=', horizon.toISOString().slice(0, 10))
+    const query = this.knex('inventory_batches as ib')
+      .leftJoin('items as i', 'ib.item_id', 'i.id')
+      .leftJoin('sites as s', 'ib.site_id', 's.id')
+      .leftJoin('locations as l', 'ib.location_id', 'l.id')
+      .where('ib.status', 'AVAILABLE')
+      .whereNotNull('ib.expiry_date')
+      .where('ib.expiry_date', '<=', horizon.toISOString().slice(0, 10))
       .select(
-        'id as batchId',
-        'item_id as itemId',
-        'location_id as locationId',
-        'batch_number as batchNumber',
-        'qty_available as availableQty',
-        'expiry_date as expiryDate',
+        'ib.id as batchId',
+        'ib.item_id as itemId',
+        'i.sku_code as skuCode',
+        'i.name as itemName',
+        'i.primary_uom as uom',
+        'ib.site_id as siteId',
+        's.name as siteName',
+        'ib.location_id as locationId',
+        'l.name as locationName',
+        'ib.batch_number as batchNumber',
+        'ib.qty_available as availableQty',
+        'ib.expiry_date as expiryDate',
       )
-      .orderBy('expiry_date', 'asc');
+      .orderBy('ib.expiry_date', 'asc');
+    if (this.isUuid(siteId)) query.where('ib.site_id', siteId);
+    return query;
   }
 
   async reverseLedgerTransaction(
@@ -1256,21 +1294,43 @@ export class InventoryService implements InventoryPort {
     let query = this.knex('stock_transfers as st')
       .leftJoin('sites as fs', 'st.from_site_id', 'fs.id')
       .leftJoin('sites as ts', 'st.to_site_id', 'ts.id')
-      .leftJoin('items as i', 'st.item_id', 'i.id')
       .select(
         'st.*',
         'fs.name as from_site_name',
         'ts.name as to_site_name',
-        'i.name as item_name',
-        'i.sku_code',
       );
-    if (siteId) {
+    if (this.isUuid(siteId)) {
       query = query.where((q) =>
         q.where('st.from_site_id', siteId).orWhere('st.to_site_id', siteId),
       );
     }
     if (status) query = query.where('st.status', status);
-    return query.orderBy('st.created_at', 'desc');
+    const transfers = await query.orderBy('st.created_at', 'desc');
+    if (transfers.length === 0) return [];
+
+    const transferIds = transfers.map((t: any) => t.id);
+    const lines = await this.knex('stock_transfer_lines as stl')
+      .leftJoin('items as i', 'stl.item_id', 'i.id')
+      .whereIn('stl.transfer_id', transferIds)
+      .select('stl.*', 'i.name as item_name', 'i.sku_code');
+
+    const linesByTransfer = new Map<string, any[]>();
+    for (const l of lines) {
+      const key = String(l.transfer_id);
+      if (!linesByTransfer.has(key)) linesByTransfer.set(key, []);
+      linesByTransfer.get(key)!.push(l);
+    }
+
+    return transfers.map((t: any) => {
+      const tLines = linesByTransfer.get(String(t.id)) || [];
+      return {
+        ...t,
+        lines: tLines,
+        item_name: tLines[0]?.item_name ?? null,
+        sku_code: tLines[0]?.sku_code ?? null,
+        requested_qty: tLines[0]?.requested_qty ?? null,
+      };
+    });
   }
 
   async listAdjustments(siteId?: string, status?: string) {
@@ -1283,7 +1343,7 @@ export class InventoryService implements InventoryPort {
         'i.name as item_name',
         'i.sku_code',
       );
-    if (siteId) query = query.where('sa.site_id', siteId);
+    if (this.isUuid(siteId)) query = query.where('sa.site_id', siteId);
     if (status) query = query.where('sa.status', status);
     return query.orderBy('sa.created_at', 'desc');
   }
@@ -1298,9 +1358,65 @@ export class InventoryService implements InventoryPort {
         'i.name as item_name',
         'i.sku_code',
       );
-    if (siteId) query = query.where('sr.site_id', siteId);
-    if (itemId) query = query.where('sr.item_id', itemId);
+    if (this.isUuid(siteId)) query = query.where('sr.site_id', siteId);
+    if (this.isUuid(itemId)) query = query.where('sr.item_id', itemId);
     return query.orderBy('sr.created_at', 'desc');
+  }
+
+  async getStockProjection(itemId?: string, siteId?: string) {
+    const stockQuery = this.knex('inventory_batches').where('status', 'AVAILABLE');
+    if (this.isUuid(itemId)) stockQuery.where('item_id', itemId);
+    if (this.isUuid(siteId)) stockQuery.where('site_id', siteId);
+    const stockAgg = await stockQuery
+      .select(
+        this.knex.raw('COALESCE(SUM(qty_on_hand), 0) as on_hand'),
+        this.knex.raw('COALESCE(SUM(qty_committed), 0) as reserved'),
+      )
+      .first();
+
+    const poQuery = this.knex('purchase_order_lines as pol')
+      .join('purchase_orders as po', 'pol.po_id', 'po.id')
+      .whereIn('po.po_status', [
+        'ISSUED',
+        'PARTIALLY_RECEIVED',
+        'PENDING_APPROVAL',
+      ]);
+    if (this.isUuid(itemId)) poQuery.where('pol.item_id', itemId);
+    if (this.isUuid(siteId)) poQuery.where('po.receiving_site_id', siteId);
+    const poAgg = await poQuery
+      .select(
+        this.knex.raw(
+          'COALESCE(SUM(GREATEST(pol.ordered_qty - COALESCE(pol.received_qty, 0), 0)), 0) as incoming_po',
+        ),
+      )
+      .first();
+
+    const woQuery = this.knex('production_work_orders as wo')
+      .join('bom_headers as bh', 'wo.bom_header_id', 'bh.id')
+      .whereIn('wo.status', ['PLANNED', 'IN_PROGRESS']);
+    if (this.isUuid(itemId)) woQuery.where('bh.item_id', itemId);
+    if (this.isUuid(siteId)) woQuery.where('wo.site_id', siteId);
+    const woAgg = await woQuery
+      .select(
+        this.knex.raw('COALESCE(SUM(wo.planned_qty), 0) as planned_wo'),
+      )
+      .first();
+
+    const onHand = Number(stockAgg?.on_hand ?? 0);
+    const reserved = Number(stockAgg?.reserved ?? 0);
+    const incomingPo = Number(poAgg?.incoming_po ?? 0);
+    const plannedWo = Number(woAgg?.planned_wo ?? 0);
+    const projected = onHand - reserved + incomingPo + plannedWo;
+
+    return {
+      itemId: itemId ?? null,
+      siteId: siteId ?? null,
+      onHandQty: String(onHand),
+      reservedQty: String(reserved),
+      incomingPoQty: String(incomingPo),
+      plannedWoQty: String(plannedWo),
+      projectedAvailableQty: String(projected),
+    };
   }
 
   /**
@@ -1352,9 +1468,9 @@ export class InventoryService implements InventoryPort {
     let query = this.knex('stock_count_sheets as scs')
       .leftJoin('sites as s', 'scs.site_id', 's.id')
       .leftJoin('users as u', 'scs.created_by', 'u.id')
-      .select('scs.*', 's.name as site_name', 'u.name as creator_name');
+      .select('scs.*', 's.name as site_name', 'u.full_name as creator_name');
 
-    if (siteId) query = query.where('scs.site_id', siteId);
+    if (this.isUuid(siteId)) query = query.where('scs.site_id', siteId);
     if (status) query = query.where('scs.status', status);
 
     return query.orderBy('scs.created_at', 'desc');
@@ -1365,7 +1481,7 @@ export class InventoryService implements InventoryPort {
       .leftJoin('sites as s', 'scs.site_id', 's.id')
       .leftJoin('users as u', 'scs.created_by', 'u.id')
       .where('scs.id', id)
-      .select('scs.*', 's.name as site_name', 'u.name as creator_name')
+      .select('scs.*', 's.name as site_name', 'u.full_name as creator_name')
       .first();
 
     if (!sheet) throw new BadRequestException(`Stock count sheet ${id} not found`);
@@ -1373,7 +1489,7 @@ export class InventoryService implements InventoryPort {
     const items = await this.knex('stock_count_items as sci')
       .leftJoin('items as i', 'sci.item_id', 'i.id')
       .where('sci.count_sheet_id', id)
-      .select('sci.*', 'i.name as item_name', 'i.sku_code');
+      .select('sci.*', 'i.name as item_name', 'i.sku_code', 'i.primary_uom');
 
     return { ...sheet, items };
   }
@@ -1388,11 +1504,17 @@ export class InventoryService implements InventoryPort {
     for (const item of sheet.items) {
       const variance = Number(item.variance_qty);
       if (variance !== 0) {
+        const sysQty = Number(item.system_qty || 0);
+        const variancePct =
+          sysQty > 0 ? Number(((variance / sysQty) * 100).toFixed(2)) : null;
         await this.knex('stock_adjustments').insert({
           site_id: sheet.site_id,
           item_id: item.item_id,
+          adjustment_no: `ADJ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
           adjustment_type: variance > 0 ? 'COUNT_SURPLUS' : 'COUNT_DEFICIT',
-          quantity: Math.abs(variance),
+          qty: Math.abs(variance),
+          uom: item.primary_uom || 'KG',
+          variance_pct: variancePct,
           reason: `Count variance on sheet ${sheet.count_no}`,
           status: 'APPROVED',
           requested_by: sheet.created_by,

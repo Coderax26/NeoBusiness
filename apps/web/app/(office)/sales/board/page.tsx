@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, Badge } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import { INITIAL_SALES_ORDERS, type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
+import { type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
 
 const BOARD_COLUMNS: { status: SalesOrderStatus; label: string; color: string }[] = [
   { status: 'DRAFT', label: 'Drafts', color: 'border-zinc-700' },
@@ -15,11 +15,62 @@ const BOARD_COLUMNS: { status: SalesOrderStatus; label: string; color: string }[
 ];
 
 export default function SalesBoardPage() {
-  const [orders, setOrders] = useState<SalesOrderRecord[]>(INITIAL_SALES_ORDERS);
+  const [orders, setOrders] = useState<SalesOrderRecord[]>([]);
+  const [boardMsg, setBoardMsg] = useState<string | null>(null);
 
-  const moveOrder = (orderId: string, nextStatus: SalesOrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)),
+  useEffect(() => {
+    fetch('/api/proxy/orders')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setOrders(
+          list.map((o: any) => ({
+            id: o.id,
+            orderNumber: o.order_no ?? o.orderNumber ?? o.id.slice(0, 8),
+            customerId: o.customer_id ?? '',
+            customerName: o.customer_name ?? o.customerName ?? 'Customer',
+            siteId: o.fulfillment_site_id ?? '',
+            siteName: o.site_name ?? 'Site',
+            deliveryDate: o.delivery_date ? String(o.delivery_date).split('T')[0] : '',
+            deliveryWindow: o.delivery_time_window ?? 'MORNING',
+            status: (o.order_status ?? o.status ?? 'DRAFT') as SalesOrderStatus,
+            subtotal: Number(o.total_amount ?? 0),
+            gstTotal: 0,
+            grandTotal: Number(o.total_amount ?? 0),
+            marginPct: Number(o.margin_pct ?? 0),
+            creditFlag: o.credit_flag ?? 'CLEAR',
+            lines: [],
+            createdAt: o.created_at ?? '',
+            createdBy: o.created_by ?? '',
+          })),
+        );
+      })
+      .catch(() => setOrders([]));
+  }, []);
+
+  const moveOrder = async (orderId: string, nextStatus: SalesOrderStatus) => {
+    setBoardMsg(null);
+    if (nextStatus === 'CONFIRMED') {
+      try {
+        const res = await fetch(`/api/proxy/orders/${encodeURIComponent(orderId)}/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remarks: 'Confirmed from Sales Board' }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+        }
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)),
+        );
+      } catch (err) {
+        setBoardMsg(`Failed to confirm order: ${(err as Error).message}`);
+      }
+      return;
+    }
+    setBoardMsg(
+      `Order status "${nextStatus}" is updated automatically via production/allocation workflow.`,
     );
   };
 
@@ -45,6 +96,12 @@ export default function SalesBoardPage() {
           </Link>
         </div>
       </div>
+
+      {boardMsg && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-300">
+          {boardMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {BOARD_COLUMNS.map((col) => {
@@ -86,12 +143,12 @@ export default function SalesBoardPage() {
                       </button>
                     )}
                     {o.status === 'CONFIRMED' && (
-                      <button
-                        onClick={() => moveOrder(o.id, 'READY')}
-                        className="w-full py-1 rounded-lg bg-teal-500/15 text-teal-400 text-[11px] font-semibold hover:bg-teal-500/25"
+                      <Link
+                        href={`/sales/orders/${o.id}`}
+                        className="block w-full text-center py-1 rounded-lg bg-teal-500/15 text-teal-400 text-[11px] font-semibold hover:bg-teal-500/25"
                       >
-                        Mark Ready →
-                      </button>
+                        Open Order →
+                      </Link>
                     )}
                   </div>
                 ))
@@ -103,3 +160,4 @@ export default function SalesBoardPage() {
     </div>
   );
 }
+

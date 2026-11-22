@@ -435,7 +435,12 @@ export class SupplierBillService {
       buildQuery.where('po_id', query.po_id);
     }
 
-    if (query.site_id) {
+    if (
+      query.site_id &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        query.site_id,
+      )
+    ) {
       buildQuery.where('site_id', query.site_id);
     }
 
@@ -633,14 +638,19 @@ export class SupplierBillService {
       .join('suppliers as s', 'sb.supplier_id', 's.id')
       .whereIn('sb.status', [BillStatus.APPROVED, 'RECEIVED', 'VERIFIED']);
 
-    if (siteId) {
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
       query = query.where('sb.site_id', siteId);
     }
 
     const openBills = await query.select(
       'sb.id',
       'sb.supplier_id',
-      's.name as supplier_name',
+      's.company_name as supplier_name',
       'sb.due_date',
       'sb.total_amount',
       'sb.amount',

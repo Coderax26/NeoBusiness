@@ -1,18 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DataTable, type ColumnDef, Button, KpiCard, Badge, StatusPill } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import { INITIAL_QUOTES, type QuoteRecord } from '../../../../src/lib/sales-data';
+import { type QuoteRecord } from '../../../../src/lib/sales-data';
 
 export default function QuotesListPage() {
-  const [quotes] = useState<QuoteRecord[]>(INITIAL_QUOTES);
+  const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    fetch('/api/proxy/quotes')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setQuotes(
+          list.map((q: any) => ({
+            id: q.id,
+            quoteNumber: q.quote_no ?? q.quoteNumber ?? q.id.slice(0, 8),
+            customerId: q.customer_id ?? '',
+            customerName: q.customer_name ?? q.customerName ?? 'Customer',
+            validUntil: q.valid_until ? String(q.valid_until).split('T')[0] : '',
+            totalAmount: Number(q.total_amount ?? 0),
+            marginPct: Number(q.margin_pct ?? 0),
+            status: (q.status ?? 'DRAFT') as QuoteRecord['status'],
+            lines: [],
+            createdAt: q.created_at ?? '',
+          })),
+        );
+      })
+      .catch(() => setQuotes([]));
+  }, []);
 
   const getDaysRemaining = (validUntil: string) => {
     const diff = Math.ceil(
-      (new Date(validUntil).getTime() - new Date('2026-11-13').getTime()) / (1000 * 3600 * 24),
+      (new Date(validUntil).getTime() - Date.now()) / (1000 * 3600 * 24),
     );
     return diff;
   };
@@ -121,3 +144,4 @@ export default function QuotesListPage() {
     </div>
   );
 }
+

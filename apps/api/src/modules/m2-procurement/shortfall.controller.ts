@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -83,14 +84,16 @@ export class ShortfallController {
   @ApiResponse({ status: 201, description: 'Backup PO created' })
   async createBackupPO(
     @Body() dto: CreateBackupPODto,
-    @Query('userId') userId: string,
     @Query('originalPoId') originalPoId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
     return this.shortfallService.createBackupPO({
       originalPoId,
       shortfallId: dto.shortfallId,
       backupSupplierId: dto.backupSupplierId,
-      userId,
+      userId: actorId,
     });
   }
 
@@ -102,9 +105,11 @@ export class ShortfallController {
   @ApiResponse({ status: 200, description: 'Auto-resolution result' })
   async autoResolveShortfalls(
     @Param('poId') poId: string,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
-    return this.shortfallService.autoResolveShortfalls(poId, userId);
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.shortfallService.autoResolveShortfalls(poId, actorId);
   }
 
   @Put(':id/status')
@@ -114,12 +119,14 @@ export class ShortfallController {
   async updateStatus(
     @Param('id') shortfallId: string,
     @Body() dto: UpdateShortfallStatusDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
     return this.shortfallService.updateShortfallStatus(
       shortfallId,
       dto.status,
-      userId,
+      actorId,
     );
   }
 }

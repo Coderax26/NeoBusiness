@@ -4,14 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { KpiCard, Badge, Button, Card } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import {
-  INITIAL_REQUISITIONS,
-  INITIAL_PURCHASE_ORDERS,
-  INITIAL_SHORTFALLS,
-  INITIAL_SUPPLIER_BILLS,
-  INITIAL_SUPPLIER_SCORECARDS,
-  INITIAL_MISSING_RATES,
-} from '../../../src/lib/procurement-data';
 
 interface PipelineStage {
   id: string;
@@ -25,6 +17,8 @@ interface PipelineStage {
 
 export default function ProcurementPipelineHomePage() {
   const [selectedStage, setSelectedStage] = useState<string>('requisitions');
+  const [scorecards, setScorecards] = useState<Array<{ fillRatePct: number; onTimePct: number; monthlySpend: number }>>([]);
+  const [missingRatesCount, setMissingRatesCount] = useState(0);
   const [liveStats, setLiveStats] = useState<{
     openReqs: number;
     posToIssue: number;
@@ -34,22 +28,13 @@ export default function ProcurementPipelineHomePage() {
     openShortfalls: number;
     priceSpikes: number;
   }>({
-    openReqs: INITIAL_REQUISITIONS.filter((r) => r.status === 'OPEN').length,
-    posToIssue: INITIAL_PURCHASE_ORDERS.filter(
-      (p) => p.status === 'DRAFT' || p.status === 'WAITING_APPROVAL',
-    ).length,
-    awaitingDelivery: INITIAL_PURCHASE_ORDERS.filter(
-      (p) => p.status === 'SENT_TO_SUPPLIER' || p.status === 'PARTLY_RECEIVED',
-    ).length,
-    billsToCheck: INITIAL_SUPPLIER_BILLS.filter(
-      (b) => b.status === 'RECEIVED' || b.status === 'VERIFIED',
-    ).length,
-    toPayAmount: INITIAL_SUPPLIER_BILLS.filter((b) => b.status !== 'PAID').reduce(
-      (acc, b) => acc + (b.totalAmount - b.paidAmount),
-      0,
-    ),
-    openShortfalls: INITIAL_SHORTFALLS.filter((s) => s.status === 'OPEN').length,
-    priceSpikes: INITIAL_PURCHASE_ORDERS.filter((p) => p.priceSpikeException).length,
+    openReqs: 0,
+    posToIssue: 0,
+    awaitingDelivery: 0,
+    billsToCheck: 0,
+    toPayAmount: 0,
+    openShortfalls: 0,
+    priceSpikes: 0,
   });
 
   useEffect(() => {
@@ -59,11 +44,24 @@ export default function ProcurementPipelineHomePage() {
       fetch('/api/bff/procurement/purchase-orders').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/bff/procurement/shortfalls/all/open').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/bff/procurement/supplier-bills').then((r) => (r.ok ? r.json() : null)),
-    ]).then(([reqsRes, posRes, sfRes, billsRes]) => {
-      const reqs = reqsRes.status === 'fulfilled' && Array.isArray(reqsRes.value?.data) ? reqsRes.value.data : null;
-      const pos = posRes.status === 'fulfilled' && Array.isArray(posRes.value?.data) ? posRes.value.data : null;
-      const sfs = sfRes.status === 'fulfilled' && Array.isArray(sfRes.value?.data) ? sfRes.value.data : null;
-      const bills = billsRes.status === 'fulfilled' && Array.isArray(billsRes.value?.data) ? billsRes.value.data : null;
+      fetch('/api/proxy/procurement/suppliers').then((r) => (r.ok ? r.json() : null)),
+    ]).then(([reqsRes, posRes, sfRes, billsRes, supRes]) => {
+      const reqs = reqsRes.status === 'fulfilled' && Array.isArray(reqsRes.value?.data) ? reqsRes.value.data : (reqsRes.status === 'fulfilled' && Array.isArray(reqsRes.value) ? reqsRes.value : null);
+      const pos = posRes.status === 'fulfilled' && Array.isArray(posRes.value?.data) ? posRes.value.data : (posRes.status === 'fulfilled' && Array.isArray(posRes.value) ? posRes.value : null);
+      const sfs = sfRes.status === 'fulfilled' && Array.isArray(sfRes.value?.data) ? sfRes.value.data : (sfRes.status === 'fulfilled' && Array.isArray(sfRes.value) ? sfRes.value : null);
+      const bills = billsRes.status === 'fulfilled' && Array.isArray(billsRes.value?.data) ? billsRes.value.data : (billsRes.status === 'fulfilled' && Array.isArray(billsRes.value) ? billsRes.value : null);
+      const sups = supRes.status === 'fulfilled' && Array.isArray(supRes.value) ? supRes.value : null;
+
+      if (sups) {
+        setScorecards(
+          sups.map((s: any) => ({
+            fillRatePct: Number(s.fill_rate_pct ?? s.fillRatePct ?? 95),
+            onTimePct: Number(s.on_time_pct ?? s.onTimePct ?? 92),
+            monthlySpend: Number(s.monthly_spend ?? s.monthlySpend ?? 0),
+          })),
+        );
+        setMissingRatesCount(sups.filter((s: any) => s.has_missing_rates || s.hasMissingRates).length);
+      }
 
       if (!reqs && !pos && !sfs && !bills) return;
       setLiveStats((prev) => ({
@@ -139,15 +137,13 @@ export default function ProcurementPipelineHomePage() {
     },
   ];
 
-  const avgFillRate = (
-    INITIAL_SUPPLIER_SCORECARDS.reduce((s, r) => s + r.fillRatePct, 0) /
-    INITIAL_SUPPLIER_SCORECARDS.length
-  ).toFixed(1);
-  const avgOnTime = (
-    INITIAL_SUPPLIER_SCORECARDS.reduce((s, r) => s + r.onTimePct, 0) /
-    INITIAL_SUPPLIER_SCORECARDS.length
-  ).toFixed(1);
-  const monthlySpend = INITIAL_SUPPLIER_SCORECARDS.reduce((s, r) => s + r.monthlySpend, 0);
+  const avgFillRate = scorecards.length > 0
+    ? (scorecards.reduce((s, r) => s + r.fillRatePct, 0) / scorecards.length).toFixed(1)
+    : '0.0';
+  const avgOnTime = scorecards.length > 0
+    ? (scorecards.reduce((s, r) => s + r.onTimePct, 0) / scorecards.length).toFixed(1)
+    : '0.0';
+  const monthlySpend = scorecards.reduce((s, r) => s + r.monthlySpend, 0);
 
   return (
     <div className="space-y-6">
@@ -236,7 +232,7 @@ export default function ProcurementPipelineHomePage() {
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 transition-colors text-xs font-medium"
           >
             <span>📉</span>
-            <span>Missing rates alerts ({INITIAL_MISSING_RATES.length})</span>
+            <span>Missing rates alerts ({missingRatesCount})</span>
             <span className="text-indigo-400/80">→ Update supplier quotes</span>
           </Link>
         </div>
@@ -247,26 +243,26 @@ export default function ProcurementPipelineHomePage() {
         <KpiCard
           title="Spend This Month"
           value={formatINR(monthlySpend)}
-          subtitle="Across 4 active suppliers"
-          trend={{ value: '+4.2%', direction: 'up' }}
+          subtitle={`Across ${scorecards.length} active suppliers`}
+          trend={{ value: 'Live DB', direction: 'up' }}
         />
         <KpiCard
           title="Avg Supplier Fill Rate"
           value={`${avgFillRate}%`}
           subtitle="Delivered vs ordered qty"
-          trend={{ value: '+1.1%', direction: 'up' }}
+          trend={{ value: 'Live scorecard', direction: 'up' }}
         />
         <KpiCard
           title="On-Time Delivery"
           value={`${avgOnTime}%`}
           subtitle="Arrived by expected date"
-          trend={{ value: '+0.8%', direction: 'up' }}
+          trend={{ value: 'Live scorecard', direction: 'up' }}
         />
         <KpiCard
           title="Open Shortfalls"
           value={String(liveStats.openShortfalls)}
-          subtitle="Impacting 3 sales orders"
-          trend={{ value: 'Action needed', direction: 'down' }}
+          subtitle="Unfulfilled demand items"
+          trend={{ value: liveStats.openShortfalls > 0 ? 'Action needed' : 'All clear', direction: liveStats.openShortfalls > 0 ? 'down' : 'up' }}
         />
       </div>
 

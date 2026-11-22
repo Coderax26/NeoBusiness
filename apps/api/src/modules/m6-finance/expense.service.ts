@@ -58,7 +58,9 @@ export class ExpenseService {
       .orderBy('c.date', 'desc')
       .orderBy('c.created_at', 'desc');
 
-    if (filters.siteId) query = query.andWhere('c.site_id', filters.siteId);
+    if (filters.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.siteId)) {
+      query = query.andWhere('c.site_id', filters.siteId);
+    }
     if (filters.category) {
       query = query.andWhere('c.entry_type', 'like', `%${filters.category.toUpperCase()}%`);
     }
@@ -86,7 +88,9 @@ export class ExpenseService {
       .orderBy('c.date', 'desc')
       .orderBy('c.created_at', 'desc');
 
-    if (filters.siteId) query = query.where('c.site_id', filters.siteId);
+    if (filters.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.siteId)) {
+      query = query.where('c.site_id', filters.siteId);
+    }
     if (filters.dateFrom) query = query.andWhere('c.date', '>=', filters.dateFrom);
     if (filters.dateTo) query = query.andWhere('c.date', '<=', filters.dateTo);
 

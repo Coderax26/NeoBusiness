@@ -1,14 +1,29 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Badge } from '@neo/ui';
-import { INITIAL_LEDGER_ENTRIES, type LedgerEntry } from '../../../src/lib/inventory-data';
+import { type LedgerEntry } from '../../../../src/lib/inventory-data';
 
 export default function StockLedgerExplorerPage() {
-  const [entries] = useState<LedgerEntry[]>(INITIAL_LEDGER_ENTRIES);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/inventory/ledger')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setEntries(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {

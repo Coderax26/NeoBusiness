@@ -2,6 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache python3 make g++
+
 COPY apps/api/package*.json ./
 RUN npm ci
 
@@ -24,12 +26,15 @@ COPY --from=builder --chown=neobus:neobus /app/node_modules ./node_modules
 COPY --from=builder --chown=neobus:neobus /app/dist ./dist
 COPY --from=builder --chown=neobus:neobus /app/package.json ./package.json
 COPY --chown=neobus:neobus db/migrations /app/db/migrations
+COPY --chown=neobus:neobus apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 USER neobus
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "./docker-entrypoint.sh"]
 

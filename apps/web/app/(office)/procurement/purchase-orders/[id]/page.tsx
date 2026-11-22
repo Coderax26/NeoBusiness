@@ -1,14 +1,10 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Card } from '@neo/ui';
 import { formatINR } from '@neo/shared';
-import {
-  INITIAL_PURCHASE_ORDERS,
-  INITIAL_GRNS,
-  INITIAL_SUPPLIER_BILLS,
-} from '../../../../src/lib/procurement-data';
+import { type PurchaseOrderRecord, type GrnRecord, type SupplierBillRecord } from '../../../../../src/lib/procurement-data';
 
 const LIFECYCLE_STEPS = [
   { key: 'DRAFT', label: 'Draft' },
@@ -24,13 +20,83 @@ export default function PurchaseOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const initialPo =
-    INITIAL_PURCHASE_ORDERS.find((p) => p.id === id) || INITIAL_PURCHASE_ORDERS[0];
-  const [po, setPo] = useState(initialPo);
+  const [po, setPo] = useState<PurchaseOrderRecord | null>(null);
+  const [linkedGrns, setLinkedGrns] = useState<GrnRecord[]>([]);
+  const [linkedBills, setLinkedBills] = useState<SupplierBillRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
-  const linkedGrns = INITIAL_GRNS.filter((g) => g.poId === po.id);
-  const linkedBills = INITIAL_SUPPLIER_BILLS.filter((b) => b.poId === po.id);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/procurement/grns').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([poData, grnData, billData]) => {
+        if (!active) return;
+        const p = poData?.data || poData;
+        if (p && p.id) {
+          setPo({
+            id: String(p.id),
+            poNumber: String(p.poNumber || p.po_number || p.po_no || p.id),
+            supplierId: String(p.supplierId || p.supplier_id || ''),
+            supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
+            receivingSiteId: String(p.receivingSiteId || p.receiving_site_id || ''),
+            receivingSiteName: String(p.receivingSiteName || p.siteName || p.site_name || 'Main Site'),
+            supplierPhone: String(p.supplierPhone || p.supplier_phone || ''),
+            quantitiesConfirmed: Boolean(p.quantitiesConfirmed ?? true),
+            createdAt: String(p.createdAt || p.created_at || '').slice(0, 10),
+            status: (p.status || 'DRAFT') as PurchaseOrderRecord['status'],
+            expectedDelivery: String(p.expectedDelivery || p.expected_delivery_date || '').slice(0, 10),
+            paymentTermsDays: Number(p.paymentTermsDays ?? p.payment_terms_days ?? 15),
+            priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception),
+            issuedAt: p.issuedAt || p.issued_at || undefined,
+            lines: Array.isArray(p.lines)
+              ? p.lines.map((l: any, idx: number) => ({
+                  lineId: String(l.lineId || l.id || `l-${idx}`),
+                  itemId: String(l.itemId || l.item_id || ''),
+                  itemSku: String(l.itemSku || l.sku_code || ''),
+                  itemName: String(l.itemName || l.item_name || 'Item'),
+                  uom: String(l.uom || 'kg'),
+                  orderedQty: Number(l.orderedQty ?? l.ordered_qty ?? 0),
+                  receivedQty: Number(l.receivedQty ?? l.received_qty ?? 0),
+                  unitRate: Number(l.unitRate ?? l.unit_rate ?? l.unitPrice ?? 0),
+                }))
+              : [],
+          });
+        }
+        const grnsArr = Array.isArray(grnData) ? grnData : Array.isArray(grnData?.data) ? grnData.data : [];
+        setLinkedGrns(grnsArr.filter((g: any) => String(g.poId || g.po_id) === id));
+        const billsArr = Array.isArray(billData) ? billData : Array.isArray(billData?.data) ? billData.data : [];
+        setLinkedBills(billsArr.filter((b: any) => String(b.poId || b.po_id) === id));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-zinc-400">Loading purchase order...</div>;
+  }
+
+  if (!po) {
+    return (
+      <div className="p-6 space-y-3">
+        <Link href="/procurement/purchase-orders" className="text-xs text-zinc-400 hover:text-white inline-block">
+          ← Back to Purchase Orders
+        </Link>
+        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400">
+          Purchase order not found.
+        </div>
+      </div>
+    );
+  }
+
   const totalValue = po.lines.reduce((s, l) => s + l.orderedQty * l.unitRate, 0);
 
   const currentStepIdx = Math.max(
@@ -45,7 +111,7 @@ export default function PurchaseOrderDetailPage({
 
   const handleIssue = () => {
     if (po.priceSpikeException) return;
-    setPo((prev) => ({ ...prev, status: 'SENT_TO_SUPPLIER', issuedAt: 'Just now' }));
+    setPo((prev) => (prev ? { ...prev, status: 'SENT_TO_SUPPLIER', issuedAt: 'Just now' } : prev));
     showToast(`Issued ${po.poNumber} to ${po.supplierName}.`);
   };
 

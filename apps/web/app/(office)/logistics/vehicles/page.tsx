@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DataTable,
   type ColumnDef,
@@ -28,71 +28,40 @@ export interface VehicleRecord {
   active: boolean;
 }
 
-const INITIAL_VEHICLES: VehicleRecord[] = [
-  {
-    id: 'veh-1',
-    registrationNumber: 'MH-12-RN-4821',
-    vehicleType: 'REEFER',
-    capacityKg: 1500,
-    capacityCrates: 75,
-    ownershipType: 'OWNED',
-    defaultDriverName: 'Ganesh Shinde',
-    defaultDriverPhone: '9822441100',
-    fitnessExpiryDate: '2027-04-15',
-    insuranceExpiryDate: '2027-01-20',
-    pucExpiryDate: '2026-12-10', // Expiry soon!
-    status: 'AVAILABLE',
-    active: true,
-  },
-  {
-    id: 'veh-2',
-    registrationNumber: 'MH-12-QW-8192',
-    vehicleType: 'MINI_TRUCK',
-    capacityKg: 900,
-    capacityCrates: 45,
-    ownershipType: 'OWNED',
-    defaultDriverName: 'Santosh Jadhav',
-    defaultDriverPhone: '9822558899',
-    fitnessExpiryDate: '2027-08-30',
-    insuranceExpiryDate: '2027-06-15',
-    pucExpiryDate: '2027-02-14',
-    status: 'ON_TRIP',
-    active: true,
-  },
-  {
-    id: 'veh-3',
-    registrationNumber: 'MH-14-GH-3341',
-    vehicleType: '14FT_TRUCK',
-    capacityKg: 3500,
-    capacityCrates: 180,
-    ownershipType: 'HIRED',
-    defaultDriverName: 'Anil Pawar',
-    defaultDriverPhone: '9823117766',
-    fitnessExpiryDate: '2026-11-20', // Expiring in 8 days!
-    insuranceExpiryDate: '2027-03-10',
-    pucExpiryDate: '2026-11-18', // Expiring in 6 days!
-    status: 'AVAILABLE',
-    active: true,
-  },
-  {
-    id: 'veh-4',
-    registrationNumber: 'MH-12-AB-1122',
-    vehicleType: '3_WHEELER',
-    capacityKg: 450,
-    capacityCrates: 20,
-    ownershipType: 'OWNED',
-    defaultDriverName: 'Sunil Gaikwad',
-    defaultDriverPhone: '9822990011',
-    fitnessExpiryDate: '2027-05-12',
-    insuranceExpiryDate: '2027-04-10',
-    pucExpiryDate: '2027-01-05',
-    status: 'MAINTENANCE',
-    active: true,
-  },
-];
 
 export default function VehiclesPage() {
-  const [vehicles, setVehicles] = useState<VehicleRecord[]>(INITIAL_VEHICLES);
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/vehicles')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setVehicles(
+          rows.map((v: any) => ({
+            id: String(v.id),
+            registrationNumber: String(v.registration_no || v.registrationNumber || v.regNo || ''),
+            vehicleType: (v.vehicle_type || v.vehicleType || 'MINI_TRUCK') as VehicleRecord['vehicleType'],
+            capacityKg: Number(v.capacity_kg ?? v.capacityKg ?? 1000),
+            capacityCrates: Number(v.capacity_crates ?? v.capacityCrates ?? 50),
+            ownershipType: (v.ownership_type || v.ownershipType || 'OWNED') as VehicleRecord['ownershipType'],
+            defaultDriverName: v.default_driver_name || v.defaultDriverName || '',
+            defaultDriverPhone: v.default_driver_phone || v.defaultDriverPhone || '',
+            fitnessExpiryDate: String(v.fitness_expiry || v.fitnessExpiryDate || '').slice(0, 10),
+            insuranceExpiryDate: String(v.insurance_expiry || v.insuranceExpiryDate || '').slice(0, 10),
+            pucExpiryDate: String(v.puc_expiry || v.pucExpiryDate || '').slice(0, 10),
+            status: (v.status || 'AVAILABLE') as VehicleRecord['status'],
+            active: v.is_active !== false,
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [ownershipFilter, setOwnershipFilter] = useState<string>('ALL');

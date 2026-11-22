@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Worker } from 'bullmq';
 import { InvoiceService } from '../m6-finance/invoice.service.js';
+import { getRedisConnection } from '../../shared/config/redis-connection.js';
 
 interface DomainJob {
   event_type: string;
@@ -24,7 +25,7 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(
       'domain-events',
       async (job) => this.handle(job.data as DomainJob),
-      { connection: { host: 'localhost', port: 6379 } },
+      { connection: getRedisConnection() },
     );
     this.worker.on('failed', (job, error) => {
       this.logger.error(

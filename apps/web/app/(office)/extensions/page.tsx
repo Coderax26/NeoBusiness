@@ -1,30 +1,72 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { BATCH_TRACE_SAMPLE, INITIAL_EXTENSIONS, type ErpExtensionItem } from '../../../src/lib/extensions-data';
+import React, { useEffect, useMemo, useState } from 'react';
+import { type ErpExtensionItem } from '../../../src/lib/extensions-data';
 
 export default function ErpExtensionsPage() {
-  const [extensions, setExtensions] = useState<ErpExtensionItem[]>(INITIAL_EXTENSIONS);
+  const [extensions, setExtensions] = useState<ErpExtensionItem[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'H' | 'M' | 'L'>('ALL');
-  const [barcodeInput, setBarcodeInput] = useState('BATCH-WO-2026-301');
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [latestBatch, setLatestBatch] = useState<{ batchNo: string; itemName: string; siteName: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/proxy/admin/feature-flags')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.flags) ? res.flags : Array.isArray(res?.data) ? res.data : [];
+        setExtensions(
+          list.map((f: any) => ({
+            id: f.key,
+            domain: 'Configuration',
+            priority: 'H' as const,
+            title: f.key,
+            description: f.description ?? 'Feature flag',
+            enabledFlag: Boolean(f.enabled),
+          })),
+        );
+      })
+      .catch(() => setExtensions([]));
+
+    fetch('/api/proxy/inventory/stock/current?limit=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (list[0]) {
+          setLatestBatch({
+            batchNo: list[0].batch_number ?? '-',
+            itemName: list[0].item_name ?? 'Item',
+            siteName: list[0].site_name ?? 'Site',
+          });
+          setBarcodeInput(list[0].batch_number ?? '');
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const filtered = useMemo(
     () => extensions.filter((e) => (priorityFilter === 'ALL' ? true : e.priority === priorityFilter)),
     [extensions, priorityFilter],
   );
 
-  function toggleFlag(id: string) {
+  async function toggleFlag(id: string) {
+    const target = extensions.find((e) => e.id === id);
+    const nextEnabled = !(target?.enabledFlag ?? false);
     setExtensions((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, enabledFlag: !e.enabledFlag } : e)),
+      prev.map((e) => (e.id === id ? { ...e, enabledFlag: nextEnabled } : e)),
     );
+    await fetch(`/api/proxy/admin/feature-flags/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: nextEnabled }),
+    }).catch(() => {});
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Advanced ERP Extensions (Phase F13 / R4+)</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-zinc-100">Advanced ERP Extensions (Phase F13 / R4+)</h1>
+          <p className="text-sm text-zinc-400">
             Feature-flagged R4+ modules for CRM, Supply Chain, Quality Traceability, Bank Reconciliation, HR &amp; AI.
           </p>
         </div>
@@ -35,7 +77,7 @@ export default function ErpExtensionsPage() {
               type="button"
               onClick={() => setPriorityFilter(p)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                priorityFilter === p ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'
+                priorityFilter === p ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
               }`}
             >
               {p === 'ALL' ? 'All Priorities' : `Priority ${p}`}
@@ -46,47 +88,57 @@ export default function ErpExtensionsPage() {
 
       {/* Barcode & Batch Traceability Preview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
-          <h2 className="text-base font-bold text-slate-900">Barcode / QR Input Abstraction</h2>
-          <p className="text-xs text-slate-500">Supports keyboard-wedge hardware scanners and mobile camera input.</p>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+          <h2 className="text-base font-bold text-zinc-100">Barcode / QR Input Abstraction</h2>
+          <p className="text-xs text-zinc-400">Supports keyboard-wedge hardware scanners and mobile camera input.</p>
           <input
             type="text"
             value={barcodeInput}
             onChange={(e) => setBarcodeInput(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm"
+            placeholder="Scan barcode or batch number..."
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100"
           />
-          <div className="rounded-lg bg-emerald-50 p-3 text-xs font-mono text-emerald-900">
-            Decoded Token: {barcodeInput} · Ready for Floor Mode &amp; Blind Count
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs font-mono text-emerald-300">
+            Decoded Token: {barcodeInput || 'Waiting for scan'} · Ready for Floor Mode &amp; Blind Count
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-2">
-          <h2 className="text-base font-bold text-slate-900">Batch Traceability Preview (Recall Readiness)</h2>
-          <div className="text-xs text-slate-600">RM Lot: <strong>{BATCH_TRACE_SAMPLE.rmLot}</strong></div>
-          <div className="text-xs text-slate-600">Production: <strong>{BATCH_TRACE_SAMPLE.productionBatch}</strong></div>
-          <div className="text-xs text-slate-600">
-            Deliveries: {BATCH_TRACE_SAMPLE.deliveries.join(' · ')}
-          </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-2">
+          <h2 className="text-base font-bold text-zinc-100">Batch Traceability Preview (Recall Readiness)</h2>
+          {latestBatch ? (
+            <>
+              <div className="text-xs text-zinc-300">Latest Batch: <strong className="font-mono text-amber-300">{latestBatch.batchNo}</strong></div>
+              <div className="text-xs text-zinc-300">Item: <strong>{latestBatch.itemName}</strong></div>
+              <div className="text-xs text-zinc-300">Site: <strong>{latestBatch.siteName}</strong></div>
+            </>
+          ) : (
+            <div className="text-xs text-zinc-400">No active inventory batches found.</div>
+          )}
         </div>
       </div>
 
       {/* Extensions Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {filtered.length === 0 && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+            No feature flags configured.
+          </div>
+        )}
         {filtered.map((ext) => (
-          <div key={ext.id} className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5">
+          <div key={ext.id} className="flex items-start justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
             <div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{ext.domain}</span>
-                <span className="rounded bg-amber-100 px-2 py-0.5 font-bold text-amber-800">Priority {ext.priority}</span>
+                <span className="rounded bg-zinc-800 px-2 py-0.5 font-semibold text-zinc-300">{ext.domain}</span>
+                <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold text-amber-300">Priority {ext.priority}</span>
               </div>
-              <h3 className="mt-2 text-base font-bold text-slate-900">{ext.title}</h3>
-              <p className="mt-1 text-xs text-slate-500">{ext.description}</p>
+              <h3 className="mt-2 text-base font-bold text-zinc-100">{ext.title}</h3>
+              <p className="mt-1 text-xs text-zinc-400">{ext.description}</p>
             </div>
             <button
               type="button"
               onClick={() => toggleFlag(ext.id)}
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                ext.enabledFlag ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                ext.enabledFlag ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-300'
               }`}
             >
               {ext.enabledFlag ? 'Flag ON' : 'Flag OFF'}

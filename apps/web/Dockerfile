@@ -23,6 +23,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
+ENV HOSTNAME="0.0.0.0"
 ENV API_ORIGIN=http://api:3000
 
 RUN addgroup -g 1001 -S neobus && adduser -S neobus -u 1001 -G neobus
@@ -34,7 +35,7 @@ COPY --from=builder --chown=neobus:neobus /app/apps/web/.next/static ./apps/web/
 USER neobus
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:4000/api/auth/me || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:4000/api/health || exit 1
 
 CMD ["node", "apps/web/server.js"]

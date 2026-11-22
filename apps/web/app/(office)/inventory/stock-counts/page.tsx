@@ -1,13 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill, Card } from '@neo/ui';
-import { INITIAL_STOCK_COUNTS, type StockCountRecord } from '../../../src/lib/inventory-data';
+import { type StockCountRecord } from '../../../../src/lib/inventory-data';
 
 export default function StockCountsPage() {
-  const [counts, setCounts] = useState<StockCountRecord[]>(INITIAL_STOCK_COUNTS);
+  const [counts, setCounts] = useState<StockCountRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/inventory/stock-counts')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setCounts(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updateCounted = (sheetId: string, itemId: string, val: number) => {
     setCounts((prev) =>

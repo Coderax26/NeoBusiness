@@ -1,95 +1,169 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Card, Dialog } from '@neo/ui';
 import { formatINR, rankBackupSuppliers } from '@neo/shared';
 import {
-  INITIAL_SHORTFALLS,
   type OpenShortfallRecord,
-} from '../../../src/lib/procurement-data';
+} from '../../../../src/lib/procurement-data';
 
 export default function ShortfallWorkbenchPage() {
-  const [shortfalls, setShortfalls] = useState<OpenShortfallRecord[]>(INITIAL_SHORTFALLS);
+  const [shortfalls, setShortfalls] = useState<OpenShortfallRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [writeOffTarget, setWriteOffTarget] = useState<OpenShortfallRecord | null>(null);
   const [writeOffReason, setWriteOffReason] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/procurement/shortfalls/all/open')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setShortfalls(
+          rows.map((sf: any) => ({
+            id: String(sf.id),
+            poNumber: String(sf.poNumber ?? sf.po_no ?? ''),
+            poId: String(sf.poId ?? sf.po_id ?? ''),
+            grnNumber: String(sf.grnNumber ?? sf.grn_no ?? 'GRN'),
+            itemId: String(sf.itemId ?? sf.item_id ?? ''),
+            itemName: String(sf.itemName ?? sf.item_name ?? ''),
+            uom: String(sf.uom ?? 'kg'),
+            shortQty: Number(
+              sf.shortQty ??
+                sf.shortfall_qty ??
+                Math.max(0, Number(sf.confirmed_qty ?? 0) - Number(sf.received_qty ?? 0)),
+            ),
+            primarySupplierId: String(sf.primarySupplierId ?? sf.supplier_id ?? ''),
+            primarySupplierName: String(
+              sf.primarySupplierName ?? sf.supplier_name ?? 'Primary Supplier',
+            ),
+            primaryRate: Number(sf.primaryRate ?? sf.unit_price ?? 0),
+            status: (sf.status ?? 'OPEN') as OpenShortfallRecord['status'],
+            backups: Array.isArray(sf.backups) ? sf.backups : [],
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4500);
   };
 
-  const handleCreateBackupPo = (
+  const handleCreateBackupPo = async (
     sf: OpenShortfallRecord,
     supplierId: string,
     supplierName: string,
     rate: number,
   ) => {
-    // 1-click from the ranked suggestion card (<= 3 clicks total)
-    fetch('/api/bff/procurement/shortfalls/create-backup-po', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        shortfallId: sf.id,
-        backupSupplierId: supplierId,
-        qty: sf.shortQty,
-        rate,
-      }),
-    }).catch(() => {});
-
-    setShortfalls((prev) =>
-      prev.map((s) =>
-        s.id === sf.id ? { ...s, status: 'BACKUP_PO_CREATED' } : s,
-      ),
-    );
-    const backupPoNo = `PO-2026-${Math.floor(120 + Math.random() * 79)}`;
-    showToast(
-      `Created Backup ${backupPoNo} with ${supplierName} for ${sf.shortQty} ${sf.uom} @ ₹${rate}/${sf.uom}.`,
-    );
-  };
-
-  const handleAutoResolve = (sf: OpenShortfallRecord) => {
-    fetch(`/api/bff/procurement/shortfalls/auto-resolve/${sf.poId}`, {
-      method: 'POST',
-    }).catch(() => {});
-
-    const ranked = rankBackupSuppliers(sf.primaryRate, sf.backups);
-    const best = ranked[0];
-    if (best) {
-      handleCreateBackupPo(sf, best.supplierId, best.supplierName, best.quotedRate);
+    const originalPoId = sf.poId || (sf as any).po_id || '';
+    try {
+      const res = await fetch(
+        `/api/bff/procurement/shortfalls/create-backup-po?originalPoId=${encodeURIComponent(originalPoId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shortfallId: sf.id,
+            backupSupplierId: supplierId,
+            qty: sf.shortQty,
+            rate,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      const created = await res.json().catch(() => null);
+      const createdData = created?.data ?? created;
+      const backupPoNo = createdData?.po_no ?? createdData?.poNumber ?? 'Backup PO';
+      setShortfalls((prev) =>
+        prev.map((s) =>
+          s.id === sf.id ? { ...s, status: 'BACKUP_PO_CREATED' } : s,
+        ),
+      );
+      showToast(
+        `Created ${backupPoNo} with ${supplierName} for ${sf.shortQty} ${sf.uom} @ ₹${rate}/${sf.uom}.`,
+      );
+    } catch (err) {
+      showToast(`Failed to create backup PO: ${(err as Error).message}`);
     }
   };
 
-  const handleAllocate = (sf: OpenShortfallRecord) => {
-    fetch(`/api/bff/procurement/shortfalls/${sf.id}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ALLOCATED' }),
-    }).catch(() => {});
-
-    setShortfalls((prev) =>
-      prev.map((s) => (s.id === sf.id ? { ...s, status: 'ALLOCATED' } : s)),
-    );
-    showToast(`Allocated available depot stock to cover ${sf.itemName} shortfall.`);
+  const handleAutoResolve = async (sf: OpenShortfallRecord) => {
+    try {
+      const res = await fetch(
+        `/api/bff/procurement/shortfalls/auto-resolve/${encodeURIComponent(sf.poId)}`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setShortfalls((prev) =>
+        prev.map((s) =>
+          s.id === sf.id ? { ...s, status: 'BACKUP_PO_CREATED' } : s,
+        ),
+      );
+      showToast(`Auto-resolved shortfall on ${sf.poNumber}.`);
+    } catch (err) {
+      showToast(`Auto-resolve failed: ${(err as Error).message}`);
+    }
   };
 
-  const handleWriteOff = () => {
-    if (!writeOffTarget || !writeOffReason.trim()) return;
-    fetch(`/api/bff/procurement/shortfalls/${writeOffTarget.id}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'WRITTEN_OFF', reason: writeOffReason }),
-    }).catch(() => {});
+  const handleAllocate = async (sf: OpenShortfallRecord) => {
+    try {
+      const res = await fetch(`/api/bff/procurement/shortfalls/${encodeURIComponent(sf.id)}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ALLOCATED' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setShortfalls((prev) =>
+        prev.map((s) => (s.id === sf.id ? { ...s, status: 'ALLOCATED' } : s)),
+      );
+      showToast(`Allocated available depot stock to cover ${sf.itemName} shortfall.`);
+    } catch (err) {
+      showToast(`Failed to allocate stock: ${(err as Error).message}`);
+    }
+  };
 
-    setShortfalls((prev) =>
-      prev.map((s) =>
-        s.id === writeOffTarget.id ? { ...s, status: 'WRITTEN_OFF' } : s,
-      ),
-    );
-    showToast(`Wrote off shortfall on ${writeOffTarget.poNumber}.`);
-    setWriteOffTarget(null);
-    setWriteOffReason('');
+  const handleWriteOff = async () => {
+    if (!writeOffTarget || !writeOffReason.trim()) return;
+    try {
+      const res = await fetch(
+        `/api/bff/procurement/shortfalls/${encodeURIComponent(writeOffTarget.id)}/status`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'WRITTEN_OFF', reason: writeOffReason }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setShortfalls((prev) =>
+        prev.map((s) =>
+          s.id === writeOffTarget.id ? { ...s, status: 'WRITTEN_OFF' } : s,
+        ),
+      );
+      showToast(`Wrote off shortfall on ${writeOffTarget.poNumber}.`);
+      setWriteOffTarget(null);
+      setWriteOffReason('');
+    } catch (err) {
+      showToast(`Failed to write off shortfall: ${(err as Error).message}`);
+    }
   };
 
   return (

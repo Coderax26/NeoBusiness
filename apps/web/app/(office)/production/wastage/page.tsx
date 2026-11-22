@@ -1,12 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Badge, Card } from '@neo/ui';
-import { INITIAL_WASTAGE_LOGS, type WastageRecord } from '../../../src/lib/production-data';
+import { type WastageRecord } from '../../../../src/lib/production-data';
 
 export default function ProductionWastagePage() {
-  const [logs] = useState<WastageRecord[]>(INITIAL_WASTAGE_LOGS);
+  const [logs, setLogs] = useState<WastageRecord[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/production/wastage')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        setLogs(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const byReason = ['BURNT', 'SPILLED', 'QUALITY_REJECT', 'OTHER'].map((reason) => ({
     reason,

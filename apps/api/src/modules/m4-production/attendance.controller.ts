@@ -56,7 +56,7 @@ export class AttendanceController {
     type: [AttendanceResponseDto],
   })
   async listAttendance(
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
     @Query('date') date?: string,
   ): Promise<AttendanceResponseDto[]> {
     return this.attendanceService.listAttendance(siteId, date);
@@ -66,7 +66,7 @@ export class AttendanceController {
   @RequirePermission('production.attendance.read')
   @ApiOperation({ summary: 'Get attendance records for a worker' })
   @ApiParam({ name: 'workerId', type: String })
-  @ApiQuery({ name: 'siteId', required: true, type: String })
+  @ApiQuery({ name: 'siteId', required: false, type: String })
   @ApiResponse({
     status: 200,
     description: 'Attendance records for worker',
@@ -74,7 +74,7 @@ export class AttendanceController {
   })
   async getAttendanceByWorker(
     @Param('workerId') workerId: string,
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
   ): Promise<AttendanceResponseDto[]> {
     return this.attendanceService.getAttendanceByWorker(workerId, siteId);
   }

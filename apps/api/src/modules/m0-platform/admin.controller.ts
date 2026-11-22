@@ -193,31 +193,21 @@ export class AdminController {
   @RequirePermission('config.edit')
   @ApiOperation({ summary: 'Get company legal profile and invoice header settings (G-ADM-4)' })
   async getCompanyProfile() {
-    return {
-      legalName: 'NeoAgro Dairy & Feeds Pvt. Ltd.',
-      gstin: '27AAACN1234F1Z5',
-      pan: 'AAACN1234F',
-      timezone: 'Asia/Kolkata',
-    };
+    return this.adminService.getCompanyProfile();
   }
 
   @Put('company-profile')
   @RequirePermission('config.edit')
   @ApiOperation({ summary: 'Update company legal profile and invoice header settings (G-ADM-4)' })
-  async updateCompanyProfile(@Body() body: Record<string, unknown>) {
-    return { ...body, updatedAt: new Date().toISOString() };
+  async updateCompanyProfile(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.adminService.updateCompanyProfile(body, req.user?.sub || req.user?.id);
   }
 
   @Get('notification-templates')
   @RequirePermission('config.edit')
   @ApiOperation({ summary: 'List WhatsApp/SMS/in-app notification templates (G-ADM-7)' })
   async listNotificationTemplates() {
-    return {
-      data: [
-        { code: 'ORDER_CONFIRM_WA', channel: 'WHATSAPP', providerId: 'WA_TMPL_901' },
-        { code: 'OTP_LOGIN_SMS', channel: 'SMS', providerId: 'DLT_1107169' },
-      ],
-    };
+    return this.adminService.listNotificationTemplates();
   }
 
   @Patch('notification-templates/:code')
@@ -227,20 +217,28 @@ export class AdminController {
     @Param('code') code: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return { code, ...body, updatedAt: new Date().toISOString() };
+    return this.adminService.updateNotificationTemplate(code, body);
   }
 
   @Get('system-health')
   @RequirePermission('config.edit')
   @ApiOperation({ summary: 'System health, outbox queue depth, and background job status (G-ADM-9)' })
   async getSystemHealth() {
-    return {
-      status: 'HEALTHY',
-      outboxQueueDepth: 0,
-      failedNotificationsCount: 0,
-      lastNightlyJobAt: new Date().toISOString(),
-      version: '0.7.0',
-    };
+    return this.adminService.getSystemHealth();
+  }
+
+  @Get('rollout')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Get rollout gate readiness and setup wizard state' })
+  async getRolloutConfig() {
+    return this.adminService.getRolloutConfig();
+  }
+
+  @Put('rollout')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update rollout gate readiness and setup wizard state' })
+  async updateRolloutConfig(@Body() body: Record<string, unknown>, @Req() req: any) {
+    return this.adminService.updateRolloutConfig(body, req.user?.sub || req.user?.id);
   }
 }
 

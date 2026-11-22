@@ -502,7 +502,12 @@ export class GRNService {
     if (filters.supplierId) {
       query = query.where('goods_receipts.supplier_id', filters.supplierId);
     }
-    if (filters.siteId) {
+    if (
+      filters.siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        filters.siteId,
+      )
+    ) {
       query = query.where('goods_receipts.site_id', filters.siteId);
     }
     if (filters.dateFrom) {

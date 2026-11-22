@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v7 as uuidv7 } from 'uuid';
 
@@ -32,8 +34,9 @@ export interface RequisitionLineWithItem extends RequisitionLineRow {
   item_primary_uom: string;
 }
 
+@Injectable()
 export class RequisitionRepository {
-  constructor(private readonly knex: Knex) {}
+  constructor(@InjectKnex() private readonly knex: Knex) {}
 
   async createHeader(
     data: Omit<RequisitionHeaderRow, 'id' | 'created_at' | 'updated_at'> & {
@@ -78,10 +81,18 @@ export class RequisitionRepository {
   }
 
   async getHeaders(
-    siteId: string,
+    siteId?: string,
     status?: string,
   ): Promise<RequisitionHeaderRow[]> {
-    let query = this.knex('production_requisitions').where('site_id', siteId);
+    let query = this.knex('production_requisitions');
+    if (
+      siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        siteId,
+      )
+    ) {
+      query = query.where('site_id', siteId);
+    }
     if (status) {
       query = query.andWhere('status', status);
     }

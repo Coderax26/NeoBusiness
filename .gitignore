@@ -70,3 +70,19 @@ apps/tablet/build/
 
 # Docker
 docker-compose.override.yml
+
+# Local AI / code-analysis tooling artifacts
+.claude/
+CLAUDE.md
+graphify-out/
+
+# Backup & temporary report files
+*.bak
+E2E_FRONTEND_BACKEND_TEST_REPORT.md
+
+# Next.js generated types & build outputs
+next-env.d.ts
+apps/*/.next/
+apps/*/dist/
+apps/api/.env
+!.env.prod.example

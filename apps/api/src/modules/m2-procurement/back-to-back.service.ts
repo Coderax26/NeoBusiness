@@ -250,11 +250,16 @@ export class BackToBackService {
         'purchase_orders.*',
         'suppliers.supplier_code',
         'suppliers.company_name as supplier_name',
-        'sales_orders.so_no',
-        'customers.name as customer_name',
+        'sales_orders.order_no as so_no',
+        'customers.business_name as customer_name',
       );
 
-    if (filters.siteId) {
+    if (
+      filters.siteId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        filters.siteId,
+      )
+    ) {
       query = query.where('purchase_orders.receiving_site_id', filters.siteId);
     }
     if (filters.supplierId) {

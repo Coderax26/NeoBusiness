@@ -34,106 +34,9 @@ export interface ItemRecord {
   active: boolean;
 }
 
-const INITIAL_ITEMS: ItemRecord[] = [
-  {
-    id: 'itm-1',
-    sku: 'FG-PANEER-200G',
-    name: 'Fresh Malai Paneer 200g Pack',
-    category: 'PROCESSED_FG',
-    primaryUom: 'pcs',
-    secondaryUom: 'crates',
-    conversionFactor: 24, // 1 crate = 24 pcs
-    isCatchWeight: false,
-    hsnCode: '04061000',
-    gstRate: 5,
-    taxTreatment: 'TAXABLE',
-    minMarginPct: 18,
-    shelfLifeDays: 14,
-    minStockQty: 200,
-    currentStock: 450,
-    todayPrice: 85,
-    active: true,
-  },
-  {
-    id: 'itm-2',
-    sku: 'FG-CURD-500G',
-    name: 'Farm Fresh Set Curd 500g Tub',
-    category: 'PROCESSED_FG',
-    primaryUom: 'pcs',
-    secondaryUom: 'crates',
-    conversionFactor: 20, // 1 crate = 20 pcs
-    isCatchWeight: false,
-    hsnCode: '04031000',
-    gstRate: 5,
-    taxTreatment: 'TAXABLE',
-    minMarginPct: 15,
-    shelfLifeDays: 10,
-    minStockQty: 300,
-    currentStock: 120, // Low stock
-    todayPrice: 42,
-    active: true,
-  },
-  {
-    id: 'itm-3',
-    sku: 'RM-RAW-MILK',
-    name: 'Raw Chilled Buffalo Milk (6.5% Fat)',
-    category: 'RAW_MATERIAL',
-    primaryUom: 'litres',
-    secondaryUom: 'cans',
-    conversionFactor: 40, // 1 can = 40 litres
-    isCatchWeight: true,
-    hsnCode: '04012000',
-    gstRate: 0,
-    taxTreatment: 'EXEMPT',
-    minMarginPct: 0,
-    shelfLifeDays: 2,
-    minStockQty: 1000,
-    currentStock: 2400,
-    todayPrice: 58,
-    active: true,
-  },
-  {
-    id: 'itm-4',
-    sku: 'TR-BUTTER-500G',
-    name: 'Salted Dairy Butter 500g Brick',
-    category: 'TRADED_GOOD',
-    primaryUom: 'pcs',
-    secondaryUom: 'boxes',
-    conversionFactor: 30,
-    isCatchWeight: false,
-    hsnCode: '04051000',
-    gstRate: 12,
-    taxTreatment: 'TAXABLE',
-    minMarginPct: 12,
-    shelfLifeDays: 90,
-    minStockQty: 50,
-    currentStock: 80,
-    todayPrice: undefined, // Missing today's price
-    active: true,
-  },
-  {
-    id: 'itm-5',
-    sku: 'FG-GHEE-1L',
-    name: 'Pure Desi Danedar Ghee 1L Tin',
-    category: 'PROCESSED_FG',
-    primaryUom: 'tins',
-    secondaryUom: 'cartons',
-    conversionFactor: 12,
-    isCatchWeight: false,
-    hsnCode: '04059010',
-    gstRate: 12,
-    taxTreatment: 'TAXABLE',
-    minMarginPct: 20,
-    shelfLifeDays: 180,
-    minStockQty: 100,
-    currentStock: 340,
-    todayPrice: 620,
-    active: true,
-  },
-];
 
 export default function ItemMasterPage() {
-  const [items, setItems] = useState<ItemRecord[]>(INITIAL_ITEMS);
+  const [items, setItems] = useState<ItemRecord[]>([]);
 
   const loadItems = useCallback(async () => {
     try {
@@ -143,7 +46,7 @@ export default function ItemMasterPage() {
       ]);
       if (!itemsRes.ok) return;
       const rows = await itemsRes.json();
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows)) return;
 
       const priceMap = new Map<string, number>();
       if (pricesRes && pricesRes.ok) {

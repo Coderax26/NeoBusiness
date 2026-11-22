@@ -132,9 +132,9 @@ export class CollectionService {
     const customerIds = [...new Set(receipts.map((r) => r.customer_id))];
     const customers = await this.knex('customers')
       .whereIn('id', customerIds)
-      .select('id', 'name');
+      .select('id', 'business_name');
 
-    const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+    const customerMap = new Map(customers.map((c) => [c.id, c.business_name]));
 
     return receipts.map((r) => ({
       ...r,
@@ -155,7 +155,9 @@ export class CollectionService {
     offset?: number;
   }) {
     let query = this.knex('collection_receipts');
-    if (options.siteId) query = query.where('site_id', options.siteId);
+    if (options.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.siteId)) {
+      query = query.where('site_id', options.siteId);
+    }
     if (options.customerId) query = query.where('customer_id', options.customerId);
     if (options.paymentMode) query = query.where('payment_mode', options.paymentMode);
     if (options.fromDate) query = query.where('collected_at', '>=', options.fromDate);
@@ -228,7 +230,7 @@ export class CollectionService {
       .join('customers', 'ptp_followups.customer_id', 'customers.id')
       .select(
         'ptp_followups.*',
-        'customers.name as customerName',
+        'customers.business_name as customerName',
         'customers.phone',
       );
   }

@@ -32,8 +32,9 @@ export class AtpQueryDto {
 }
 
 export class CurrentStockQueryDto {
+  @IsOptional()
   @IsUUID()
-  siteId!: string;
+  siteId?: string;
 
   @IsOptional()
   @IsUUID()

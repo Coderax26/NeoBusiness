@@ -1,15 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Badge, Button, StatusPill, Dialog } from '@neo/ui';
-import { INITIAL_WORKERS, type WorkerMasterRecord } from '../../../src/lib/production-data';
+import { type WorkerMasterRecord } from '../../../../src/lib/production-data';
 
 export default function ProductionAttendancePage() {
-  const [workers, setWorkers] = useState<WorkerMasterRecord[]>(INITIAL_WORKERS);
+  const [workers, setWorkers] = useState<WorkerMasterRecord[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newStation, setNewStation] = useState('Pelletizer Line A');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/production/workers')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        setWorkers(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const togglePunch = (id: string) => {
     setWorkers((prev) =>

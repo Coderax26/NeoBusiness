@@ -231,7 +231,6 @@ export class ProcurementPortService implements ProcurementPort {
       .where('pol.item_id', itemId)
       .where('po.receiving_site_id', siteId)
       .whereIn('po.po_status', [
-        'OPEN',
         'PENDING_APPROVAL',
         'PARTIALLY_RECEIVED',
         'ISSUED',

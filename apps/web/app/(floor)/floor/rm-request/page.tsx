@@ -1,26 +1,52 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NumericKeypad } from '@neo/ui';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
-const RM_ITEMS = [
-  { id: 'itm-maize', icon: '🌽', name: 'Yellow Maize Grain (Grade A)', uom: 'kg' },
-  { id: 'itm-soy', icon: '🫘', name: 'Soybean Meal (46% Protein)', uom: 'kg' },
-  { id: 'itm-molasses', icon: '🍯', name: 'Sugarcane Molasses', uom: 'kg' },
-  { id: 'itm-mineral', icon: '🧂', name: 'Mineral Mixture Premix', uom: 'kg' },
-];
+interface RmItem {
+  id: string;
+  icon: string;
+  name: string;
+  uom: string;
+}
 
 export default function FloorRmRequestPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [selectedId, setSelectedId] = useState(RM_ITEMS[0].id);
+  const [items, setItems] = useState<RmItem[]>([]);
+  const [selectedId, setSelectedId] = useState('');
   const [qty, setQty] = useState('250');
-  const [neededBy, setNeededBy] = useState('2026-11-14');
+  const [neededBy, setNeededBy] = useState(() => new Date().toISOString().slice(0, 10));
   const [banner, setBanner] = useState<string | null>(null);
 
-  const selected = RM_ITEMS.find((i) => i.id === selectedId) || RM_ITEMS[0];
+  useEffect(() => {
+    let active = true;
+    fetch('/api/proxy/items')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const rmRows: RmItem[] = rows
+          .filter((i: any) => !i.category || i.category === 'RAW_MATERIAL' || i.category === 'PACKAGING')
+          .map((i: any) => ({
+            id: String(i.id),
+            icon: i.category === 'PACKAGING' ? '📦' : '🌾',
+            name: String(i.name || i.sku_code || 'Material'),
+            uom: String(i.primary_uom || i.uom || 'kg'),
+          }));
+        setItems(rmRows);
+        if (rmRows.length > 0) setSelectedId(rmRows[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selected = items.find((i) => i.id === selectedId) || items[0] || { id: '', icon: '🌾', name: 'Select Material', uom: 'kg' };
 
   const handleSubmit = async () => {
+    if (!selected.id) return;
     const res = await enqueueOrSend({
       type: 'RM_REQUEST',
       endpoint: '/api/bff/production/requisitions',
@@ -49,7 +75,7 @@ export default function FloorRmRequestPage() {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {RM_ITEMS.map((item) => (
+        {items.map((item) => (
           <button
             key={item.id}
             type="button"

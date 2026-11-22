@@ -1,43 +1,97 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { maskGrnForBlindView } from '@neo/shared';
 import { NumericKeypad } from '@neo/ui';
-import { INITIAL_FLOOR_EXPECTED_POS } from '../../../../src/lib/inventory-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
+
+interface ExpectedPo {
+  poId: string;
+  poNumber: string;
+  supplierName: string;
+  lines: Array<{
+    lineId: string;
+    itemId: string;
+    itemSku: string;
+    itemName: string;
+    uom: string;
+    orderedQty: number;
+    unitPrice: number;
+  }>;
+}
 
 export default function FloorBlindGrnPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [selectedPoId, setSelectedPoId] = useState<string>(INITIAL_FLOOR_EXPECTED_POS[0].poId);
+  const [expectedPos, setExpectedPos] = useState<ExpectedPo[]>([]);
+  const [selectedPoId, setSelectedPoId] = useState<string>('');
+
+  useEffect(() => {
+    fetch('/api/proxy/procurement/purchase-orders')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (res) => {
+        const pos = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const openPos = pos.filter((p: any) => ['ISSUED', 'PARTIAL', 'APPROVED', 'DRAFT'].includes(String(p.po_status ?? p.status ?? '')));
+        const mapped: ExpectedPo[] = await Promise.all(
+          openPos.slice(0, 10).map(async (p: any) => {
+            let lines: any[] = Array.isArray(p.lines) ? p.lines : [];
+            if (lines.length === 0) {
+              try {
+                const lr = await fetch(`/api/proxy/procurement/purchase-orders/${p.id}/lines`);
+                if (lr.ok) {
+                  const ljson = await lr.json();
+                  lines = Array.isArray(ljson?.data) ? ljson.data : Array.isArray(ljson) ? ljson : [];
+                }
+              } catch { /* ignore */ }
+            }
+            return {
+              poId: p.id,
+              poNumber: p.po_no ?? p.poNumber ?? p.id.slice(0, 8),
+              supplierName: p.supplier_name ?? p.supplierName ?? 'Supplier',
+              lines: lines.map((l: any) => ({
+                lineId: l.id,
+                itemId: l.item_id ?? l.itemId ?? '',
+                itemSku: l.sku_code ?? l.itemSku ?? '',
+                itemName: l.item_name ?? l.itemName ?? 'Item',
+                uom: l.primary_uom ?? l.uom ?? 'KG',
+                orderedQty: Number(l.ordered_qty ?? 0),
+                unitPrice: Number(l.unit_price ?? 0),
+              })),
+            };
+          }),
+        );
+        setExpectedPos(mapped);
+        if (mapped.length > 0) setSelectedPoId(mapped[0].poId);
+      })
+      .catch(() => setExpectedPos([]));
+  }, []);
+
   const selectedPo =
-    INITIAL_FLOOR_EXPECTED_POS.find((p) => p.poId === selectedPoId) ||
-    INITIAL_FLOOR_EXPECTED_POS[0];
+    expectedPos.find((p) => p.poId === selectedPoId) || expectedPos[0];
 
   // BR-05: Strip orderedQty and unitPrice immediately before rendering
   const blindLines = useMemo(
     () =>
-      maskGrnForBlindView(
-        selectedPo.lines.map((l) => ({
-          lineId: l.lineId,
-          itemId: l.itemId,
-          itemSku: l.itemSku,
-          itemName: l.itemName,
-          uom: l.uom,
-          orderedQty: l.orderedQty,
-          unitPrice: l.unitPrice,
-          receivedQty: 0,
-        })),
-      ),
+      selectedPo
+        ? maskGrnForBlindView(
+            selectedPo.lines.map((l) => ({
+              lineId: l.lineId,
+              itemId: l.itemId,
+              itemSku: l.itemSku,
+              itemName: l.itemName,
+              uom: l.uom,
+              orderedQty: l.orderedQty,
+              unitPrice: l.unitPrice,
+              receivedQty: 0,
+            })),
+          )
+        : [],
     [selectedPo],
   );
 
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [batches, setBatches] = useState<Record<string, string>>({});
-  const [expiries, setExpiries] = useState<Record<string, string>>({
-    'fpol-1': '2027-02-11',
-    'fpol-2': '2027-11-13',
-  });
+  const [expiries, setExpiries] = useState<Record<string, string>>({});
   const [damaged, setDamaged] = useState<Record<string, boolean>>({});
   const [photoName, setPhotoName] = useState('');
   const [notes, setNotes] = useState('');
@@ -46,6 +100,7 @@ export default function FloorBlindGrnPage() {
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
 
   const handleSaveReceipt = async () => {
+    if (!selectedPo) return;
     const payload = {
       poId: selectedPo.poId,
       poNumber: selectedPo.poNumber,
@@ -104,9 +159,8 @@ export default function FloorBlindGrnPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Receive Goods (Blind GRN)</h1>
           <p className="text-base text-zinc-400">
-            Supplier: <strong className="text-white">{selectedPo.supplierName}</strong> · PO:{' '}
-            <strong className="text-amber-400 font-mono">{selectedPo.poNumber}</strong> · Vehicle:{' '}
-            {selectedPo.vehicleNo}
+            Supplier: <strong className="text-white">{selectedPo?.supplierName ?? '—'}</strong> · PO:{' '}
+            <strong className="text-amber-400 font-mono">{selectedPo?.poNumber ?? 'None'}</strong>
           </p>
         </div>
         <select
@@ -114,7 +168,8 @@ export default function FloorBlindGrnPage() {
           onChange={(e) => setSelectedPoId(e.target.value)}
           className="min-h-[56px] bg-zinc-950 border border-zinc-700 rounded-xl px-4 text-base text-white"
         >
-          {INITIAL_FLOOR_EXPECTED_POS.map((po) => (
+          {expectedPos.length === 0 && <option value="">No open POs</option>}
+          {expectedPos.map((po) => (
             <option key={po.poId} value={po.poId}>
               {po.poNumber} — {po.supplierName}
             </option>

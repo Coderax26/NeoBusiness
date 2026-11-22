@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -44,9 +45,11 @@ export class SupplierController {
   @ApiResponse({ status: 201, description: 'Supplier created' })
   async create(
     @Body() dto: CreateSupplierDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
-    return this.supplierService.create({ ...dto, userId });
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.supplierService.create({ ...dto, userId: actorId });
   }
 
   @Get()
@@ -85,9 +88,11 @@ export class SupplierController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateSupplierDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
-    return this.supplierService.update(id, { ...dto, userId });
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.supplierService.update(id, { ...dto, userId: actorId });
   }
 
   @Post(':id/items/:itemId')
@@ -98,11 +103,13 @@ export class SupplierController {
     @Param('id') supplierId: string,
     @Param('itemId') itemId: string,
     @Body() dto: LinkSupplierItemDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
+    const actorId = userId || req?.user?.sub || req?.user?.id;
     return this.supplierService.linkItem(supplierId, itemId, {
       ...dto,
-      userId,
+      userId: actorId,
     });
   }
 
@@ -129,9 +136,15 @@ export class SupplierController {
   async addRateQuote(
     @Param('id') supplierId: string,
     @Body() dto: AddRateQuoteDto,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
-    return this.supplierService.addRateQuote({ ...dto, supplierId, userId });
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.supplierService.addRateQuote({
+      ...dto,
+      supplierId,
+      userId: actorId,
+    });
   }
 
   @Get(':id/rates/:itemId')
@@ -171,9 +184,11 @@ export class SupplierController {
   @ApiResponse({ status: 200, description: 'Reliability score updated' })
   async updateReliabilityScore(
     @Param('id') supplierId: string,
-    @Query('userId') userId: string,
+    @Query('userId') userId?: string,
+    @Req() req?: any,
   ) {
-    return this.supplierService.updateReliabilityScore(supplierId, userId);
+    const actorId = userId || req?.user?.sub || req?.user?.id;
+    return this.supplierService.updateReliabilityScore(supplierId, actorId);
   }
 
   @Get('alerts/missing-rates')

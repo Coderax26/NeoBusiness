@@ -11,27 +11,71 @@ import {
   type SessionUser,
 } from '@neo/shared';
 import {
-  INITIAL_STOCK_ROWS,
-  INITIAL_LEDGER_ENTRIES,
   type StockRow,
-} from '../../../src/lib/inventory-data';
+  type LedgerEntry,
+} from '../../../../src/lib/inventory-data';
 
 type StockViewMode = 'BY_ITEM' | 'BY_SITE' | 'BY_BATCH';
 
 export default function StockOverviewPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [rows] = useState<StockRow[]>(INITIAL_STOCK_ROWS);
+  const [rows, setRows] = useState<StockRow[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [viewMode, setViewMode] = useState<StockViewMode>('BY_ITEM');
   const [search, setSearch] = useState('');
   const [drillItemId, setDrillItemId] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.user) setUser(d.user);
+        if (active && d?.user) setUser(d.user);
       })
       .catch(() => {});
+
+    Promise.all([
+      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/inventory/ledger').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([stkRes, ledRes]) => {
+        if (!active) return;
+        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+        const lRows = Array.isArray(ledRes) ? ledRes : Array.isArray(ledRes?.data) ? ledRes.data : [];
+        setRows(
+          sRows.map((r: any) => {
+            const expiryDate = String(r.expiryDate ?? r.expiry_date ?? '').slice(0, 10);
+            const computedDays = expiryDate
+              ? Math.ceil((new Date(expiryDate).getTime() - Date.now()) / 86_400_000)
+              : 999;
+            return {
+              ...r,
+              id: String(r.id ?? r.batchId ?? r.itemId ?? ''),
+              itemId: String(r.itemId ?? r.item_id ?? ''),
+              sku: String(r.sku ?? r.skuCode ?? r.sku_code ?? ''),
+              itemName: String(r.itemName ?? r.item_name ?? r.name ?? ''),
+              category: (r.category ?? r.itemCategory ?? 'RAW_MATERIAL') as any,
+              siteId: String(r.siteId ?? r.site_id ?? ''),
+              siteName: String(r.siteName ?? r.site_name ?? ''),
+              locationCode: String(r.locationCode ?? r.locationName ?? r.location_name ?? ''),
+              batchNo: String(r.batchNo ?? r.batchNumber ?? r.batch_number ?? ''),
+              onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
+              reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? 0),
+              minStock: Number(r.minStock ?? r.min_stock_qty ?? 0),
+              uom: String(r.uom ?? 'kg'),
+              altUomLabel: String(r.altUomLabel ?? ''),
+              unitCost: Number(r.unitCost ?? r.unitCostInr ?? r.landedCostPerUnit ?? r.cost_per_unit ?? 0),
+              daysToExpiry: r.daysToExpiry !== undefined ? Number(r.daysToExpiry) : computedDays,
+              expiryDate,
+            };
+          }),
+        );
+        setLedgerEntries(lRows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   const showValuation = !user || canViewMarginAndCost(user.role);
@@ -103,8 +147,8 @@ export default function StockOverviewPage() {
 
   const drillMovements = useMemo(() => {
     if (!drillItemId) return [];
-    return INITIAL_LEDGER_ENTRIES.filter((l) => l.itemId === drillItemId);
-  }, [drillItemId]);
+    return ledgerEntries.filter((l) => l.itemId === drillItemId);
+  }, [drillItemId, ledgerEntries]);
 
   return (
     <div className="space-y-6">
@@ -135,7 +179,7 @@ export default function StockOverviewPage() {
             title="Total Stock Value"
             value={formatINR(totalStockValue)}
             subtitle="Owner-only valuation"
-            trend={{ value: 'Across 2 sites', direction: 'up' }}
+            trend={{ value: `Across ${new Set(rows.map((r) => r.siteName).filter(Boolean)).size} sites`, direction: 'up' }}
           />
         )}
         <KpiCard
@@ -152,7 +196,7 @@ export default function StockOverviewPage() {
         />
         <KpiCard
           title="Drift / Negative Alerts"
-          value="1"
+          value={String(rows.filter((r) => Number(r.onHand ?? 0) < 0).length)}
           subtitle="Cycle count variance"
           trend={{ value: 'View alerts', direction: 'down' }}
         />

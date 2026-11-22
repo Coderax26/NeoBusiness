@@ -20,6 +20,7 @@ export interface DataTableProps<T> {
   enableSelection?: boolean;
   bulkActions?: { label: string; onClick: (selectedItems: T[]) => void; tone?: 'primary' | 'danger' }[];
   exportFileName?: string;
+  pageSize?: number;
   emptyTitle?: string;
   emptyDescription?: string;
 }

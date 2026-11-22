@@ -62,7 +62,7 @@ export class WorkOrderController {
     type: [WorkOrderResponseDto],
   })
   async listWorkOrders(
-    @Query('siteId') siteId: string,
+    @Query('siteId') siteId?: string,
     @Query('status') status?: string,
   ): Promise<WorkOrderResponseDto[]> {
     return this.woService.listWorkOrders(siteId, status);

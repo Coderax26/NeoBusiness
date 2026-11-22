@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Badge, Card } from '@neo/ui';
 import {
@@ -9,11 +9,8 @@ import {
   requiresEwayBill,
 } from '@neo/shared';
 import {
-  READY_ORDERS_POOL,
-  FLEET_VEHICLES,
-  FLEET_DRIVERS,
   type ReadyOrderItem,
-} from '../../../../src/lib/logistics-data';
+} from '../../../../../src/lib/logistics-data';
 
 interface DraftStop extends ReadyOrderItem {
   ewayBillRef: string;
@@ -21,30 +18,79 @@ interface DraftStop extends ReadyOrderItem {
 }
 
 export default function PlanNewTripPage() {
+  const [readyPool, setReadyPool] = useState<ReadyOrderItem[]>([]);
+  const [vehicles, setVehicles] = useState<Array<{ id: string; regNo: string; model: string; capacityKg: number; capacityCrates: number }>>([]);
+  const [drivers, setDrivers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   const [areaFilter, setAreaFilter] = useState('ALL');
   const [windowFilter, setWindowFilter] = useState('ALL');
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
-  const [stops, setStops] = useState<DraftStop[]>([
-    { ...READY_ORDERS_POOL[0], ewayBillRef: '', challanGenerated: false },
-    { ...READY_ORDERS_POOL[1], ewayBillRef: '', challanGenerated: false },
-  ]);
-  const [vehicleId, setVehicleId] = useState(FLEET_VEHICLES[0].id);
-  const [driverId, setDriverId] = useState(FLEET_DRIVERS[0].id);
+  const [stops, setStops] = useState<DraftStop[]>([]);
+  const [vehicleId, setVehicleId] = useState('');
+  const [driverId, setDriverId] = useState('');
   const [loadingConfirmed, setLoadingConfirmed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/proxy/orders?status=READY').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/vehicles').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/drivers').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([ordRes, vehRes, drvRes]) => {
+        if (!active) return;
+        const oRows = Array.isArray(ordRes) ? ordRes : Array.isArray(ordRes?.data) ? ordRes.data : [];
+        const mappedOrders: ReadyOrderItem[] = oRows.map((o: any) => ({
+          id: String(o.id),
+          orderNo: String(o.order_no || o.orderNumber || o.id),
+          customerName: String(o.customer_name || o.customerName || 'Customer'),
+          area: String(o.area || o.city || 'Pune'),
+          deliveryWindow: String(o.delivery_time_window || o.deliveryWindow || '10-12'),
+          weightKg: Number(o.total_weight_kg ?? o.weightKg ?? 50),
+          crates: Number(o.total_crates ?? o.crates ?? 2),
+          valueInr: Number(o.total_amount ?? o.valueInr ?? 0),
+          codExpectedInr: Number(o.cod_expected_inr ?? 0),
+        }));
+        setReadyPool(mappedOrders);
+
+        const vRows = Array.isArray(vehRes) ? vehRes : Array.isArray(vehRes?.data) ? vehRes.data : [];
+        const mappedVehicles = vRows.map((v: any) => ({
+          id: String(v.id),
+          regNo: String(v.registration_no || v.regNo || v.id),
+          model: String(v.vehicle_type || v.model || 'Truck'),
+          capacityKg: Number(v.capacity_kg ?? v.capacityKg ?? 1000),
+          capacityCrates: Number(v.capacity_crates ?? v.capacityCrates ?? 50),
+        }));
+        setVehicles(mappedVehicles);
+        if (mappedVehicles.length > 0) setVehicleId(mappedVehicles[0].id);
+
+        const dRows = Array.isArray(drvRes) ? drvRes : Array.isArray(drvRes?.data) ? drvRes.data : [];
+        const mappedDrivers = dRows.map((d: any) => ({
+          id: String(d.id),
+          name: String(d.full_name || d.name || 'Driver'),
+          phone: String(d.phone || ''),
+        }));
+        setDrivers(mappedDrivers);
+        if (mappedDrivers.length > 0) setDriverId(mappedDrivers[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selectedVehicle =
-    FLEET_VEHICLES.find((v) => v.id === vehicleId) || FLEET_VEHICLES[0];
+    vehicles.find((v) => v.id === vehicleId) || vehicles[0] || { id: '', regNo: '—', model: '', capacityKg: 1000, capacityCrates: 50 };
 
   const availableOrders = useMemo(() => {
     const inTrip = new Set(stops.map((s) => s.id));
-    return READY_ORDERS_POOL.filter((o) => {
+    return readyPool.filter((o) => {
       if (inTrip.has(o.id)) return false;
       if (areaFilter !== 'ALL' && o.area !== areaFilter) return false;
       if (windowFilter !== 'ALL' && o.deliveryWindow !== windowFilter) return false;
       return true;
     });
-  }, [stops, areaFilter, windowFilter]);
+  }, [readyPool, stops, areaFilter, windowFilter]);
 
   const readiness = useMemo(
     () =>
@@ -227,7 +273,7 @@ export default function PlanNewTripPage() {
                 onChange={(e) => setVehicleId(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
               >
-                {FLEET_VEHICLES.map((v) => (
+                {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.regNo} ({v.capacityKg} kg)
                   </option>
@@ -241,7 +287,7 @@ export default function PlanNewTripPage() {
                 onChange={(e) => setDriverId(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
               >
-                {FLEET_DRIVERS.map((d) => (
+                {drivers.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>

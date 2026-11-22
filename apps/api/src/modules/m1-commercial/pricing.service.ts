@@ -282,42 +282,65 @@ export class PricingService implements OnModuleInit {
    * Get all prices for a date (with item details for display).
    */
   async getPricesForDate(date: string, filters?: { itemCategory?: string }) {
-    let query = this.knex('daily_price_lists as dpl')
-      .join('items as i', 'dpl.item_id', 'i.id')
-      .where('dpl.effective_date', date)
+    let itemsQuery = this.knex('items as i')
+      .where('i.is_active', true)
       .select(
-        'dpl.item_id as itemId',
+        'i.id as itemId',
         'i.sku_code as skuCode',
         'i.name as itemName',
         'i.item_category as itemCategory',
         'i.primary_uom as primaryUom',
-        'dpl.latest_landed_cost as latestLandedCost',
-        'dpl.floor_price as floorPrice',
-        'dpl.target_price as targetPrice',
-        'dpl.min_margin_pct_used as minMarginPctUsed',
-        'dpl.source as source',
-        'dpl.published_at as publishedAt',
-      );
+      )
+      .orderBy('i.item_category')
+      .orderBy('i.name');
 
     if (filters?.itemCategory) {
-      query = query.andWhere('i.item_category', filters.itemCategory);
+      itemsQuery = itemsQuery.andWhere('i.item_category', filters.itemCategory);
     }
 
-    const rows = await query.orderBy('i.item_category').orderBy('i.name');
+    const items = await itemsQuery;
+    if (items.length === 0) return [];
 
-    return rows.map((r) => ({
-      itemId: r.itemId,
-      skuCode: r.skuCode,
-      itemName: r.itemName,
-      itemCategory: r.itemCategory,
-      primaryUom: r.primaryUom,
-      latestLandedCost: r.latestLandedCost,
-      floorPrice: r.floorPrice,
-      targetPrice: r.targetPrice,
-      minMarginPctUsed: Number(r.minMarginPctUsed),
-      source: r.source,
-      publishedAt: r.publishedAt,
-    }));
+    const itemIds = items.map((it) => it.itemId);
+    const exactRows = await this.knex('daily_price_lists')
+      .where('effective_date', date)
+      .whereIn('item_id', itemIds);
+    const exactMap = new Map<string, any>(
+      exactRows.map((r: any) => [String(r.item_id), r]),
+    );
+
+    // Fallback to most recent price list entry on or before the requested date
+    const fallbackRows = await this.knex
+      .raw(
+        `SELECT DISTINCT ON (item_id) *
+         FROM daily_price_lists
+         WHERE item_id = ANY(?) AND effective_date <= ?
+         ORDER BY item_id, effective_date DESC`,
+        [itemIds, date],
+      )
+      .then((res: any) => res.rows || []);
+    const fallbackMap = new Map<string, any>(
+      fallbackRows.map((r: any) => [String(r.item_id), r]),
+    );
+
+    return items.map((item: any) => {
+      const exact = exactMap.get(String(item.itemId));
+      const row = exact || fallbackMap.get(String(item.itemId));
+      return {
+        itemId: item.itemId,
+        skuCode: item.skuCode,
+        itemName: item.itemName,
+        itemCategory: item.itemCategory,
+        primaryUom: item.primaryUom,
+        latestLandedCost: row?.latest_landed_cost ?? '0.00',
+        floorPrice: row?.floor_price ?? '0.00',
+        targetPrice: row?.target_price ?? '0.00',
+        minMarginPctUsed: row?.min_margin_pct_used != null ? Number(row.min_margin_pct_used) : 10,
+        source: exact ? exact.source : row ? 'CARRIED_FORWARD' : 'UNSET',
+        publishedAt: exact?.published_at ?? null,
+        isPublished: Boolean(exact),
+      };
+    });
   }
 
   /**

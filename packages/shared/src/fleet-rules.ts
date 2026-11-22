@@ -92,9 +92,13 @@ export function evaluateTripBuilderReadiness(input: {
 }
 
 export interface TripStopProgressInput {
-  deliveryStatus: 'PENDING' | 'DELIVERED' | 'PARTIAL' | 'FAILED';
-  expectedCodInr: number;
-  collectedCodInr: number;
+  deliveryStatus?: 'PENDING' | 'DELIVERED' | 'PARTIAL' | 'FAILED' | string;
+  delivery_status?: string;
+  status?: string;
+  expectedCodInr?: number | string;
+  cash_to_collect?: number | string;
+  collectedCodInr?: number | string;
+  actual_cash_collected?: number | string;
 }
 
 export function calculateTripProgress(stops: TripStopProgressInput[]): {
@@ -103,8 +107,12 @@ export function calculateTripProgress(stops: TripStopProgressInput[]): {
   pct: number;
   label: string;
 } {
-  const totalStops = stops.length;
-  const completedStops = stops.filter((s) => s.deliveryStatus !== 'PENDING').length;
+  const safeStops = Array.isArray(stops) ? stops : [];
+  const totalStops = safeStops.length;
+  const completedStops = safeStops.filter((s) => {
+    const status = s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING';
+    return status !== 'PENDING';
+  }).length;
   const pct = totalStops > 0 ? Math.round((completedStops / totalStops) * 100) : 0;
   return {
     completedStops,
@@ -120,11 +128,16 @@ export function reconcileTripCod(stops: TripStopProgressInput[]): {
   variance: number;
   isReconciled: boolean;
 } {
+  const safeStops = Array.isArray(stops) ? stops : [];
   const expectedCod = Number(
-    stops.reduce((s, st) => s + st.expectedCodInr, 0).toFixed(2),
+    safeStops
+      .reduce((s, st) => s + Number(st.expectedCodInr ?? st.cash_to_collect ?? 0), 0)
+      .toFixed(2),
   );
   const collectedCod = Number(
-    stops.reduce((s, st) => s + st.collectedCodInr, 0).toFixed(2),
+    safeStops
+      .reduce((s, st) => s + Number(st.collectedCodInr ?? st.actual_cash_collected ?? 0), 0)
+      .toFixed(2),
   );
   const variance = Number((collectedCod - expectedCod).toFixed(2));
   return {

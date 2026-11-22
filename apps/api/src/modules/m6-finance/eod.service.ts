@@ -111,7 +111,7 @@ export class EodService {
     const openTrips = await this.knex('delivery_trips')
       .where('site_id', siteId)
       .where('trip_date', date)
-      .whereNotIn('status', ['CLOSED', 'CANCELLED'])
+      .whereNotIn('status', ['COMPLETED', 'CANCELLED'])
       .count('* as cnt')
       .first();
 

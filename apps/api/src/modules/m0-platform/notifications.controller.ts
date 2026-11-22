@@ -35,12 +35,19 @@ export class NotificationsController {
     @Query('limit') limit = '50',
     @Query('offset') offset = '0',
   ) {
-    const userId = req.user?.id;
+    const userId = req.user?.sub || req.user?.id;
     const lim = Math.min(Math.max(Number(limit) || 50, 1), 100);
     const off = Math.max(Number(offset) || 0, 0);
 
-    let query = this.knex('notification_outbox')
-      .where('recipient_ref', String(userId));
+    let query = this.knex('notification_outbox').where(function () {
+      this.where('recipient_ref', String(userId));
+      if (req.user?.phone) {
+        this.orWhere('recipient_ref', String(req.user.phone));
+      }
+      if (req.user?.role === 'OWNER') {
+        this.orWhere('channel', 'PUSH').orWhere('channel', 'IN_APP');
+      }
+    });
 
     if (status) {
       query = query.where('status', status);

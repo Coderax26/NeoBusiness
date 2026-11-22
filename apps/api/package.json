@@ -10,6 +10,7 @@
     "build": "nest build",
     "deploy": "nest deploy",
     "migrate": "node dist/scripts/migrate.js",
+    "bootstrap": "node dist/scripts/bootstrap-client.js",
     "seed": "node dist/scripts/seed.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

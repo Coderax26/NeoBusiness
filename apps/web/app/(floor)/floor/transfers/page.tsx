@@ -1,13 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
-import { INITIAL_TRANSFERS, type TransferRecord } from '../../../../src/lib/inventory-data';
+import React, { useEffect, useState } from 'react';
+import { type TransferRecord } from '../../../../src/lib/inventory-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
 export default function FloorTransfersPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [transfers, setTransfers] = useState<TransferRecord[]>(INITIAL_TRANSFERS);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/proxy/inventory/transfers')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setTransfers(
+          list.map((t: any) => ({
+            id: t.id,
+            transferNo: t.transfer_no ?? t.transferNo ?? t.id.slice(0, 8),
+            itemName: t.item_name ?? t.itemName ?? 'Stock Transfer',
+            fromSite: t.from_site_name ?? t.fromSite ?? 'Source',
+            toSite: t.to_site_name ?? t.toSite ?? 'Destination',
+            batchNo: t.batch_number ?? t.batchNo ?? '-',
+            qty: Number(t.qty ?? 0),
+            uom: t.uom ?? 'KG',
+            status: t.status ?? 'DRAFT',
+            createdAt: t.created_at ?? '',
+          })),
+        );
+      })
+      .catch(() => setTransfers([]));
+  }, []);
 
   const handleAction = async (trf: TransferRecord, action: 'dispatch' | 'receive') => {
     const res = await enqueueOrSend({

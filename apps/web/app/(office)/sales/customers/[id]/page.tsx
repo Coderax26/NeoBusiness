@@ -10,23 +10,26 @@ import {
   type LedgerEntryInput,
   type SessionUser,
 } from '@neo/shared';
-import {
-  INITIAL_CUSTOMERS_SUMMARY,
-  INITIAL_SALES_ORDERS,
-  INITIAL_DAILY_PRICES,
-} from '../../../../../src/lib/sales-data';
-
-const SAMPLE_LEDGER: LedgerEntryInput[] = [
-  { id: 'leg-1', date: '2026-11-01', type: 'OPENING', reference: 'OB-NOV', description: 'Opening Balance', debit: 50000, credit: 0 },
-  { id: 'leg-2', date: '2026-11-05', type: 'INVOICE', reference: 'INV-2026-0490', description: 'Fresh Malai Paneer & Curd', debit: 42000, credit: 0 },
-  { id: 'leg-3', date: '2026-11-08', type: 'PAYMENT', reference: 'RCPT-881', description: 'NEFT Receipt', debit: 0, credit: 32000 },
-  { id: 'leg-4', date: '2026-11-12', type: 'INVOICE', reference: 'INV-2026-0512', description: 'Desi Ghee 1L Tin', debit: 20000, credit: 0 },
-];
 
 export default function Customer360Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const customer =
-    INITIAL_CUSTOMERS_SUMMARY.find((c) => c.id === id) || INITIAL_CUSTOMERS_SUMMARY[0];
+  const [customer, setCustomer] = useState({
+    id,
+    name: 'Loading...',
+    phone: '',
+    gstin: '',
+    site: '',
+    window: '10-12',
+    creditLimit: 0,
+    outstanding: 0,
+    overdueDays: 0,
+    creditHold: false,
+  });
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
+  const [customerPayments, setCustomerPayments] = useState<any[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntryInput[]>([]);
+  const [dailyPrices, setDailyPrices] = useState<any[]>([]);
 
   const [user, setUser] = useState<SessionUser | null>(null);
   const [activeTab, setActiveTab] = useState<
@@ -34,38 +37,109 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
   >('overview');
 
   // Activity log state (§8, F4-08)
-  const [activities, setActivities] = useState([
-    { id: 'act-1', type: 'CALL', date: '2026-11-12 10:30 AM', user: 'Anita Desai', notes: 'Confirmed Diwali week paneer requirement (500 kg).' },
-    { id: 'act-2', type: 'WHATSAPP', date: '2026-11-10 04:15 PM', user: 'System', notes: 'Sent Invoice INV-2026-0490 PDF on WhatsApp.' },
-    { id: 'act-3', type: 'VISIT', date: '2026-11-05 11:00 AM', user: 'Ravi Kumar', notes: 'Site visit — discussed credit limit increase to ₹1L.' },
-  ]);
+  const [activities, setActivities] = useState<Array<{ id: string; type: string; date: string; user: string; notes: string }>>([]);
   const [newActType, setNewActType] = useState<'CALL' | 'VISIT' | 'WHATSAPP' | 'NOTE'>('CALL');
   const [newActNote, setNewActNote] = useState('');
 
   // Promises (PTP) state
-  const [promises, setPromises] = useState([
-    { id: 'ptp-1', amount: 30000, dueDate: '2026-11-15', status: 'OPEN', note: 'Promised RTGS after weekend sales' },
-  ]);
+  const [promises, setPromises] = useState<Array<{ id: string; amount: number; dueDate: string; status: string; note: string }>>([]);
 
   // Contacts state
-  const [contacts, setContacts] = useState([
-    { id: 'c-1', name: 'Ramesh Sharma', role: 'Owner', phone: customer.phone, isPrimary: true },
-    { id: 'c-2', name: 'Vijay Sharma', role: 'Store Manager', phone: '9822098765', isPrimary: false },
-  ]);
+  const [contacts, setContacts] = useState<Array<{ id: string; name: string; role: string; phone: string; isPrimary: boolean }>>([]);
 
   useEffect(() => {
+    let active = true;
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.user) setUser(data.user);
+        if (active && data?.user) setUser(data.user);
       })
       .catch(() => {});
-  }, []);
+
+    Promise.all([
+      fetch(`/api/proxy/customers/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/orders?customerId=${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/prices/today').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/ptp').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/invoices').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/collections').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([custData, ordData, priceData, ptpData, invData, payData]) => {
+        if (!active) return;
+        const invList = Array.isArray(invData) ? invData : Array.isArray(invData?.data) ? invData.data : [];
+        const payList = Array.isArray(payData) ? payData : Array.isArray(payData?.data) ? payData.data : [];
+        setCustomerInvoices(invList.filter((inv: any) => String(inv.customer_id ?? inv.customerId ?? '') === id));
+        setCustomerPayments(payList.filter((p: any) => String(p.customer_id ?? p.customerId ?? '') === id));
+        if (custData && custData.id) {
+          setCustomer({
+            id: String(custData.id),
+            name: String(custData.business_name || custData.name || 'Customer'),
+            phone: String(custData.phone || ''),
+            gstin: String(custData.gstin || ''),
+            site: String(custData.default_site_name || 'Main Site'),
+            window: String(custData.preferred_delivery_window || '10-12'),
+            creditLimit: Number(custData.credit_limit ?? 0),
+            outstanding: Number(custData.current_ar_balance ?? 0),
+            overdueDays: Number(custData.overdue_days ?? 0),
+            creditHold: Boolean(custData.credit_hold),
+          });
+          setContacts([
+            {
+              id: 'primary',
+              name: String(custData.contact_person || custData.business_name || 'Primary Contact'),
+              role: 'Primary Contact',
+              phone: String(custData.phone || ''),
+              isPrimary: true,
+            },
+          ]);
+        }
+        if (Array.isArray(ordData)) {
+          setCustomerOrders(
+            ordData.map((o: any) => ({
+              id: String(o.id),
+              orderNumber: String(o.order_no || o.orderNumber || o.id),
+              deliveryDate: String(o.delivery_date || o.created_at_idx || '').slice(0, 10),
+              status: String(o.order_status || o.status || 'DRAFT'),
+              grandTotal: Number(o.total_amount ?? o.grandTotal ?? 0),
+            })),
+          );
+          setLedgerEntries(
+            ordData.slice(0, 10).map((o: any) => ({
+              id: String(o.id),
+              date: String(o.delivery_date || o.created_at_idx || new Date().toISOString()).slice(0, 10),
+              type: 'INVOICE' as const,
+              reference: String(o.order_no || o.id),
+              description: `Sales Order ${o.order_no || o.id}`,
+              debit: Number(o.total_amount ?? 0),
+              credit: 0,
+            })),
+          );
+        }
+        if (Array.isArray(priceData)) setDailyPrices(priceData);
+        if (Array.isArray(ptpData)) {
+          setPromises(
+            ptpData
+              .filter((p: any) => !p.customerId || String(p.customerId) === id)
+              .map((p: any) => ({
+                id: String(p.id),
+                amount: Number(p.amount ?? p.promisedAmount ?? 0),
+                dueDate: String(p.dueDate || p.promisedDate || '').slice(0, 10),
+                status: String(p.status || 'OPEN'),
+                note: String(p.note || p.remarks || ''),
+              })),
+          );
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const isOwner = !user || canViewMarginAndCost(user.role);
-  const ledgerWithBalance = computeRunningLedgerBalance(SAMPLE_LEDGER);
-  const customerOrders = INITIAL_SALES_ORDERS.filter((o) => o.customerId === customer.id);
-  const creditUsedPct = Math.round((customer.outstanding / customer.creditLimit) * 100);
+  const ledgerWithBalance = computeRunningLedgerBalance(ledgerEntries);
+  const creditUsedPct = customer.creditLimit > 0 ? Math.round((customer.outstanding / customer.creditLimit) * 100) : 0;
 
   const handleLogActivity = () => {
     if (!newActNote.trim()) return;
@@ -114,9 +188,26 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
         <KpiCard title="Outstanding" value={formatINR(customer.outstanding)} subtitle="Current AR balance" tone="default" />
         <KpiCard title="Overdue" value={customer.overdueDays > 0 ? `${customer.overdueDays} days` : '₹0'} subtitle="Past credit terms" tone={customer.overdueDays > 0 ? 'danger' : 'success'} />
         <KpiCard title="Credit Used" value={`${creditUsedPct}%`} subtitle={`of ${formatINR(customer.creditLimit)}`} tone={creditUsedPct > 85 ? 'warning' : 'default'} />
-        <KpiCard title="Sales (30 d)" value="₹4.2 L" subtitle="↑ 12% vs prev 30d" tone="success" />
+        <KpiCard
+          title="Sales (30 d)"
+          value={formatINR(customerOrders.reduce((s, o) => s + Number(o.total_amount ?? o.totalAmount ?? 0), 0))}
+          subtitle={`${customerOrders.length} orders in system`}
+          tone="success"
+        />
         {isOwner && (
-          <KpiCard title="Avg Margin (Owner)" value="9.4%" subtitle="Net customer profitability" tone="brand" />
+          <KpiCard
+            title="Avg Margin (Owner)"
+            value={
+              customerOrders.length > 0 && customerOrders.some((o) => o.margin_pct != null)
+                ? `${(
+                    customerOrders.reduce((s, o) => s + Number(o.margin_pct ?? 0), 0) /
+                    customerOrders.length
+                  ).toFixed(1)}%`
+                : '0.0%'
+            }
+            subtitle="Net customer profitability"
+            tone="brand"
+          />
         )}
       </div>
 
@@ -169,10 +260,10 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
             <h3 className="text-sm font-bold text-white">Receivables Aging</h3>
             <AgingBuckets
               buckets={[
-                { label: 'Current (0–7d)', amount: '₹52,000', tone: 'success' },
-                { label: '8–15 days', amount: '₹28,000', tone: 'warning' },
-                { label: '16–30 days', amount: '₹0', tone: 'neutral' },
-                { label: '30+ days', amount: '₹0', tone: 'danger' },
+                { label: 'Current (0–7d)', amount: `₹${Number(customer?.outstanding ?? 0).toLocaleString('en-IN')}`, count: 0, tone: 'info' },
+                { label: '8–15 days', amount: '₹0', count: 0, tone: 'warning' },
+                { label: '16–30 days', amount: '₹0', count: 0, tone: 'warning' },
+                { label: '30+ days', amount: `₹${Number((customer as any)?.overdue ?? 0).toLocaleString('en-IN')}`, count: 0, tone: 'danger' },
               ]}
             />
           </Card>
@@ -212,20 +303,21 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* Tab 3: Invoices */}
       {activeTab === 'invoices' && (
         <Card className="p-5 text-xs space-y-2">
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center">
-            <div>
-              <span className="font-mono font-bold text-teal-400">INV-2026-0512</span>
-              <span className="text-zinc-400 ml-3">12 Nov 2026</span>
+          {customerInvoices.length === 0 ? (
+            <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500">
+              No invoices found for this customer in database.
             </div>
-            <span className="font-mono font-bold text-white">₹20,000.00</span>
-          </div>
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center">
-            <div>
-              <span className="font-mono font-bold text-teal-400">INV-2026-0490</span>
-              <span className="text-zinc-400 ml-3">05 Nov 2026</span>
-            </div>
-            <span className="font-mono font-bold text-white">₹42,000.00</span>
-          </div>
+          ) : (
+            customerInvoices.map((inv: any) => (
+              <div key={inv.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center">
+                <div>
+                  <span className="font-mono font-bold text-teal-400">{inv.invoice_number || inv.invoiceNumber || inv.id}</span>
+                  <span className="text-zinc-400 ml-3">{inv.invoice_date || inv.created_at || ''}</span>
+                </div>
+                <span className="font-mono font-bold text-white">{formatINR(Number(inv.total_amount ?? inv.totalAmount ?? 0))}</span>
+              </div>
+            ))
+          )}
         </Card>
       )}
 
@@ -268,13 +360,21 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* Tab 5: Payments */}
       {activeTab === 'payments' && (
         <Card className="p-5 text-xs space-y-3">
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between">
-            <div>
-              <strong className="text-white font-mono">RCPT-881</strong>
-              <span className="text-zinc-400 ml-2">08 Nov 2026 · NEFT</span>
+          {customerPayments.length === 0 ? (
+            <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500">
+              No payments recorded for this customer in database.
             </div>
-            <span className="font-mono font-bold text-emerald-400">₹32,000.00</span>
-          </div>
+          ) : (
+            customerPayments.map((p: any) => (
+              <div key={p.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between">
+                <div>
+                  <strong className="text-white font-mono">{p.receipt_number || p.id}</strong>
+                  <span className="text-zinc-400 ml-2">{p.collected_at || p.created_at || ''} · {p.payment_mode || 'CASH'}</span>
+                </div>
+                <span className="font-mono font-bold text-emerald-400">{formatINR(Number(p.amount ?? 0))}</span>
+              </div>
+            ))
+          )}
         </Card>
       )}
 
@@ -298,15 +398,13 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'prices' && (
         <Card className="p-5 text-xs space-y-3">
           <h4 className="font-bold text-white">Recent Item-wise Price Memory</h4>
-          {INITIAL_DAILY_PRICES.slice(0, 2).map((item) => (
+          {dailyPrices.slice(0, 5).map((item) => (
             <div key={item.itemId} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl space-y-2">
               <div className="font-bold text-teal-400">{item.itemName}</div>
               <div className="flex gap-3 flex-wrap">
-                {(item.lastPricesForCustomer || []).map((lp, idx) => (
-                  <span key={idx} className="px-2 py-1 bg-zinc-900 rounded-lg border border-zinc-800 font-mono">
-                    {lp.date}: <strong>₹{lp.price}</strong>
-                  </span>
-                ))}
+                <span className="px-2 py-1 bg-zinc-900 rounded-lg border border-zinc-800 font-mono">
+                  Floor: <strong>₹{item.floorPrice ?? '—'}</strong> · Target: <strong>₹{item.targetPrice ?? '—'}</strong>
+                </span>
               </div>
             </div>
           ))}
@@ -380,3 +478,4 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
     </div>
   );
 }
+
