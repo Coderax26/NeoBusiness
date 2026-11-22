@@ -41,7 +41,12 @@ CREATE POLICY rls_delivery_command_queue ON delivery_command_queue
   );
 
 -- Append-only protection (no DELETE)
-REVOKE DELETE ON delivery_command_queue FROM neobus_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neobus_app') THEN
+    REVOKE DELETE ON delivery_command_queue FROM neobus_app;
+  END IF;
+END $$;
 
 -- Trigger to update updated_at timestamp
 DROP TRIGGER IF EXISTS trg_delivery_command_queue_updated_at ON delivery_command_queue;

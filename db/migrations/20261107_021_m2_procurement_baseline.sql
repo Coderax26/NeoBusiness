@@ -378,9 +378,14 @@ CREATE POLICY supplier_bills_rls ON supplier_bills
 -- ============================================================================
 
 -- goods_receipts and goods_receipt_lines are append-only (financial/stock impact)
-REVOKE DELETE, UPDATE ON goods_receipts FROM neobus_app;
-REVOKE DELETE, UPDATE ON goods_receipt_lines FROM neobus_app;
-REVOKE DELETE, UPDATE ON po_shortfalls FROM neobus_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neobus_app') THEN
+    REVOKE DELETE, UPDATE ON goods_receipts FROM neobus_app;
+    REVOKE DELETE, UPDATE ON goods_receipt_lines FROM neobus_app;
+    REVOKE DELETE, UPDATE ON po_shortfalls FROM neobus_app;
+  END IF;
+END $$;
 
 -- ============================================================================
 -- UPDATED_AT TRIGGERS

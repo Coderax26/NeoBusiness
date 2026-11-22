@@ -63,8 +63,8 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       LOG_LEVEL: ${LOG_LEVEL:-log}
       APP_TZ: ${APP_TZ:-Asia/Kolkata}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-neobus_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-neobus_prod}}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-neobus_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-neobus_prod}
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
       JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
@@ -84,10 +84,10 @@ services:
       - "3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      start_period: 25s
-      retries: 3
+      start_period: 60s
+      retries: 6
     deploy:
       resources:
         limits:
@@ -115,10 +115,10 @@ services:
       - "4000"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      start_period: 20s
-      retries: 3
+      start_period: 30s
+      retries: 6
     deploy:
       resources:
         limits:

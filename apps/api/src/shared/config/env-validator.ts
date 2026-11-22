@@ -12,13 +12,29 @@ export interface EnvValidationResult {
   warnings: string[];
 }
 
-const WEAK_SECRET_PATTERNS = [
-  'change_in_production',
-  'dev_jwt_secret',
+const WEAK_EXACT_SECRETS = new Set([
   'secret',
   'default',
   '123456',
+  'password',
+  'changeme',
+]);
+
+const WEAK_PLACEHOLDER_SUBSTRINGS = [
+  'change_in_production',
+  'dev_jwt_secret',
+  'test-jwt-secret',
+  'test-refresh-secret',
+  'replace_with_',
 ];
+
+function isWeakSecret(value: string): boolean {
+  const lower = value.trim().toLowerCase();
+  return (
+    WEAK_EXACT_SECRETS.has(lower) ||
+    WEAK_PLACEHOLDER_SUBSTRINGS.some((p) => lower.includes(p))
+  );
+}
 
 export function validateEnvironmentConfig(
   env: Record<string, string | undefined> = process.env,
@@ -35,26 +51,16 @@ export function validateEnvironmentConfig(
   const jwtRefreshSecret = env.JWT_REFRESH_SECRET ?? '';
 
   if (nodeEnv === 'production') {
-    if (jwtSecret.length < 32) {
-      errors.push('JWT_SECRET must be at least 32 characters in production');
-    }
-    if (
-      WEAK_SECRET_PATTERNS.some((p) =>
-        jwtSecret.toLowerCase().includes(p),
-      )
-    ) {
-      errors.push('JWT_SECRET uses an insecure development/default placeholder');
-    }
-
-    if (jwtRefreshSecret.length < 32) {
-      errors.push('JWT_REFRESH_SECRET must be at least 32 characters in production');
-    }
-    if (
-      WEAK_SECRET_PATTERNS.some((p) =>
-        jwtRefreshSecret.toLowerCase().includes(p),
-      )
-    ) {
-      errors.push('JWT_REFRESH_SECRET uses an insecure development/default placeholder');
+    for (const [label, secret] of [
+      ['JWT_SECRET', jwtSecret],
+      ['JWT_REFRESH_SECRET', jwtRefreshSecret],
+    ] as const) {
+      if (secret.length < 32) {
+        errors.push(`${label} must be at least 32 characters in production`);
+      }
+      if (isWeakSecret(secret)) {
+        errors.push(`${label} uses an insecure development/default placeholder`);
+      }
     }
 
     if (jwtSecret && jwtSecret === jwtRefreshSecret) {

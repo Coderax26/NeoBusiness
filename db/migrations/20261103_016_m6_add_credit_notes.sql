@@ -78,10 +78,15 @@ CREATE POLICY rls_credit_note_lines ON credit_note_lines
   );
 
 -- Append-only protection for credit_notes (no DELETE, no UPDATE on financial fields)
-REVOKE DELETE ON credit_notes FROM neobus_app;
-REVOKE DELETE ON credit_note_lines FROM neobus_app;
-REVOKE UPDATE (total_debit, status, credit_note_no) ON credit_notes FROM neobus_app;
-REVOKE UPDATE (debited_qty, unit_price, total_debit) ON credit_note_lines FROM neobus_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neobus_app') THEN
+    REVOKE DELETE ON credit_notes FROM neobus_app;
+    REVOKE DELETE ON credit_note_lines FROM neobus_app;
+    REVOKE UPDATE (total_debit, status, credit_note_no) ON credit_notes FROM neobus_app;
+    REVOKE UPDATE (debited_qty, unit_price, total_debit) ON credit_note_lines FROM neobus_app;
+  END IF;
+END $$;
 
 -- Trigger to update updated_at timestamp
 DROP TRIGGER IF EXISTS trg_credit_notes_updated_at ON credit_notes;

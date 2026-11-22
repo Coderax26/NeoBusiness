@@ -337,11 +337,16 @@ CREATE POLICY rls_labour_attendance_logs ON labour_attendance_logs
 -- ============================================================
 -- Append-Only Protection (no DELETE on financial/stock tables)
 -- ============================================================
-REVOKE DELETE ON work_order_materials FROM neobus_app;
-REVOKE DELETE ON work_order_outputs FROM neobus_app;
-REVOKE DELETE ON wastage_records FROM neobus_app;
-REVOKE UPDATE (planned_qty, actual_qty, uom) ON work_order_materials FROM neobus_app;
-REVOKE UPDATE (planned_qty, actual_qty, uom) ON work_order_outputs FROM neobus_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neobus_app') THEN
+    REVOKE DELETE ON work_order_materials FROM neobus_app;
+    REVOKE DELETE ON work_order_outputs FROM neobus_app;
+    REVOKE DELETE ON wastage_records FROM neobus_app;
+    REVOKE UPDATE (planned_qty, actual_qty, uom) ON work_order_materials FROM neobus_app;
+    REVOKE UPDATE (planned_qty, actual_qty, uom) ON work_order_outputs FROM neobus_app;
+  END IF;
+END $$;
 
 -- ============================================================
 -- Updated_At Triggers
