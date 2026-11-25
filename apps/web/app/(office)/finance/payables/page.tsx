@@ -62,21 +62,21 @@ export default function SupplierPayablesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Supplier Bills &amp; Payables (AP)</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Supplier Bills &amp; Payables (AP)</h1>
+        <p className="text-sm text-ink-3">
           Approved supplier bills from Procurement (F5), outstanding balance, and payment recording.
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Bill # / Supplier</th>
               <th className="px-4 py-3">Due Date</th>
@@ -86,10 +86,10 @@ export default function SupplierPayablesPage() {
               <th className="px-4 py-3 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {bills.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-zinc-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-ink-3">
                   No supplier payables found.
                 </td>
               </tr>
@@ -97,23 +97,23 @@ export default function SupplierPayablesPage() {
               bills.map((b) => {
                 const balance = Number(subMoney(b.totalAmount, b.paidAmount));
                 return (
-                  <tr key={b.id} className="hover:bg-zinc-800/40">
+                  <tr key={b.id} className="hover:bg-sunken">
                     <td className="px-4 py-3">
-                      <div className="font-mono font-semibold text-zinc-100">{b.billNo}</div>
-                      <div className="text-xs text-zinc-400">{b.supplierName}</div>
+                      <div className="font-mono font-semibold text-ink">{b.billNo}</div>
+                      <div className="text-xs text-ink-3">{b.supplierName}</div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">{b.dueDate}</td>
-                    <td className="px-4 py-3 text-right font-mono text-zinc-200">{formatINR(b.totalAmount)}</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-rose-400">
+                    <td className="px-4 py-3 text-xs text-ink-3">{b.dueDate}</td>
+                    <td className="px-4 py-3 text-right font-mono text-ink">{formatINR(b.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-madder">
                       {formatINR(balance)}
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-zinc-300">{b.status}</td>
+                    <td className="px-4 py-3 text-xs font-semibold text-ink-2">{b.status}</td>
                     <td className="px-4 py-3 text-right">
                       {b.status !== 'PAID' && (
                         <button
                           type="button"
                           onClick={() => recordFullPayment(b)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                          className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                         >
                           Record Payment
                         </button>

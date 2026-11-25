@@ -34,21 +34,21 @@ export default function CodSettlementPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">COD Settlement</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">COD Settlement</h1>
+        <p className="text-sm text-ink-3">
           Confirm cash-on-delivery stops collected per trip/driver (linked with Phase F8 trips).
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Trip / Driver</th>
               <th className="px-4 py-3">Order / Customer</th>
@@ -58,32 +58,32 @@ export default function CodSettlementPage() {
               <th className="px-4 py-3 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {stops.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-zinc-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-ink-3">
                   No pending COD settlements.
                 </td>
               </tr>
             ) : (
               stops.map((s) => (
-                <tr key={s.stopId} className="hover:bg-zinc-800/40">
+                <tr key={s.stopId} className="hover:bg-sunken">
                   <td className="px-4 py-3">
-                    <div className="font-mono font-semibold text-zinc-100">{s.tripNo}</div>
-                    <div className="text-xs text-zinc-400">{s.driverName}</div>
+                    <div className="font-mono font-semibold text-ink">{s.tripNo}</div>
+                    <div className="text-xs text-ink-3">{s.driverName}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-zinc-200">{s.customerName}</div>
-                    <div className="font-mono text-xs text-zinc-400">{s.orderNo}</div>
+                    <div className="font-semibold text-ink">{s.customerName}</div>
+                    <div className="font-mono text-xs text-ink-3">{s.orderNo}</div>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-zinc-200">{formatINR(s.expectedCod)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-400">
+                  <td className="px-4 py-3 text-right font-mono text-ink">{formatINR(s.expectedCod)}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-leaf">
                     {formatINR(s.collectedCod)}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        s.status === 'SETTLED' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                        s.status === 'SETTLED' ? 'bg-leaf-soft text-leaf' : 'bg-haldi-soft text-haldi'
                       }`}
                     >
                       {s.status}
@@ -94,7 +94,7 @@ export default function CodSettlementPage() {
                       <button
                         type="button"
                         onClick={() => settleStop(s.stopId)}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                        className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                       >
                         Settle COD
                       </button>

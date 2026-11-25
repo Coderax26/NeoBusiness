@@ -83,9 +83,9 @@ export default function ProductionOverviewPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-            <h1 className="text-2xl font-bold text-white">Production &amp; Factory Overview</h1>
+            <h1 className="text-2xl font-bold text-ink">Production &amp; Factory Overview</h1>
           </div>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm text-ink-3 mt-1">
             Plan vs actual output, weekly yield health (±3% BR-06), open RM shortages, and variance alerts.
           </p>
         </div>
@@ -123,62 +123,62 @@ export default function ProductionOverviewPage() {
           title="Wastage %"
           value={`${wastagePct}%`}
           subtitle={`${totalWastageKg} kg logged`}
-          trend={{ value: `${wastageLogs.length} events`, direction: wastageLogs.length > 0 ? 'down' : 'up' }}
-        />
-      </div>
+          trend={{ value: `${wastageLogs.length} events`, direction: wastageLogs.length > 0 ? 'down' : 'up'}}
+ />
+ </div>
 
-      {/* Plan vs Actual Chart */}
-      <Card className="p-5 bg-zinc-900 border-zinc-800">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-white">Plan vs Actual Output (kg)</h2>
-          <div className="flex gap-4 text-xs text-zinc-400">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-zinc-600" /> Planned
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-orange-500" /> Actual Output
-            </span>
-          </div>
-        </div>
-        <div className="grid grid-cols-7 gap-3 items-end h-44 pt-4">
-          {yieldTrend.map((d) => (
-            <div key={d.day} className="flex flex-col items-center gap-1.5 h-full justify-end">
-              <div className="flex items-end gap-1 h-32 w-full justify-center">
-                <div
-                  className="w-4 bg-zinc-700 rounded-t"
-                  style={{ height: `${(d.plannedKg / maxKg) * 100}%` }}
-                  title={`Planned: ${d.plannedKg} kg`}
-                />
-                <div
-                  className="w-4 bg-orange-500 rounded-t"
-                  style={{ height: `${(d.outputKg / maxKg) * 100}%` }}
-                  title={`Output: ${d.outputKg} kg`}
-                />
-              </div>
-              <span className="text-[11px] text-zinc-400 font-mono">{d.day}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
+ {/* Plan vs Actual Chart */}
+ <Card className="p-5 bg-sheet border-rule">
+ <div className="flex items-center justify-between mb-4">
+ <h2 className="text-sm font-semibold text-ink">Plan vs Actual Output (kg)</h2>
+ <div className="flex gap-4 text-xs text-ink-3">
+ <span className="flex items-center gap-1.5">
+ <span className="w-3 h-3 rounded bg-zinc-600" /> Planned
+ </span>
+ <span className="flex items-center gap-1.5">
+ <span className="w-3 h-3 rounded bg-orange-500" /> Actual Output
+ </span>
+ </div>
+ </div>
+ <div className="grid grid-cols-7 gap-3 items-end h-44 pt-4">
+ {yieldTrend.map((d) => (
+ <div key={d.day} className="flex flex-col items-center gap-1.5 h-full justify-end">
+ <div className="flex items-end gap-1 h-32 w-full justify-center">
+ <div
+ className="w-4 bg-sunken rounded-t"
+ style={{ height: `${(d.plannedKg / maxKg) * 100}%` }}
+ title={`Planned: ${d.plannedKg} kg`}
+ />
+ <div
+ className="w-4 bg-orange-500 rounded-t"
+ style={{ height: `${(d.outputKg / maxKg) * 100}%` }}
+ title={`Output: ${d.outputKg} kg`}
+ />
+ </div>
+ <span className="text-[11px] text-ink-3 font-mono">{d.day}</span>
+ </div>
+ ))}
+ </div>
+ </Card>
 
-      {/* Bottom 3 Panels: Orders Waiting, Material Shortages, Yield Variance Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-5 bg-zinc-900 border-zinc-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Orders Waiting for Production</h3>
-            <Badge variant="info">IN_PRODUCTION_SOURCING</Badge>
-          </div>
-          {workOrders.filter((w) => w.linkedSalesOrderNo && w.status !== 'COMPLETED').map(
+ {/* Bottom 3 Panels: Orders Waiting, Material Shortages, Yield Variance Alerts */}
+ <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+ <Card className="p-5 bg-sheet border-rule space-y-3">
+ <div className="flex items-center justify-between">
+ <h3 className="text-sm font-semibold text-ink">Orders Waiting for Production</h3>
+ <Badge variant="info">IN_PRODUCTION_SOURCING</Badge>
+ </div>
+ {workOrders.filter((w) => w.linkedSalesOrderNo && w.status !=='COMPLETED').map(
             (w) => (
               <div
                 key={w.id}
-                className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs flex justify-between items-center"
+                className="p-3 rounded-lg bg-paper border border-rule text-xs flex justify-between items-center"
               >
                 <div>
                   <div className="font-mono text-orange-400 font-bold">{w.linkedSalesOrderNo}</div>
-                  <div className="text-zinc-200">{w.customerName}</div>
+                  <div className="text-ink">{w.customerName}</div>
                 </div>
-                <div className="text-right font-mono text-zinc-400">
+                <div className="text-right font-mono text-ink-3">
                   <div>{w.plannedQty} {w.uom}</div>
                   <div>Due {w.requiredBy}</div>
                 </div>
@@ -187,21 +187,21 @@ export default function ProductionOverviewPage() {
           )}
         </Card>
 
-        <Card className="p-5 bg-zinc-900 border-zinc-800 space-y-3">
+        <Card className="p-5 bg-sheet border-rule space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Material Shortages</h3>
+            <h3 className="text-sm font-semibold text-ink">Material Shortages</h3>
             <Badge variant="warning">{openShortages.length} open</Badge>
           </div>
           {openShortages.map((s) => (
             <div
               key={s.id}
-              className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs flex justify-between items-center"
+              className="p-3 rounded-lg bg-paper border border-rule text-xs flex justify-between items-center"
             >
               <div>
-                <div className="text-white font-medium">{s.itemName}</div>
-                <div className="text-zinc-500">For {s.sourceWoNo}</div>
+                <div className="text-ink font-medium">{s.itemName}</div>
+                <div className="text-ink-3">For {s.sourceWoNo}</div>
               </div>
-              <span className="font-mono text-amber-400 font-bold">
+              <span className="font-mono text-haldi font-bold">
                 {s.qty} {s.uom}
               </span>
             </div>
@@ -211,22 +211,22 @@ export default function ProductionOverviewPage() {
           </Link>
         </Card>
 
-        <Card className="p-5 bg-zinc-900 border-zinc-800 space-y-3">
+        <Card className="p-5 bg-sheet border-rule space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Yield Variance Alerts</h3>
+            <h3 className="text-sm font-semibold text-ink">Yield Variance Alerts</h3>
             <Badge variant="danger">{varianceAlerts.length} alert</Badge>
           </div>
           {varianceAlerts.map((w) => (
             <div
               key={w.id}
-              className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs"
+              className="p-3 rounded-lg bg-madder-soft border border-madder/30 text-xs"
             >
-              <div className="flex justify-between font-bold text-rose-300">
+              <div className="flex justify-between font-bold text-madder">
                 <span>{w.woNumber}</span>
                 <span>YIELD_VARIANCE</span>
               </div>
-              <div className="text-zinc-200 mt-1">{w.finishedItemName}</div>
-              <div className="text-zinc-400 mt-0.5">
+              <div className="text-ink mt-1">{w.finishedItemName}</div>
+              <div className="text-ink-3 mt-0.5">
                 Issued {w.issuedRmQty} kg → Output {w.actualOutputQty} kg
               </div>
             </div>

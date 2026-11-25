@@ -100,30 +100,30 @@ export default function TallyExportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Tally Prime XML Export (OD-018)</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Tally Prime XML Export (OD-018)</h1>
+        <p className="text-sm text-ink-3">
           Select date range and voucher types to generate Tally-compatible XML batches for your accountant.
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label className="block text-xs font-semibold text-zinc-400">From Date</label>
+            <label className="block text-xs font-semibold text-ink-3">From Date</label>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="mt-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-400">To Date</label>
+            <label className="block text-xs font-semibold text-ink-3">To Date</label>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="mt-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -132,10 +132,10 @@ export default function TallyExportPage() {
                 key={t}
                 type="button"
                 onClick={() => toggleType(t)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                className={`rounded-lg px-3 py-2 text-xs font-semibold${
                   selectedTypes.includes(t)
-                    ? 'bg-emerald-600 text-white'
-                    : 'border border-zinc-800 bg-zinc-950 text-zinc-300'
+                    ? 'bg-leaf text-white'
+                    : 'border border-rule bg-paper text-ink-2'
                 }`}
               >
                 {t}
@@ -145,25 +145,25 @@ export default function TallyExportPage() {
           <button
             type="button"
             onClick={createExportBatch}
-            className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="ml-auto rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             Generate XML Batch ({preview.includedCount})
           </button>
         </div>
 
-        <pre className="max-h-64 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-emerald-400">
+        <pre className="max-h-64 overflow-auto rounded-[3px] border border-rule bg-paper p-4 font-mono text-xs text-leaf">
           {preview.xml}
         </pre>
       </div>
 
       {batches.length > 0 && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-2">
-          <h2 className="text-sm font-bold text-zinc-100">Generated Export Batches</h2>
+        <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-2">
+          <h2 className="text-sm font-bold text-ink">Generated Export Batches</h2>
           {batches.map((b) => (
-            <div key={b.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2 text-xs">
-              <span className="font-mono font-bold text-zinc-100">{b.id}</span>
-              <span className="text-zinc-400">{b.range}</span>
-              <span className="font-mono text-emerald-400">{b.count} vouchers</span>
+            <div key={b.id} className="flex items-center justify-between rounded-lg border border-rule bg-paper px-4 py-2 text-xs">
+              <span className="font-mono font-bold text-ink">{b.id}</span>
+              <span className="text-ink-3">{b.range}</span>
+              <span className="font-mono text-leaf">{b.count} vouchers</span>
             </div>
           ))}
         </div>

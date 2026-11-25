@@ -236,13 +236,13 @@ export default function PurchaseOrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/procurement" className="hover:text-white">Procurement</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/procurement" className="hover:text-ink">Procurement</Link>
             <span>/</span>
-            <span className="text-indigo-400">Purchase Orders</span>
+            <span className="text-action">Purchase Orders</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Purchase Orders</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Purchase Orders</h1>
+          <p className="text-sm text-ink-3">
             Build POs with automatic rate variance checks, confirm supplier quantities, and issue PDFs.
           </p>
         </div>
@@ -259,13 +259,13 @@ export default function PurchaseOrdersPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
       {/* Status Tabs & Filters */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-3">
+      <div className="bg-sheet border border-rule rounded-[3px] p-3 space-y-3">
         <div className="flex flex-wrap gap-1.5">
           {STATUS_TABS.map((tab) => {
             const count =
@@ -276,10 +276,10 @@ export default function PurchaseOrdersPage() {
               <button
                 key={tab.key}
                 onClick={() => setStatusTab(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors${
                   statusTab === tab.key
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    : 'bg-sunken text-ink-3 hover:text-ink'
                 }`}
               >
                 {tab.label} ({count})
@@ -292,7 +292,7 @@ export default function PurchaseOrdersPage() {
           <select
             value={supplierFilter}
             onChange={(e) => setSupplierFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200"
+            className="bg-paper border border-rule-strong rounded-lg px-3 py-1.5 text-xs text-ink"
           >
             <option value="ALL">All Suppliers</option>
             {PROCUREMENT_SUPPLIERS.map((s) => (
@@ -303,7 +303,7 @@ export default function PurchaseOrdersPage() {
           <select
             value={siteFilter}
             onChange={(e) => setSiteFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200"
+            className="bg-paper border border-rule-strong rounded-lg px-3 py-1.5 text-xs text-ink"
           >
             <option value="ALL">All Receiving Sites</option>
             <option value="Pune Central Depot">Pune Central Depot</option>
@@ -313,10 +313,10 @@ export default function PurchaseOrdersPage() {
       </div>
 
       {/* PO Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
               <tr>
                 <th className="p-3">PO #</th>
                 <th className="p-3">Supplier</th>
@@ -327,38 +327,38 @@ export default function PurchaseOrdersPage() {
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {filteredPos.map((po) => {
                 const total = po.lines.reduce(
                   (sum, l) => sum + l.orderedQty * l.unitRate,
                   0,
                 );
                 return (
-                  <tr key={po.id} className="hover:bg-zinc-800/40">
+                  <tr key={po.id} className="hover:bg-sunken">
                     <td className="p-3">
                       <Link
                         href={`/procurement/purchase-orders/${po.id}`}
-                        className="font-mono text-xs text-indigo-400 font-semibold hover:underline"
+                        className="font-mono text-xs text-action font-semibold hover:underline"
                       >
                         {po.poNumber}
                       </Link>
                       {po.linkedSalesOrderNo && (
-                        <div className="text-[11px] text-teal-400">
+                        <div className="text-[11px] text-action">
                           Back-to-back: {po.linkedSalesOrderNo}
                         </div>
                       )}
                     </td>
                     <td className="p-3">
-                      <div className="text-zinc-100 font-medium">{po.supplierName}</div>
-                      <div className="text-[11px] text-zinc-500">
+                      <div className="text-ink font-medium">{po.supplierName}</div>
+                      <div className="text-[11px] text-ink-3">
                         {po.lines.length} line(s) · {po.paymentTermsDays}d terms
                       </div>
                     </td>
-                    <td className="p-3 text-xs text-zinc-300">
+                    <td className="p-3 text-xs text-ink-2">
                       <div>{po.receivingSiteName}</div>
-                      <div className="text-zinc-500 font-mono">ETA {po.expectedDelivery}</div>
+                      <div className="text-ink-3 font-mono">ETA {po.expectedDelivery}</div>
                     </td>
-                    <td className="p-3 font-mono font-semibold text-white">
+                    <td className="p-3 font-mono font-semibold text-ink">
                       {formatINR(total)}
                     </td>
                     <td className="p-3">
@@ -393,7 +393,7 @@ export default function PurchaseOrdersPage() {
                                 setConfirmTarget(po);
                                 setConfirmQtyValue(po.lines[0]?.orderedQty ?? 0);
                               }}
-                              className="text-xs text-sky-400 hover:text-sky-300 font-medium"
+                              className="text-xs text-action hover:text-action font-medium"
                             >
                               Confirm Qty
                             </button>
@@ -406,9 +406,9 @@ export default function PurchaseOrdersPage() {
                                 : 'Issue PO to supplier'
                             }
                             onClick={() => handleIssuePo(po)}
-                            className={`text-xs font-medium ${
+                            className={`text-xs font-medium${
                               po.priceSpikeException
-                                ? 'text-zinc-600 cursor-not-allowed'
+                                ? 'text-ink-3 cursor-not-allowed'
                                 : 'text-emerald-400 hover:text-emerald-300'
                             }`}
                           >
@@ -416,7 +416,7 @@ export default function PurchaseOrdersPage() {
                           </button>
                           <button
                             onClick={() => setCancelTarget(po)}
-                            className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                            className="text-xs text-madder hover:text-madder font-medium"
                           >
                             Cancel
                           </button>
@@ -424,7 +424,7 @@ export default function PurchaseOrdersPage() {
                       )}
                       <Link
                         href={`/procurement/purchase-orders/${po.id}`}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                        className="text-xs text-action hover:text-action font-medium"
                       >
                         View
                       </Link>
@@ -450,12 +450,12 @@ export default function PurchaseOrdersPage() {
               (label, i) => (
                 <div
                   key={label}
-                  className={`p-1.5 rounded text-center ${
+                  className={`p-1.5 rounded text-center${
                     wizardStep === i + 1
                       ? 'bg-indigo-600 text-white'
                       : wizardStep > i + 1
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'bg-zinc-950 text-zinc-500'
+                        ? 'bg-leaf-soft text-leaf'
+                        : 'bg-paper text-ink-3'
                   }`}
                 >
                   {label}
@@ -466,7 +466,7 @@ export default function PurchaseOrdersPage() {
 
           {wizardStep === 1 && (
             <div className="space-y-3">
-              <label className="block text-xs text-zinc-400">Select Supplier</label>
+              <label className="block text-xs text-ink-3">Select Supplier</label>
               <select
                 value={wizSupplierId}
                 onChange={(e) => {
@@ -474,7 +474,7 @@ export default function PurchaseOrdersPage() {
                   const sup = PROCUREMENT_SUPPLIERS.find((s) => s.id === e.target.value);
                   if (sup) setWizTerms(sup.termsDays);
                 }}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               >
                 {PROCUREMENT_SUPPLIERS.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -482,18 +482,18 @@ export default function PurchaseOrdersPage() {
                   </option>
                 ))}
               </select>
-              <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs">
+              <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-paper border border-rule text-xs">
                 <div>
-                  <span className="text-zinc-500">Reliability</span>
-                  <div className="text-white font-bold">{selectedWizSupplier.reliability} / 5.0</div>
+                  <span className="text-ink-3">Reliability</span>
+                  <div className="text-ink font-bold">{selectedWizSupplier.reliability} / 5.0</div>
                 </div>
                 <div>
-                  <span className="text-zinc-500">Fill Rate</span>
-                  <div className="text-emerald-400 font-bold">{selectedWizSupplier.fillRate}%</div>
+                  <span className="text-ink-3">Fill Rate</span>
+                  <div className="text-leaf font-bold">{selectedWizSupplier.fillRate}%</div>
                 </div>
                 <div>
-                  <span className="text-zinc-500">Lead Time</span>
-                  <div className="text-white font-bold">{selectedWizSupplier.leadTimeDays} days</div>
+                  <span className="text-ink-3">Lead Time</span>
+                  <div className="text-ink font-bold">{selectedWizSupplier.leadTimeDays} days</div>
                 </div>
               </div>
             </div>
@@ -502,7 +502,7 @@ export default function PurchaseOrdersPage() {
           {wizardStep === 2 && (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Item</label>
+                <label className="block text-xs text-ink-3 mb-1">Item</label>
                 <select
                   value={wizItemId}
                   onChange={(e) => {
@@ -510,7 +510,7 @@ export default function PurchaseOrdersPage() {
                     const found = PROCUREMENT_ITEMS.find((i) => i.id === e.target.value);
                     if (found) setWizRate(found.lastRate);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                  className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                 >
                   {PROCUREMENT_ITEMS.map((i) => (
                     <option key={i.id} value={i.id}>
@@ -521,35 +521,35 @@ export default function PurchaseOrdersPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">
+                  <label className="block text-xs text-ink-3 mb-1">
                     Quantity ({selectedWizItem.uom})
                   </label>
                   <input
                     type="number"
                     value={wizQty}
                     onChange={(e) => setWizQty(Number(e.target.value))}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                    className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">
+                  <label className="block text-xs text-ink-3 mb-1">
                     Unit Rate (₹/{selectedWizItem.uom})
                   </label>
                   <input
                     type="number"
                     value={wizRate}
                     onChange={(e) => setWizRate(Number(e.target.value))}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                    className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                   />
                 </div>
               </div>
 
               {/* BR-03 Live Price Spike Feedback */}
               <div
-                className={`p-3 rounded-lg border text-xs ${
+                className={`p-3 rounded-lg border text-xs${
                   spikeEval.requiresOwnerApproval
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
-                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    ? 'bg-haldi-soft border-haldi/30 text-haldi'
+                    : 'bg-leaf-soft border-leaf/30 text-leaf'
                 }`}
               >
                 <div className="flex items-center justify-between font-semibold">
@@ -570,11 +570,11 @@ export default function PurchaseOrdersPage() {
           {wizardStep === 3 && (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Receiving Site</label>
+                <label className="block text-xs text-ink-3 mb-1">Receiving Site</label>
                 <select
                   value={wizSite}
                   onChange={(e) => setWizSite(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                  className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                 >
                   <option value="Pune Central Depot">Pune Central Depot</option>
                   <option value="Baramati Plant">Baramati Plant</option>
@@ -582,21 +582,21 @@ export default function PurchaseOrdersPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Expected Delivery</label>
+                  <label className="block text-xs text-ink-3 mb-1">Expected Delivery</label>
                   <input
                     type="date"
                     value={wizDeliveryDate}
                     onChange={(e) => setWizDeliveryDate(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                    className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Payment Terms (days)</label>
+                  <label className="block text-xs text-ink-3 mb-1">Payment Terms (days)</label>
                   <input
                     type="number"
                     value={wizTerms}
                     onChange={(e) => setWizTerms(Number(e.target.value))}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                    className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                   />
                 </div>
               </div>
@@ -605,32 +605,32 @@ export default function PurchaseOrdersPage() {
 
           {wizardStep === 4 && (
             <div className="space-y-3 text-sm">
-              <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
+              <div className="p-3 rounded-lg bg-paper border border-rule space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Supplier</span>
-                  <span className="text-white font-medium">{selectedWizSupplier.name}</span>
+                  <span className="text-ink-3">Supplier</span>
+                  <span className="text-ink font-medium">{selectedWizSupplier.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Item</span>
-                  <span className="text-white">
+                  <span className="text-ink-3">Item</span>
+                  <span className="text-ink">
                     {selectedWizItem.name} × {wizQty} {selectedWizItem.uom}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Rate</span>
-                  <span className="text-white font-mono">₹{wizRate}/{selectedWizItem.uom}</span>
+                  <span className="text-ink-3">Rate</span>
+                  <span className="text-ink font-mono">₹{wizRate}/{selectedWizItem.uom}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Receiving Site &amp; ETA</span>
-                  <span className="text-white">{wizSite} ({wizDeliveryDate})</span>
+                  <span className="text-ink-3">Receiving Site &amp; ETA</span>
+                  <span className="text-ink">{wizSite} ({wizDeliveryDate})</span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-zinc-800 font-bold">
-                  <span className="text-zinc-300">Total Order Value</span>
-                  <span className="text-emerald-400 font-mono">{formatINR(wizQty * wizRate)}</span>
+                <div className="flex justify-between pt-2 border-t border-rule font-bold">
+                  <span className="text-ink-2">Total Order Value</span>
+                  <span className="text-leaf font-mono">{formatINR(wizQty * wizRate)}</span>
                 </div>
               </div>
               {spikeEval.requiresOwnerApproval && (
-                <div className="p-3 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs">
+                <div className="p-3 rounded-lg bg-haldi-soft border border-haldi/30 text-haldi text-xs">
                   <strong>SUPPLIER_PRICE_SPIKE:</strong> {plainSpikeSentence}. PO will be saved in{' '}
                   <strong>Waiting for Owner</strong> status with Issue disabled.
                 </div>
@@ -670,14 +670,14 @@ export default function PurchaseOrdersPage() {
         title={`Confirm Supplier Quantities — ${confirmTarget?.poNumber ?? ''}`}
       >
         <div className="space-y-4">
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-ink-3">
             Enter the supplier-confirmed quantity for {confirmTarget?.lines[0]?.itemName} before issuing the PO.
           </p>
           <input
             type="number"
             value={confirmQtyValue}
             onChange={(e) => setConfirmQtyValue(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmTarget(null)}>
@@ -702,7 +702,7 @@ export default function PurchaseOrdersPage() {
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="Cancellation reason required..."
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCancelTarget(null)}>

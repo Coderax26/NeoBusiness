@@ -164,8 +164,8 @@ export default function EodClosingPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Guided End-of-Day (EOD) Close</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Guided End-of-Day (EOD) Close</h1>
+          <p className="text-sm text-ink-3">
             All 6 checklist preconditions must be green before Owner sign-off becomes available.
           </p>
         </div>
@@ -174,13 +174,13 @@ export default function EodClosingPage() {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+            className="rounded-lg border border-rule bg-sheet px-3 py-2 text-sm text-ink"
           />
           {!started && (
             <button
               type="button"
               onClick={handleStartEod}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-lg bg-leaf px-4 py-2 text-sm font-semibold text-white"
             >
               Start EOD
             </button>
@@ -189,31 +189,31 @@ export default function EodClosingPage() {
       </div>
 
       {eodError && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm font-semibold text-rose-300">
+        <div className="rounded-[3px] border border-madder/30 bg-madder-soft p-4 text-sm font-semibold text-madder">
           {eodError}
         </div>
       )}
 
       {signedOff && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft p-4 text-sm font-semibold text-leaf">
           ✓ EOD Close for {selectedDate} signed off by Owner. Day ledger is locked.
         </div>
       )}
 
-      <div className="divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="divide-y divide-rule overflow-hidden rounded-[3px] border border-rule bg-sheet">
         {checklist.rows.map((item) => (
           <div key={item.key} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
             <div className="flex items-center gap-3">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
-                  item.passed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold${
+                  item.passed ? 'bg-leaf-soft text-leaf' : 'bg-madder-soft text-madder'
                 }`}
               >
                 {item.passed ? '✓' : '✕'}
               </span>
               <div>
-                <div className="font-semibold text-zinc-100">{item.label}</div>
-                <div className={`text-xs ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <div className="font-semibold text-ink">{item.label}</div>
+                <div className={`text-xs${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {item.passed ? 'Passed' : item.detail}
                 </div>
               </div>
@@ -221,7 +221,7 @@ export default function EodClosingPage() {
             {!item.passed && (
               <Link
                 href={item.fixHref}
-                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20"
+                className="rounded-lg border border-madder/30 bg-madder-soft px-3 py-1.5 text-xs font-semibold text-madder hover:opacity-90/20"
               >
                 Resolve →
               </Link>
@@ -230,41 +230,40 @@ export default function EodClosingPage() {
         ))}
       </div>
 
-      <form onSubmit={handleOwnerSignOff} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <form onSubmit={handleOwnerSignOff} className="rounded-[3px] border border-rule bg-sheet p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-zinc-100">Owner Sign-off</div>
-            <div className="text-xs text-zinc-400">
+            <div className="text-sm font-bold text-ink">Owner Sign-off</div>
+            <div className="text-xs text-ink-3">
               {checklist.canSignOff
-                ? 'All checks passed. Enter Owner password to lock EOD.'
-                : `${checklist.rows.filter((r) => !r.passed).length} blocker(s) remaining before sign-off.`}
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-xs text-zinc-300">
-            <input
-              type="checkbox"
-              checked={depositSlipPrepared}
-              onChange={(e) => setDepositSlipPrepared(e.target.checked)}
-              className="rounded border-zinc-700 bg-zinc-950"
-            />
-            Deposit slip prepared
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <input
-            type="password"
-            value={ownerPassword}
-            onChange={(e) => setOwnerPassword(e.target.value)}
-            placeholder="Owner password"
-            disabled={!checklist.canSignOff || signedOff}
-            className="flex-1 min-w-[200px] rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!checklist.canSignOff || signedOff || !ownerPassword.trim()}
-            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-          >
-            {signedOff ? 'Signed Off' : 'Sign Off & Lock Day'}
+                ? 'All checks passed. Enter Owner password to lock EOD.': `${checklist.rows.filter((r) => !r.passed).length} blocker(s) remaining before sign-off.`}
+ </div>
+ </div>
+ <label className="flex items-center gap-2 text-xs text-ink-2">
+ <input
+ type="checkbox"
+ checked={depositSlipPrepared}
+ onChange={(e) => setDepositSlipPrepared(e.target.checked)}
+ className="rounded border-rule-strong bg-paper"
+ />
+ Deposit slip prepared
+ </label>
+ </div>
+ <div className="flex flex-wrap gap-3">
+ <input
+ type="password"
+ value={ownerPassword}
+ onChange={(e) => setOwnerPassword(e.target.value)}
+ placeholder="Owner password"
+ disabled={!checklist.canSignOff || signedOff}
+ className="flex-1 min-w-[200px] rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-3 disabled:opacity-50"
+ />
+ <button
+ type="submit"
+ disabled={!checklist.canSignOff || signedOff || !ownerPassword.trim()}
+ className="rounded-lg bg-leaf px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3"
+ >
+ {signedOff ?'Signed Off' : 'Sign Off & Lock Day'}
           </button>
         </div>
       </form>

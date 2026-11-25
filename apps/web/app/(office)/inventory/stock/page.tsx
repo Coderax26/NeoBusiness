@@ -154,8 +154,8 @@ export default function StockOverviewPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Stock Overview</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Stock Overview</h1>
+          <p className="text-sm text-ink-3">
             Live warehouse stock with dual UoM, ATP (On Hand − Reserved), FEFO expiry heat, and batch drill-down.
           </p>
         </div>
@@ -203,7 +203,7 @@ export default function StockOverviewPage() {
       </div>
 
       {/* View Switcher + Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-sheet border border-rule rounded-[3px] p-3">
         <div className="flex flex-wrap gap-1.5">
           {(
             [
@@ -215,10 +215,10 @@ export default function StockOverviewPage() {
             <button
               key={tab.key}
               onClick={() => setViewMode(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium${
                 viewMode === tab.key
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  ? 'bg-haldi text-white'
+                  : 'bg-sunken text-ink-3 hover:text-ink'
               }`}
             >
               {tab.label}
@@ -231,16 +231,16 @@ export default function StockOverviewPage() {
           placeholder="Search item, SKU, site, or batch..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white w-full sm:w-64"
+          className="bg-paper border border-rule-strong rounded-lg px-3 py-1.5 text-xs text-ink w-full sm:w-64"
         />
       </div>
 
       {/* Stock Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <div className="overflow-x-auto">
           {viewMode === 'BY_ITEM' ? (
             <table className="w-full text-left text-sm">
-              <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+              <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
                 <tr>
                   <th className="p-3">Item</th>
                   <th className="p-3 text-right">On Hand</th>
@@ -251,38 +251,38 @@ export default function StockOverviewPage() {
                   <th className="p-3 text-right">Drill-Down</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-rule">
                 {itemGrouped.map((item) => {
                   const atp = computeAtp(item.onHand, item.reserved);
                   const exp = classifyExpiryBucket(item.nearestExpiryDays);
                   const ratio = Math.min(100, Math.round((item.onHand / Math.max(1, item.minStock)) * 100));
                   const isLow = item.onHand < item.minStock;
                   return (
-                    <tr key={item.itemId} className="hover:bg-zinc-800/40">
+                    <tr key={item.itemId} className="hover:bg-sunken">
                       <td className="p-3">
-                        <div className="text-white font-medium">{item.itemName}</div>
-                        <div className="text-[11px] font-mono text-zinc-500">
+                        <div className="text-ink font-medium">{item.itemName}</div>
+                        <div className="text-[11px] font-mono text-ink-3">
                           {item.sku} · {item.sitesCount} location(s)
                         </div>
                       </td>
-                      <td className="p-3 text-right font-mono text-zinc-200">
+                      <td className="p-3 text-right font-mono text-ink">
                         {item.onHand} {item.uom}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-400">
+                      <td className="p-3 text-right font-mono text-haldi">
                         {item.reserved} {item.uom}
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-400">
+                      <td className="p-3 text-right font-mono font-bold text-leaf">
                         {atp} {item.uom}
                       </td>
                       <td className="p-3 w-40">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-sunken rounded-full overflow-hidden">
                             <div
-                              className={`h-full ${isLow ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                              className={`h-full${isLow ? 'bg-rose-500' : 'bg-emerald-500'}`}
                               style={{ width: `${ratio}%` }}
                             />
                           </div>
-                          <span className="text-[11px] font-mono text-zinc-400">
+                          <span className="text-[11px] font-mono text-ink-3">
                             {isLow ? 'Low' : 'OK'}
                           </span>
                         </div>
@@ -295,7 +295,7 @@ export default function StockOverviewPage() {
                       <td className="p-3 text-right">
                         <button
                           onClick={() => setDrillItemId(item.itemId)}
-                          className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+                          className="text-xs text-haldi hover:text-haldi font-medium"
                         >
                           Batches &amp; Ledger →
                         </button>
@@ -307,7 +307,7 @@ export default function StockOverviewPage() {
             </table>
           ) : (
             <table className="w-full text-left text-sm">
-              <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+              <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
                 <tr>
                   <th className="p-3">Item</th>
                   <th className="p-3">Site / Location</th>
@@ -319,33 +319,33 @@ export default function StockOverviewPage() {
                   <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-rule">
                 {filteredRows.map((r) => {
                   const atp = computeAtp(r.onHand, r.reserved);
                   const exp = classifyExpiryBucket(r.daysToExpiry);
                   return (
-                    <tr key={r.id} className="hover:bg-zinc-800/40">
+                    <tr key={r.id} className="hover:bg-sunken">
                       <td className="p-3">
-                        <div className="text-white font-medium">{r.itemName}</div>
-                        <div className="text-[11px] font-mono text-zinc-500">{r.sku}</div>
+                        <div className="text-ink font-medium">{r.itemName}</div>
+                        <div className="text-[11px] font-mono text-ink-3">{r.sku}</div>
                       </td>
-                      <td className="p-3 text-xs text-zinc-300">
+                      <td className="p-3 text-xs text-ink-2">
                         <div>{r.siteName}</div>
-                        <div className="font-mono text-zinc-500">{r.locationCode}</div>
+                        <div className="font-mono text-ink-3">{r.locationCode}</div>
                       </td>
                       {viewMode === 'BY_BATCH' && (
-                        <td className="p-3 font-mono text-xs text-amber-400">{r.batchNo}</td>
+                        <td className="p-3 font-mono text-xs text-haldi">{r.batchNo}</td>
                       )}
                       <td className="p-3 text-right">
-                        <div className="font-mono text-white">
+                        <div className="font-mono text-ink">
                           {r.onHand} {r.uom}
                         </div>
-                        <div className="text-[11px] text-zinc-500">{r.altUomLabel}</div>
+                        <div className="text-[11px] text-ink-3">{r.altUomLabel}</div>
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-400">
+                      <td className="p-3 text-right font-mono text-haldi">
                         {r.reserved} {r.uom}
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-400">
+                      <td className="p-3 text-right font-mono font-bold text-leaf">
                         {atp} {r.uom}
                       </td>
                       <td className="p-3">
@@ -356,7 +356,7 @@ export default function StockOverviewPage() {
                       <td className="p-3 text-right">
                         <button
                           onClick={() => setDrillItemId(r.itemId)}
-                          className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+                          className="text-xs text-haldi hover:text-haldi font-medium"
                         >
                           Inspect
                         </button>
@@ -378,24 +378,24 @@ export default function StockOverviewPage() {
       >
         <div className="space-y-4">
           <div>
-            <h4 className="text-xs font-semibold uppercase text-zinc-400 mb-2">
+            <h4 className="text-xs font-semibold uppercase text-ink-3 mb-2">
               Batches (Ordered by Earliest Expiry / FEFO)
             </h4>
             <div className="space-y-2">
               {drillBatches.map((b) => (
                 <div
                   key={b.id}
-                  className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between text-xs"
+                  className="p-2.5 rounded-lg bg-paper border border-rule flex items-center justify-between text-xs"
                 >
                   <div>
-                    <span className="font-mono text-amber-400 font-bold mr-2">{b.batchNo}</span>
-                    <span className="text-zinc-300">{b.siteName} ({b.locationCode})</span>
+                    <span className="font-mono text-haldi font-bold mr-2">{b.batchNo}</span>
+                    <span className="text-ink-2">{b.siteName} ({b.locationCode})</span>
                   </div>
                   <div className="font-mono text-right">
-                    <span className="text-emerald-400 font-bold">
+                    <span className="text-leaf font-bold">
                       ATP {computeAtp(b.onHand, b.reserved)} {b.uom}
                     </span>
-                    <span className="text-zinc-500 ml-2">Exp {b.expiryDate}</span>
+                    <span className="text-ink-3 ml-2">Exp {b.expiryDate}</span>
                   </div>
                 </div>
               ))}
@@ -403,24 +403,24 @@ export default function StockOverviewPage() {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase text-zinc-400 mb-2">
+            <h4 className="text-xs font-semibold uppercase text-ink-3 mb-2">
               Recent Ledger Movements
             </h4>
             {drillMovements.length === 0 ? (
-              <p className="text-xs text-zinc-500">No recent ledger entries for this item.</p>
+              <p className="text-xs text-ink-3">No recent ledger entries for this item.</p>
             ) : (
               <div className="space-y-1.5">
                 {drillMovements.map((m) => (
                   <div
                     key={m.id}
-                    className="p-2 rounded bg-zinc-950 border border-zinc-800 flex items-center justify-between text-xs"
+                    className="p-2 rounded bg-paper border border-rule flex items-center justify-between text-xs"
                   >
                     <div>
-                      <span className="font-mono text-indigo-400 mr-2">{m.type}</span>
-                      <span className="text-zinc-300">{m.refNo}</span>
+                      <span className="font-mono text-action mr-2">{m.type}</span>
+                      <span className="text-ink-2">{m.refNo}</span>
                     </div>
                     <span
-                      className={`font-mono font-bold ${
+                      className={`font-mono font-bold${
                         m.qtyDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >

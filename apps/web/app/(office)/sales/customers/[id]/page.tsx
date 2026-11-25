@@ -159,16 +159,16 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header (§8) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-black text-white">{customer.name}</h1>
+            <h1 className="text-2xl font-semibold text-ink">{customer.name}</h1>
             <StatusPill tone="success" label="Active" />
             <Badge tone={customer.creditHold ? 'danger' : 'success'}>
               {customer.creditHold ? 'Credit Hold' : 'Credit OK'}
             </Badge>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-ink-3 mt-1">
             📞 {customer.phone} · 💬 WhatsApp · GSTIN <span className="font-mono">{customer.gstin}</span> · {customer.site} · Window {customer.window}
           </p>
         </div>
@@ -184,7 +184,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* 5 KPIs (§8) */}
-      <div className={`grid grid-cols-2 ${isOwner ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
+      <div className={`grid grid-cols-2${isOwner ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}gap-4`}>
         <KpiCard title="Outstanding" value={formatINR(customer.outstanding)} subtitle="Current AR balance" tone="default" />
         <KpiCard title="Overdue" value={customer.overdueDays > 0 ? `${customer.overdueDays} days` : '₹0'} subtitle="Past credit terms" tone={customer.overdueDays > 0 ? 'danger' : 'success'} />
         <KpiCard title="Credit Used" value={`${creditUsedPct}%`} subtitle={`of ${formatINR(customer.creditLimit)}`} tone={creditUsedPct > 85 ? 'warning' : 'default'} />
@@ -212,7 +212,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* 10 Tabs (§8) */}
-      <div className="flex border-b border-zinc-800 text-xs font-semibold gap-5 overflow-x-auto pb-0.5">
+      <div className="flex border-b border-rule text-xs font-semibold gap-5 overflow-x-auto pb-0.5">
         {[
           { key: 'overview', label: 'Overview' },
           { key: 'orders', label: `Orders (${customerOrders.length})` },
@@ -228,8 +228,8 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
-            className={`pb-2.5 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === t.key ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+            className={`pb-2.5 border-b-2 whitespace-nowrap transition-colors${
+              activeTab === t.key ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
             }`}
           >
             {t.label}
@@ -238,29 +238,29 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Tab 1: Overview */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          <Card className="lg:col-span-7 p-5 space-y-4">
-            <h3 className="text-sm font-bold text-white">12-Month Sales Trend</h3>
-            <div className="flex items-end gap-2 h-32 pt-4">
-              {[28, 32, 35, 30, 38, 42, 40, 44, 46, 41, 48, 52].map((val, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full bg-teal-500/70 hover:bg-teal-400 rounded-t-md transition-all"
-                    style={{ height: `${(val / 55) * 100}%` }}
-                    title={`Month ${idx + 1}: ₹${val}k`}
-                  />
-                  <span className="text-[10px] text-zinc-500">{idx + 1}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+      {activeTab === 'overview'&& (
+ <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+ <Card className="lg:col-span-7 p-5 space-y-4">
+ <h3 className="text-sm font-bold text-ink">12-Month Sales Trend</h3>
+ <div className="flex items-end gap-2 h-32 pt-4">
+ {[28, 32, 35, 30, 38, 42, 40, 44, 46, 41, 48, 52].map((val, idx) => (
+ <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+ <div
+ className="w-full bg-action/70 hover:bg-teal-400 rounded-t-md transition-all"
+ style={{ height: `${(val / 55) * 100}%` }}
+ title={`Month ${idx + 1}: ₹${val}k`}
+ />
+ <span className="text-[10px] text-ink-3">{idx + 1}</span>
+ </div>
+ ))}
+ </div>
+ </Card>
 
-          <Card className="lg:col-span-5 p-5 space-y-4">
-            <h3 className="text-sm font-bold text-white">Receivables Aging</h3>
-            <AgingBuckets
-              buckets={[
-                { label: 'Current (0–7d)', amount: `₹${Number(customer?.outstanding ?? 0).toLocaleString('en-IN')}`, count: 0, tone: 'info' },
+ <Card className="lg:col-span-5 p-5 space-y-4">
+ <h3 className="text-sm font-bold text-ink">Receivables Aging</h3>
+ <AgingBuckets
+ buckets={[
+ { label:'Current (0–7d)', amount: `₹${Number(customer?.outstanding ?? 0).toLocaleString('en-IN')}`, count: 0, tone: 'info' },
                 { label: '8–15 days', amount: '₹0', count: 0, tone: 'warning' },
                 { label: '16–30 days', amount: '₹0', count: 0, tone: 'warning' },
                 { label: '30+ days', amount: `₹${Number((customer as any)?.overdue ?? 0).toLocaleString('en-IN')}`, count: 0, tone: 'danger' },
@@ -274,7 +274,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'orders' && (
         <Card className="p-0 overflow-hidden">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
+            <thead className="bg-paper border-b border-rule text-ink-3 uppercase font-semibold">
               <tr>
                 <th className="p-3">Order No</th>
                 <th className="p-3">Delivery Date</th>
@@ -282,17 +282,17 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
                 <th className="p-3 text-right">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {customerOrders.map((o) => (
                 <tr key={o.id}>
                   <td className="p-3">
-                    <Link href={`/sales/orders/${o.id}`} className="font-mono font-bold text-teal-400 hover:underline">
+                    <Link href={`/sales/orders/${o.id}`} className="font-mono font-bold text-action hover:underline">
                       {o.orderNumber}
                     </Link>
                   </td>
-                  <td className="p-3 text-zinc-300">{o.deliveryDate}</td>
+                  <td className="p-3 text-ink-2">{o.deliveryDate}</td>
                   <td className="p-3"><Badge tone="info">{o.status}</Badge></td>
-                  <td className="p-3 text-right font-mono font-bold text-white">{formatINR(o.grandTotal)}</td>
+                  <td className="p-3 text-right font-mono font-bold text-ink">{formatINR(o.grandTotal)}</td>
                 </tr>
               ))}
             </tbody>
@@ -304,17 +304,17 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'invoices' && (
         <Card className="p-5 text-xs space-y-2">
           {customerInvoices.length === 0 ? (
-            <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500">
+            <div className="p-3 bg-paper border border-rule rounded-[3px] text-ink-3">
               No invoices found for this customer in database.
             </div>
           ) : (
             customerInvoices.map((inv: any) => (
-              <div key={inv.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center">
+              <div key={inv.id} className="p-3 bg-paper border border-rule rounded-[3px] flex justify-between items-center">
                 <div>
-                  <span className="font-mono font-bold text-teal-400">{inv.invoice_number || inv.invoiceNumber || inv.id}</span>
-                  <span className="text-zinc-400 ml-3">{inv.invoice_date || inv.created_at || ''}</span>
+                  <span className="font-mono font-bold text-action">{inv.invoice_number || inv.invoiceNumber || inv.id}</span>
+                  <span className="text-ink-3 ml-3">{inv.invoice_date || inv.created_at || ''}</span>
                 </div>
-                <span className="font-mono font-bold text-white">{formatINR(Number(inv.total_amount ?? inv.totalAmount ?? 0))}</span>
+                <span className="font-mono font-bold text-ink">{formatINR(Number(inv.total_amount ?? inv.totalAmount ?? 0))}</span>
               </div>
             ))
           )}
@@ -324,14 +324,14 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* Tab 4: Statement (Running Ledger Balance, AC-7) */}
       {activeTab === 'statement' && (
         <Card className="p-0 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800 flex justify-between items-center text-xs">
-            <span className="font-bold text-white">Customer Account Statement (Ledger)</span>
+          <div className="p-4 border-b border-rule flex justify-between items-center text-xs">
+            <span className="font-bold text-ink">Customer Account Statement (Ledger)</span>
             <Button variant="secondary" size="sm" onClick={() => window.print()}>
               🖨️ Print / Share PDF Statement
             </Button>
           </div>
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
+            <thead className="bg-paper border-b border-rule text-ink-3 uppercase font-semibold">
               <tr>
                 <th className="p-3">Date</th>
                 <th className="p-3">Reference</th>
@@ -341,15 +341,15 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
                 <th className="p-3 text-right">Running Balance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {ledgerWithBalance.map((row) => (
                 <tr key={row.id}>
-                  <td className="p-3 text-zinc-300">{row.date}</td>
-                  <td className="p-3 font-mono text-teal-400">{row.reference}</td>
-                  <td className="p-3 text-zinc-200">{row.description}</td>
-                  <td className="p-3 text-right font-mono text-zinc-200">{row.debit > 0 ? formatINR(row.debit) : '—'}</td>
-                  <td className="p-3 text-right font-mono text-emerald-400">{row.credit > 0 ? formatINR(row.credit) : '—'}</td>
-                  <td className="p-3 text-right font-mono font-bold text-white">{formatINR(row.runningBalance)}</td>
+                  <td className="p-3 text-ink-2">{row.date}</td>
+                  <td className="p-3 font-mono text-action">{row.reference}</td>
+                  <td className="p-3 text-ink">{row.description}</td>
+                  <td className="p-3 text-right font-mono text-ink">{row.debit > 0 ? formatINR(row.debit) : '—'}</td>
+                  <td className="p-3 text-right font-mono text-leaf">{row.credit > 0 ? formatINR(row.credit) : '—'}</td>
+                  <td className="p-3 text-right font-mono font-bold text-ink">{formatINR(row.runningBalance)}</td>
                 </tr>
               ))}
             </tbody>
@@ -361,17 +361,17 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'payments' && (
         <Card className="p-5 text-xs space-y-3">
           {customerPayments.length === 0 ? (
-            <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500">
+            <div className="p-3 bg-paper border border-rule rounded-[3px] text-ink-3">
               No payments recorded for this customer in database.
             </div>
           ) : (
             customerPayments.map((p: any) => (
-              <div key={p.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between">
+              <div key={p.id} className="p-3 bg-paper border border-rule rounded-[3px] flex justify-between">
                 <div>
-                  <strong className="text-white font-mono">{p.receipt_number || p.id}</strong>
-                  <span className="text-zinc-400 ml-2">{p.collected_at || p.created_at || ''} · {p.payment_mode || 'CASH'}</span>
+                  <strong className="text-ink font-mono">{p.receipt_number || p.id}</strong>
+                  <span className="text-ink-3 ml-2">{p.collected_at || p.created_at || ''} · {p.payment_mode || 'CASH'}</span>
                 </div>
-                <span className="font-mono font-bold text-emerald-400">{formatINR(Number(p.amount ?? 0))}</span>
+                <span className="font-mono font-bold text-leaf">{formatINR(Number(p.amount ?? 0))}</span>
               </div>
             ))
           )}
@@ -382,11 +382,11 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'promises' && (
         <Card className="p-5 text-xs space-y-3">
           {promises.map((p) => (
-            <div key={p.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between items-center">
+            <div key={p.id} className="p-3 bg-paper border border-rule rounded-[3px] flex justify-between items-center">
               <div>
-                <strong className="text-white">Promised {formatINR(p.amount)}</strong>
-                <span className="text-zinc-400 ml-2">Due {p.dueDate}</span>
-                <div className="text-[11px] text-zinc-500 mt-0.5">{p.note}</div>
+                <strong className="text-ink">Promised {formatINR(p.amount)}</strong>
+                <span className="text-ink-3 ml-2">Due {p.dueDate}</span>
+                <div className="text-[11px] text-ink-3 mt-0.5">{p.note}</div>
               </div>
               <Badge tone="warning">{p.status}</Badge>
             </div>
@@ -397,12 +397,12 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {/* Tab 7: Price History */}
       {activeTab === 'prices' && (
         <Card className="p-5 text-xs space-y-3">
-          <h4 className="font-bold text-white">Recent Item-wise Price Memory</h4>
+          <h4 className="font-bold text-ink">Recent Item-wise Price Memory</h4>
           {dailyPrices.slice(0, 5).map((item) => (
-            <div key={item.itemId} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl space-y-2">
-              <div className="font-bold text-teal-400">{item.itemName}</div>
+            <div key={item.itemId} className="p-3 bg-paper border border-rule rounded-[3px] space-y-2">
+              <div className="font-bold text-action">{item.itemName}</div>
               <div className="flex gap-3 flex-wrap">
-                <span className="px-2 py-1 bg-zinc-900 rounded-lg border border-zinc-800 font-mono">
+                <span className="px-2 py-1 bg-sheet rounded-lg border border-rule font-mono">
                   Floor: <strong>₹{item.floorPrice ?? '—'}</strong> · Target: <strong>₹{item.targetPrice ?? '—'}</strong>
                 </span>
               </div>
@@ -415,12 +415,12 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'contacts' && (
         <Card className="p-5 text-xs space-y-2">
           {contacts.map((c) => (
-            <div key={c.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex justify-between">
+            <div key={c.id} className="p-3 bg-paper border border-rule rounded-[3px] flex justify-between">
               <div>
-                <strong className="text-white">{c.name}</strong> <span className="text-zinc-500">({c.role})</span>
+                <strong className="text-ink">{c.name}</strong> <span className="text-ink-3">({c.role})</span>
                 {c.isPrimary && <Badge tone="brand">Primary</Badge>}
               </div>
-              <span className="font-mono text-teal-400">📞 {c.phone}</span>
+              <span className="font-mono text-action">📞 {c.phone}</span>
             </div>
           ))}
         </Card>
@@ -430,12 +430,12 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       {activeTab === 'activity' && (
         <div className="space-y-4">
           <Card className="p-4 space-y-3 text-xs">
-            <h4 className="font-bold text-white">Log Customer Activity</h4>
+            <h4 className="font-bold text-ink">Log Customer Activity</h4>
             <div className="flex flex-col sm:flex-row gap-2">
               <select
                 value={newActType}
                 onChange={(e) => setNewActType(e.target.value as any)}
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+                className="bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
               >
                 <option value="CALL">📞 Phone Call</option>
                 <option value="VISIT">🏪 Field Visit</option>
@@ -447,7 +447,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
                 value={newActNote}
                 onChange={(e) => setNewActNote(e.target.value)}
                 placeholder="Summary of call, visit, or payment follow-up..."
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+                className="flex-1 bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
               />
               <Button variant="primary" size="sm" onClick={handleLogActivity}>
                 Log Activity
@@ -457,12 +457,12 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
 
           <Card className="p-4 space-y-3 text-xs">
             {activities.map((a) => (
-              <div key={a.id} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
+              <div key={a.id} className="p-3 bg-paper border border-rule rounded-[3px]">
                 <div className="flex justify-between items-center">
                   <Badge tone="neutral">{a.type}</Badge>
-                  <span className="text-zinc-500">{a.date} · {a.user}</span>
+                  <span className="text-ink-3">{a.date} · {a.user}</span>
                 </div>
-                <p className="text-zinc-200 mt-1.5">{a.notes}</p>
+                <p className="text-ink mt-1.5">{a.notes}</p>
               </div>
             ))}
           </Card>
@@ -471,7 +471,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
 
       {/* Tab 10: Documents */}
       {activeTab === 'documents' && (
-        <Card className="p-6 text-center text-xs text-zinc-400">
+        <Card className="p-6 text-center text-xs text-ink-3">
           📄 KYC &amp; Trade Agreements (FSSAI Certificate, Signed Credit Agreement) — document vault connected via G-FILE-1.
         </Card>
       )}

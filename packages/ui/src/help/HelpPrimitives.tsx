@@ -28,15 +28,14 @@ export const HowItWorksDrawer: React.FC<HowItWorksDrawerProps> = ({
   return (
     <Drawer open={open} onClose={onClose} title={`How ${pageTitle} Works`} subtitle="Simple 3-step guide">
       <div className="flex flex-col gap-6">
-        {/* Quick Video Pill */}
-        <div className="p-4 bg-teal-950/30 border border-teal-500/30 rounded-2xl flex items-center justify-between">
+        <div className="p-4 bg-paper border border-rule rounded-[4px] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-lg">
+            <span className="w-9 h-9 rounded-full bg-action text-white flex items-center justify-center font-semibold text-sm">
               ▶
             </span>
             <div>
-              <div className="text-xs font-bold text-white">Watch {videoDurationSec}s Walkthrough</div>
-              <div className="text-[11px] text-zinc-400">Quick video explanation for this screen</div>
+              <div className="text-[14px] font-semibold text-ink">Watch {videoDurationSec}s Walkthrough</div>
+              <div className="text-[13px] text-ink-3">Quick video explanation for this screen</div>
             </div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => window.open(videoUrl || '#', '_blank')}>
@@ -44,23 +43,22 @@ export const HowItWorksDrawer: React.FC<HowItWorksDrawerProps> = ({
           </Button>
         </div>
 
-        {/* 3-Step Guide */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">3-Step Workflow</h4>
+        <div className="space-y-3">
+          <h4 className="text-[13px] font-semibold text-ink pb-1.5 border-b border-ink">3-Step Workflow</h4>
           {steps.map((st) => (
-            <div key={st.step} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex gap-3.5">
-              <span className="w-7 h-7 rounded-full bg-teal-600/30 border border-teal-500/40 text-teal-300 font-bold text-xs flex items-center justify-center shrink-0">
+            <div key={st.step} className="p-4 bg-sheet border border-rule rounded-[4px] flex gap-3.5">
+              <span className="w-7 h-7 rounded-full bg-action-soft border border-action/30 text-action font-semibold text-[13px] flex items-center justify-center shrink-0">
                 {st.step}
               </span>
               <div>
-                <div className="text-xs font-bold text-white">{st.title}</div>
-                <p className="text-xs text-zinc-300 mt-1 leading-relaxed">{st.description}</p>
+                <div className="text-[14px] font-semibold text-ink">{st.title}</div>
+                <p className="text-[13.5px] text-ink-2 mt-1 leading-relaxed">{st.description}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-end">
+        <div className="mt-4 pt-4 border-t border-rule flex justify-end">
           <Button variant="primary" size="sm" onClick={onClose}>
             Got it, let&apos;s start
           </Button>
@@ -90,21 +88,21 @@ export const TourEngine: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center p-4">
-      <div className="bg-zinc-900/95 border border-teal-500/50 rounded-2xl p-5 shadow-2xl max-w-sm w-full pointer-events-auto backdrop-blur-md animate-fade-in">
+      <div className="bg-sheet border border-rule-strong rounded-[4px] p-5 shadow-2xl max-w-sm w-full pointer-events-auto">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-bold text-teal-400 uppercase tracking-wider">
+          <span className="text-[13px] font-semibold text-action">
             Step {currentIdx + 1} of {steps.length}
           </span>
           <button
             type="button"
             onClick={onComplete}
-            className="text-xs text-zinc-400 hover:text-white"
+            className="text-[13px] text-ink-3 hover:text-ink"
           >
             Skip Tour
           </button>
         </div>
-        <h4 className="text-sm font-bold text-white mb-1.5">{currentStep.title}</h4>
-        <p className="text-xs text-zinc-300 leading-relaxed mb-4">{currentStep.content}</p>
+        <h4 className="text-[16px] font-serif font-medium text-ink mb-1.5">{currentStep.title}</h4>
+        <p className="text-[13.5px] text-ink-2 leading-relaxed mb-4">{currentStep.content}</p>
         <div className="flex justify-between items-center">
           <Button
             size="sm"
@@ -129,4 +127,3 @@ export const TourEngine: React.FC<{
     </div>
   );
 };
-

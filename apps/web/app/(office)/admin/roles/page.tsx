@@ -42,20 +42,20 @@ export default function AdminRolesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Roles &amp; Access Matrix</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Roles &amp; Access Matrix</h1>
+        <p className="text-sm text-ink-3">
           Seeded 6-role RBAC permissions with plain descriptions and a &ldquo;What can this person see?&rdquo; preview.
         </p>
       </div>
 
       {/* View As Preview */}
-      <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5 space-y-3">
+      <div className="rounded-[3px] border border-purple-500/30 bg-purple-950/20 p-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-bold text-purple-200">What can this person see?</div>
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-semibold text-zinc-100"
+            className="rounded-lg border border-rule-strong bg-paper px-3 py-1.5 text-sm font-semibold text-ink"
           >
             {users.length === 0 && <option value="">No users loaded</option>}
             {users.map((u) => (
@@ -65,39 +65,39 @@ export default function AdminRolesPage() {
             ))}
           </select>
         </div>
-        <p className="text-xs text-zinc-300">{userRoleSpec.summary}</p>
+        <p className="text-xs text-ink-2">{userRoleSpec.summary}</p>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="font-semibold text-emerald-400">Allowed:</span>
+          <span className="font-semibold text-leaf">Allowed:</span>
           {userRoleSpec.permissions.map((p) => (
-            <span key={p} className="rounded bg-emerald-500/20 px-2 py-0.5 font-mono text-emerald-300">{p}</span>
+            <span key={p} className="rounded bg-leaf-soft px-2 py-0.5 font-mono text-leaf">{p}</span>
           ))}
         </div>
         {userRoleSpec.maskedFields.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="font-semibold text-rose-400">Masked / Hidden:</span>
+            <span className="font-semibold text-madder">Masked / Hidden:</span>
             {userRoleSpec.maskedFields.map((m) => (
-              <span key={m} className="rounded bg-rose-500/20 px-2 py-0.5 font-mono text-rose-300">{m}</span>
+              <span key={m} className="rounded bg-madder-soft px-2 py-0.5 font-mono text-madder">{m}</span>
             ))}
           </div>
         )}
       </div>
 
       {/* Matrix Table */}
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Plain Description</th>
               <th className="px-4 py-3">Masked Fields</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {ROLE_MATRIX.map((r) => (
               <tr key={r.role}>
                 <td className="px-4 py-3 font-mono font-bold text-purple-300">{r.role}</td>
-                <td className="px-4 py-3 text-zinc-300">{r.summary}</td>
-                <td className="px-4 py-3 font-mono text-xs text-rose-300">
+                <td className="px-4 py-3 text-ink-2">{r.summary}</td>
+                <td className="px-4 py-3 font-mono text-xs text-madder">
                   {r.maskedFields.length ? r.maskedFields.join(', ') : 'None (Full Visibility)'}
                 </td>
               </tr>

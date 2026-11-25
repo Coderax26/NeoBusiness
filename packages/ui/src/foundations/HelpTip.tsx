@@ -22,7 +22,7 @@ export const HelpTip: React.FC<HelpTipProps> = ({
   const example = term?.example;
 
   return (
-    <span className={`relative inline-flex items-center ml-1 text-zinc-400 ${className}`}>
+    <span className={`relative inline-flex items-center ml-1 text-ink-3 ${className}`}>
       <button
         type="button"
         aria-label={`Help: ${title}`}
@@ -31,7 +31,7 @@ export const HelpTip: React.FC<HelpTipProps> = ({
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        className="w-4 h-4 rounded-full border border-zinc-600 hover:border-zinc-400 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors focus:outline-none focus:ring-1 focus:ring-teal-500"
+        className="w-4 h-4 rounded-full border border-rule-strong hover:border-action hover:text-action flex items-center justify-center text-[11px] font-semibold transition-colors focus:outline-none focus:ring-1 focus:ring-action"
       >
         ?
       </button>
@@ -39,14 +39,13 @@ export const HelpTip: React.FC<HelpTipProps> = ({
       {open && (
         <div
           role="tooltip"
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs shadow-xl pointer-events-none"
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 rounded-[4px] bg-sheet border border-rule-strong text-ink text-[13px] shadow-lg pointer-events-none"
         >
-          <div className="font-semibold text-teal-300 mb-1">{title}</div>
-          <p className="leading-relaxed text-zinc-300">{explanation}</p>
-          {example && <div className="mt-1 text-[11px] text-zinc-400 italic">{example}</div>}
+          <div className="font-semibold text-action mb-1">{title}</div>
+          <p className="leading-relaxed text-ink-2">{explanation}</p>
+          {example && <div className="mt-1 text-[12px] text-ink-3 italic">{example}</div>}
         </div>
       )}
     </span>
   );
 };
-

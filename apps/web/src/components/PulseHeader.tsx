@@ -107,72 +107,65 @@ export function PulseHeader({
   const staleness = evaluatePulseStaleness(missedRefreshes);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 shadow-sm space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            Business Pulse · {snapshot.siteName}
-          </span>
-          <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
-            Sales {snapshot.salesDeltaPct >= 0 ? `+${snapshot.salesDeltaPct}%` : `${snapshot.salesDeltaPct}%`} · EOD {snapshot.yesterdayEodStatus}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 pb-2 border-b-[1.5px] border-ink">
+        <div className="flex items-center gap-3">
+          <h2 className="text-[15px] font-semibold text-ink">
+            Today in numbers · {snapshot.siteName}
+          </h2>
+          <span className="text-[13px] text-ink-3">
+            EOD {snapshot.yesterdayEodStatus}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="text-[13px]">
           <span
-            className={`rounded-full px-2.5 py-0.5 font-semibold ${
-              staleness.isStale ? 'bg-rose-500/20 text-rose-300' : 'bg-zinc-800 text-zinc-300'
-            }`}
+            className={staleness.isStale ? 'text-madder font-semibold' : 'text-ink-3'}
           >
             {staleness.isStale ? staleness.label : `Updated ${secondsAgo}s ago`}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3.5" title="Formula: Sum of tax invoices issued today (OD-020)">
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Today&apos;s Sales</span>
-            <span className="cursor-help rounded-full bg-zinc-800 px-1.5 text-[10px] font-bold">i</span>
+      {/* Ruled 4-column Bahi-Khata ledger strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-b border-rule">
+        <div className="py-3 pr-4" title="Sum of tax invoices issued today">
+          <div className="text-[13px] text-ink-2">Today&apos;s Sales</div>
+          <div className="mt-1 font-serif text-[30px] leading-tight font-medium text-ink tabular-nums">
+            {pulseRestricted ? 'Owner Only' : formatINR(snapshot.todaySalesInr)}
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-xl font-bold text-zinc-100">
-              {pulseRestricted ? 'Owner Only' : formatINR(snapshot.todaySalesInr)}
-            </span>
-            {!pulseRestricted && (
-              <span className="text-xs font-semibold text-emerald-400">↑ {snapshot.salesDeltaPct}%</span>
-            )}
-          </div>
+          {!pulseRestricted && (
+            <div className={`text-[12.5px] mt-1 ${snapshot.salesDeltaPct >= 0 ? 'text-leaf' : 'text-madder'}`}>
+              {snapshot.salesDeltaPct >= 0 ? `↑ ${snapshot.salesDeltaPct}%` : `↓ ${Math.abs(snapshot.salesDeltaPct)}%`} vs yesterday
+            </div>
+          )}
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3.5" title="Formula: (Sales - Landed Cost) / Sales">
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Gross Margin</span>
-            <span className="cursor-help rounded-full bg-zinc-800 px-1.5 text-[10px] font-bold">i</span>
-          </div>
-          <div className="mt-1 font-mono text-xl font-bold text-emerald-400">
+        <div className="py-3 sm:pl-5 sm:border-l border-rule pr-4" title="(Sales - Landed Cost) / Sales">
+          <div className="text-[13px] text-ink-2">Gross Margin</div>
+          <div className="mt-1 font-serif text-[30px] leading-tight font-medium text-ink tabular-nums">
             {pulseRestricted ? 'Restricted' : `${snapshot.grossMarginPct}%`}
           </div>
+          <div className="text-[12.5px] text-ink-3 mt-1">Target 15%</div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3.5" title="Formula: Cash + UPI + Bank receipts posted today">
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Cash Collected Today</span>
-            <span className="cursor-help rounded-full bg-zinc-800 px-1.5 text-[10px] font-bold">i</span>
-          </div>
-          <div className="mt-1 font-mono text-xl font-bold text-zinc-100">
+        <div className="py-3 lg:pl-5 lg:border-l border-rule pr-4" title="Cash + UPI + Bank receipts posted today">
+          <div className="text-[13px] text-ink-2">Cash Collected Today</div>
+          <div className="mt-1 font-serif text-[30px] leading-tight font-medium text-ink tabular-nums">
             {pulseRestricted ? 'Restricted' : formatINR(snapshot.cashCollectedInr)}
           </div>
+          <div className="text-[12.5px] text-ink-3 mt-1">Cash, UPI &amp; bank</div>
         </div>
 
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/25 p-3.5" title="Formula: Pending exceptions awaiting Owner approval">
-          <div className="flex items-center justify-between text-xs text-amber-300">
-            <span>Needs Your Decision</span>
-            <span className="cursor-help rounded-full bg-amber-200 px-1.5 text-[10px] font-bold">i</span>
+        <div className="py-3 sm:pl-5 sm:border-l border-rule" title="Pending exceptions awaiting Owner approval">
+          <div className="text-[13px] text-ink-2">Needs Your Decision</div>
+          <div className={`mt-1 font-serif text-[30px] leading-tight font-medium tabular-nums ${pendingDecisionsCount > 0 ? 'text-haldi' : 'text-leaf'}`}>
+            {pendingDecisionsCount}
           </div>
-          <div className="mt-1 font-mono text-xl font-bold text-amber-900">{pendingDecisionsCount}</div>
+          <div className="text-[12.5px] text-ink-3 mt-1">
+            {pendingDecisionsCount > 0 ? 'Waiting for approval' : 'All clear'}
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

@@ -43,8 +43,8 @@ export default function StockAlertsControlPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Stock Alerts Control Center</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Stock Alerts Control Center</h1>
+          <p className="text-sm text-ink-3">
             Low stock, expiring batches, negative balances, and cycle-count drift alerts.
           </p>
         </div>
@@ -65,14 +65,14 @@ export default function StockAlertsControlPage() {
           <button
             key={c.key}
             onClick={() => setFilterType(filterType === c.key ? 'ALL' : c.key)}
-            className={`text-left p-4 rounded-xl border transition-colors ${
+            className={`text-left p-4 rounded-[3px] border transition-colors${
               filterType === c.key
-                ? 'bg-amber-500/15 border-amber-500'
-                : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                ? 'bg-haldi-soft border-haldi/30'
+                : 'bg-sheet border-rule hover:border-rule-strong'
             }`}
           >
-            <div className="text-xs text-zinc-400">{c.label}</div>
-            <div className="text-2xl font-bold text-white font-mono mt-1">{c.count}</div>
+            <div className="text-xs text-ink-3">{c.label}</div>
+            <div className="text-2xl font-bold text-ink font-mono mt-1">{c.count}</div>
           </button>
         ))}
       </div>
@@ -81,17 +81,17 @@ export default function StockAlertsControlPage() {
         {visible.map((alert) => (
           <Card
             key={alert.id}
-            className="p-4 bg-zinc-900 border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            className="p-4 bg-sheet border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-3"
           >
             <div>
               <div className="flex items-center gap-2">
                 <Badge variant={alert.severity === 'HIGH' ? 'danger' : 'warning'}>
                   {alert.type.replace('_', ' ')}
                 </Badge>
-                <span className="text-xs text-zinc-400">{alert.siteName}</span>
+                <span className="text-xs text-ink-3">{alert.siteName}</span>
               </div>
-              <div className="text-base font-semibold text-white mt-1">{alert.itemName}</div>
-              <div className="text-xs text-zinc-400">{alert.detail}</div>
+              <div className="text-base font-semibold text-ink mt-1">{alert.itemName}</div>
+              <div className="text-xs text-ink-3">{alert.detail}</div>
             </div>
             <Link
               href={

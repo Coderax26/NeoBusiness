@@ -52,15 +52,15 @@ export default function ControlAuditTrailPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Immutable Audit Trail</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Immutable Audit Trail</h1>
+          <p className="text-sm text-ink-3">
             Searchable record of every create, update, approval, and reversal with before → after diffs.
           </p>
         </div>
         <a
           href={`data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`}
           download="audit-trail.csv"
-          className="rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-xs font-semibold text-zinc-100 hover:bg-zinc-700"
+          className="rounded-lg bg-sunken border border-rule-strong px-4 py-2 text-xs font-semibold text-ink hover:bg-sunken"
         >
           Export for Auditors (CSV)
         </a>
@@ -72,12 +72,12 @@ export default function ControlAuditTrailPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by doc #, user, or summary..."
-          className="w-full sm:w-80 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          className="w-full sm:w-80 rounded-lg border border-rule-strong bg-paper px-3 py-2 text-sm text-ink"
         />
         <select
           value={moduleFilter}
           onChange={(e) => setModuleFilter(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          className="rounded-lg border border-rule-strong bg-paper px-3 py-2 text-sm text-ink"
         >
           <option value="ALL">All Modules</option>
           <option value="Sales">Sales</option>
@@ -86,7 +86,7 @@ export default function ControlAuditTrailPage() {
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          className="rounded-lg border border-rule-strong bg-paper px-3 py-2 text-sm text-ink"
         >
           <option value="ALL">All Actions</option>
           <option value="UPDATE">UPDATE</option>
@@ -96,26 +96,26 @@ export default function ControlAuditTrailPage() {
 
       <div className="space-y-3">
         {filtered.length === 0 && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+          <div className="rounded-[3px] border border-rule bg-sheet p-6 text-sm text-ink-3">
             No audit log entries match the current filter.
           </div>
         )}
         {filtered.map((entry) => (
-          <div key={entry.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+          <div key={entry.id} className="rounded-[3px] border border-rule bg-sheet p-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-3">
               <span>
-                <strong className="text-zinc-200">{entry.timestampIst}</strong> · {entry.module} ·{' '}
+                <strong className="text-ink">{entry.timestampIst}</strong> · {entry.module} ·{' '}
                 <span className="font-mono font-bold text-purple-300">{entry.entityNo}</span>
               </span>
               <span className="font-mono">IP {entry.ipAddress}</span>
             </div>
-            <div className="text-sm font-semibold text-zinc-100">{entry.summary}</div>
+            <div className="text-sm font-semibold text-ink">{entry.summary}</div>
             {(entry.beforeJson || entry.afterJson) && (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs font-mono">
-                <div className="rounded bg-rose-950/30 border border-rose-500/30 p-2 text-rose-300">
+                <div className="rounded bg-madder-soft border border-madder/30 p-2 text-madder">
                   Before: {JSON.stringify(entry.beforeJson ?? {})}
                 </div>
-                <div className="rounded bg-emerald-950/30 border border-emerald-500/30 p-2 text-emerald-300">
+                <div className="rounded bg-leaf-soft border border-leaf/30 p-2 text-leaf">
                   After: {JSON.stringify(entry.afterJson ?? {})}
                 </div>
               </div>

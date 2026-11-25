@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Drawer, Button, Badge } from '@neo/ui';
+import { Drawer } from '@neo/ui';
 import { formatISTDate } from '@neo/shared';
 
 export interface NotificationItem {
@@ -76,24 +76,24 @@ export const NotificationsDrawer: React.FC<{
     <Drawer
       open={open}
       onClose={onClose}
-      title="Notifications & Alerts"
-      subtitle={`${unreadCount} unread system alerts`}
+      title="Notifications"
+      subtitle={`${unreadCount} unread alerts`}
       width="md"
     >
-      <div className="flex justify-between items-center mb-4 pb-2 border-b border-zinc-800">
-        <span className="text-xs text-zinc-400">Activity Stream</span>
+      <div className="flex justify-between items-center mb-3 pb-2 border-b border-ink">
+        <span className="text-[13px] font-semibold text-ink">Activity</span>
         {unreadCount > 0 && (
           <button
             type="button"
             onClick={markAllRead}
-            className="text-xs text-teal-400 hover:text-teal-300 font-semibold"
+            className="text-[13px] text-action hover:underline font-medium"
           >
             Mark all read ✓
           </button>
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="divide-y divide-rule">
         {notifications.map((n) => (
           <Link
             key={n.id}
@@ -102,26 +102,23 @@ export const NotificationsDrawer: React.FC<{
               markItemRead(n.id);
               onClose();
             }}
-            className={`block p-3.5 rounded-xl border transition-colors ${
-              n.read
-                ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-400'
-                : 'bg-zinc-900 border-teal-500/30 text-zinc-200 shadow-sm'
+            className={`block py-3.5 transition-colors hover:bg-paper/60 px-2 -mx-2 rounded-[3px] ${
+              n.read ? 'text-ink-3' : 'text-ink'
             }`}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-white flex items-center gap-2">
-                {!n.read && <span className="w-2 h-2 rounded-full bg-teal-400" />}
+              <span className="text-[14px] font-medium text-ink flex items-center gap-2">
+                {!n.read && <span className="w-2 h-2 rounded-full bg-madder" />}
                 {n.title}
               </span>
-              <span className="text-[10px] text-zinc-500 font-mono">
+              <span className="text-[12.5px] text-ink-3 font-mono">
                 {formatISTDate(n.timestamp, true)}
               </span>
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed">{n.message}</p>
+            <p className="text-[13px] text-ink-2 leading-relaxed">{n.message}</p>
           </Link>
         ))}
       </div>
     </Drawer>
   );
 };
-

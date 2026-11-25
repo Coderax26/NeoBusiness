@@ -126,21 +126,21 @@ export default function ReportsLibraryPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Report Library &amp; Business Documents</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Report Library &amp; Business Documents</h1>
+          <p className="text-sm text-ink-3">
             Browse live reports, star favourites, export CSV, and print A4 business documents.
           </p>
         </div>
         <Link
           href="/reports/scheduled"
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+          className="rounded-lg border border-rule bg-sheet px-4 py-2 text-sm font-semibold text-ink hover:bg-sunken"
         >
           Scheduled Reports →
         </Link>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
@@ -151,7 +151,7 @@ export default function ReportsLibraryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search reports (e.g. aging, margin, P&L)..."
-          className="w-full sm:w-80 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500"
+          className="w-full sm:w-80 rounded-lg border border-rule bg-sheet px-3 py-2 text-sm text-ink placeholder:text-ink-3"
         />
         <div className="flex flex-wrap gap-1.5">
           {areas.map((a) => (
@@ -159,10 +159,10 @@ export default function ReportsLibraryPage() {
               key={a}
               type="button"
               onClick={() => setAreaFilter(a)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
                 areaFilter === a
-                  ? 'bg-emerald-600 text-white'
-                  : 'border border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  ? 'bg-leaf text-white'
+                  : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
               }`}
             >
               {a}
@@ -173,33 +173,33 @@ export default function ReportsLibraryPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.length === 0 ? (
-          <div className="col-span-full rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-500">
+          <div className="col-span-full rounded-[3px] border border-rule bg-sheet p-8 text-center text-sm text-ink-3">
             No matching reports found.
           </div>
         ) : (
           filtered.map((r) => (
-            <div key={r.id} className="flex flex-col justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+            <div key={r.id} className="flex flex-col justify-between rounded-[3px] border border-rule bg-sheet p-5">
               <div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 font-bold text-emerald-400">{r.area}</span>
+                  <span className="rounded bg-leaf-soft px-2 py-0.5 font-bold text-leaf">{r.area}</span>
                   <button
                     type="button"
                     onClick={() => toggleFav(r.id)}
-                    className="text-base text-amber-400"
+                    className="text-base text-haldi"
                     title="Toggle Favourite"
                   >
                     {r.favourite ? '⭐' : '☆'}
                   </button>
                 </div>
-                <h2 className="mt-2 text-base font-bold text-zinc-100">{r.title}</h2>
-                <p className="mt-1 text-xs text-zinc-400">{r.description}</p>
+                <h2 className="mt-2 text-base font-bold text-ink">{r.title}</h2>
+                <p className="mt-1 text-xs text-ink-3">{r.description}</p>
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-3">
-                <span className="text-[11px] text-zinc-500">Last run: {r.lastRun}</span>
+              <div className="mt-4 flex items-center justify-between border-t border-rule pt-3">
+                <span className="text-[11px] text-ink-3">Last run: {r.lastRun}</span>
                 <button
                   type="button"
                   onClick={() => setActiveReport(r)}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
                   Run Report
                 </button>
@@ -209,22 +209,22 @@ export default function ReportsLibraryPage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
-        <h2 className="text-base font-bold text-zinc-100">Business Documents &amp; A4 Printing</h2>
+      <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
+        <h2 className="text-base font-bold text-ink">Business Documents &amp; A4 Printing</h2>
         {printableDocs.length === 0 ? (
-          <p className="text-xs text-zinc-500">No printable invoices available yet.</p>
+          <p className="text-xs text-ink-3">No printable invoices available yet.</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {printableDocs.map((doc) => (
-              <div key={doc.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs space-y-1.5">
-                <div className="font-bold text-zinc-100">{doc.title}</div>
-                <div className="font-mono text-zinc-300">{doc.docNo}</div>
-                <div className="text-zinc-400">{doc.party} · {doc.amount}</div>
+              <div key={doc.id} className="rounded-lg border border-rule bg-paper p-3 text-xs space-y-1.5">
+                <div className="font-bold text-ink">{doc.title}</div>
+                <div className="font-mono text-ink-2">{doc.docNo}</div>
+                <div className="text-ink-3">{doc.party} · {doc.amount}</div>
                 <a
                   href={doc.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="block w-full rounded bg-zinc-800 py-1 text-center text-zinc-100 font-semibold hover:bg-zinc-700"
+                  className="block w-full rounded bg-sunken py-1 text-center text-ink font-semibold hover:bg-sunken"
                 >
                   Open PDF ({doc.mode})
                 </a>
@@ -235,36 +235,36 @@ export default function ReportsLibraryPage() {
       </div>
 
       {activeReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[4px] border border-rule bg-sheet p-6 shadow-xl space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-bold text-zinc-100">{activeReport.title}</h3>
-                <p className="text-xs text-zinc-400">{activeReport.description}</p>
+                <h3 className="text-lg font-bold text-ink">{activeReport.title}</h3>
+                <p className="text-xs text-ink-3">{activeReport.description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleExportCsv(activeReport)}
-                  className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white"
+                  className="rounded-lg bg-leaf px-3 py-1 text-xs font-semibold text-white"
                 >
                   Export CSV
                 </button>
-                <button type="button" onClick={() => setActiveReport(null)} className="px-2 py-1 text-sm text-zinc-400 hover:text-white">
+                <button type="button" onClick={() => setActiveReport(null)} className="px-2 py-1 text-sm text-ink-3 hover:text-ink">
                   ✕
                 </button>
               </div>
             </div>
 
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-950 text-zinc-400">
+              <thead className="bg-paper text-ink-3">
                 <tr>
                   {activeReport.columns.map((c) => (
                     <th key={c} className="px-3 py-2">{c}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800 text-zinc-200">
+              <tbody className="divide-y divide-rule text-ink">
                 {activeReport.rows.map((row, idx) => (
                   <tr key={idx}>
                     {row.map((cell, ci) => (

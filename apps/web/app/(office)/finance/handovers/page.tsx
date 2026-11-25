@@ -5,9 +5,9 @@ import { evaluateHandoverVariance, formatINR } from '@neo/shared';
 import { type HandoverRecord } from '../../../../src/lib/finance-data';
 
 const STATUS_BADGE: Record<HandoverRecord['status'], string> = {
-  PENDING: 'bg-amber-500/15 text-amber-400',
-  VERIFIED: 'bg-emerald-500/15 text-emerald-400',
-  DISPUTED: 'bg-rose-500/15 text-rose-400',
+  PENDING: 'bg-haldi-soft text-haldi',
+  VERIFIED: 'bg-leaf-soft text-leaf',
+  DISPUTED: 'bg-madder-soft text-madder',
   RESOLVED: 'bg-blue-500/15 text-blue-400',
 };
 
@@ -131,20 +131,20 @@ export default function CashHandoversPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Cash Handover Desk (BR-07)</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Cash Handover Desk (BR-07)</h1>
+        <p className="text-sm text-ink-3">
           Verify field staff cash &amp; cheques (OD-015: UPI settles direct). Non-zero variance raises an Owner dispute.
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-medium text-amber-300">
+        <div className="rounded-[3px] border border-haldi/30 bg-haldi-soft px-4 py-2.5 text-sm font-medium text-haldi">
           {toast}
         </div>
       )}
 
       {handovers.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-500">
+        <div className="rounded-[3px] border border-rule bg-sheet p-8 text-center text-sm text-ink-3">
           No pending cash handovers.
         </div>
       ) : (
@@ -155,45 +155,45 @@ export default function CashHandoversPage() {
                 key={h.id}
                 type="button"
                 onClick={() => setSelectedId(h.id)}
-                className={`w-full rounded-xl border p-4 text-left transition ${
+                className={`w-full rounded-[3px] border p-4 text-left transition${
                   selected?.id === h.id
-                    ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                    ? 'border-leaf/30 bg-leaf-soft'
+                    : 'border-rule bg-sheet hover:border-rule-strong'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-zinc-100">{h.staffName}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[h.status]}`}>
+                  <span className="font-semibold text-ink">{h.staffName}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold${STATUS_BADGE[h.status]}`}>
                     {h.status}
                   </span>
                 </div>
-                <div className="mt-1 text-xs text-zinc-400">
-                  Expected Cash: <span className="font-mono text-zinc-200">{formatINR(h.expectedCash)}</span>
+                <div className="mt-1 text-xs text-ink-3">
+                  Expected Cash: <span className="font-mono text-ink">{formatINR(h.expectedCash)}</span>
                 </div>
               </button>
             ))}
           </div>
 
           {selected && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-5 lg:col-span-2">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+            <div className="rounded-[3px] border border-rule bg-sheet p-6 space-y-5 lg:col-span-2">
+              <div className="flex items-center justify-between border-b border-rule pb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-zinc-100">{selected.staffName}</h2>
-                  <p className="text-xs text-zinc-400">Date: {(selected as any).date || (selected as any).handoverDate || ''}</p>
+                  <h2 className="text-lg font-bold text-ink">{selected.staffName}</h2>
+                  <p className="text-xs text-ink-3">Date: {(selected as any).date || (selected as any).handoverDate || ''}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-zinc-400">Expected Cash</div>
-                  <div className="font-mono text-xl font-bold text-zinc-100">{formatINR(selected.expectedCash)}</div>
+                  <div className="text-xs text-ink-3">Expected Cash</div>
+                  <div className="font-mono text-xl font-bold text-ink">{formatINR(selected.expectedCash)}</div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-zinc-400">Counted Cash (₹)</label>
+                  <label className="text-xs font-semibold text-ink-3">Counted Cash (₹)</label>
                   <button
                     type="button"
                     onClick={() => setShowDenom((v) => !v)}
-                    className="text-xs font-semibold text-emerald-400 hover:underline"
+                    className="text-xs font-semibold text-leaf hover:underline"
                   >
                     {showDenom ? 'Hide Denominations' : 'Use Note Counter'}
                   </button>
@@ -203,14 +203,14 @@ export default function CashHandoversPage() {
                   value={countedInput}
                   onChange={(e) => setCountedInput(e.target.value)}
                   placeholder="Enter physically counted cash"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-mono text-ink"
                 />
                 {showDenom && (
-                  <div className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs">
-                    <input type="number" value={n500} onChange={(e) => setN500(Number(e.target.value))} placeholder="₹500" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
-                    <input type="number" value={n200} onChange={(e) => setN200(Number(e.target.value))} placeholder="₹200" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
-                    <input type="number" value={n100} onChange={(e) => setN100(Number(e.target.value))} placeholder="₹100" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100" />
-                    <button type="button" onClick={applyDenominationTotal} className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white">
+                  <div className="grid grid-cols-4 gap-2 rounded-lg border border-rule bg-paper p-3 text-xs">
+                    <input type="number" value={n500} onChange={(e) => setN500(Number(e.target.value))} placeholder="₹500" className="rounded border border-rule bg-sheet px-2 py-1 text-ink" />
+                    <input type="number" value={n200} onChange={(e) => setN200(Number(e.target.value))} placeholder="₹200" className="rounded border border-rule bg-sheet px-2 py-1 text-ink" />
+                    <input type="number" value={n100} onChange={(e) => setN100(Number(e.target.value))} placeholder="₹100" className="rounded border border-rule bg-sheet px-2 py-1 text-ink" />
+                    <button type="button" onClick={applyDenominationTotal} className="rounded bg-leaf px-2 py-1 font-semibold text-white">
                       Apply
                     </button>
                   </div>
@@ -219,23 +219,23 @@ export default function CashHandoversPage() {
 
               {selected.cheques?.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-zinc-400">Cheques Collected</div>
+                  <div className="text-xs font-semibold text-ink-3">Cheques Collected</div>
                   {selected.cheques.map((c) => (
-                    <label key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs">
-                      <span className="flex items-center gap-2 text-zinc-200">
+                    <label key={c.id} className="flex items-center justify-between rounded-lg border border-rule bg-paper px-3 py-2 text-xs">
+                      <span className="flex items-center gap-2 text-ink">
                         <input type="checkbox" checked={c.checked} onChange={() => toggleCheque(c.id)} />
                         <span className="font-mono">{c.chequeNo}</span>
                       </span>
-                      <span className="font-mono text-zinc-100">{formatINR(c.amount)}</span>
+                      <span className="font-mono text-ink">{formatINR(c.amount)}</span>
                     </label>
                   ))}
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 pt-4">
-                <div className="text-xs text-zinc-400">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
+                <div className="text-xs text-ink-3">
                   Variance:{' '}
-                  <span className={`font-mono font-bold ${evaluation.isDisputed ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  <span className={`font-mono font-bold${evaluation.isDisputed ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {formatINR(evaluation.cashVariance)}
                   </span>
                 </div>
@@ -244,7 +244,7 @@ export default function CashHandoversPage() {
                     <button
                       type="button"
                       onClick={() => resolveDispute(selected.id)}
-                      className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-400"
+                      className="rounded-lg border border-action/30 bg-action-soft px-4 py-2 text-xs font-semibold text-action"
                     >
                       Owner Resolve
                     </button>
@@ -253,7 +253,7 @@ export default function CashHandoversPage() {
                     type="button"
                     disabled={!evaluation.canVerify}
                     onClick={verifyHandover}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                    className="rounded-lg bg-leaf px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3"
                   >
                     Verify Handover
                   </button>

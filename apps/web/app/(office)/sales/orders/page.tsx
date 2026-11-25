@@ -211,7 +211,7 @@ export default function OrdersTrackerPage() {
       cell: (info) => {
         const o = info.row.original;
         return (
-          <Link href={`/sales/orders/${o.id}`} className="font-mono text-xs font-bold text-teal-400 hover:underline">
+          <Link href={`/sales/orders/${o.id}`} className="font-mono text-xs font-bold text-action hover:underline">
             {o.orderNumber}
           </Link>
         );
@@ -224,10 +224,10 @@ export default function OrdersTrackerPage() {
         const o = info.row.original;
         return (
           <div>
-            <Link href={`/sales/customers/${o.customerId}`} className="font-bold text-white text-xs hover:text-teal-300">
+            <Link href={`/sales/customers/${o.customerId}`} className="font-bold text-ink text-xs hover:text-action">
               {o.customerName}
             </Link>
-            <div className="text-[11px] text-zinc-400">{o.siteName}</div>
+            <div className="text-[11px] text-ink-3">{o.siteName}</div>
           </div>
         );
       },
@@ -239,8 +239,8 @@ export default function OrdersTrackerPage() {
         const o = info.row.original;
         return (
           <div className="text-xs">
-            <div className="text-zinc-200">{o.deliveryDate}</div>
-            <div className="text-[11px] text-zinc-500">Slot {o.deliveryWindow}</div>
+            <div className="text-ink">{o.deliveryDate}</div>
+            <div className="text-[11px] text-ink-3">Slot {o.deliveryWindow}</div>
           </div>
         );
       },
@@ -250,7 +250,7 @@ export default function OrdersTrackerPage() {
       header: 'Order Value',
       accessorKey: 'grandTotal',
       cell: (info) => (
-        <span className="font-mono text-xs font-bold text-white">
+        <span className="font-mono text-xs font-bold text-ink">
           {formatINR(info.getValue() as number)}
         </span>
       ),
@@ -271,19 +271,19 @@ export default function OrdersTrackerPage() {
         const o = info.row.original;
         return (
           <div className="flex items-center gap-2 text-xs">
-            <Link href={`/sales/orders/${o.id}`} className="text-teal-400 hover:underline font-medium">
+            <Link href={`/sales/orders/${o.id}`} className="text-action hover:underline font-medium">
               View
             </Link>
             {o.status === 'DRAFT' && (
-              <button onClick={() => handleConfirmOrder(o.id)} className="text-emerald-400 hover:underline">
+              <button onClick={() => handleConfirmOrder(o.id)} className="text-leaf hover:underline">
                 Confirm
               </button>
             )}
-            <button onClick={() => handleDuplicateOrder(o)} className="text-zinc-400 hover:text-white">
+            <button onClick={() => handleDuplicateOrder(o)} className="text-ink-3 hover:text-ink">
               Duplicate
             </button>
             {o.status !== 'CANCELLED' && o.status !== 'DELIVERED' && (
-              <button onClick={() => setCancelTarget(o)} className="text-rose-400 hover:underline">
+              <button onClick={() => setCancelTarget(o)} className="text-madder hover:underline">
                 Cancel
               </button>
             )}
@@ -296,10 +296,10 @@ export default function OrdersTrackerPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <h1 className="text-2xl font-black text-white">Orders Tracker</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Orders Tracker</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Track order confirmations, Owner price/credit approvals, production readiness, and dispatches.
           </p>
         </div>
@@ -338,16 +338,16 @@ export default function OrdersTrackerPage() {
       </div>
 
       {/* Saved Views & View Mode Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-sheet border border-rule p-3.5 rounded-[4px]">
         <div className="flex items-center gap-2 flex-wrap">
           <input
             type="text"
             placeholder="Search order # or customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-60 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+            className="w-60 bg-paper border border-rule rounded-[3px] px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-action/30"
           />
-          <span className="text-[11px] text-zinc-500 ml-1">Saved Views:</span>
+          <span className="text-[11px] text-ink-3 ml-1">Saved Views:</span>
           {[
             { key: 'MY_TODAY', label: 'My orders today' },
             { key: 'READY_PUNE', label: 'Ready for Pune route' },
@@ -356,10 +356,10 @@ export default function OrdersTrackerPage() {
             <button
               key={sv.key}
               onClick={() => applySavedView(sv.key)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors${
                 savedView === sv.key
-                  ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
-                  : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white'
+                  ? 'bg-action/20 text-action border-action/30'
+                  : 'bg-paper text-ink-3 border-rule hover:text-ink'
               }`}
             >
               {sv.label}
@@ -367,13 +367,13 @@ export default function OrdersTrackerPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+        <div className="flex items-center gap-1 bg-paper p-1 rounded-[3px] border border-rule text-xs">
           {(['table', 'kanban', 'calendar'] as const).map((m) => (
             <button
               key={m}
               onClick={() => setViewMode(m)}
-              className={`px-3 py-1 rounded-lg font-medium capitalize ${
-                viewMode === m ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+              className={`px-3 py-1 rounded-lg font-medium capitalize${
+                viewMode === m ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
               }`}
             >
               {m}
@@ -388,10 +388,10 @@ export default function OrdersTrackerPage() {
           <button
             key={t.key}
             onClick={() => setStatusTab(t.key)}
-            className={`px-3 py-1.5 rounded-xl font-semibold whitespace-nowrap border transition-colors ${
+            className={`px-3 py-1.5 rounded-[3px] font-semibold whitespace-nowrap border transition-colors${
               statusTab === t.key
-                ? 'bg-teal-600 text-white border-teal-500'
-                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+                ? 'bg-action text-white border-action/30'
+                : 'bg-sheet text-ink-3 border-rule hover:text-ink'
             }`}
           >
             {t.label}
@@ -412,20 +412,20 @@ export default function OrdersTrackerPage() {
           ].map((col) => {
             const colOrders = filteredOrders.filter((o) => o.status === col.status);
             return (
-              <div key={col.status} className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-white pb-2 border-b border-zinc-800">
+              <div key={col.status} className="bg-sheet border border-rule rounded-[4px] p-3 space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-ink pb-2 border-b border-rule">
                   <span>{col.title}</span>
                   <Badge tone="neutral">{colOrders.length}</Badge>
                 </div>
                 {colOrders.map((o) => (
                   <Link key={o.id} href={`/sales/orders/${o.id}`}>
-                    <div className="p-3 bg-zinc-950 border border-zinc-800 hover:border-teal-500/50 rounded-xl space-y-1.5 transition-colors">
+                    <div className="p-3 bg-paper border border-rule hover:border-action/30 rounded-[3px] space-y-1.5 transition-colors">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-mono font-bold text-teal-400">{o.orderNumber}</span>
-                        <span className="font-mono font-bold text-white">{formatINR(o.grandTotal)}</span>
+                        <span className="font-mono font-bold text-action">{o.orderNumber}</span>
+                        <span className="font-mono font-bold text-ink">{formatINR(o.grandTotal)}</span>
                       </div>
-                      <div className="text-xs font-semibold text-zinc-200">{o.customerName}</div>
-                      <div className="text-[11px] text-zinc-500">{o.deliveryDate} • Slot {o.deliveryWindow}</div>
+                      <div className="text-xs font-semibold text-ink">{o.customerName}</div>
+                      <div className="text-[11px] text-ink-3">{o.deliveryDate} • Slot {o.deliveryWindow}</div>
                     </div>
                   </Link>
                 ))}
@@ -438,18 +438,18 @@ export default function OrdersTrackerPage() {
       {viewMode === 'calendar' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from(new Set(filteredOrders.map((o) => o.deliveryDate))).map((date) => (
-            <div key={date} className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
-              <div className="text-xs font-bold text-teal-400 border-b border-zinc-800 pb-2">
+            <div key={date} className="bg-sheet border border-rule rounded-[4px] p-4 space-y-3">
+              <div className="text-xs font-bold text-action border-b border-rule pb-2">
                 📅 Delivery Date: {date}
               </div>
               {filteredOrders
                 .filter((o) => o.deliveryDate === date)
                 .map((o) => (
                   <Link key={o.id} href={`/sales/orders/${o.id}`}>
-                    <div className="p-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs flex justify-between items-center hover:border-teal-500/40">
+                    <div className="p-2.5 bg-paper border border-rule rounded-[3px] text-xs flex justify-between items-center hover:border-action/30">
                       <div>
-                        <span className="font-bold text-white">{o.customerName}</span>
-                        <span className="block text-[11px] text-zinc-400">{o.orderNumber} • Slot {o.deliveryWindow}</span>
+                        <span className="font-bold text-ink">{o.customerName}</span>
+                        <span className="block text-[11px] text-ink-3">{o.orderNumber} • Slot {o.deliveryWindow}</span>
                       </div>
                       <StatusPill tone={getStatusTone(o.status)} label={o.status} />
                     </div>
@@ -468,11 +468,11 @@ export default function OrdersTrackerPage() {
         maxWidth="sm"
       >
         <div className="space-y-4 my-2 text-xs">
-          <p className="text-zinc-300">Please choose a reason for cancelling this order:</p>
+          <p className="text-ink-2">Please choose a reason for cancelling this order:</p>
           <select
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+            className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
           >
             {CANCEL_REASONS.map((r) => (
               <option key={r} value={r}>

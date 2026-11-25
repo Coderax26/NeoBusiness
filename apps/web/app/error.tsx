@@ -16,13 +16,13 @@ export default function ErrorBoundary({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-12 h-12 rounded-xl bg-rose-500/20 text-rose-400 font-bold text-xl flex items-center justify-center mx-auto mb-4 border border-rose-500/30">
+    <div className="min-h-screen bg-paper flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-sheet border border-rule rounded-[4px] p-8 text-center shadow-2xl">
+        <div className="w-12 h-12 rounded-[3px] bg-madder-soft text-madder font-bold text-xl flex items-center justify-center mx-auto mb-4 border border-madder/30">
           ✕
         </div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Something went wrong</h2>
-        <p className="text-xs text-zinc-400 mt-2 mb-6 leading-relaxed">
+        <h2 className="text-xl font-bold text-ink tracking-tight">Something went wrong</h2>
+        <p className="text-xs text-ink-3 mt-2 mb-6 leading-relaxed">
           We couldn't reach the server or process this action. Your work is saved — you can try reloading the latest data.
         </p>
 

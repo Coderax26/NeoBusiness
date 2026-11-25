@@ -155,13 +155,13 @@ export default function BomsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/production" className="hover:text-white">Production</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/production" className="hover:text-ink">Production</Link>
             <span>/</span>
             <span className="text-orange-400">Recipes &amp; BOMs</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Recipes / Bills of Material</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Recipes / Bills of Material</h1>
+          <p className="text-sm text-ink-3">
             Recipe-card view with batch scale calculator, single-active-version control, and owner-only cost roll-up.
           </p>
         </div>
@@ -171,7 +171,7 @@ export default function BomsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
@@ -183,10 +183,10 @@ export default function BomsPage() {
             <div
               key={bom.id}
               onClick={() => setSelectedBomId(bom.id)}
-              className={`p-4 rounded-xl border cursor-pointer transition-colors ${
+              className={`p-4 rounded-[3px] border cursor-pointer transition-colors${
                 selectedBom.id === bom.id
                   ? 'bg-orange-500/10 border-orange-500'
-                  : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                  : 'bg-sheet border-rule hover:border-rule-strong'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -204,10 +204,10 @@ export default function BomsPage() {
                   }
                 />
               </div>
-              <div className="text-sm font-semibold text-white mt-1">
+              <div className="text-sm font-semibold text-ink mt-1">
                 {bom.finishedItemName}
               </div>
-              <div className="text-xs text-zinc-400 mt-1">
+              <div className="text-xs text-ink-3 mt-1">
                 Yields {bom.outputQty} {bom.outputUom} · {bom.ingredients.length} ingredients
               </div>
               <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -228,20 +228,20 @@ export default function BomsPage() {
 
         {/* Recipe Card Preview + Scale Calculator */}
         <div className="lg:col-span-2 space-y-4">
-          <Card className="p-5 bg-zinc-900 border-zinc-800 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+          <Card className="p-5 bg-sheet border-rule space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-rule">
               <div>
-                <h2 className="text-lg font-bold text-white">
+                <h2 className="text-lg font-bold text-ink">
                   Recipe Card: {selectedBom.finishedItemName}
                 </h2>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-ink-3">
                   {selectedBom.code} · Base batch: {selectedBom.outputQty} {selectedBom.outputUom}
                 </p>
               </div>
               {showCostRollup && (
                 <div className="text-right">
-                  <div className="text-[11px] text-zinc-400">Estimated Cost Roll-up (Owner)</div>
-                  <div className="text-sm font-bold text-emerald-400 font-mono">
+                  <div className="text-[11px] text-ink-3">Estimated Cost Roll-up (Owner)</div>
+                  <div className="text-sm font-bold text-leaf font-mono">
                     {formatINR(costRollup.costPerUnit)} / {selectedBom.outputUom} ({formatINR(costRollup.totalBatchCost)}/batch)
                   </div>
                 </div>
@@ -249,14 +249,14 @@ export default function BomsPage() {
             </div>
 
             {/* Scale Calculator */}
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-zinc-300 font-medium">
+            <div className="p-3 rounded-lg bg-paper border border-rule flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-ink-2 font-medium">
                 Scale Calculator: Make{' '}
                 <input
                   type="number"
                   value={scaleTargetQty}
                   onChange={(e) => setScaleTargetQty(Number(e.target.value) || 0)}
-                  className="w-24 mx-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-white font-mono"
+                  className="w-24 mx-1 bg-sheet border border-rule-strong rounded px-2 py-1 text-ink font-mono"
                 />{' '}
                 {selectedBom.outputUom} → needs:
               </div>
@@ -265,7 +265,7 @@ export default function BomsPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-800">
+                <thead className="text-xs uppercase text-ink-3 border-b border-rule">
                   <tr>
                     <th className="py-2">Ingredient</th>
                     <th className="py-2 text-right">Base ({selectedBom.outputQty} {selectedBom.outputUom})</th>
@@ -273,14 +273,14 @@ export default function BomsPage() {
                     <th className="py-2 text-right">Scaled ({scaleTargetQty} {selectedBom.outputUom})</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/70">
+                <tbody className="divide-y divide-rule">
                   {scaledIngredients.map((ing) => (
                     <tr key={ing.itemId}>
-                      <td className="py-2.5 text-white font-medium">{ing.itemName}</td>
-                      <td className="py-2.5 text-right font-mono text-zinc-300">
+                      <td className="py-2.5 text-ink font-medium">{ing.itemName}</td>
+                      <td className="py-2.5 text-right font-mono text-ink-2">
                         {ing.qty} {ing.uom}
                       </td>
-                      <td className="py-2.5 text-right font-mono text-zinc-400">
+                      <td className="py-2.5 text-right font-mono text-ink-3">
                         {ing.expectedLossPct}%
                       </td>
                       <td className="py-2.5 text-right font-mono font-bold text-orange-400">
@@ -292,11 +292,11 @@ export default function BomsPage() {
               </table>
             </div>
 
-            <div className="pt-2 border-t border-zinc-800">
-              <h4 className="text-xs font-semibold uppercase text-zinc-400 mb-2">
+            <div className="pt-2 border-t border-rule">
+              <h4 className="text-xs font-semibold uppercase text-ink-3 mb-2">
                 Process Steps
               </h4>
-              <ol className="list-decimal list-inside space-y-1 text-xs text-zinc-300">
+              <ol className="list-decimal list-inside space-y-1 text-xs text-ink-2">
                 {selectedBom.steps.map((s, idx) => (
                   <li key={idx}>{s}</li>
                 ))}
@@ -309,21 +309,21 @@ export default function BomsPage() {
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Draft BOM">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Finished Item</label>
+            <label className="block text-xs text-ink-3 mb-1">Finished Item</label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Base Output Qty (kg)</label>
+            <label className="block text-xs text-ink-3 mb-1">Base Output Qty (kg)</label>
             <input
               type="number"
               value={newOutputQty}
               onChange={(e) => setNewOutputQty(Number(e.target.value))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             />
           </div>
           <div className="flex justify-end gap-2">

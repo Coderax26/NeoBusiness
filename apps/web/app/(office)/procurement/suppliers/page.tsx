@@ -280,7 +280,7 @@ export default function SupplierMasterPage() {
       header: 'Code',
       accessorKey: 'code',
       cell: (info) => (
-        <span className="font-mono text-xs font-bold text-teal-400">
+        <span className="font-mono text-xs font-bold text-action">
           {info.getValue() as string}
         </span>
       ),
@@ -293,15 +293,15 @@ export default function SupplierMasterPage() {
         const s = info.row.original;
         return (
           <div>
-            <div className="font-bold text-white text-xs">{s.name}</div>
-            <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
+            <div className="font-bold text-ink text-xs">{s.name}</div>
+            <div className="text-[11px] text-ink-3 flex items-center gap-2 mt-0.5">
               <span>{s.contactPerson}</span>
               <span>•</span>
-              <a href={`tel:${s.phone}`} className="text-teal-400 hover:underline">
+              <a href={`tel:${s.phone}`} className="text-action hover:underline">
                 📞 {s.phone}
               </a>
               {s.hasMissingRates && (
-                <span className="text-rose-400 font-semibold">• Missing rate alert</span>
+                <span className="text-madder font-semibold">• Missing rate alert</span>
               )}
             </div>
           </div>
@@ -313,7 +313,7 @@ export default function SupplierMasterPage() {
       header: 'Items Supplied',
       cell: (info) => {
         const count = info.row.original.items.length;
-        return <span className="text-xs text-zinc-300">{count} active items</span>;
+        return <span className="text-xs text-ink-2">{count} active items</span>;
       },
     },
     {
@@ -324,8 +324,8 @@ export default function SupplierMasterPage() {
         const score = info.getValue() as number;
         return (
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-amber-400 font-bold">★ {score.toFixed(1)}</span>
-            <span className="text-zinc-500">/ 5.0</span>
+            <span className="text-haldi font-bold">★ {score.toFixed(1)}</span>
+            <span className="text-ink-3">/ 5.0</span>
           </div>
         );
       },
@@ -337,7 +337,7 @@ export default function SupplierMasterPage() {
       cell: (info) => {
         const rate = info.getValue() as number;
         return (
-          <span className={`text-xs font-mono font-bold ${rate >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
+          <span className={`text-xs font-mono font-bold${rate >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
             {rate.toFixed(1)}%
           </span>
         );
@@ -348,7 +348,7 @@ export default function SupplierMasterPage() {
       header: 'Last PO',
       accessorKey: 'lastPoDate',
       cell: (info) => (
-        <span className="text-xs text-zinc-400">{((info.getValue() as string) || 'No orders yet')}</span>
+        <span className="text-xs text-ink-3">{((info.getValue() as string) || 'No orders yet')}</span>
       ),
     },
     {
@@ -360,7 +360,7 @@ export default function SupplierMasterPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => openEditForm(s)}
-              className="text-xs text-teal-400 hover:text-teal-300 font-medium"
+              className="text-xs text-action hover:text-action font-medium"
             >
               Manage
             </button>
@@ -391,13 +391,13 @@ export default function SupplierMasterPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/30 mb-1.5">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-action/10 text-action border border-action/30 mb-1.5">
             <span>🏭 Procurement &amp; Vendors</span>
           </div>
-          <h1 className="text-2xl font-black text-white">Supplier Master Directory</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Supplier Master Directory</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Manage approved vendors, contract rate cards, supplied materials, and vendor reliability metrics.
           </p>
         </div>
@@ -444,19 +444,19 @@ export default function SupplierMasterPage() {
       </div>
 
       {/* 3. Filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-sheet border border-rule p-4 rounded-[4px]">
         <div className="flex items-center gap-3 flex-1">
           <input
             type="text"
             placeholder="Search by name or code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+            className="w-full md:w-80 bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink placeholder-ink-3 focus:outline-none focus:border-action/30"
           />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+            className="bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink-2 focus:outline-none focus:border-action/30"
           >
             <option value="ALL">All Status</option>
             <option value="ACTIVE">Active Only</option>
@@ -466,10 +466,10 @@ export default function SupplierMasterPage() {
 
         <button
           onClick={() => setMissingRateOnly(!missingRateOnly)}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+          className={`px-3 py-1.5 rounded-[3px] text-xs font-semibold border transition-all${
             missingRateOnly
-              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-              : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white'
+              ? 'bg-madder-soft text-madder border-madder/30'
+              : 'bg-paper text-ink-3 border-rule hover:text-ink'
           }`}
         >
           🚨 Missing Rate Alerts ({missingRateCount})
@@ -488,11 +488,11 @@ export default function SupplierMasterPage() {
       >
         <div className="space-y-5 my-2">
           {/* Tabs */}
-          <div className="flex border-b border-zinc-800 text-xs font-semibold gap-4 overflow-x-auto">
+          <div className="flex border-b border-rule text-xs font-semibold gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('general')}
-              className={`pb-2 border-b-2 transition-colors ${
-                activeTab === 'general' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              className={`pb-2 border-b-2 transition-colors${
+                activeTab === 'general' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               General Info
@@ -501,24 +501,24 @@ export default function SupplierMasterPage() {
               <>
                 <button
                   onClick={() => setActiveTab('items')}
-                  className={`pb-2 border-b-2 transition-colors ${
-                    activeTab === 'items' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+                  className={`pb-2 border-b-2 transition-colors${
+                    activeTab === 'items' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >
                   Supplied Items ({editingSupplier.items.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('rates')}
-                  className={`pb-2 border-b-2 transition-colors ${
-                    activeTab === 'rates' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+                  className={`pb-2 border-b-2 transition-colors${
+                    activeTab === 'rates' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >
                   Rate Cards &amp; History
                 </button>
                 <button
                   onClick={() => setActiveTab('performance')}
-                  className={`pb-2 border-b-2 transition-colors ${
-                    activeTab === 'performance' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+                  className={`pb-2 border-b-2 transition-colors${
+                    activeTab === 'performance' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >
                   Performance &amp; Reliability
@@ -532,100 +532,100 @@ export default function SupplierMasterPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Supplier Code *</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Supplier Code *</label>
                   <input
                     type="text"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono uppercase focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.code && <p className="text-xs text-rose-400 mt-1">{formErrors.code}</p>}
+                  {formErrors.code && <p className="text-xs text-madder mt-1">{formErrors.code}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Business / Firm Name *</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Business / Firm Name *</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.name && <p className="text-xs text-rose-400 mt-1">{formErrors.name}</p>}
+                  {formErrors.name && <p className="text-xs text-madder mt-1">{formErrors.name}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">GSTIN</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">GSTIN</label>
                   <input
                     type="text"
                     value={gstin}
                     onChange={(e) => setGstin(e.target.value.toUpperCase())}
                     placeholder="e.g. 27AABCG1234F1Z5"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono uppercase focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.gstin && <p className="text-xs text-rose-400 mt-1">{formErrors.gstin}</p>}
+                  {formErrors.gstin && <p className="text-xs text-madder mt-1">{formErrors.gstin}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Contact Person</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Contact Person</label>
                   <input
                     type="text"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Phone Number *</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Phone Number *</label>
                   <input
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.phone && <p className="text-xs text-rose-400 mt-1">{formErrors.phone}</p>}
+                  {formErrors.phone && <p className="text-xs text-madder mt-1">{formErrors.phone}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Email</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Email</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Payment Terms (Days)</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Payment Terms (Days)</label>
                   <input
                     type="number"
                     value={paymentTermsDays}
                     onChange={(e) => setPaymentTermsDays(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Expected Lead Time (Days)</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Expected Lead Time (Days)</label>
                   <input
                     type="number"
                     value={leadTimeDays}
                     onChange={(e) => setLeadTimeDays(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Factory / Dispatch Address</label>
+                <label className="block text-xs font-semibold text-ink-2 mb-1">Factory / Dispatch Address</label>
                 <textarea
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   rows={2}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                 />
               </div>
             </div>
@@ -635,7 +635,7 @@ export default function SupplierMasterPage() {
           {activeTab === 'items' && editingSupplier && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-ink-3">
                   Catalog items linked to this supplier for purchase orders:
                 </span>
               </div>
@@ -644,11 +644,11 @@ export default function SupplierMasterPage() {
                 {editingSupplier.items.map((it) => (
                   <div
                     key={it.itemId}
-                    className="p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
+                    className="p-3 bg-paper border border-rule rounded-[3px] flex items-center justify-between text-xs"
                   >
                     <div>
-                      <div className="font-bold text-white">{it.itemName}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">
+                      <div className="font-bold text-ink">{it.itemName}</div>
+                      <div className="text-[11px] text-ink-3 mt-0.5">
                         <span>SKU: {it.itemSku}</span>
                         <span className="mx-1.5">•</span>
                         <span>Vendor SKU: {it.supplierSku}</span>
@@ -658,11 +658,11 @@ export default function SupplierMasterPage() {
                     </div>
                     <div className="text-right">
                       {it.latestRate !== undefined ? (
-                        <span className="font-mono font-bold text-teal-400">
+                        <span className="font-mono font-bold text-action">
                           ₹{it.latestRate.toFixed(2)}
                         </span>
                       ) : (
-                        <span className="text-rose-400 font-semibold">⚠️ No rate set</span>
+                        <span className="text-madder font-semibold">⚠️ No rate set</span>
                       )}
                     </div>
                   </div>
@@ -676,8 +676,8 @@ export default function SupplierMasterPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">Active Rate Agreements</h4>
-                  <p className="text-[11px] text-zinc-400">Contract rates with start and expiry dates</p>
+                  <h4 className="text-xs font-bold text-ink">Active Rate Agreements</h4>
+                  <p className="text-[11px] text-ink-3">Contract rates with start and expiry dates</p>
                 </div>
                 <Button
                   variant="primary"
@@ -692,7 +692,7 @@ export default function SupplierMasterPage() {
               </div>
 
               {editingSupplier.rates.length === 0 ? (
-                <div className="p-8 text-center bg-zinc-950/40 rounded-2xl border border-zinc-800 text-xs text-zinc-500">
+                <div className="p-8 text-center bg-paper rounded-[4px] border border-rule text-xs text-ink-3">
                   No rate agreements recorded yet. Add an agreed contract rate to prevent PO price discrepancies.
                 </div>
               ) : (
@@ -700,17 +700,17 @@ export default function SupplierMasterPage() {
                   {editingSupplier.rates.map((r) => (
                     <div
                       key={r.id}
-                      className="p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
+                      className="p-3 bg-paper border border-rule rounded-[3px] flex items-center justify-between text-xs"
                     >
                       <div>
-                        <div className="font-bold text-white">{r.itemName}</div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5">
+                        <div className="font-bold text-ink">{r.itemName}</div>
+                        <div className="text-[11px] text-ink-3 mt-0.5">
                           <span>Valid from: {r.validFrom}</span>
                           {r.validTo && <span> to {r.validTo}</span>}
-                          {r.notes && <span className="ml-2 text-zinc-500">({r.notes})</span>}
+                          {r.notes && <span className="ml-2 text-ink-3">({r.notes})</span>}
                         </div>
                       </div>
-                      <div className="text-base font-mono font-black text-teal-400">
+                      <div className="text-base font-mono font-semibold text-action">
                         ₹{r.ratePerUnit.toFixed(2)}
                       </div>
                     </div>
@@ -724,33 +724,33 @@ export default function SupplierMasterPage() {
           {activeTab === 'performance' && editingSupplier && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-xl text-center">
-                  <span className="text-[11px] text-zinc-500 font-semibold uppercase">Reliability Score</span>
-                  <div className="text-2xl font-black text-amber-400 mt-1">
+                <div className="p-4 bg-paper border border-rule rounded-[3px] text-center">
+                  <span className="text-[11px] text-ink-3 font-semibold uppercase">Reliability Score</span>
+                  <div className="text-2xl font-semibold text-haldi mt-1">
                     ★ {editingSupplier.reliabilityScore.toFixed(1)}
                   </div>
-                  <span className="text-[11px] text-zinc-400">Calculated composite</span>
+                  <span className="text-[11px] text-ink-3">Calculated composite</span>
                 </div>
-                <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-xl text-center">
-                  <span className="text-[11px] text-zinc-500 font-semibold uppercase">PO Fill Rate</span>
-                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                <div className="p-4 bg-paper border border-rule rounded-[3px] text-center">
+                  <span className="text-[11px] text-ink-3 font-semibold uppercase">PO Fill Rate</span>
+                  <div className="text-2xl font-semibold text-leaf mt-1">
                     {editingSupplier.fillRatePct.toFixed(1)}%
                   </div>
-                  <span className="text-[11px] text-zinc-400">Delivered vs Ordered</span>
+                  <span className="text-[11px] text-ink-3">Delivered vs Ordered</span>
                 </div>
-                <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-xl text-center">
-                  <span className="text-[11px] text-zinc-500 font-semibold uppercase">On-Time Delivery</span>
-                  <div className="text-2xl font-black text-teal-400 mt-1">
+                <div className="p-4 bg-paper border border-rule rounded-[3px] text-center">
+                  <span className="text-[11px] text-ink-3 font-semibold uppercase">On-Time Delivery</span>
+                  <div className="text-2xl font-semibold text-action mt-1">
                     {editingSupplier.onTimePct.toFixed(1)}%
                   </div>
-                  <span className="text-[11px] text-zinc-400">Within agreed lead time</span>
+                  <span className="text-[11px] text-ink-3">Within agreed lead time</span>
                 </div>
               </div>
 
-              <div className="p-4 bg-zinc-950/40 border border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="p-4 bg-paper border border-rule rounded-[3px] flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-white">Historical Shortfall Events</div>
-                  <p className="text-[11px] text-zinc-400">
+                  <div className="text-xs font-bold text-ink">Historical Shortfall Events</div>
+                  <p className="text-[11px] text-ink-3">
                     Total recorded delivery shortages: {editingSupplier.shortfallCount} instances.
                   </p>
                 </div>
@@ -762,7 +762,7 @@ export default function SupplierMasterPage() {
           )}
 
           {/* Footer */}
-          <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+          <div className="pt-4 border-t border-rule flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={() => setFormOpen(false)}>
               Close
             </Button>
@@ -782,11 +782,11 @@ export default function SupplierMasterPage() {
       >
         <div className="space-y-4 my-2">
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">Item</label>
+            <label className="block text-xs font-semibold text-ink-2 mb-1">Item</label>
             <select
               value={newRateItemId}
               onChange={(e) => setNewRateItemId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
             >
               {editingSupplier?.items.map((i) => (
                 <option key={i.itemId} value={i.itemId}>
@@ -797,28 +797,28 @@ export default function SupplierMasterPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">Rate Per Unit (₹)</label>
+            <label className="block text-xs font-semibold text-ink-2 mb-1">Rate Per Unit (₹)</label>
             <input
               type="number"
               step="any"
               value={newRateValue}
               onChange={(e) => setNewRateValue(e.target.value)}
               placeholder="e.g. 56.50"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+              className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">Valid From</label>
+            <label className="block text-xs font-semibold text-ink-2 mb-1">Valid From</label>
             <input
               type="date"
               value={newRateValidFrom}
               onChange={(e) => setNewRateValidFrom(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
             />
           </div>
 
-          <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2">
+          <div className="pt-3 border-t border-rule flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setRateModalOpen(false)}>
               Cancel
             </Button>

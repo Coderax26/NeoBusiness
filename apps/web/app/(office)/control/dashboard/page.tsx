@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatINR, resolveExceptionWithConcurrency, type ExceptionItem, type ExceptionType } from '@neo/shared';
+import { Button } from '@neo/ui';
 import { PulseHeader } from '../../../../src/components/PulseHeader';
 import { type SitePulseSnapshot } from '../../../../src/lib/control-tower-data';
 
@@ -169,14 +170,14 @@ export default function ControlTowerDashboardPage() {
   }
 
   return (
-    <div className={tvMode ? 'fixed inset-0 z-50 overflow-y-auto bg-zinc-950 p-6 text-zinc-100' : 'space-y-6'}>
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className={tvMode ? 'fixed inset-0 z-50 overflow-y-auto bg-sheet p-8 text-ink space-y-6' : 'max-w-[1200px] mx-auto space-y-7'}>
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">
-            Owner Control Tower
+          <h1 className="font-serif text-[32px] font-medium text-ink leading-tight">
+            Business Overview
           </h1>
-          <p className="text-sm text-zinc-400">
-            Exception-first command centre: live pulse, operational queues, inline approvals, and site comparison.
+          <p className="text-[14px] text-ink-2 mt-1">
+            Live pulse, operational queues, inline approvals, and site comparison.
           </p>
         </div>
 
@@ -184,7 +185,7 @@ export default function ControlTowerDashboardPage() {
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+            className="rounded-[3px] border border-rule-strong bg-sheet px-3 py-1.5 text-[13.5px] text-ink"
           >
             <option value="all">All Sites (Aggregated)</option>
             {sites.map((s) => (
@@ -193,96 +194,94 @@ export default function ControlTowerDashboardPage() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setSimulateOffline((v) => !v)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-200"
           >
-            {simulateOffline ? 'Resume Live Sync' : 'Simulate Offline'}
-          </button>
-          <button
-            type="button"
+            {simulateOffline ? 'Resume Live Sync' : 'Pause Sync'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setTvMode((v) => !v)}
-            className="rounded-lg bg-zinc-100 px-3.5 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200"
           >
-            {tvMode ? 'Exit TV Mode' : 'TV / Wall Mode'}
-          </button>
+            {tvMode ? 'Exit TV View' : 'Show on TV'}
+          </Button>
         </div>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border-l-4 border-leaf bg-leaf-soft px-4 py-2.5 text-[13.5px] font-medium text-leaf">
           {toast}
         </div>
       )}
 
-      {/* F10-01 Pulse Header */}
+      {/* Pulse Header */}
       <PulseHeader
         siteId={siteId}
         pendingDecisionsCount={pendingExceptions.length}
         simulateOffline={simulateOffline}
       />
 
-      {/* F10-02 Status Matrix & Needs Your Decision */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100 space-y-4">
-          <h2 className="text-base font-bold">Operations Status Matrix</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/sales/orders" className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-blue-500">
-              <div className="text-xs text-zinc-400">Orders to Dispatch</div>
-              <div className="mt-1 text-2xl font-bold text-zinc-100">{snapshot.ordersToDispatch}</div>
+      {/* Operations & Needs Your Decision */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div>
+          <div className="flex items-baseline justify-between pb-2 bahi-section-rule mb-1">
+            <h2 className="text-[15px] font-semibold text-ink">Operations Status</h2>
+          </div>
+          <div className="divide-y divide-rule border-b border-rule">
+            <Link href="/sales/orders" className="flex items-center justify-between py-3 hover:bg-paper/60 px-1.5 -mx-1.5 rounded-[3px]">
+              <span className="text-[14px] text-ink-2">Orders to Dispatch</span>
+              <span className="font-serif text-[22px] font-medium text-ink tabular-nums">{snapshot.ordersToDispatch}</span>
             </Link>
-            <Link href="/production/work-orders" className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-orange-500">
-              <div className="text-xs text-zinc-400">Batches Running</div>
-              <div className="mt-1 text-2xl font-bold text-zinc-100">{snapshot.batchesRunning}</div>
+            <Link href="/production/work-orders" className="flex items-center justify-between py-3 hover:bg-paper/60 px-1.5 -mx-1.5 rounded-[3px]">
+              <span className="text-[14px] text-ink-2">Batches Running</span>
+              <span className="font-serif text-[22px] font-medium text-ink tabular-nums">{snapshot.batchesRunning}</span>
             </Link>
-            <Link href="/logistics/dispatch" className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-emerald-500">
-              <div className="text-xs text-zinc-400">Trucks on Road</div>
-              <div className="mt-1 text-sm font-bold text-zinc-100">{snapshot.trucksOnRoadLabel}</div>
+            <Link href="/logistics/dispatch" className="flex items-center justify-between py-3 hover:bg-paper/60 px-1.5 -mx-1.5 rounded-[3px]">
+              <span className="text-[14px] text-ink-2">Trucks on Road</span>
+              <span className="font-serif text-[18px] font-medium text-ink">{snapshot.trucksOnRoadLabel}</span>
             </Link>
-            <Link href="/procurement/shortfalls" className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-rose-500">
-              <div className="text-xs text-zinc-400">Supplier Shortfalls</div>
-              <div className="mt-1 text-2xl font-bold text-rose-400">{snapshot.supplierShortfalls}</div>
+            <Link href="/procurement/shortfalls" className="flex items-center justify-between py-3 hover:bg-paper/60 px-1.5 -mx-1.5 rounded-[3px]">
+              <span className="text-[14px] text-ink-2">Supplier Shortfalls</span>
+              <span className={`font-serif text-[22px] font-medium tabular-nums ${snapshot.supplierShortfalls > 0 ? 'text-madder' : 'text-ink'}`}>
+                {snapshot.supplierShortfalls}
+              </span>
             </Link>
           </div>
         </div>
 
         {/* Inline Decisions Panel */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">Needs Your Decision</h2>
-            <Link href="/control/approvals" className="text-xs font-semibold text-teal-400 hover:underline">
-              Open Approvals Centre →
+        <div>
+          <div className="flex items-baseline justify-between pb-2 bahi-section-rule mb-1">
+            <h2 className="text-[15px] font-semibold text-ink">Needs Your Decision</h2>
+            <Link href="/control/approvals" className="text-[13.5px] font-medium text-action hover:underline">
+              Open Approvals →
             </Link>
           </div>
           {pendingExceptions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-emerald-400 font-semibold">
+            <p className="py-6 text-[14px] text-leaf font-medium border-b border-rule">
               ✓ All pending exceptions cleared!
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-rule border-b border-rule">
               {pendingExceptions.slice(0, 3).map((exc) => (
-                <div key={exc.id} className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3.5 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300">{exc.type.replace(/_/g, ' ')}</span>
-                    <span className="text-xs text-zinc-400">Escalates in {exc.escalatesInMinutes}m</span>
+                <div key={exc.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-3 text-[13px]">
+                      <span className="font-semibold text-haldi">{exc.type.replace(/_/g, ' ')}</span>
+                      <span className="text-ink-3">Escalates in {exc.escalatesInMinutes}m</span>
+                    </div>
+                    <div className="mt-0.5 text-[14.5px] font-medium text-ink">{exc.title}</div>
                   </div>
-                  <div className="mt-1 font-semibold text-zinc-100">{exc.title}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => quickResolve(exc, 'APPROVE')}
-                      className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
-                    >
-                      ✓ Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => quickResolve(exc, 'REJECT')}
-                      className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                    >
-                      ✕ Reject
-                    </button>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Button size="sm" variant="primary" onClick={() => quickResolve(exc, 'APPROVE')}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => quickResolve(exc, 'REJECT')}>
+                      Reject
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -292,26 +291,26 @@ export default function ControlTowerDashboardPage() {
       </div>
 
       {/* 30-Day Sales Trend + Stock Alerts + Yesterday's EOD */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">Sales Trend (Last 30 Days)</h2>
-            <Link href="/control/analytics" className="text-xs font-semibold text-teal-400 hover:underline">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+            <h2 className="text-[15px] font-semibold text-ink">Sales Trend (Last 30 Days)</h2>
+            <Link href="/control/analytics" className="text-[13.5px] font-medium text-action hover:underline">
               Explore Analytics →
             </Link>
           </div>
           {trend.length === 0 ? (
-            <div className="mt-6 text-xs text-zinc-400">Live trend data populates as invoices are posted.</div>
+            <div className="mt-5 text-[13.5px] text-ink-3">Live trend data populates as invoices are posted.</div>
           ) : (
-            <div className="mt-4 flex items-end gap-3 h-36">
-              {trend.map((pt) => (
+            <div className="mt-4 flex items-end gap-2.5 h-36 border-b border-rule-strong pb-1">
+              {trend.map((pt, i) => (
                 <div key={pt.day} className="flex flex-1 flex-col items-center gap-1">
                   <div
-                    className="w-full rounded-t-md bg-teal-500 transition-all"
+                    className={`w-full transition-all ${i === trend.length - 1 ? 'bg-action' : 'bg-rule-strong'}`}
                     style={{ height: `${Math.min(110, Math.max(8, Math.round((pt.salesInr / 500000) * 110)))}px` }}
                     title={`${pt.day}: ${formatINR(pt.salesInr)}`}
                   />
-                  <span className="text-[10px] text-zinc-400">{pt.day}</span>
+                  <span className="text-[12px] text-ink-3">{pt.day}</span>
                 </div>
               ))}
             </div>
@@ -319,13 +318,16 @@ export default function ControlTowerDashboardPage() {
         </div>
 
         <div className="space-y-4">
-          <Link href="/control/stock-alerts" className="block rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100 hover:border-amber-500">
-            <div className="text-xs font-semibold text-zinc-400">Stock Alerts</div>
-            <div className="mt-1 text-2xl font-bold text-amber-400">{alertCount} Active Alerts</div>
+          <div className="pb-2 bahi-section-rule">
+            <h2 className="text-[15px] font-semibold text-ink">Keep an eye on</h2>
+          </div>
+          <Link href="/control/stock-alerts" className="block py-2 border-b border-rule hover:text-action">
+            <div className="text-[13px] text-ink-3">Stock Alerts</div>
+            <div className="mt-0.5 font-serif text-[24px] font-medium text-haldi">{alertCount} Active Alerts</div>
           </Link>
-          <Link href="/finance/eod" className="block rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100 hover:border-emerald-500">
-            <div className="text-xs font-semibold text-zinc-400">Yesterday&apos;s EOD</div>
-            <div className="mt-1 text-xl font-bold text-emerald-400">
+          <Link href="/finance/eod" className="block py-2 border-b border-rule hover:text-action">
+            <div className="text-[13px] text-ink-3">Yesterday&apos;s EOD</div>
+            <div className="mt-0.5 font-serif text-[24px] font-medium text-leaf">
               {snapshot.yesterdayEodStatus} ({snapshot.yesterdayEodMinutes} min)
             </div>
           </Link>
@@ -334,4 +336,3 @@ export default function ControlTowerDashboardPage() {
     </div>
   );
 }
-

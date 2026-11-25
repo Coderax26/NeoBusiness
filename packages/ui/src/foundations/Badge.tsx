@@ -17,27 +17,26 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   className = '',
 }) => {
-  const resolvedTone: BadgeTone = ((tone ?? variant ?? 'neutral') as BadgeTone);
+  const resolvedTone: BadgeTone = (tone ?? variant ?? 'neutral') as BadgeTone;
   const toneClasses: Record<BadgeTone, string> = {
-    brand: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
-    success: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    warning: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    danger: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-    info: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-    neutral: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+    brand: 'bg-action-soft text-action border-action/25',
+    success: 'bg-leaf-soft text-leaf border-leaf/25',
+    warning: 'bg-haldi-soft text-haldi border-haldi/25',
+    danger: 'bg-madder-soft text-madder border-madder/25',
+    info: 'bg-action-soft text-action border-action/25',
+    neutral: 'bg-sunken text-ink-2 border-rule-strong',
   };
 
   const sizeClasses = {
-    sm: 'px-2 py-0.5 text-[11px]',
-    md: 'px-2.5 py-1 text-xs',
+    sm: 'px-2 py-0.5 text-[13px]',
+    md: 'px-2.5 py-0.5 text-[13px]',
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-medium rounded-full border ${toneClasses[resolvedTone] ?? toneClasses.neutral} ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center gap-1.5 font-medium rounded-[3px] border ${toneClasses[resolvedTone] ?? toneClasses.neutral} ${sizeClasses[size]} ${className}`}
     >
       {children}
     </span>
   );
 };
-

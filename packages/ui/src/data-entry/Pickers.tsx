@@ -51,44 +51,44 @@ export const SearchPicker: React.FC<SearchPickerProps> = ({
     : items.slice(0, 8);
 
   const badgeToneClasses = {
-    brand: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-    success: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    warning: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    danger: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-    neutral: 'bg-zinc-700/40 text-zinc-300 border-zinc-600',
+    brand: 'bg-action-soft text-action border-action/30',
+    success: 'bg-leaf-soft text-leaf border-leaf/30',
+    warning: 'bg-haldi-soft text-haldi border-haldi/30',
+    danger: 'bg-madder-soft text-madder border-madder/30',
+    neutral: 'bg-sunken text-ink-2 border-rule-strong',
   };
 
   return (
     <div className={`relative w-full ${className}`}>
-      <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+      <label className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
         {label}
-        {required && <span className="text-rose-400 ml-1">*</span>}
+        {required && <span className="text-madder ml-1">*</span>}
       </label>
 
       {/* Selected Box / Search Input */}
       <div
         onClick={() => setIsOpen(true)}
-        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 min-h-[44px]"
+        className="w-full bg-sheet border border-rule-strong rounded-[3px] p-2.5 flex items-center justify-between cursor-pointer hover:border-action min-h-[44px]"
       >
         {selectedItem ? (
           <div className="flex items-center gap-2.5">
             <Avatar name={selectedItem.title} size="sm" />
             <div>
-              <div className="text-sm font-semibold text-zinc-100">{selectedItem.title}</div>
+              <div className="text-[14px] font-medium text-ink">{selectedItem.title}</div>
               {selectedItem.subtitle && (
-                <div className="text-xs text-zinc-400">{selectedItem.subtitle}</div>
+                <div className="text-[13px] text-ink-3">{selectedItem.subtitle}</div>
               )}
             </div>
           </div>
         ) : (
-          <span className="text-sm text-zinc-500">{placeholder}</span>
+          <span className="text-[14px] text-ink-3">{placeholder}</span>
         )}
-        <span className="text-zinc-500 text-xs">▼</span>
+        <span className="text-ink-3 text-xs">▾</span>
       </div>
 
       {/* Dropdown with search and recent items */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-2.5 animate-fade-in">
+        <div className="absolute z-50 left-0 right-0 mt-1.5 bg-sheet border border-rule-strong rounded-[4px] shadow-xl p-2.5">
           <div className="mb-2">
             <input
               type="text"
@@ -96,17 +96,17 @@ export const SearchPicker: React.FC<SearchPickerProps> = ({
               placeholder="Type to filter..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-1.5 text-[13.5px] text-ink placeholder-ink-3 focus:outline-none focus:border-action"
             />
           </div>
 
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 px-2 py-1">
-            {query ? 'Matching Results' : recentItems.length > 0 ? 'Recent Items' : 'All Items'}
+          <div className="text-[13px] font-medium text-ink-3 px-2 py-1">
+            {query ? 'Matching results' : recentItems.length > 0 ? 'Recent items' : 'All items'}
           </div>
 
-          <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800/60">
+          <div className="max-h-56 overflow-y-auto divide-y divide-rule">
             {filtered.length === 0 ? (
-              <div className="p-3 text-center text-xs text-zinc-500">No matching items found.</div>
+              <div className="p-3 text-center text-[13px] text-ink-3">No matching items found.</div>
             ) : (
               filtered.map((item) => (
                 <div
@@ -115,23 +115,23 @@ export const SearchPicker: React.FC<SearchPickerProps> = ({
                     onSelect(item);
                     setIsOpen(false);
                   }}
-                  className="p-2.5 rounded-lg hover:bg-zinc-800 flex items-center justify-between cursor-pointer transition-colors"
+                  className="p-2.5 rounded-[3px] hover:bg-paper flex items-center justify-between cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2.5">
                     <Avatar name={item.title} size="sm" />
                     <div>
-                      <div className="text-xs font-semibold text-zinc-100">{item.title}</div>
-                      {item.subtitle && <div className="text-[11px] text-zinc-400">{item.subtitle}</div>}
+                      <div className="text-[13.5px] font-medium text-ink">{item.title}</div>
+                      {item.subtitle && <div className="text-[13px] text-ink-3">{item.subtitle}</div>}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-right">
                     {item.metadata && (
-                      <span className="text-[11px] text-zinc-400 font-mono">{item.metadata}</span>
+                      <span className="text-[13px] text-ink-2 font-mono">{item.metadata}</span>
                     )}
                     {item.badge && (
                       <span
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                        className={`text-[13px] font-medium px-2 py-0.5 rounded-[3px] border ${
                           badgeToneClasses[item.badge.tone]
                         }`}
                       >
@@ -144,11 +144,11 @@ export const SearchPicker: React.FC<SearchPickerProps> = ({
             )}
           </div>
 
-          <div className="mt-2 pt-2 border-t border-zinc-800 flex justify-end">
+          <div className="mt-2 pt-2 border-t border-rule flex justify-end">
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="text-xs text-zinc-400 hover:text-white px-2 py-1"
+              className="text-[13px] text-ink-2 hover:text-ink px-2 py-1"
             >
               Close
             </button>
@@ -157,11 +157,10 @@ export const SearchPicker: React.FC<SearchPickerProps> = ({
       )}
 
       {error ? (
-        <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">{error}</p>
+        <p role="alert" className="text-[13px] text-madder mt-1 font-medium">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+        <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
       ) : null}
     </div>
   );
 };
-

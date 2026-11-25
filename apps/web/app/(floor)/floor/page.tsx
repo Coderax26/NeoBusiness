@@ -2,8 +2,34 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  Factory,
+  Package,
+  ClipboardList,
+  Users,
+  Trash2,
+  Calculator,
+  Inbox,
+  Truck,
+  ArrowLeftRight,
+  Scale,
+  AlertTriangle,
+  Monitor,
+  type LucideIcon,
+} from 'lucide-react';
 import { NumericKeypad } from '@neo/ui';
 import type { SessionUser } from '@neo/shared';
+
+interface FloorTile {
+  title: string;
+  mr: string;
+  description: string;
+  Icon: LucideIcon;
+  accent: string;
+  badge: string;
+  href?: string;
+  onClick?: () => void;
+}
 
 export default function FloorTerminalPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -22,52 +48,58 @@ export default function FloorTerminalPage() {
 
   const isStorekeeper = user?.role === 'STOREKEEPER';
 
-  const prodMgrTiles = [
+  const prodMgrTiles: FloorTile[] = [
     {
       title: 'Active Work Orders',
+      mr: 'सक्रिय उत्पादन बॅचेस',
       description: 'Cook, process, and pack batches according to standard BOM recipes',
-      icon: '⚙️',
-      color: 'border-orange-500/40 bg-orange-950/20 text-orange-200',
-      badge: '5 Active Batches',
+      Icon: Factory,
+      accent: 'border-l-4 border-l-action',
+      badge: 'Work Orders',
       href: '/floor/production',
     },
     {
       title: 'Record Batch Output & Yield',
+      mr: 'उत्पादन नोंदणी',
       description: 'Log actual finished goods output and calculate physical yield variance',
-      icon: '📦',
-      color: 'border-teal-500/40 bg-teal-950/20 text-teal-200',
+      Icon: Package,
+      accent: 'border-l-4 border-l-leaf',
       badge: 'Yield Check',
       href: '/floor/output',
     },
     {
       title: 'Raw Material Request',
+      mr: 'कच्चा माल मागणी',
       description: 'Request ingredients and packaging crates from warehouse storekeeper',
-      icon: '📋',
-      color: 'border-blue-500/40 bg-blue-950/20 text-blue-200',
+      Icon: ClipboardList,
+      accent: 'border-l-4 border-l-action',
       badge: 'BOM Pull',
       href: '/floor/material-request',
     },
     {
       title: 'Shift Worker Attendance',
+      mr: 'कामगार हजेरी',
       description: 'Record headcount, shifts, and machine station assignments',
-      icon: '👥',
-      color: 'border-emerald-500/40 bg-emerald-950/20 text-emerald-200',
-      badge: 'Shift 1 Active',
+      Icon: Users,
+      accent: 'border-l-4 border-l-leaf',
+      badge: 'Shift Active',
       href: '/floor/attendance',
     },
     {
       title: 'Report Production Wastage',
+      mr: 'नुकसान / वाया गेलेला माल',
       description: 'Log spilled pulp, rejected packaging, and equipment downtime',
-      icon: '🗑️',
-      color: 'border-rose-500/40 bg-rose-950/20 text-rose-200',
+      Icon: Trash2,
+      accent: 'border-l-4 border-l-madder',
       badge: 'Spill Log',
       href: '/floor/wastage',
     },
     {
       title: 'Quick Scale Keypad',
+      mr: 'वजन नोंदणी कीपॅड',
       description: 'Enter weights and quantity readings with gloves on touchscreen',
-      icon: '🔢',
-      color: 'border-purple-500/40 bg-purple-950/20 text-purple-200',
+      Icon: Calculator,
+      accent: 'border-l-4 border-l-action',
       badge: 'Large Touch',
       onClick: () => {
         setKeypadContext('Scale / Crate Tare Reading');
@@ -76,52 +108,58 @@ export default function FloorTerminalPage() {
     },
   ];
 
-  const storekeeperTiles = [
+  const storekeeperTiles: FloorTile[] = [
     {
       title: 'Blind GRN Receiving',
-      description: 'Weigh and count incoming supplier lots without seeing invoice amounts (BR-05)',
-      icon: '📥',
-      color: 'border-blue-500/40 bg-blue-950/20 text-blue-200',
-      badge: '3 Deliveries Arriving',
+      mr: 'माल आवक मोजणी',
+      description: 'Count incoming supplier lots without seeing invoice amounts',
+      Icon: Inbox,
+      accent: 'border-l-4 border-l-action',
+      badge: 'Receiving',
       href: '/floor/grn',
     },
     {
       title: 'Vehicle Loading Check',
-      description: 'Verify crate counts and seal delivery vehicle before gate pass (G-FLT-2)',
-      icon: '🚚',
-      color: 'border-emerald-500/40 bg-emerald-950/20 text-emerald-200',
-      badge: '2 Trucks Staged',
+      mr: 'वाहन भराई तपासणी',
+      description: 'Verify crate counts and seal delivery vehicle before gate pass',
+      Icon: Truck,
+      accent: 'border-l-4 border-l-leaf',
+      badge: 'Dispatch Gate',
       href: '/floor/loading',
     },
     {
       title: 'Inter-Site Warehouse Transfers',
-      description: 'Dispatch or receive pallets transferred between Pune plant and Mumbai hub',
-      icon: '🔄',
-      color: 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200',
-      badge: '1 Inbound Truck',
+      mr: 'गोदाम हस्तांतरण',
+      description: 'Dispatch or receive pallets transferred between plant and hub',
+      Icon: ArrowLeftRight,
+      accent: 'border-l-4 border-l-action',
+      badge: 'Transfers',
       href: '/floor/transfers',
     },
     {
       title: 'Physical Stock Count',
+      mr: 'प्रत्यक्ष साठा मोजणी',
       description: 'Cycle count cold rooms and raw material bins to reconcile stock',
-      icon: '🔢',
-      color: 'border-amber-500/40 bg-amber-950/20 text-amber-200',
-      badge: 'Weekly Cycle',
+      Icon: Scale,
+      accent: 'border-l-4 border-l-action',
+      badge: 'Cycle Count',
       href: '/floor/stock-counts',
     },
     {
       title: 'Stock Damage & Adjustment',
-      description: 'Record crushed crates or expired dairy lots with reason code',
-      icon: '⚠️',
-      color: 'border-rose-500/40 bg-rose-950/20 text-rose-200',
+      mr: 'साठा तफावत नोंदणी',
+      description: 'Record crushed crates or expired lots with reason code',
+      Icon: AlertTriangle,
+      accent: 'border-l-4 border-l-madder',
       badge: 'Damaged Lot',
       href: '/floor/adjustments',
     },
     {
       title: 'Quick Count Keypad',
+      mr: 'मोजणी कीपॅड',
       description: 'Touchscreen numeric entry for high-speed stock counts',
-      icon: '⌨️',
-      color: 'border-purple-500/40 bg-purple-950/20 text-purple-200',
+      Icon: Calculator,
+      accent: 'border-l-4 border-l-action',
       badge: 'Keypad (56px)',
       onClick: () => {
         setKeypadContext('Physical Bin Count');
@@ -134,51 +172,62 @@ export default function FloorTerminalPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-rule">
         <div>
-          <h1 className="text-2xl font-black text-white">
+          <h1 className="text-[26px] font-semibold text-ink">
             {isStorekeeper ? 'Warehouse & Receiving Terminal' : 'Factory Production Terminal'}
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Logged in as <strong className="text-white">{user?.name || 'Operator'}</strong> ({user?.role || 'FLOOR_STAFF'}). Tap any action tile.
+          <p className="text-[15px] text-ink-3 mt-1">
+            Operator: <strong className="text-ink">{user?.name || 'Operator'}</strong> ({user?.role || 'FLOOR_STAFF'})
           </p>
         </div>
 
         <Link
           href="/home"
-          className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          className="min-h-[48px] text-[14px] font-semibold px-4 py-2 rounded-[6px] bg-sunken hover:bg-sheet text-ink border border-rule-strong inline-flex items-center gap-2"
         >
-          🖥 Switch to Office View
+          <Monitor className="w-4 h-4" />
+          <span>Office View</span>
         </Link>
       </div>
 
-      {/* Grid of large 56px touch tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {activeTiles.map((tile: any) => {
+      {/* Grid of large 56px+ touch tiles */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {activeTiles.map((tile) => {
+          const TileIcon = tile.Icon;
+          const inner = (
+            <>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-[6px] bg-sunken border border-rule-strong flex items-center justify-center shrink-0 text-action">
+                  <TileIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-[19px] font-semibold text-ink leading-snug">{tile.title}</h3>
+                  <div className="font-devanagari text-[15px] text-ink-3 mt-0.5">{tile.mr}</div>
+                  <p className="text-[14px] text-ink-2 mt-2 leading-relaxed">{tile.description}</p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between pt-3.5 border-t border-rule">
+                <span className="text-[13px] font-semibold px-2.5 py-1 rounded-[4px] bg-sunken text-ink-2">
+                  {tile.badge}
+                </span>
+                <span className="text-[15px] font-bold text-action">
+                  {tile.onClick ? 'Open Keypad ↵' : 'Start Task →'}
+                </span>
+              </div>
+            </>
+          );
+
           if (tile.onClick) {
             return (
               <button
                 key={tile.title}
                 type="button"
                 onClick={tile.onClick}
-                className={`p-6 rounded-3xl border-2 shadow-2xl flex flex-col justify-between min-h-[180px] active:scale-[0.98] transition-transform text-left select-none ${tile.color}`}
+                className={`p-6 rounded-[6px] bg-sheet border border-rule-strong hover:border-action flex flex-col justify-between min-h-[196px] active:scale-[0.98] transition-all text-left select-none ${tile.accent}`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl">{tile.icon}</span>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">{tile.title}</h3>
-                      <p className="text-xs text-zinc-300/80 mt-1 leading-relaxed">{tile.description}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between pt-4 border-t border-white/10">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/10 text-white">
-                    {tile.badge}
-                  </span>
-                  <span className="text-sm font-bold text-white">Open Keypad ↵</span>
-                </div>
+                {inner}
               </button>
             );
           }
@@ -186,25 +235,10 @@ export default function FloorTerminalPage() {
           return (
             <Link
               key={tile.title}
-              href={tile.href}
-              className={`p-6 rounded-3xl border-2 shadow-2xl flex flex-col justify-between min-h-[180px] active:scale-[0.98] transition-transform select-none ${tile.color}`}
+              href={tile.href!}
+              className={`p-6 rounded-[6px] bg-sheet border border-rule-strong hover:border-action flex flex-col justify-between min-h-[196px] active:scale-[0.98] transition-all select-none ${tile.accent}`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl">{tile.icon}</span>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">{tile.title}</h3>
-                    <p className="text-xs text-zinc-300/80 mt-1 leading-relaxed">{tile.description}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between pt-4 border-t border-white/10">
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/10 text-white">
-                  {tile.badge}
-                </span>
-                <span className="text-sm font-bold text-white">Start Task →</span>
-              </div>
+              {inner}
             </Link>
           );
         })}
@@ -212,14 +246,15 @@ export default function FloorTerminalPage() {
 
       {/* Touchpad Keypad Modal */}
       {keypadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-700 rounded-3xl p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75">
+          <div className="w-full max-w-sm bg-sheet border border-rule-strong rounded-[6px] p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white">{keypadContext}</h3>
+              <h3 className="text-[16px] font-semibold text-ink">{keypadContext}</h3>
               <button
                 type="button"
                 onClick={() => setKeypadOpen(false)}
-                className="text-zinc-400 hover:text-white p-1 text-sm"
+                className="text-ink-3 hover:text-ink p-2 text-base"
+                aria-label="Close keypad"
               >
                 ✕
               </button>

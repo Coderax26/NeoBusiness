@@ -48,35 +48,35 @@ export default function AdminBusinessRulesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Business Rules &amp; Thresholds</h1>
-        <p className="text-sm text-zinc-400">
-          Plain-language configuration over <code className="font-mono text-zinc-300">business_rule_config</code>. Changes are audited and take effect within 5 minutes.
+        <h1 className="text-2xl font-bold text-ink">Business Rules &amp; Thresholds</h1>
+        <p className="text-sm text-ink-3">
+          Plain-language configuration over <code className="font-mono text-ink-2">business_rule_config</code>. Changes are audited and take effect within 5 minutes.
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-2.5 text-sm font-medium text-purple-200">
+        <div className="rounded-[3px] border border-purple-500/40 bg-purple-950/30 px-4 py-2.5 text-sm font-medium text-purple-200">
           {toast}
         </div>
       )}
 
       <div className="space-y-3">
         {rules.length === 0 && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+          <div className="rounded-[3px] border border-rule bg-sheet p-6 text-sm text-ink-3">
             No business rules found in configuration.
           </div>
         )}
         {rules.map((r) => (
-          <div key={r.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <div key={r.id} className="flex flex-wrap items-center justify-between gap-4 rounded-[3px] border border-rule bg-sheet p-5">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs">
                 <span className="rounded bg-purple-500/20 px-2 py-0.5 font-bold text-purple-300">{r.group}</span>
-                <span className="rounded bg-zinc-800 px-2 py-0.5 font-mono text-zinc-300">
+                <span className="rounded bg-sunken px-2 py-0.5 font-mono text-ink-2">
                   {r.scope}: {r.scopeTarget}
                 </span>
               </div>
-              <div className="text-sm font-bold text-zinc-100">{r.question}</div>
-              <div className="text-xs text-zinc-400">
+              <div className="text-sm font-bold text-ink">{r.question}</div>
+              <div className="text-xs text-ink-3">
                 Key: {r.id} · Last updated {r.lastChangedAt}
               </div>
             </div>
@@ -85,7 +85,7 @@ export default function AdminBusinessRulesPage() {
                 type="text"
                 value={r.value}
                 onChange={(e) => updateRule(r.id, e.target.value)}
-                className="w-32 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-sm font-bold text-zinc-100"
+                className="w-32 rounded-lg border border-rule-strong bg-paper px-3 py-1.5 font-mono text-sm font-bold text-ink"
               />
             </div>
           </div>

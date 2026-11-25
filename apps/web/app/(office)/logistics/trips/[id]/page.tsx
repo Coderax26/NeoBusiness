@@ -14,18 +14,18 @@ import {
 type DetailTab = 'STOPS' | 'DOCUMENTS' | 'COD' | 'EXPENSES' | 'ISSUES' | 'TIMELINE';
 
 const STATUS_BADGES: Record<TripRecord['status'], string> = {
-  DRAFT: 'bg-zinc-800 text-zinc-300',
-  LOADING: 'bg-amber-500/15 text-amber-400',
+  DRAFT: 'bg-sunken text-ink-2',
+  LOADING: 'bg-haldi-soft text-haldi',
   IN_TRANSIT: 'bg-blue-500/15 text-blue-400',
-  COMPLETED: 'bg-emerald-500/15 text-emerald-400',
-  CLOSED: 'bg-emerald-600 text-white',
+  COMPLETED: 'bg-leaf-soft text-leaf',
+  CLOSED: 'bg-leaf text-white',
 };
 
 const STOP_STATUS_STYLES: Record<TripStopDetail['deliveryStatus'], string> = {
-  PENDING: 'bg-zinc-800 text-zinc-300',
-  DELIVERED: 'bg-emerald-500/15 text-emerald-400',
-  PARTIAL: 'bg-amber-500/15 text-amber-400',
-  FAILED: 'bg-rose-500/15 text-rose-400',
+  PENDING: 'bg-sunken text-ink-2',
+  DELIVERED: 'bg-leaf-soft text-leaf',
+  PARTIAL: 'bg-haldi-soft text-haldi',
+  FAILED: 'bg-madder-soft text-madder',
 };
 
 export default function TripDetailPage() {
@@ -70,16 +70,16 @@ export default function TripDetailPage() {
   const codSummary = useMemo(() => reconcileTripCod(trip?.stops ?? []), [trip?.stops]);
 
   if (loading) {
-    return <div className="p-6 text-sm text-zinc-400">Loading trip details...</div>;
+    return <div className="p-6 text-sm text-ink-3">Loading trip details...</div>;
   }
 
   if (!trip) {
     return (
       <div className="p-6 space-y-3">
-        <Link href="/logistics/trips" className="text-xs text-zinc-400 hover:text-white inline-block">
+        <Link href="/logistics/trips" className="text-xs text-ink-3 hover:text-ink inline-block">
           ← Back to Trips
         </Link>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+        <div className="rounded-[3px] border border-rule bg-sheet p-6 text-sm text-ink-3">
           Trip not found.
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function TripDetailPage() {
           </div>
           <div className="mt-1 flex items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{trip.tripNo}</h1>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGES[trip.status]}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STATUS_BADGES[trip.status]}`}>
               {trip.status}
             </span>
           </div>
@@ -145,7 +145,7 @@ export default function TripDetailPage() {
           </Link>
           <Link
             href={`/logistics/trips/${trip.id}/close`}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             Close Trip Checklist →
           </Link>
@@ -153,34 +153,34 @@ export default function TripDetailPage() {
       </div>
 
       {statusMessage && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800">
+        <div className="rounded-[3px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800">
           {statusMessage}
         </div>
       )}
 
       {/* Progress & COD Summary */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-4">
           <div className="text-xs font-medium text-slate-500">Stop Progress</div>
           <div className="mt-1 text-xl font-bold text-slate-900">
             {progress.completedStops} / {progress.totalStops} ({progress.pct}%)
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress.pct}%` }} />
+            <div className="h-full bg-action transition-all" style={{ width: `${progress.pct}%` }} />
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-4">
           <div className="text-xs font-medium text-slate-500">Expected COD</div>
           <div className="mt-1 text-xl font-bold text-slate-900">₹{codSummary.expectedCod.toLocaleString('en-IN')}</div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-4">
           <div className="text-xs font-medium text-slate-500">Collected COD</div>
           <div className="mt-1 text-xl font-bold text-emerald-700">₹{codSummary.collectedCod.toLocaleString('en-IN')}</div>
           <div className="mt-1 text-xs text-slate-500">
             Variance: ₹{codSummary.variance.toLocaleString('en-IN')}
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-4">
           <div className="text-xs font-medium text-slate-500">F9 Settlement Link</div>
           <div className="mt-1 text-sm font-semibold text-slate-800">
             {trip.codHandedOver ? 'Handed Over to Accounts' : 'Pending Handover'}
@@ -211,7 +211,7 @@ export default function TripDetailPage() {
             key={tabKey}
             type="button"
             onClick={() => setActiveTab(tabKey)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition${
               activeTab === tabKey ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
           >
@@ -222,7 +222,7 @@ export default function TripDetailPage() {
 
       {/* Tab Content */}
       {activeTab === 'STOPS' && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-[3px] border border-slate-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
@@ -248,58 +248,58 @@ export default function TripDetailPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STOP_STATUS_STYLES[stop.deliveryStatus]}`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STOP_STATUS_STYLES[stop.deliveryStatus]}`}
                     >
                       {stop.deliveryStatus}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-700">
                     ₹{stop.collectedCodInr.toLocaleString('en-IN')} / ₹{stop.expectedCodInr.toLocaleString('en-IN')}
-                  </td>
-                  <td className="px-4 py-3">
-                    {stop.epodSignedBy || stop.epodPhotoName ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedStopEpod(stop)}
-                        className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        View ePOD
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-400">Pending</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateStopStatus(stop.stopId, 'DELIVERED')}
-                        className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        Deliver
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStopStatus(stop.stopId, 'PARTIAL')}
-                        className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                      >
-                        Partial
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+ </td>
+ <td className="px-4 py-3">
+ {stop.epodSignedBy || stop.epodPhotoName ? (
+ <button
+ type="button"
+ onClick={() => setSelectedStopEpod(stop)}
+ className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+ >
+ View ePOD
+ </button>
+ ) : (
+ <span className="text-xs text-slate-400">Pending</span>
+ )}
+ </td>
+ <td className="px-4 py-3 text-right">
+ <div className="inline-flex gap-1">
+ <button
+ type="button"
+ onClick={() => updateStopStatus(stop.stopId,'DELIVERED')}
+ className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+ >
+ Deliver
+ </button>
+ <button
+ type="button"
+ onClick={() => updateStopStatus(stop.stopId,'PARTIAL')}
+ className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+ >
+ Partial
+ </button>
+ </div>
+ </td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ )}
 
-      {activeTab === 'DOCUMENTS' && (
+ {activeTab ==='DOCUMENTS' && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {trip.stops.map((stop) => {
             const needEway = requiresEwayBill(stop.valueInr);
             return (
-              <div key={stop.stopId} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div key={stop.stopId} className="rounded-[3px] border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between">
                   <div className="font-semibold text-slate-900">
                     Stop #{stop.seq} — {stop.orderNo}
@@ -322,7 +322,7 @@ export default function TripDetailPage() {
       )}
 
       {activeTab === 'COD' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">Trip COD Reconciliation (Linked to Finance F9)</h2>
@@ -341,21 +341,21 @@ export default function TripDetailPage() {
             <div className="rounded-lg bg-slate-50 p-3">
               <div className="text-xs text-slate-500">Expected</div>
               <div className="text-lg font-bold text-slate-900">₹{codSummary.expectedCod.toLocaleString('en-IN')}</div>
-            </div>
-            <div className="rounded-lg bg-emerald-50 p-3">
-              <div className="text-xs text-emerald-700">Collected</div>
-              <div className="text-lg font-bold text-emerald-800">₹{codSummary.collectedCod.toLocaleString('en-IN')}</div>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-3">
-              <div className="text-xs text-amber-800">Variance</div>
-              <div className="text-lg font-bold text-amber-900">₹{codSummary.variance.toLocaleString('en-IN')}</div>
+ </div>
+ <div className="rounded-lg bg-emerald-50 p-3">
+ <div className="text-xs text-emerald-700">Collected</div>
+ <div className="text-lg font-bold text-emerald-800">₹{codSummary.collectedCod.toLocaleString('en-IN')}</div>
+ </div>
+ <div className="rounded-lg bg-amber-50 p-3">
+ <div className="text-xs text-amber-800">Variance</div>
+ <div className="text-lg font-bold text-amber-900">₹{codSummary.variance.toLocaleString('en-IN')}</div>
             </div>
           </div>
         </div>
       )}
 
       {activeTab === 'EXPENSES' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-[3px] border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900">Trip Expenses</h2>
             <Link
@@ -383,39 +383,39 @@ export default function TripDetailPage() {
         </div>
       )}
 
-      {activeTab === 'ISSUES' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">Delivery Issues</h2>
-            <Link
-              href="/logistics/issues"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Open Issues Desk →
-            </Link>
-          </div>
-          {tripIssues.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">No delivery issues reported for this trip.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {tripIssues.map((iss) => (
-                <li key={iss.id} className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-rose-900">
-                      {iss.issueNo} · {iss.type} ({iss.stopOrderNo})
-                    </span>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-rose-700">{iss.status}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-rose-800">{iss.description}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {activeTab === 'ISSUES'&& (
+ <div className="rounded-[3px] border border-slate-200 bg-white p-5">
+ <div className="flex items-center justify-between">
+ <h2 className="text-base font-bold text-slate-900">Delivery Issues</h2>
+ <Link
+ href="/logistics/issues"
+ className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+ >
+ Open Issues Desk →
+ </Link>
+ </div>
+ {tripIssues.length === 0 ? (
+ <p className="mt-3 text-sm text-slate-500">No delivery issues reported for this trip.</p>
+ ) : (
+ <ul className="mt-3 space-y-2">
+ {tripIssues.map((iss) => (
+ <li key={iss.id} className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm">
+ <div className="flex items-center justify-between">
+ <span className="font-semibold text-rose-900">
+ {iss.issueNo} · {iss.type} ({iss.stopOrderNo})
+ </span>
+ <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-rose-700">{iss.status}</span>
+ </div>
+ <p className="mt-1 text-xs text-rose-800">{iss.description}</p>
+ </li>
+ ))}
+ </ul>
+ )}
+ </div>
+ )}
 
-      {activeTab === 'TIMELINE' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+ {activeTab ==='TIMELINE' && (
+        <div className="rounded-[3px] border border-slate-200 bg-white p-5">
           <h2 className="text-base font-bold text-slate-900">Trip Event Timeline</h2>
           <ol className="mt-4 space-y-3 border-l-2 border-blue-200 pl-4 text-sm">
             <li>
@@ -437,7 +437,7 @@ export default function TripDetailPage() {
       {/* ePOD Modal */}
       {selectedStopEpod && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-[4px] bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">ePOD Proof — {selectedStopEpod.orderNo}</h3>
               <button
@@ -467,7 +467,7 @@ export default function TripDetailPage() {
               <button
                 type="button"
                 onClick={() => setSelectedStopEpod(null)}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-ink hover:bg-slate-800"
               >
                 Close
               </button>

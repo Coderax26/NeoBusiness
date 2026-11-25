@@ -56,15 +56,15 @@ export default function SupplierScorecardsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/procurement" className="hover:text-white">Procurement</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/procurement" className="hover:text-ink">Procurement</Link>
             <span>/</span>
-            <span className="text-indigo-400">Scorecards &amp; Rate Monitoring</span>
+            <span className="text-action">Scorecards &amp; Rate Monitoring</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-ink">
             Supplier Scorecards &amp; Rate Monitoring
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-ink-3">
             Track fill rate, on-time delivery, price variance %, missing-rate alerts, and multi-supplier price trends.
           </p>
         </div>
@@ -75,14 +75,14 @@ export default function SupplierScorecardsPage() {
       </div>
 
       {/* Supplier Ranking Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Supplier Performance Ranking</h2>
-          <span className="text-xs text-zinc-400">Click any supplier to drill down</span>
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
+        <div className="p-4 border-b border-rule flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">Supplier Performance Ranking</h2>
+          <span className="text-xs text-ink-3">Click any supplier to drill down</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
               <tr>
                 <th className="p-3">Rank</th>
                 <th className="p-3">Supplier</th>
@@ -93,47 +93,46 @@ export default function SupplierScorecardsPage() {
                 <th className="p-3 text-right">Reliability</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {scorecards.map((row, idx) => (
                 <tr
                   key={row.supplierId}
                   onClick={() => setSelectedSupplier(row)}
-                  className={`hover:bg-zinc-800/40 cursor-pointer ${
-                    selectedSupplier?.supplierId === row.supplierId ? 'bg-indigo-500/10' : ''
-                  }`}
-                >
-                  <td className="p-3 font-mono text-xs text-zinc-400">#{idx + 1}</td>
-                  <td className="p-3">
-                    <div className="text-white font-medium">{row.name}</div>
-                    <div className="text-[11px] font-mono text-zinc-500">{row.code}</div>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500"
-                          style={{ width: `${row.fillRatePct}%` }}
-                        />
-                      </div>
-                      <span className="font-mono text-xs text-emerald-400">
-                        {row.fillRatePct}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-3 font-mono text-xs text-zinc-200">{row.onTimePct}%</td>
-                  <td className="p-3 text-right font-mono text-xs">
-                    <span
-                      className={
-                        row.avgPriceVariancePct > 3 ? 'text-amber-400' : 'text-emerald-400'
+                  className={`hover:bg-sunken cursor-pointer${
+                    selectedSupplier?.supplierId === row.supplierId ? 'bg-indigo-500/10' : ''}`}
+ >
+ <td className="p-3 font-mono text-xs text-ink-3">#{idx + 1}</td>
+ <td className="p-3">
+ <div className="text-ink font-medium">{row.name}</div>
+ <div className="text-[11px] font-mono text-ink-3">{row.code}</div>
+ </td>
+ <td className="p-3">
+ <div className="flex items-center gap-2">
+ <div className="w-20 h-2 bg-sunken rounded-full overflow-hidden">
+ <div
+ className="h-full bg-emerald-500"
+ style={{ width: `${row.fillRatePct}%` }}
+ />
+ </div>
+ <span className="font-mono text-xs text-leaf">
+ {row.fillRatePct}%
+ </span>
+ </div>
+ </td>
+ <td className="p-3 font-mono text-xs text-ink">{row.onTimePct}%</td>
+ <td className="p-3 text-right font-mono text-xs">
+ <span
+ className={
+ row.avgPriceVariancePct > 3 ?'text-amber-400' : 'text-emerald-400'
                       }
                     >
                       +{row.avgPriceVariancePct}%
                     </span>
                   </td>
-                  <td className="p-3 text-right font-mono text-xs text-zinc-300">
+                  <td className="p-3 text-right font-mono text-xs text-ink-2">
                     {row.poCount} / {row.grnCount}
                   </td>
-                  <td className="p-3 text-right font-mono font-bold text-indigo-400">
+                  <td className="p-3 text-right font-mono font-bold text-action">
                     {row.reliabilityScore.toFixed(1)} ★
                   </td>
                 </tr>
@@ -145,35 +144,35 @@ export default function SupplierScorecardsPage() {
 
       {/* Selected Supplier Drilldown + Missing Rates */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
+        <Card className="p-5 bg-sheet border-rule">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-semibold text-ink">
               Supplier Drill-Down: {selectedSupplier?.name ?? 'Select a supplier'}
             </h3>
             <Badge variant="info">{selectedSupplier?.code ?? '—'}</Badge>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-              <span className="text-zinc-400">Monthly Spend</span>
-              <div className="text-lg font-bold text-white font-mono mt-1">
+            <div className="p-3 rounded-lg bg-paper border border-rule">
+              <span className="text-ink-3">Monthly Spend</span>
+              <div className="text-lg font-bold text-ink font-mono mt-1">
                 {formatINR(selectedSupplier?.monthlySpend ?? 0)}
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-              <span className="text-zinc-400">Reliability Score</span>
-              <div className="text-lg font-bold text-indigo-400 font-mono mt-1">
+            <div className="p-3 rounded-lg bg-paper border border-rule">
+              <span className="text-ink-3">Reliability Score</span>
+              <div className="text-lg font-bold text-action font-mono mt-1">
                 {selectedSupplier?.reliabilityScore ?? 0} / 5.0
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-              <span className="text-zinc-400">Fill Rate</span>
-              <div className="text-lg font-bold text-emerald-400 font-mono mt-1">
+            <div className="p-3 rounded-lg bg-paper border border-rule">
+              <span className="text-ink-3">Fill Rate</span>
+              <div className="text-lg font-bold text-leaf font-mono mt-1">
                 {selectedSupplier?.fillRatePct ?? 0}%
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-              <span className="text-zinc-400">Avg Price Variance</span>
-              <div className="text-lg font-bold text-amber-400 font-mono mt-1">
+            <div className="p-3 rounded-lg bg-paper border border-rule">
+              <span className="text-ink-3">Avg Price Variance</span>
+              <div className="text-lg font-bold text-haldi font-mono mt-1">
                 +{selectedSupplier?.avgPriceVariancePct ?? 0}%
               </div>
             </div>
@@ -181,23 +180,23 @@ export default function SupplierScorecardsPage() {
         </Card>
 
         {/* Missing Rates Alert List */}
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
+        <Card className="p-5 bg-sheet border-rule">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Missing Rates Alerts</h3>
+            <h3 className="text-sm font-semibold text-ink">Missing Rates Alerts</h3>
             <Badge variant="warning">{missingRates.length} items</Badge>
           </div>
           <div className="space-y-2">
             {missingRates.length === 0 ? (
-              <p className="text-xs text-emerald-400">All active items have current supplier quotes.</p>
+              <p className="text-xs text-leaf">All active items have current supplier quotes.</p>
             ) : (
               missingRates.map((mr) => (
                 <div
                   key={mr.itemId ?? mr.itemSku}
-                  className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between text-xs"
+                  className="p-3 rounded-lg bg-paper border border-rule flex items-center justify-between text-xs"
                 >
                   <div>
-                    <div className="text-white font-medium">{mr.itemName}</div>
-                    <div className="text-zinc-500">
+                    <div className="text-ink font-medium">{mr.itemName}</div>
+                    <div className="text-ink-3">
                       {mr.itemSku} · Last quote {mr.daysSinceLastQuote} days ago (₹{mr.lastKnownRate ?? 0}/{mr.uom ?? 'kg'})
                     </div>
                   </div>
@@ -217,20 +216,20 @@ export default function SupplierScorecardsPage() {
       </div>
 
       {/* Multi-Supplier Price Trend Chart */}
-      <Card className="p-5 bg-zinc-900 border-zinc-800">
+      <Card className="p-5 bg-sheet border-rule">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-semibold text-ink">
               Price Trend Across Suppliers
             </h3>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-ink-3">
               Compare historical quoted rates per item to spot spikes before raising a PO.
             </p>
           </div>
           <select
             value={selectedTrendItemId}
             onChange={(e) => setSelectedTrendItemId(e.target.value)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white"
+            className="bg-paper border border-rule-strong rounded-lg px-3 py-1.5 text-xs text-ink"
           >
             {priceTrends.map((t) => (
               <option key={t.itemId} value={t.itemId}>
@@ -242,7 +241,7 @@ export default function SupplierScorecardsPage() {
 
         <div className="flex flex-wrap gap-4 mb-3 text-xs">
           {trendSeries.suppliers.map((s) => (
-            <div key={s.id} className="flex items-center gap-1.5 text-zinc-300">
+            <div key={s.id} className="flex items-center gap-1.5 text-ink-2">
               <span
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: s.color }}
@@ -253,7 +252,7 @@ export default function SupplierScorecardsPage() {
         </div>
 
         <div className="w-full overflow-x-auto">
-          <svg viewBox="0 0 600 180" className="w-full h-48 bg-zinc-950 rounded-xl border border-zinc-800 p-2">
+          <svg viewBox="0 0 600 180" className="w-full h-48 bg-paper rounded-[3px] border border-rule p-2">
             {trendSeries.suppliers.map((sup) => {
               const pts = trendSeries.points
                 .map((pt, i) => {

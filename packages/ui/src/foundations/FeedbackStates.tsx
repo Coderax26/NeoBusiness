@@ -17,20 +17,20 @@ export const Banner: React.FC<BannerProps> = ({
   className = '',
 }) => {
   const toneClasses = {
-    info: 'bg-sky-950/40 border-sky-500/30 text-sky-200',
-    warning: 'bg-amber-950/40 border-amber-500/30 text-amber-200',
-    danger: 'bg-rose-950/40 border-rose-500/30 text-rose-200',
-    success: 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200',
+    info: 'bg-action-soft border-action/40 text-ink',
+    warning: 'bg-haldi-soft border-haldi/40 text-ink',
+    danger: 'bg-madder-soft border-madder/40 text-ink',
+    success: 'bg-leaf-soft border-leaf/40 text-ink',
   };
 
   return (
     <div
       role="alert"
-      className={`p-4 rounded-xl border flex items-center justify-between gap-4 text-xs ${toneClasses[tone]} ${className}`}
+      className={`p-4 rounded-[3px] border-l-4 border ${toneClasses[tone]} flex items-center justify-between gap-4 text-[13.5px] ${className}`}
     >
       <div>
-        {title && <div className="font-bold mb-0.5 text-sm">{title}</div>}
-        <div className="leading-relaxed">{children}</div>
+        {title && <div className="font-semibold mb-0.5 text-[14px]">{title}</div>}
+        <div className="leading-relaxed text-ink-2">{children}</div>
       </div>
       {action && (
         <Button size="sm" variant="secondary" onClick={action.onClick}>
@@ -48,14 +48,14 @@ export const Skeleton: React.FC<{
   className?: string;
 }> = ({ variant = 'rect', width, height, className = '' }) => {
   const roundedClasses = {
-    text: 'rounded',
-    rect: 'rounded-xl',
+    text: 'rounded-[3px]',
+    rect: 'rounded-[4px]',
     circle: 'rounded-full',
   };
 
   return (
     <div
-      className={`animate-pulse bg-zinc-800/70 ${roundedClasses[variant]} ${className}`}
+      className={`animate-pulse bg-sunken ${roundedClasses[variant]} ${className}`}
       style={{
         width: width ?? '100%',
         height: height ?? (variant === 'text' ? '1rem' : '4rem'),
@@ -74,14 +74,15 @@ export interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
-  icon = '📭',
   action,
 }) => {
   return (
-    <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/20 max-w-lg mx-auto">
-      <div className="text-4xl mb-3">{icon}</div>
-      <h4 className="text-base font-bold text-white tracking-tight">{title}</h4>
-      <p className="text-xs text-zinc-400 mt-1 mb-5 max-w-sm mx-auto leading-relaxed">
+    <div className="text-center py-10 px-6 rounded-[4px] border border-dashed border-rule-strong bg-paper/50 max-w-lg mx-auto">
+      <div className="w-10 h-10 rounded-full border border-rule-strong bg-sheet text-ink-3 flex items-center justify-center mx-auto mb-3 text-sm font-mono">
+        —
+      </div>
+      <h4 className="text-[16px] font-serif font-medium text-ink">{title}</h4>
+      <p className="text-[13.5px] text-ink-2 mt-1 mb-5 max-w-sm mx-auto leading-relaxed">
         {description}
       </p>
       {action && (
@@ -109,16 +110,16 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   return (
     <div
       role="alert"
-      className="p-6 rounded-2xl bg-rose-950/20 border border-rose-500/30 text-rose-200 text-center max-w-md mx-auto"
+      className="p-6 rounded-[4px] bg-madder-soft border border-madder/30 text-ink text-center max-w-md mx-auto"
     >
-      <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-300 font-bold flex items-center justify-center mx-auto mb-3">
-        ✕
+      <div className="w-9 h-9 rounded-full bg-madder text-white font-bold flex items-center justify-center mx-auto mb-3 text-sm">
+        !
       </div>
-      <h4 className="text-sm font-bold text-white">{title}</h4>
-      <p className="text-xs text-rose-300 mt-1 mb-2 leading-relaxed">{message}</p>
+      <h4 className="text-[15px] font-semibold text-ink">{title}</h4>
+      <p className="text-[13.5px] text-madder mt-1 mb-3 leading-relaxed">{message}</p>
       {resolutionHint && (
-        <p className="text-[11px] text-zinc-400 mb-4 bg-zinc-900/60 p-2 rounded-lg border border-zinc-800">
-          💡 <span className="font-semibold text-zinc-200">How to fix:</span> {resolutionHint}
+        <p className="text-[13px] text-ink-2 mb-4 bg-sheet p-2.5 rounded-[3px] border border-rule">
+          <span className="font-semibold text-ink">How to fix:</span> {resolutionHint}
         </p>
       )}
       {onRetry && (
@@ -137,7 +138,7 @@ export interface StepperProps {
 
 export const Stepper: React.FC<StepperProps> = ({ steps, currentStepIndex }) => {
   return (
-    <nav aria-label="Progress" className="my-4">
+    <nav aria-label="Progress" className="my-3">
       <ol className="flex items-center justify-between w-full">
         {steps.map((step, idx) => {
           const isDone = idx < currentStepIndex;
@@ -147,19 +148,19 @@ export const Stepper: React.FC<StepperProps> = ({ steps, currentStepIndex }) => 
             <li key={step.id} className="flex-1 flex items-center">
               <div className="flex items-center gap-2">
                 <span
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-semibold transition-colors ${
                     isDone
-                      ? 'bg-teal-600 text-white'
+                      ? 'bg-leaf text-white'
                       : isCurrent
-                      ? 'bg-teal-500/20 border-2 border-teal-400 text-teal-300'
-                      : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                      ? 'bg-sheet border-2 border-action text-action'
+                      : 'bg-paper text-ink-3 border border-rule-strong'
                   }`}
                 >
                   {isDone ? '✓' : idx + 1}
                 </span>
                 <span
-                  className={`text-xs font-medium ${
-                    isCurrent ? 'text-white font-bold' : isDone ? 'text-zinc-300' : 'text-zinc-500'
+                  className={`text-[13px] ${
+                    isCurrent ? 'text-action font-semibold' : isDone ? 'text-ink font-medium' : 'text-ink-3'
                   }`}
                 >
                   {step.label}
@@ -167,8 +168,8 @@ export const Stepper: React.FC<StepperProps> = ({ steps, currentStepIndex }) => 
               </div>
               {idx < steps.length - 1 && (
                 <div
-                  className={`flex-1 h-0.5 mx-3 ${
-                    idx < currentStepIndex ? 'bg-teal-600' : 'bg-zinc-800'
+                  className={`flex-1 h-px mx-3 ${
+                    idx < currentStepIndex ? 'bg-leaf' : 'bg-rule-strong'
                   }`}
                 />
               )}
@@ -186,10 +187,10 @@ export const ProgressBar: React.FC<{
   className?: string;
 }> = ({ value, tone = 'brand', className = '' }) => {
   const toneClasses = {
-    brand: 'bg-teal-500',
-    success: 'bg-emerald-500',
-    warning: 'bg-amber-500',
-    danger: 'bg-rose-500',
+    brand: 'bg-action',
+    success: 'bg-leaf',
+    warning: 'bg-haldi',
+    danger: 'bg-madder',
   };
 
   const clamped = Math.min(Math.max(value, 0), 100);
@@ -200,7 +201,7 @@ export const ProgressBar: React.FC<{
       aria-valuenow={clamped}
       aria-valuemin={0}
       aria-valuemax={100}
-      className={`w-full h-2 rounded-full bg-zinc-800 overflow-hidden ${className}`}
+      className={`w-full h-2 rounded-[2px] bg-sunken overflow-hidden ${className}`}
     >
       <div
         className={`h-full transition-all duration-300 ${toneClasses[tone]}`}
@@ -212,9 +213,8 @@ export const ProgressBar: React.FC<{
 
 export const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-zinc-800 border border-zinc-700 text-zinc-300 shadow-xs">
+    <kbd className="px-1.5 py-0.5 text-[12px] font-mono font-medium rounded-[3px] bg-sheet border border-rule-strong border-b-2 text-ink-3">
       {children}
     </kbd>
   );
 };
-

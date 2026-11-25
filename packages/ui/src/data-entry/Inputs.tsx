@@ -15,10 +15,10 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       <div className="w-full">
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none"
+          className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none"
         >
           {label}
-          {required && <span className="text-rose-400 ml-1" aria-hidden="true">*</span>}
+          {required && <span className="text-madder ml-1" aria-hidden="true">*</span>}
         </label>
         <input
           ref={ref}
@@ -26,17 +26,17 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
           required={required}
-          className={`w-full bg-zinc-900 border rounded-lg px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[40px] transition-colors ${
-            error ? 'border-rose-500/80 bg-rose-950/10' : 'border-zinc-800 focus:border-teal-500'
+          className={`w-full bg-sheet border rounded-[3px] px-3.5 py-2 text-[14.5px] text-ink placeholder-ink-3 focus:outline-none focus:ring-2 focus:ring-action/25 min-h-[40px] transition-colors ${
+            error ? 'border-madder bg-madder-soft' : 'border-rule-strong focus:border-action'
           } ${className}`}
           {...props}
         />
         {error ? (
-          <p id={`${inputId}-error`} role="alert" className="text-xs text-rose-400 mt-1 font-medium">
+          <p id={`${inputId}-error`} role="alert" className="text-[13px] text-madder mt-1 font-medium">
             {error}
           </p>
         ) : helperText ? (
-          <p id={`${inputId}-helper`} className="text-xs text-zinc-400 mt-1">
+          <p id={`${inputId}-helper`} className="text-[13px] text-ink-3 mt-1">
             {helperText}
           </p>
         ) : null}
@@ -61,10 +61,10 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
       <div className="w-full">
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none"
+          className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none"
         >
           {label}
-          {required && <span className="text-rose-400 ml-1" aria-hidden="true">*</span>}
+          {required && <span className="text-madder ml-1" aria-hidden="true">*</span>}
         </label>
         <textarea
           ref={ref}
@@ -72,17 +72,17 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           aria-invalid={Boolean(error)}
           required={required}
           rows={props.rows || 3}
-          className={`w-full bg-zinc-900 border rounded-lg px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
-            error ? 'border-rose-500/80 bg-rose-950/10' : 'border-zinc-800 focus:border-teal-500'
+          className={`w-full bg-sheet border rounded-[3px] px-3.5 py-2 text-[14.5px] text-ink placeholder-ink-3 focus:outline-none focus:ring-2 focus:ring-action/25 transition-colors ${
+            error ? 'border-madder bg-madder-soft' : 'border-rule-strong focus:border-action'
           } ${className}`}
           {...props}
         />
         {error ? (
-          <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">
+          <p role="alert" className="text-[13px] text-madder mt-1 font-medium">
             {error}
           </p>
         ) : helperText ? (
-          <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+          <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
         ) : null}
       </div>
     );
@@ -112,36 +112,35 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <div className="w-full">
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none"
+          className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none"
         >
           {label}
-          {required && <span className="text-rose-400 ml-1" aria-hidden="true">*</span>}
+          {required && <span className="text-madder ml-1" aria-hidden="true">*</span>}
         </label>
         <select
           ref={ref}
           id={inputId}
           required={required}
-          className={`w-full bg-zinc-900 border rounded-lg px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[40px] transition-colors ${
-            error ? 'border-rose-500/80' : 'border-zinc-800 focus:border-teal-500'
+          className={`w-full bg-sheet border rounded-[3px] px-3.5 py-2 text-[14.5px] text-ink focus:outline-none focus:ring-2 focus:ring-action/25 min-h-[40px] transition-colors ${
+            error ? 'border-madder' : 'border-rule-strong focus:border-action'
           } ${className}`}
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-zinc-900 text-zinc-100">
+            <option key={opt.value} value={opt.value} className="bg-sheet text-ink">
               {opt.label} {opt.hint ? `(${opt.hint})` : ''}
             </option>
           ))}
         </select>
         {error ? (
-          <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">
+          <p role="alert" className="text-[13px] text-madder mt-1 font-medium">
             {error}
           </p>
         ) : helperText ? (
-          <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+          <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
         ) : null}
       </div>
     );
   },
 );
 Select.displayName = 'Select';
-

@@ -453,15 +453,15 @@ export default function QuickOrderEntryPage() {
             {submittedOrder.status === 'PENDING_APPROVAL' ? '⏳' : '✅'}
           </div>
           <div>
-            <span className="font-mono text-sm font-bold text-teal-400">
+            <span className="font-mono text-sm font-bold text-action">
               {submittedOrder.orderNumber}
             </span>
-            <h1 className="text-2xl font-black text-white mt-1">
+            <h1 className="text-2xl font-semibold text-ink mt-1">
               {submittedOrder.status === 'PENDING_APPROVAL'
                 ? 'Waiting for Owner Approval'
                 : 'Order Confirmed!'}
             </h1>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-ink-3 mt-1">
               {submittedOrder.status === 'PENDING_APPROVAL'
                 ? 'Your order has been routed to the Owner Approvals Inbox. Status updates automatically every 30s.'
                 : 'Stock reserved and order queued for dispatch planning.'}
@@ -501,35 +501,35 @@ export default function QuickOrderEntryPage() {
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
       {/* Header & Mode Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-white">New Order</h1>
+            <h1 className="text-2xl font-semibold text-ink">New Order</h1>
             {draftSavedAt && (
-              <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="text-[11px] text-leaf font-semibold bg-leaf-soft px-2 py-0.5 rounded-full border border-leaf/30">
                 Draft saved ✓ ({draftSavedAt})
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-ink-3 mt-0.5">
             Fast 60-second order entry with live price-band, credit limit, and stock checks.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
+          <div className="flex items-center gap-1 bg-sheet p-1 rounded-[3px] border border-rule text-xs">
             <button
               onClick={() => setMode('GUIDED')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
-                mode === 'GUIDED' ? 'bg-teal-600 text-white' : 'text-zinc-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors${
+                mode === 'GUIDED' ? 'bg-action text-white' : 'text-ink-3 hover:text-ink'
               }`}
             >
               🧭 Guided (3-step)
             </button>
             <button
               onClick={() => setMode('EXPRESS')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
-                mode === 'EXPRESS' ? 'bg-teal-600 text-white' : 'text-zinc-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors${
+                mode === 'EXPRESS' ? 'bg-action text-white' : 'text-ink-3 hover:text-ink'
               }`}
             >
               ⚡ Express (Keyboard)
@@ -540,7 +540,7 @@ export default function QuickOrderEntryPage() {
 
       {/* Guided Stepper Header */}
       {mode === 'GUIDED' && (
-        <div className="flex items-center gap-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 text-xs">
+        <div className="flex items-center gap-4 bg-sheet border border-rule rounded-[4px] p-3 text-xs">
           {[
             { num: 1 as const, label: '① Customer & Delivery' },
             { num: 2 as const, label: '② Items & Pricing' },
@@ -549,12 +549,12 @@ export default function QuickOrderEntryPage() {
             <button
               key={s.num}
               onClick={() => setGuidedStep(s.num)}
-              className={`flex-1 py-2 px-3 rounded-xl font-bold transition-all text-center ${
+              className={`flex-1 py-2 px-3 rounded-[3px] font-bold transition-all text-center${
                 guidedStep === s.num
-                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                  ? 'bg-action/20 text-action border border-action/30'
                   : guidedStep > s.num
-                  ? 'bg-emerald-500/10 text-emerald-400'
-                  : 'text-zinc-500'
+                  ? 'bg-leaf-soft text-leaf'
+                  : 'text-ink-3'
               }`}
             >
               {s.label}
@@ -565,17 +565,17 @@ export default function QuickOrderEntryPage() {
 
       {/* Duplicate Guard Warning */}
       {duplicateWarning && (
-        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-center justify-between">
+        <div className="p-3 rounded-[3px] bg-haldi-soft border border-haldi/30 text-xs text-haldi flex items-center justify-between">
           <span>⚠️ {duplicateWarning}</span>
         </div>
       )}
 
       {/* Step 1: Customer & Credit Meter */}
       {(mode === 'EXPRESS' || guidedStep === 1 || guidedStep === 3) && (
-        <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 space-y-3">
+        <div className="bg-sheet border border-rule rounded-[4px] p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
             <div>
-              <label className="block text-zinc-400 font-semibold mb-1">Customer *</label>
+              <label className="block text-ink-3 font-semibold mb-1">Customer *</label>
               <select
                 value={selectedCustomerId}
                 onChange={(e) => {
@@ -589,7 +589,7 @@ export default function QuickOrderEntryPage() {
                     setDeliveryWindow(next.window);
                   }
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-teal-500"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink font-semibold focus:outline-none focus:border-action/30"
               >
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -600,7 +600,7 @@ export default function QuickOrderEntryPage() {
             </div>
 
             <div>
-              <label className="block text-zinc-400 font-semibold mb-1">Dispatch Site</label>
+              <label className="block text-ink-3 font-semibold mb-1">Dispatch Site</label>
               <select
                 value={selectedSiteId}
                 onChange={(e) => {
@@ -608,7 +608,7 @@ export default function QuickOrderEntryPage() {
                   setSelectedSiteId(e.target.value);
                   if (found) setSiteName(found.name);
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink focus:outline-none focus:border-action/30"
               >
                 {sites.length > 0 ? (
                   sites.map((s) => (
@@ -623,21 +623,21 @@ export default function QuickOrderEntryPage() {
             </div>
 
             <div>
-              <label className="block text-zinc-400 font-semibold mb-1">Delivery Date</label>
+              <label className="block text-ink-3 font-semibold mb-1">Delivery Date</label>
               <input
                 type="date"
                 value={deliveryDate}
                 onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink focus:outline-none focus:border-action/30"
               />
             </div>
 
             <div>
-              <label className="block text-zinc-400 font-semibold mb-1">Delivery Window</label>
+              <label className="block text-ink-3 font-semibold mb-1">Delivery Window</label>
               <select
                 value={deliveryWindow}
                 onChange={(e) => setDeliveryWindow(e.target.value as any)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink focus:outline-none focus:border-action/30"
               >
                 <option value="04-08">04:00 AM – 08:00 AM</option>
                 <option value="10-12">10:00 AM – 12:00 PM</option>
@@ -648,15 +648,15 @@ export default function QuickOrderEntryPage() {
           </div>
 
           {/* Credit Meter (BR-02) */}
-          <div className="pt-2 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="pt-2 border-t border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-3 flex-1">
-              <span className="text-zinc-400 font-semibold">Credit:</span>
-              <span className="font-mono font-bold text-white">
+              <span className="text-ink-3 font-semibold">Credit:</span>
+              <span className="font-mono font-bold text-ink">
                 {formatINR(creditEval.projectedOutstanding)} of {formatINR(customer.creditLimit)}
               </span>
-              <div className="flex-1 max-w-xs h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="flex-1 max-w-xs h-2 bg-sunken rounded-full overflow-hidden">
                 <div
-                  className={`h-full transition-all ${
+                  className={`h-full transition-all${
                     creditEval.status === 'BREACH' || creditEval.status === 'HOLD'
                       ? 'bg-rose-500'
                       : creditEval.status === 'NEAR_LIMIT'
@@ -666,7 +666,7 @@ export default function QuickOrderEntryPage() {
                   style={{ width: `${Math.min(100, creditEval.utilizationPct)}%` }}
                 />
               </div>
-              <span className="text-zinc-400">
+              <span className="text-ink-3">
                 Overdue: {customer.overdueDays > 0 ? `${customer.overdueDays}d` : 'none'}
               </span>
             </div>
@@ -705,10 +705,10 @@ export default function QuickOrderEntryPage() {
       {(mode === 'EXPRESS' || guidedStep === 2 || guidedStep === 3) && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Line Items Table (Left 9 cols) */}
-          <div className="lg:col-span-9 bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 space-y-4">
+          <div className="lg:col-span-9 bg-sheet border border-rule rounded-[4px] p-4 space-y-4">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
+                <thead className="border-b border-rule text-ink-3 uppercase font-semibold">
                   <tr>
                     <th className="py-2 pr-2">#</th>
                     <th className="py-2 px-2">Item</th>
@@ -721,7 +721,7 @@ export default function QuickOrderEntryPage() {
                     <th className="py-2 pl-2"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/60">
+                <tbody className="divide-y divide-rule">
                   {lines.map((line, idx) => {
                     const band = evaluatePriceBand(line.unitPrice, line.floorPrice, line.targetPrice, line.floorPrice * 0.85);
                     const stock = evaluateStockAvailability(line.atpStock, line.qty, line.category);
@@ -729,12 +729,12 @@ export default function QuickOrderEntryPage() {
 
                     return (
                       <tr key={line.id} onFocus={() => setFocusedItemId(line.itemId)}>
-                        <td className="py-2.5 pr-2 font-mono text-zinc-500">{idx + 1}</td>
+                        <td className="py-2.5 pr-2 font-mono text-ink-3">{idx + 1}</td>
                         <td className="py-2.5 px-2">
                           <select
                             value={line.itemId}
                             onChange={(e) => handleUpdateLine(line.id, { itemId: e.target.value })}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 text-white font-medium focus:outline-none focus:border-teal-500"
+                            className="w-full bg-paper border border-rule rounded-lg px-2 py-1.5 text-ink font-medium focus:outline-none focus:border-action/30"
                           >
                             {dailyPrices.map((p) => (
                               <option key={p.itemId} value={p.itemId}>
@@ -751,10 +751,10 @@ export default function QuickOrderEntryPage() {
                             onChange={(e) =>
                               handleUpdateLine(line.id, { qty: parseFloat(e.target.value) || 0 })
                             }
-                            className="w-20 bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 font-mono text-white focus:outline-none focus:border-teal-500"
+                            className="w-20 bg-paper border border-rule rounded-lg px-2 py-1.5 font-mono text-ink focus:outline-none focus:border-action/30"
                           />
                         </td>
-                        <td className="py-2.5 px-2 text-zinc-400">{line.uom}</td>
+                        <td className="py-2.5 px-2 text-ink-3">{line.uom}</td>
                         <td className="py-2.5 px-2">
                           <input
                             type="number"
@@ -765,10 +765,10 @@ export default function QuickOrderEntryPage() {
                                 unitPrice: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className={`w-24 bg-zinc-950 border rounded-lg px-2 py-1.5 font-mono text-white focus:outline-none ${
+                            className={`w-24 bg-paper border rounded-lg px-2 py-1.5 font-mono text-ink focus:outline-none${
                               band.status === 'BELOW_FLOOR'
                                 ? 'border-amber-500'
-                                : 'border-zinc-800 focus:border-teal-500'
+                                : 'border-rule focus:border-action/30'
                             }`}
                           />
                         </td>
@@ -779,21 +779,21 @@ export default function QuickOrderEntryPage() {
                         </td>
                         <td className="py-2.5 px-2">
                           <span
-                            className={`text-[11px] font-medium ${
+                            className={`text-[11px] font-medium${
                               stock.status === 'AVAILABLE' ? 'text-emerald-400' : 'text-amber-400'
                             }`}
                           >
                             {stock.status === 'AVAILABLE' ? `${line.atpStock} avail` : stock.suggestion}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2 text-right font-mono font-bold text-white">
+                        <td className="py-2.5 px-2 text-right font-mono font-bold text-ink">
                           {formatINR(lineAmount)}
                         </td>
                         <td className="py-2.5 pl-2">
                           {lines.length > 1 && (
                             <button
                               onClick={() => handleRemoveLine(line.id)}
-                              className="text-zinc-500 hover:text-rose-400"
+                              className="text-ink-3 hover:text-madder"
                               title="Remove line"
                             >
                               ✕
@@ -811,13 +811,13 @@ export default function QuickOrderEntryPage() {
               <Button variant="ghost" size="sm" onClick={handleAddLine}>
                 + Add item (Enter)
               </Button>
-              <span className="text-[11px] text-zinc-500">
+              <span className="text-[11px] text-ink-3">
                 Shortcuts: Ctrl+Enter Submit · Ctrl+S Save Draft
               </span>
             </div>
 
             {mode === 'GUIDED' && guidedStep === 2 && (
-              <div className="flex justify-between pt-3 border-t border-zinc-800">
+              <div className="flex justify-between pt-3 border-t border-rule">
                 <Button variant="ghost" size="sm" onClick={() => setGuidedStep(1)}>
                   ← Back to Customer
                 </Button>
@@ -829,33 +829,33 @@ export default function QuickOrderEntryPage() {
           </div>
 
           {/* Right Panel: Price Memory (§4.2) */}
-          <div className="lg:col-span-3 bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 space-y-4">
+          <div className="lg:col-span-3 bg-sheet border border-rule rounded-[4px] p-4 space-y-4">
             <div>
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
                 Last Prices ({customer.code})
               </h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{focusedItemMeta.itemName}</p>
+              <p className="text-[11px] text-ink-3 mt-0.5 truncate">{focusedItemMeta.itemName}</p>
             </div>
 
             <div className="space-y-2">
               {(focusedItemMeta.lastPricesForCustomer || []).map((lp, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between text-xs p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/80"
+                  className="flex items-center justify-between text-xs p-2 rounded-[3px] bg-paper border border-rule"
                 >
-                  <span className="text-zinc-400">{lp.date}</span>
-                  <span className="font-mono font-bold text-zinc-200">₹{lp.price}</span>
+                  <span className="text-ink-3">{lp.date}</span>
+                  <span className="font-mono font-bold text-ink">₹{lp.price}</span>
                 </div>
               ))}
             </div>
 
-            <div className="pt-3 border-t border-zinc-800 text-xs space-y-1">
-              <div className="text-zinc-400">Today&apos;s Suggested Target:</div>
-              <div className="text-lg font-mono font-black text-teal-400">
+            <div className="pt-3 border-t border-rule text-xs space-y-1">
+              <div className="text-ink-3">Today&apos;s Suggested Target:</div>
+              <div className="text-lg font-mono font-semibold text-action">
                 ₹{focusedItemMeta.targetPrice ?? focusedItemMeta.yesterdayTarget} / {focusedItemMeta.uom}
               </div>
               {isOwner && (
-                <div className="text-[11px] text-zinc-500">
+                <div className="text-[11px] text-ink-3">
                   Today&apos;s Floor: ₹{focusedItemMeta.floorPrice ?? focusedItemMeta.yesterdayFloor}
                 </div>
               )}
@@ -866,28 +866,28 @@ export default function QuickOrderEntryPage() {
 
       {/* Footer Summary & Dynamic Primary Action */}
       {(mode === 'EXPRESS' || guidedStep === 3) && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+        <div className="bg-sheet border border-rule rounded-[4px] p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
             <div className="flex flex-wrap items-center gap-6">
               <div>
-                <span className="text-xs text-zinc-400 block">Subtotal</span>
-                <span className="font-mono font-bold text-white">{formatINR(subtotal)}</span>
+                <span className="text-xs text-ink-3 block">Subtotal</span>
+                <span className="font-mono font-bold text-ink">{formatINR(subtotal)}</span>
               </div>
               <div>
-                <span className="text-xs text-zinc-400 block">GST</span>
-                <span className="font-mono font-bold text-zinc-200">{formatINR(gstTotal)}</span>
+                <span className="text-xs text-ink-3 block">GST</span>
+                <span className="font-mono font-bold text-ink">{formatINR(gstTotal)}</span>
               </div>
               <div>
-                <span className="text-xs text-zinc-400 block">Grand Total</span>
-                <span className="font-mono font-black text-teal-400 text-lg">
+                <span className="text-xs text-ink-3 block">Grand Total</span>
+                <span className="font-mono font-semibold text-action text-lg">
                   {formatINR(grandTotal)}
                 </span>
               </div>
               {isOwner && (
                 <div>
-                  <span className="text-xs text-zinc-400 block">Margin (Owner Only)</span>
+                  <span className="text-xs text-ink-3 block">Margin (Owner Only)</span>
                   <span
-                    className={`font-mono font-bold ${
+                    className={`font-mono font-bold${
                       marginPct >= 12 ? 'text-emerald-400' : 'text-amber-400'
                     }`}
                   >
@@ -912,7 +912,7 @@ export default function QuickOrderEntryPage() {
                 disabled={submitting}
                 className={
                   approvalEval.primaryAction === 'SEND_FOR_APPROVAL'
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500'
+                    ? 'bg-haldi hover:opacity-90 text-white border-haldi/30'
                     : ''
                 }
                 onClick={handleSubmitOrder}
@@ -923,13 +923,13 @@ export default function QuickOrderEntryPage() {
           </div>
 
           {submitError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">
+            <div className="p-3 rounded-[3px] bg-madder-soft border border-madder/30 text-xs text-madder">
               ❌ {submitError}
             </div>
           )}
 
           {approvalEval.reasons.length > 0 && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+            <div className="p-3 rounded-[3px] bg-haldi-soft border border-haldi/30 text-xs text-haldi space-y-1">
               {approvalEval.reasons.map((r, i) => (
                 <div key={i}>⚠ {r}</div>
               ))}

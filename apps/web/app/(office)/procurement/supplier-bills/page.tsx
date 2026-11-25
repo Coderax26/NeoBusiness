@@ -249,13 +249,13 @@ export default function SupplierBillsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/procurement" className="hover:text-white">Procurement</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/procurement" className="hover:text-ink">Procurement</Link>
             <span>/</span>
-            <span className="text-indigo-400">Supplier Bills &amp; AP</span>
+            <span className="text-action">Supplier Bills &amp; AP</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Supplier Bills &amp; 3-Way Match</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Supplier Bills &amp; 3-Way Match</h1>
+          <p className="text-sm text-ink-3">
             Verify PO vs GRN vs Bill with ✓/✗ line indicators, approve bills, record payments (G-AP-1), and track AP aging (G-AP-2).
           </p>
         </div>
@@ -274,33 +274,33 @@ export default function SupplierBillsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
       {/* AP Aging Summary Bar (G-AP-2) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4 bg-zinc-900 border-zinc-800">
-          <div className="text-xs text-zinc-400">0–30 Days (Current)</div>
-          <div className="text-xl font-bold text-white font-mono mt-1">
+        <Card className="p-4 bg-sheet border-rule">
+          <div className="text-xs text-ink-3">0–30 Days (Current)</div>
+          <div className="text-xl font-bold text-ink font-mono mt-1">
             {formatINR(apAging.current)}
           </div>
         </Card>
-        <Card className="p-4 bg-zinc-900 border-zinc-800">
-          <div className="text-xs text-zinc-400">31–60 Days</div>
-          <div className="text-xl font-bold text-amber-400 font-mono mt-1">
+        <Card className="p-4 bg-sheet border-rule">
+          <div className="text-xs text-ink-3">31–60 Days</div>
+          <div className="text-xl font-bold text-haldi font-mono mt-1">
             {formatINR(apAging.d31_60)}
           </div>
         </Card>
-        <Card className="p-4 bg-zinc-900 border-zinc-800">
-          <div className="text-xs text-zinc-400">61–90 Days</div>
-          <div className="text-xl font-bold text-rose-400 font-mono mt-1">
+        <Card className="p-4 bg-sheet border-rule">
+          <div className="text-xs text-ink-3">61–90 Days</div>
+          <div className="text-xl font-bold text-madder font-mono mt-1">
             {formatINR(apAging.d61_90)}
           </div>
         </Card>
-        <Card className="p-4 bg-zinc-900 border-zinc-800">
-          <div className="text-xs text-zinc-400">90+ Days Overdue</div>
+        <Card className="p-4 bg-sheet border-rule">
+          <div className="text-xs text-ink-3">90+ Days Overdue</div>
           <div className="text-xl font-bold text-rose-500 font-mono mt-1">
             {formatINR(apAging.d90_plus)}
           </div>
@@ -309,27 +309,27 @@ export default function SupplierBillsPage() {
 
       {/* Optional Supplier Ledger Drawer/Card */}
       {showLedger && (
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
-          <h3 className="text-sm font-semibold text-white mb-3">
+        <Card className="p-5 bg-sheet border-rule">
+          <h3 className="text-sm font-semibold text-ink mb-3">
             Supplier Payment Ledger (G-AP-1)
           </h3>
           <div className="space-y-2">
             {payments.map((p) => (
               <div
                 key={p.id}
-                className="flex flex-wrap items-center justify-between p-2.5 rounded bg-zinc-950 border border-zinc-800 text-xs"
+                className="flex flex-wrap items-center justify-between p-2.5 rounded bg-paper border border-rule text-xs"
               >
                 <div>
-                  <span className="font-mono text-indigo-400 font-semibold mr-2">
+                  <span className="font-mono text-action font-semibold mr-2">
                     {p.billNumber}
                   </span>
-                  <span className="text-zinc-200">{p.supplierName}</span>
+                  <span className="text-ink">{p.supplierName}</span>
                 </div>
                 <div className="flex items-center gap-4 font-mono">
-                  <span className="text-zinc-400">{p.date}</span>
+                  <span className="text-ink-3">{p.date}</span>
                   <Badge variant="info">{p.mode}</Badge>
-                  <span className="text-zinc-300">{p.reference}</span>
-                  <span className="text-emerald-400 font-bold">{formatINR(p.amount)}</span>
+                  <span className="text-ink-2">{p.reference}</span>
+                  <span className="text-leaf font-bold">{formatINR(p.amount)}</span>
                 </div>
               </div>
             ))}
@@ -338,15 +338,15 @@ export default function SupplierBillsPage() {
       )}
 
       {/* Status Tabs */}
-      <div className="flex flex-wrap gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl p-2">
+      <div className="flex flex-wrap gap-1.5 bg-sheet border border-rule rounded-[3px] p-2">
         {BILL_TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setStatusTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
               statusTab === t.key
                 ? 'bg-indigo-600 text-white'
-                : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                : 'bg-sunken text-ink-3 hover:text-ink'
             }`}
           >
             {t.label}
@@ -355,9 +355,9 @@ export default function SupplierBillsPage() {
       </div>
 
       {/* Bills Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
             <tr>
               <th className="p-3">Bill #</th>
               <th className="p-3">Supplier &amp; PO</th>
@@ -367,34 +367,34 @@ export default function SupplierBillsPage() {
               <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {filteredBills.map((b) => {
               const chip = THREE_WAY_CHIP_MAP[b.three_way_status];
               return (
                 <tr
                   key={b.id}
                   onClick={() => setSelectedBill(b)}
-                  className={`hover:bg-zinc-800/40 cursor-pointer ${
+                  className={`hover:bg-sunken cursor-pointer${
                     selectedBill?.id === b.id ? 'bg-indigo-500/10' : ''
                   }`}
                 >
-                  <td className="p-3 font-mono text-xs text-indigo-400 font-semibold">
+                  <td className="p-3 font-mono text-xs text-action font-semibold">
                     {b.billNumber}
-                    <div className="text-[11px] text-zinc-500">{b.billDate}</div>
+                    <div className="text-[11px] text-ink-3">{b.billDate}</div>
                   </td>
                   <td className="p-3">
-                    <div className="text-zinc-100 font-medium">{b.supplierName}</div>
-                    <div className="text-[11px] text-zinc-500 font-mono">
+                    <div className="text-ink font-medium">{b.supplierName}</div>
+                    <div className="text-[11px] text-ink-3 font-mono">
                       {b.poNumber} · {b.grnNumber}
                     </div>
                   </td>
                   <td className="p-3">
                     <Badge variant={chip.variant}>{chip.label}</Badge>
                   </td>
-                  <td className="p-3 text-right font-mono font-semibold text-white">
+                  <td className="p-3 text-right font-mono font-semibold text-ink">
                     {formatINR(b.totalAmount)}
                     {b.paidAmount > 0 && (
-                      <div className="text-[11px] text-emerald-400">
+                      <div className="text-[11px] text-leaf">
                         Paid {formatINR(b.paidAmount)}
                       </div>
                     )}
@@ -415,7 +415,7 @@ export default function SupplierBillsPage() {
                     {b.status === 'RECEIVED' && (
                       <button
                         onClick={() => handleStatusAction(b, 'submit')}
-                        className="text-xs text-sky-400 hover:text-sky-300 font-medium"
+                        className="text-xs text-action hover:text-action font-medium"
                       >
                         Submit
                       </button>
@@ -424,13 +424,13 @@ export default function SupplierBillsPage() {
                       <>
                         <button
                           onClick={() => handleStatusAction(b, 'approve')}
-                          className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+                          className="text-xs text-leaf hover:text-leaf font-medium"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => setRejectTarget(b)}
-                          className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                          className="text-xs text-madder hover:text-madder font-medium"
                         >
                           Reject
                         </button>
@@ -442,7 +442,7 @@ export default function SupplierBillsPage() {
                           setPayTarget(b);
                           setPayAmount(b.totalAmount - b.paidAmount);
                         }}
-                        className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+                        className="text-xs text-leaf hover:text-leaf font-medium"
                       >
                         Record Payment
                       </button>
@@ -456,13 +456,13 @@ export default function SupplierBillsPage() {
       </div>
 
       {/* Side-by-side PO vs GRN vs Bill Comparison (§3.5 & §4) */}
-      <Card className="p-5 bg-zinc-900 border-zinc-800">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+      <Card className="p-5 bg-sheet border-rule">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-rule">
           <div>
-            <h2 className="text-base font-semibold text-white">
+            <h2 className="text-base font-semibold text-ink">
               3-Way Comparison: {selectedBill?.billNumber ?? '—'} ({selectedBill?.supplierName ?? 'Select a bill'})
             </h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-ink-3">
               PO ({selectedBill?.poNumber ?? '—'}) vs GRN ({selectedBill?.grnNumber ?? '—'}) vs Supplier Bill
             </p>
           </div>
@@ -475,7 +475,7 @@ export default function SupplierBillsPage() {
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-800">
+            <thead className="text-xs uppercase text-ink-3 border-b border-rule">
               <tr>
                 <th className="py-2">Match</th>
                 <th className="py-2">Item</th>
@@ -485,7 +485,7 @@ export default function SupplierBillsPage() {
                 <th className="py-2 text-right">Variance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {threeWayEval.lines.map((line) => (
                 <tr key={line.itemId}>
                   <td className="py-3 text-lg font-bold">
@@ -497,14 +497,14 @@ export default function SupplierBillsPage() {
                       {line.icon}
                     </span>
                   </td>
-                  <td className="py-3 text-white font-medium">{line.itemName}</td>
-                  <td className="py-3 text-right font-mono text-xs text-zinc-300">
+                  <td className="py-3 text-ink font-medium">{line.itemName}</td>
+                  <td className="py-3 text-right font-mono text-xs text-ink-2">
                     {line.poQty} @ ₹{line.poRate}
                   </td>
-                  <td className="py-3 text-right font-mono text-xs text-sky-400">
+                  <td className="py-3 text-right font-mono text-xs text-action">
                     {line.grnQty}
                   </td>
-                  <td className="py-3 text-right font-mono text-xs text-white">
+                  <td className="py-3 text-right font-mono text-xs text-ink">
                     {line.billQty} @ ₹{line.billRate}
                   </td>
                   <td className="py-3 text-right font-mono text-xs">
@@ -533,7 +533,7 @@ export default function SupplierBillsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Link Purchase Order</label>
+            <label className="block text-xs text-ink-3 mb-1">Link Purchase Order</label>
             <select
               value={newPoId}
               onChange={(e) => {
@@ -544,7 +544,7 @@ export default function SupplierBillsPage() {
                   setNewBillRate(po.lines[0].unitRate);
                 }
               }}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
               {purchaseOrders.map((po) => (
                 <option key={po.id} value={po.id}>
@@ -555,51 +555,51 @@ export default function SupplierBillsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Supplier Bill No.</label>
+              <label className="block text-xs text-ink-3 mb-1">Supplier Bill No.</label>
               <input
                 type="text"
                 placeholder="e.g., INV-SAT-902"
                 value={newBillNo}
                 onChange={(e) => setNewBillNo(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Bill Date</label>
+              <label className="block text-xs text-ink-3 mb-1">Bill Date</label>
               <input
                 type="date"
                 value={newBillDate}
                 onChange={(e) => setNewBillDate(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Billed Qty</label>
+              <label className="block text-xs text-ink-3 mb-1">Billed Qty</label>
               <input
                 type="number"
                 value={newBillQty}
                 onChange={(e) => setNewBillQty(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Billed Rate (₹)</label>
+              <label className="block text-xs text-ink-3 mb-1">Billed Rate (₹)</label>
               <input
                 type="number"
                 value={newBillRate}
                 onChange={(e) => setNewBillRate(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Attach Bill Scan (G-FILE-1)</label>
+            <label className="block text-xs text-ink-3 mb-1">Attach Bill Scan (G-FILE-1)</label>
             <input
               type="file"
               onChange={(e) => setNewScanName(e.target.files?.[0]?.name || '')}
-              className="w-full text-xs text-zinc-400"
+              className="w-full text-xs text-ink-3"
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -625,7 +625,7 @@ export default function SupplierBillsPage() {
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="Reason required..."
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setRejectTarget(null)}>
@@ -651,11 +651,11 @@ export default function SupplierBillsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Payment Mode</label>
+              <label className="block text-xs text-ink-3 mb-1">Payment Mode</label>
               <select
                 value={payMode}
                 onChange={(e) => setPayMode(e.target.value as any)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               >
                 <option value="BANK">Bank Transfer (NEFT/RTGS)</option>
                 <option value="UPI">UPI</option>
@@ -663,23 +663,23 @@ export default function SupplierBillsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Amount (₹)</label>
+              <label className="block text-xs text-ink-3 mb-1">Amount (₹)</label>
               <input
                 type="number"
                 value={payAmount}
                 onChange={(e) => setPayAmount(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">UTR / Reference No.</label>
+            <label className="block text-xs text-ink-3 mb-1">UTR / Reference No.</label>
             <input
               type="text"
               placeholder="e.g., UTR-991024"
               value={payRef}
               onChange={(e) => setPayRef(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             />
           </div>
           <div className="flex justify-end gap-2">

@@ -50,7 +50,7 @@ export default function QuotesListPage() {
       cell: (info) => {
         const q = info.row.original;
         return (
-          <Link href={`/sales/quotes/${q.id}`} className="font-mono text-xs font-bold text-teal-400 hover:underline">
+          <Link href={`/sales/quotes/${q.id}`} className="font-mono text-xs font-bold text-action hover:underline">
             {q.quoteNumber}
           </Link>
         );
@@ -60,7 +60,7 @@ export default function QuotesListPage() {
       id: 'customer',
       header: 'Customer',
       accessorKey: 'customerName',
-      cell: (info) => <span className="text-xs font-bold text-white">{info.getValue() as string}</span>,
+      cell: (info) => <span className="text-xs font-bold text-ink">{info.getValue() as string}</span>,
     },
     {
       id: 'expiry',
@@ -80,7 +80,7 @@ export default function QuotesListPage() {
       header: 'Quoted Value',
       accessorKey: 'totalAmount',
       cell: (info) => (
-        <span className="font-mono text-xs font-bold text-white">{formatINR(info.getValue() as number)}</span>
+        <span className="font-mono text-xs font-bold text-ink">{formatINR(info.getValue() as number)}</span>
       ),
     },
     {
@@ -97,7 +97,7 @@ export default function QuotesListPage() {
       id: 'actions',
       header: 'Actions',
       cell: (info) => (
-        <Link href={`/sales/quotes/${info.row.original.id}`} className="text-xs text-teal-400 hover:underline font-medium">
+        <Link href={`/sales/quotes/${info.row.original.id}`} className="text-xs text-action hover:underline font-medium">
           Open &amp; Convert →
         </Link>
       ),
@@ -106,10 +106,10 @@ export default function QuotesListPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <h1 className="text-2xl font-black text-white">Customer Quotes</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Customer Quotes</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Create validity-tracked price quotes and convert them to sales orders in 1 click.
           </p>
         </div>
@@ -131,8 +131,8 @@ export default function QuotesListPage() {
           <button
             key={st}
             onClick={() => setStatusFilter(st)}
-            className={`px-3 py-1.5 rounded-xl font-semibold border ${
-              statusFilter === st ? 'bg-teal-600 text-white border-teal-500' : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+            className={`px-3 py-1.5 rounded-[3px] font-semibold border${
+              statusFilter === st ? 'bg-action text-white border-action/30' : 'bg-sheet text-ink-3 border-rule'
             }`}
           >
             {st}

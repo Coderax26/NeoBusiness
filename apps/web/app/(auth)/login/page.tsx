@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, Check, Delete } from 'lucide-react';
 import { Button } from '@neo/ui';
+import { useLocale } from '../../../src/lib/locale';
 
 interface DemoPersona {
   label: string;
@@ -22,17 +24,17 @@ const DEMO_PERSONAS: DemoPersona[] = [
     identifier: '+919876543210',
     secret: '1234',
     usePin: false,
-    badge: 'Full Control Tower',
-    desc: 'Approvals, margins, analytics, EOD sign-off & admin',
+    badge: 'Owner',
+    desc: 'Approvals, margins, analytics, day closing & admin',
   },
   {
-    label: 'Anita Desai (Ops Coord)',
+    label: 'Anita Desai (Coordinator)',
     role: 'OPS_COORD',
     identifier: '+919876543211',
     secret: '2233',
     usePin: false,
     badge: 'Office Desk',
-    desc: 'Sales orders, procurement, dispatch & daily price sheet',
+    desc: 'Sales orders, procurement, dispatch & daily prices',
   },
   {
     label: 'Arjun Rao (Storekeeper)',
@@ -41,7 +43,7 @@ const DEMO_PERSONAS: DemoPersona[] = [
     secret: '6677',
     usePin: true,
     badge: 'Floor Mode',
-    desc: 'Touch-friendly blind GRN, stock count, transfers & loading',
+    desc: 'Receive goods, stock count, transfers & loading',
   },
   {
     label: 'Suresh Patel (Production Mgr)',
@@ -50,12 +52,20 @@ const DEMO_PERSONAS: DemoPersona[] = [
     secret: '3344',
     usePin: true,
     badge: 'Factory Floor',
-    desc: 'Work orders, batch output, wastage & worker attendance',
+    desc: 'Work orders, batch output, wastage & attendance',
   },
 ];
 
+function getTimeGreeting() {
+  const hr = new Date().getHours();
+  if (hr < 12) return { en: 'Good morning.', mr: 'शुभ प्रभात' };
+  if (hr < 17) return { en: 'Good afternoon.', mr: 'शुभ दुपार' };
+  return { en: 'Good evening.', mr: 'शुभ संध्याकाळ' };
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const { locale, setLocale } = useLocale();
   const [identifier, setIdentifier] = useState('');
   const [secret, setSecret] = useState('');
   const showDemoPersonas = process.env.NEXT_PUBLIC_SHOW_DEMO_PERSONAS === 'true';
@@ -64,12 +74,13 @@ export default function LoginPage() {
   const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [greeting, setGreeting] = useState({ en: 'Good evening.', mr: 'शुभ संध्याकाळ' });
 
-  // Rate-limiting state (5 attempts / 60s per F2-01)
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   useEffect(() => {
+    setGreeting(getTimeGreeting());
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('neobus_remembered_identifier');
       if (saved && saved !== 'owner@neobus.in') {
@@ -99,7 +110,7 @@ export default function LoginPage() {
     if (lockoutSeconds > 0 || loading) return;
     if (digit === 'CLR') {
       setSecret('');
-    } else if (digit === '⌫') {
+    } else if (digit === 'BACK') {
       setSecret((prev) => prev.slice(0, -1));
     } else if (secret.length < 6) {
       setSecret((prev) => prev + digit);
@@ -143,7 +154,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Successful login
       setFailedAttempts(0);
       if (rememberDevice && typeof window !== 'undefined') {
         localStorage.setItem('neobus_remembered_identifier', identifier);
@@ -166,96 +176,38 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 flex flex-col lg:flex-row relative overflow-hidden">
-      {/* Ambient Background Glows */}
-      <div className="pointer-events-none absolute -top-40 -left-40 w-96 h-96 rounded-full bg-teal-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
+    <div className="min-h-screen w-full bg-paper text-ink flex flex-col lg:flex-row">
+      {/* Left 58%: Ruled Ledger Paper with Double Madder Margin Line */}
+      <div className="lg:w-[58%] bahi-ledger-bg relative px-8 py-10 sm:px-16 lg:pl-36 lg:pr-20 lg:py-16 flex flex-col border-b lg:border-b-0 lg:border-r border-rule">
+        {/* Double red margin rule */}
+        <div
+          aria-hidden="true"
+          className="hidden lg:block absolute top-0 bottom-0 left-[104px] bahi-margin-rule"
+        />
 
-      {/* Left Column — Interactive Enterprise Control Tower Showcase */}
-      <div className="lg:w-7/12 xl:w-3/5 p-8 lg:p-14 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-zinc-800/80 bg-gradient-to-br from-zinc-950 via-zinc-900/90 to-teal-950/25">
-        <div>
-          {/* Top Brand Bar */}
-          <div className="flex items-center justify-between gap-4 mb-10">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-teal-950/60">
-                NB
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-black tracking-tight text-white">NeoBus ERP</span>
-                  <span className="text-[11px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                    v2.4 Control Tower
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400">
-                  Baramati Agro-Processing, Supply Chain &amp; Multi-Site Distribution
-                </p>
-              </div>
-            </div>
+        <div className="font-serif text-[26px] font-semibold tracking-tight text-ink">
+          NeoBus
+        </div>
 
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>All 3 Plants Online · IST Sync</span>
-            </div>
+        <div className="mt-16 lg:mt-36 max-w-xl">
+          <h1 className="font-serif text-5xl sm:text-[68px] leading-[1.05] tracking-[-0.02em] font-normal text-ink">
+            {greeting.en}
+          </h1>
+          <div className="font-devanagari text-2xl sm:text-[28px] font-medium text-ink-2 mt-3">
+            {greeting.mr}
           </div>
+          <p className="font-serif text-[18px] sm:text-[19px] leading-relaxed text-ink-2 mt-7 max-w-lg">
+            Orders, stock, factory, deliveries and money, kept in one book.
+          </p>
+        </div>
 
-          {/* Hero Headline */}
-          <div className="max-w-2xl mb-8">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight mb-3">
-              Exception-First Operations &amp; Real-Time Margin Control.
-            </h1>
-            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-              Manage daily commodity price bands, FEFO batch inventory, factory work orders, GPS
-              fleet dispatch, and FIFO receivables from a single role-tailored workspace.
-            </p>
-          </div>
-
-          {/* Live Telemetry Preview Strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-8">
-            <div className="p-4 rounded-2xl bg-zinc-900/75 border border-zinc-800/90 backdrop-blur-md">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
-                <span>Today&apos;s Dispatch Pulse</span>
-                <span className="text-emerald-400 font-semibold">Live</span>
-              </div>
-              <div className="text-xl font-black text-white font-mono">PostgreSQL</div>
-              <div className="text-[11px] text-zinc-500 mt-1">
-                Role-Scoped Orders · Active Trips
-              </div>
+        {/* Optional demo personas if enabled by env */}
+        {showDemoPersonas && (
+          <div className="mt-10 pt-6 border-t border-rule">
+            <div className="text-[13px] font-semibold text-ink-2 mb-3">
+              Demo logins (click to fill)
             </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900/75 border border-zinc-800/90 backdrop-blur-md">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
-                <span>Floor &amp; FEFO Guard</span>
-                <span className="text-teal-400 font-semibold">100% Enforced</span>
-              </div>
-              <div className="text-xl font-black text-white font-mono">0 Drift</div>
-              <div className="text-[11px] text-zinc-500 mt-1">
-                Exact Decimal Money · Blind GRN Active
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900/75 border border-zinc-800/90 backdrop-blur-md">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
-                <span>Pending Approvals</span>
-                <span className="text-amber-400 font-semibold">Live SLA Tracking</span>
-              </div>
-              <div className="text-xl font-black text-white font-mono">&lt; 4 min</div>
-              <div className="text-[11px] text-zinc-500 mt-1">
-                Avg Owner Counter-Offer Resolution
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive 1-Click Demo Role Switcher (only when NEXT_PUBLIC_SHOW_DEMO_PERSONAS=true) */}
-          {showDemoPersonas && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Quick-Fill Role Personas (Click to Load Credentials)
-              </span>
-              <span className="text-[11px] text-teal-400 font-mono">Seeded Demo Users</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {DEMO_PERSONAS.map((persona) => {
                 const isSelected = identifier === persona.identifier && usePin === persona.usePin;
                 return (
@@ -263,139 +215,110 @@ export default function LoginPage() {
                     key={persona.role}
                     type="button"
                     onClick={() => handleSelectPersona(persona)}
-                    className={`text-left p-3.5 rounded-2xl border transition-all ${
+                    className={`text-left p-3 rounded-[4px] border transition-colors ${
                       isSelected
-                        ? 'bg-teal-950/40 border-teal-500/70 shadow-lg shadow-teal-950/50'
-                        : 'bg-zinc-900/60 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'
+                        ? 'bg-sheet border-action'
+                        : 'bg-sheet/80 border-rule hover:border-rule-strong'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-sm font-bold text-white">{persona.label}</span>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                          isSelected
-                            ? 'bg-teal-500 text-zinc-950'
-                            : 'bg-zinc-800 text-zinc-300'
-                        }`}
-                      >
-                        {persona.badge}
-                      </span>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="text-[13.5px] font-semibold text-ink">{persona.label}</span>
+                      <span className="text-[12px] text-action font-medium">{persona.badge}</span>
                     </div>
-                    <p className="text-xs text-zinc-400 line-clamp-1 mb-1.5">{persona.desc}</p>
-                    <div className="flex items-center gap-2 text-[11px] font-mono text-teal-300/90">
-                      <span>Phone: {persona.identifier}</span>
-                      <span>·</span>
-                      <span>PIN: {persona.secret}</span>
-                    </div>
+                    <p className="text-[12.5px] text-ink-3 line-clamp-1">{persona.desc}</p>
                   </button>
                 );
               })}
             </div>
           </div>
-          )}
-        </div>
+        )}
 
-        {/* Footer Compliance Note */}
-        <div className="mt-8 pt-6 border-t border-zinc-800/70 flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-500">
-          <span>🔒 256-Bit JWT Session · Role-Scoped Field Masking (OD-004)</span>
-          <span>Need help? Contact Plant IT Extension #104</span>
+        <div className="mt-auto pt-10 text-[13px] text-ink-3">
+          Trouble signing in? Call the office on 02112 244 100.
         </div>
       </div>
 
-      {/* Right Column — Sign-In Card */}
-      <div className="lg:w-5/12 xl:w-2/5 flex items-center justify-center p-6 sm:p-10 lg:p-12">
-        <div className="w-full max-w-md bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-7 sm:p-9 shadow-2xl">
-          {/* Card Header */}
-          <div className="mb-6">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-semibold mb-3">
-              <span>⚡</span>
-              <span>Secure Workspace Sign-In</span>
-            </div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Welcome back</h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Sign in with your office password or 6-digit factory floor security PIN.
-            </p>
-          </div>
+      {/* Right 42%: Clean Sheet Sign-In Form */}
+      <div className="lg:w-[42%] bg-sheet flex flex-col px-6 py-8 sm:px-14 lg:px-20 lg:py-10">
+        {/* Language switch */}
+        <div className="self-end text-[13.5px] text-ink-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLocale('en')}
+            className={locale === 'en' ? 'text-ink font-semibold' : 'hover:text-ink'}
+          >
+            English
+          </button>
+          <span>·</span>
+          <button
+            type="button"
+            onClick={() => setLocale('mr')}
+            className={`font-devanagari ${locale === 'mr' ? 'text-ink font-semibold' : 'hover:text-ink'}`}
+          >
+            मराठी
+          </button>
+        </div>
 
-          {/* Auth Mode Toggle (Password vs Quick PIN for Floor devices) */}
-          <div className="grid grid-cols-2 bg-zinc-950 p-1 rounded-xl mb-6 border border-zinc-800">
-            <button
-              type="button"
-              onClick={() => {
-                setUsePin(false);
-                setError(null);
-              }}
-              className={`py-2.5 text-xs font-bold rounded-lg transition-all ${
-                !usePin
-                  ? 'bg-teal-600 text-white shadow-md'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              🔑 Password (Office)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setUsePin(true);
-                setError(null);
-              }}
-              className={`py-2.5 text-xs font-bold rounded-lg transition-all ${
-                usePin
-                  ? 'bg-teal-600 text-white shadow-md'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              🔢 Security PIN (Floor)
-            </button>
-          </div>
+        <div className="my-auto py-10 max-w-[400px] w-full mx-auto lg:mx-0">
+          <h2 className="font-serif text-[32px] font-medium text-ink tracking-tight">
+            {locale === 'mr' ? 'साइन इन करा' : 'Sign in'}
+          </h2>
+          <p className="text-[14.5px] text-ink-2 mt-1.5">
+            {locale === 'mr'
+              ? 'कार्यालयात नोंदवलेला मोबाईल क्रमांक वापरा.'
+              : 'Use the mobile number registered with the office.'}
+          </p>
 
           {error && (
             <div
               role="alert"
-              className="mb-5 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5"
+              className="mt-5 p-3.5 rounded-[3px] bg-madder-soft border border-madder/30 text-madder text-[13.5px] flex items-start gap-2"
             >
-              <span className="font-bold text-sm">✕</span>
+              <span className="font-semibold">✕</span>
               <span>{error}</span>
             </div>
           )}
 
           {lockoutSeconds > 0 && (
-            <div className="mb-5 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs text-center font-mono">
-              ⏳ Try again in <strong className="text-white">{lockoutSeconds}s</strong>
+            <div className="mt-5 p-3 rounded-[3px] bg-haldi-soft border border-haldi/30 text-haldi text-[13.5px] text-center font-mono">
+              Try again in <strong>{lockoutSeconds}s</strong>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
-                Phone Number or Email
+              <label className="block text-[13.5px] font-medium text-ink mb-1.5 select-none">
+                {usePin ? 'Mobile number' : 'Mobile number or email'}
               </label>
-              <input
-                type="text"
-                required
-                disabled={lockoutSeconds > 0 || loading}
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[46px]"
-                placeholder={
-                  usePin ? 'Enter registered phone (e.g. 9876543212)' : 'name@neobus.in or phone'
-                }
-              />
+              <div className="flex h-[46px] rounded-[3px] border border-rule-strong bg-white focus-within:border-action focus-within:ring-2 focus-within:ring-action/20 overflow-hidden">
+                <span className="px-3 bg-paper border-r border-rule flex items-center text-[14px] text-ink-2 select-none">
+                  +91
+                </span>
+                <input
+                  type="text"
+                  required
+                  disabled={lockoutSeconds > 0 || loading}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="flex-1 px-3 bg-white text-[15px] text-[#1E1C19] placeholder-[#77716A] outline-none"
+                  placeholder={usePin ? '98765 43212' : '99999 99999 or email'}
+                />
+              </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-zinc-300 select-none">
-                  {usePin ? '4–6 Digit Security PIN' : 'Account Password'}
+                <label className="block text-[13.5px] font-medium text-ink select-none">
+                  {usePin ? '4–6 digit security PIN' : 'Password'}
                 </label>
                 <Link
                   href="/login/forgot"
-                  className="text-xs font-semibold text-teal-400 hover:text-teal-300 transition-colors"
+                  className="text-[13.5px] font-medium text-action hover:underline"
                 >
-                  Forgot {usePin ? 'PIN' : 'password'}?
+                  Forgot?
                 </Link>
               </div>
-              <div className="relative flex items-center">
+              <div className="relative flex items-center h-[46px] rounded-[3px] border border-rule-strong bg-white focus-within:border-action focus-within:ring-2 focus-within:ring-action/20 overflow-hidden">
                 <input
                   type={showSecret ? 'text' : 'password'}
                   inputMode={usePin ? 'numeric' : 'text'}
@@ -403,65 +326,98 @@ export default function LoginPage() {
                   disabled={lockoutSeconds > 0 || loading}
                   value={secret}
                   onChange={(e) => setSecret(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-4 pr-14 py-3 text-sm text-white font-mono tracking-wider placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[46px]"
+                  className="w-full px-3 pr-11 h-full bg-white text-[15px] text-[#1E1C19] font-mono tracking-wider placeholder-[#77716A] outline-none"
                   placeholder={usePin ? '••••••' : 'Enter password'}
                 />
                 <button
                   type="button"
                   onClick={() => setShowSecret(!showSecret)}
-                  className="absolute right-3 text-xs font-semibold text-zinc-400 hover:text-white px-2 py-1 rounded-md bg-zinc-900 border border-zinc-800"
+                  className="absolute right-2.5 text-ink-3 hover:text-ink p-1.5"
                   aria-label={showSecret ? 'Hide password' : 'Show password'}
                 >
-                  {showSecret ? 'Hide' : 'Show'}
+                  {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Interactive Touch PIN Pad when in Floor PIN mode */}
             {usePin && (
               <div className="pt-1">
-                <div className="text-[11px] text-zinc-400 mb-2 font-medium">
-                  Touch Keypad (Glove-Friendly 48px Targets)
-                </div>
+                <div className="text-[13px] text-ink-3 mb-2">Touch keypad</div>
                 <div className="grid grid-cols-3 gap-2">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLR', '0', '⌫'].map((key) => (
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLR', '0', 'BACK'].map((key) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => handlePinKey(key)}
-                      className="h-11 rounded-xl bg-zinc-950 hover:bg-zinc-800 active:bg-teal-600/30 border border-zinc-800 text-sm font-bold text-zinc-200 font-mono transition-colors"
+                      className="h-12 rounded-[3px] bg-paper hover:bg-sunken border border-rule-strong text-[15px] font-semibold text-ink font-mono flex items-center justify-center transition-colors"
                     >
-                      {key}
+                      {key === 'BACK' ? <Delete className="w-4 h-4" /> : key}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberDevice}
-                  onChange={(e) => setRememberDevice(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-700 bg-zinc-950 text-teal-600 focus:ring-teal-500"
-                />
-                <span>Remember this workstation</span>
-              </label>
-              <span className="text-[11px] text-zinc-500">Max 5 attempts / 60s</span>
-            </div>
+            <label className="flex items-center gap-2.5 text-[14px] text-ink-2 cursor-pointer select-none pt-0.5">
+              <span
+                className={`w-[17px] h-[17px] rounded-[2px] border flex items-center justify-center transition-colors ${
+                  rememberDevice ? 'bg-action border-action text-white' : 'bg-white border-rule-strong'
+                }`}
+              >
+                {rememberDevice && <Check className="w-3 h-3" strokeWidth={2.5} />}
+              </span>
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => setRememberDevice(e.target.checked)}
+                className="sr-only"
+              />
+              <span>Keep me signed in on this computer</span>
+            </label>
 
             <Button
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full mt-2 py-3.5 text-sm font-bold rounded-xl bg-teal-600 hover:bg-teal-500 text-white shadow-lg shadow-teal-950/50 transition-all"
+              className="w-full h-[48px] text-[15.5px]"
               loading={loading}
               disabled={lockoutSeconds > 0}
             >
-              {lockoutSeconds > 0 ? `Locked (${lockoutSeconds}s)` : 'Sign In to Workspace →'}
+              {lockoutSeconds > 0 ? `Locked (${lockoutSeconds}s)` : 'Sign in'}
             </Button>
           </form>
+
+          <div className="mt-7 pt-4 border-t border-rule text-[14px] text-ink-2">
+            {usePin ? (
+              <>
+                Signing in at an office desk?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePin(false);
+                    setError(null);
+                  }}
+                  className="text-action font-medium hover:underline"
+                >
+                  Sign in with your password →
+                </button>
+              </>
+            ) : (
+              <>
+                Working on the floor or in the store?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePin(true);
+                    setError(null);
+                  }}
+                  className="text-action font-medium hover:underline"
+                >
+                  Sign in with your PIN →
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

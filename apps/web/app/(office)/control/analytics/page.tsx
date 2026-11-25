@@ -145,9 +145,9 @@ export default function ControlAnalyticsPage() {
 
   if (!allowed) {
     return (
-      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-8 text-center space-y-3">
-        <h1 className="text-xl font-bold text-rose-300">Access Restricted (403 — Masked Role)</h1>
-        <p className="text-sm text-rose-200/80">
+      <div className="rounded-[4px] border border-madder/30 bg-madder-soft p-8 text-center space-y-3">
+        <h1 className="text-xl font-bold text-madder">Access Restricted (403 — Masked Role)</h1>
+        <p className="text-sm text-madder/80">
           Role <span className="font-mono font-bold">{role}</span> cannot view commercial margin or customer profitability analytics.
         </p>
       </div>
@@ -158,8 +158,8 @@ export default function ControlAnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Executive Analytics</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Executive Analytics</h1>
+          <p className="text-sm text-ink-3">
             Plain-English drill-down reports across commercial, factory, procurement, and delivery performance.
           </p>
         </div>
@@ -168,7 +168,7 @@ export default function ControlAnalyticsPage() {
           <select
             value={datePreset}
             onChange={(e) => setDatePreset(e.target.value as '7D' | '30D' | '90D')}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-100"
+            className="rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs font-semibold text-ink"
           >
             <option value="7D">Last 7 Days</option>
             <option value="30D">Last 30 Days</option>
@@ -177,7 +177,7 @@ export default function ControlAnalyticsPage() {
           <select
             value={siteFilter}
             onChange={(e) => setSiteFilter(e.target.value)}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-100"
+            className="rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs font-semibold text-ink"
           >
             <option value="ALL">All Sites</option>
             {sites.map((s) => (
@@ -189,28 +189,28 @@ export default function ControlAnalyticsPage() {
           <button
             type="button"
             onClick={() => setViewMode((m) => (m === 'TABLE' ? 'CHART' : 'TABLE'))}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800"
+            className="rounded-lg border border-rule bg-sheet px-3 py-1.5 text-xs font-semibold text-ink hover:bg-sunken"
           >
             {viewMode === 'TABLE' ? '📊 Chart View' : '📋 Table View'}
-          </button>
-          <a
-            href={`data:text/csv;charset=utf-8,${encodeURIComponent(csvPayload)}`}
-            download={`analytics-${activeTab.toLowerCase()}.csv`}
-            className="rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
-          >
-            Export CSV
-          </a>
-        </div>
-      </div>
+ </button>
+ <a
+ href={`data:text/csv;charset=utf-8,${encodeURIComponent(csvPayload)}`}
+ download={`analytics-${activeTab.toLowerCase()}.csv`}
+ className="rounded-lg bg-action px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+ >
+ Export CSV
+ </a>
+ </div>
+ </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-2">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setActiveTab(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-              activeTab === t.key ? 'bg-teal-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+ <div className="flex flex-wrap gap-2 border-b border-rule pb-2">
+ {TABS.map((t) => (
+ <button
+ key={t.key}
+ type="button"
+ onClick={() => setActiveTab(t.key)}
+ className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+ activeTab === t.key ?'bg-teal-600 text-white' : 'bg-sheet text-ink-3 hover:bg-sunken hover:text-ink'
             }`}
           >
             {t.label}
@@ -218,62 +218,62 @@ export default function ControlAnalyticsPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="rounded-[4px] border border-rule bg-sheet p-5">
         {activeTab === 'CUSTOMERS' && (
           <div className="space-y-4">
-            <h2 className="text-base font-bold text-zinc-100">Which customers generate the most profit ({datePreset})</h2>
+            <h2 className="text-base font-bold text-ink">Which customers generate the most profit ({datePreset})</h2>
             {customers.length === 0 ? (
-              <div className="text-sm text-zinc-500">No customer analytics data available.</div>
-            ) : viewMode === 'CHART' ? (
-              <div className="space-y-3">
-                {customers.map((c) => {
-                  const maxProfit = Math.max(1, ...customers.map((x) => x.grossProfit));
-                  return (
-                    <div key={c.customer} className="space-y-1">
-                      <div className="flex justify-between text-xs font-semibold text-zinc-200">
-                        <span>{c.customer}</span>
-                        <span className="font-mono text-emerald-400">{formatINR(c.grossProfit)} ({c.marginPct}%)</span>
-                      </div>
-                      <div className="h-3 w-full rounded-full bg-zinc-800">
-                        <div
-                          className="h-full rounded-full bg-emerald-500"
-                          style={{ width: `${Math.round((c.grossProfit / maxProfit) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
-                  <tr>
-                    <th className="px-4 py-2.5">Customer</th>
-                    <th className="px-4 py-2.5 text-right">Revenue</th>
-                    <th className="px-4 py-2.5 text-right">Gross Profit</th>
-                    <th className="px-4 py-2.5 text-right">Margin %</th>
-                    <th className="px-4 py-2.5 text-right">Orders</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800 text-zinc-200">
-                  {customers.map((c) => (
-                    <tr key={c.customer}>
-                      <td className="px-4 py-2.5 font-semibold">{c.customer}</td>
-                      <td className="px-4 py-2.5 text-right font-mono">{formatINR(c.revenue)}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-emerald-400">{formatINR(c.grossProfit)}</td>
-                      <td className="px-4 py-2.5 text-right font-mono">{c.marginPct}%</td>
-                      <td className="px-4 py-2.5 text-right font-mono">{c.orders}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
+              <div className="text-sm text-ink-3">No customer analytics data available.</div>
+            ) : viewMode === 'CHART'? (
+ <div className="space-y-3">
+ {customers.map((c) => {
+ const maxProfit = Math.max(1, ...customers.map((x) => x.grossProfit));
+ return (
+ <div key={c.customer} className="space-y-1">
+ <div className="flex justify-between text-xs font-semibold text-ink">
+ <span>{c.customer}</span>
+ <span className="font-mono text-leaf">{formatINR(c.grossProfit)} ({c.marginPct}%)</span>
+ </div>
+ <div className="h-3 w-full rounded-full bg-sunken">
+ <div
+ className="h-full rounded-full bg-emerald-500"
+ style={{ width: `${Math.round((c.grossProfit / maxProfit) * 100)}%` }}
+ />
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ ) : (
+ <table className="w-full text-left text-sm">
+ <thead className="bg-paper text-xs uppercase text-ink-3">
+ <tr>
+ <th className="px-4 py-2.5">Customer</th>
+ <th className="px-4 py-2.5 text-right">Revenue</th>
+ <th className="px-4 py-2.5 text-right">Gross Profit</th>
+ <th className="px-4 py-2.5 text-right">Margin %</th>
+ <th className="px-4 py-2.5 text-right">Orders</th>
+ </tr>
+ </thead>
+ <tbody className="divide-y divide-rule text-ink">
+ {customers.map((c) => (
+ <tr key={c.customer}>
+ <td className="px-4 py-2.5 font-semibold">{c.customer}</td>
+ <td className="px-4 py-2.5 text-right font-mono">{formatINR(c.revenue)}</td>
+ <td className="px-4 py-2.5 text-right font-mono text-leaf">{formatINR(c.grossProfit)}</td>
+ <td className="px-4 py-2.5 text-right font-mono">{c.marginPct}%</td>
+ <td className="px-4 py-2.5 text-right font-mono">{c.orders}</td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ )}
+ </div>
+ )}
 
-        {activeTab === 'SUPPLIERS' && (
+ {activeTab ==='SUPPLIERS' && (
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper text-xs uppercase text-ink-3">
               <tr>
                 <th className="px-4 py-2.5">Supplier</th>
                 <th className="px-4 py-2.5 text-right">Fill Rate</th>
@@ -281,16 +281,16 @@ export default function ControlAnalyticsPage() {
                 <th className="px-4 py-2.5 text-right">POs / GRNs</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-zinc-200">
+            <tbody className="divide-y divide-rule text-ink">
               {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-4 text-center text-zinc-500">No supplier analytics available.</td>
+                  <td colSpan={4} className="px-4 py-4 text-center text-ink-3">No supplier analytics available.</td>
                 </tr>
               ) : (
                 suppliers.map((s) => (
                   <tr key={s.supplier}>
                     <td className="px-4 py-2.5 font-semibold">{s.supplier}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-emerald-400">{s.fillRatePct}%</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-leaf">{s.fillRatePct}%</td>
                     <td className="px-4 py-2.5 text-right font-mono">{s.priceVarPct}%</td>
                     <td className="px-4 py-2.5 text-right font-mono">{s.pos} / {s.grns}</td>
                   </tr>
@@ -302,7 +302,7 @@ export default function ControlAnalyticsPage() {
 
         {activeTab === 'FACTORY' && (
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper text-xs uppercase text-ink-3">
               <tr>
                 <th className="px-4 py-2.5">Work Order</th>
                 <th className="px-4 py-2.5 text-right">Planned (kg)</th>
@@ -311,10 +311,10 @@ export default function ControlAnalyticsPage() {
                 <th className="px-4 py-2.5 text-right">Wastage %</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-zinc-200">
+            <tbody className="divide-y divide-rule text-ink">
               {factoryRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-4 text-center text-zinc-500">No factory analytics available.</td>
+                  <td colSpan={5} className="px-4 py-4 text-center text-ink-3">No factory analytics available.</td>
                 </tr>
               ) : (
                 factoryRows.map((f) => (
@@ -322,8 +322,8 @@ export default function ControlAnalyticsPage() {
                     <td className="px-4 py-2.5 font-semibold">{f.week}</td>
                     <td className="px-4 py-2.5 text-right font-mono">{f.plannedKg.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-2.5 text-right font-mono">{f.outputKg.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-emerald-400">{f.yieldPct}%</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-amber-400">{f.wastagePct}%</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-leaf">{f.yieldPct}%</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-haldi">{f.wastagePct}%</td>
                   </tr>
                 ))
               )}
@@ -333,17 +333,17 @@ export default function ControlAnalyticsPage() {
 
         {['RECEIVABLES', 'SALES', 'INVENTORY', 'DELIVERY', 'PURCHASES'].includes(activeTab) && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-zinc-100">
+            <h2 className="text-base font-bold text-ink">
               {activeTab.charAt(0) + activeTab.slice(1).toLowerCase()} Summary ({datePreset} · {siteFilter})
             </h2>
             {salesTrend.length === 0 ? (
-              <div className="text-sm text-zinc-500">No trend records available for this window.</div>
+              <div className="text-sm text-ink-3">No trend records available for this window.</div>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {salesTrend.slice(-4).map((d) => (
-                  <div key={d.day} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-xs text-zinc-400">{d.day}</div>
-                    <div className="mt-1 font-mono text-base font-bold text-zinc-100">{formatINR(d.salesInr)}</div>
+                  <div key={d.day} className="rounded-[3px] border border-rule bg-paper p-3">
+                    <div className="text-xs text-ink-3">{d.day}</div>
+                    <div className="mt-1 font-mono text-base font-bold text-ink">{formatINR(d.salesInr)}</div>
                   </div>
                 ))}
               </div>

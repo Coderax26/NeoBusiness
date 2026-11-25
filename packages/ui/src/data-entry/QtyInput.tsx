@@ -45,55 +45,55 @@ export const QtyInput: React.FC<QtyInputProps> = ({
   const dualUomHint = dualUomConfig && qty ? formatQty(qty, uom, dualUomConfig) : null;
 
   const sizeClasses = {
-    md: 'min-h-[40px] text-sm py-2 px-3',
-    floor: 'min-h-[56px] text-lg font-bold py-3 px-4 rounded-xl',
+    md: 'min-h-[40px] text-[14.5px] py-2 px-3',
+    floor: 'min-h-[56px] text-lg font-bold py-3 px-4 rounded-[6px]',
   };
 
   return (
     <div className={`w-full ${className}`}>
-      <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+      <label className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
         {label}
       </label>
-      <div className="flex rounded-lg overflow-hidden border border-zinc-800 focus-within:ring-2 focus-within:ring-teal-500">
+      <div className="flex rounded-[3px] overflow-hidden border border-rule-strong focus-within:ring-2 focus-within:ring-action/25 focus-within:border-action">
         <input
           type="text"
           inputMode="decimal"
           value={internalQty}
           onChange={(e) => setInternalQty(e.target.value)}
           onBlur={handleBlur}
-          className={`flex-1 bg-zinc-900 px-3 py-2 text-right font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none ${sizeClasses[size]}`}
+          className={`flex-1 bg-sheet px-3 py-2 text-right font-mono tabular-nums text-ink placeholder-ink-3 focus:outline-none ${sizeClasses[size]}`}
           placeholder="0.000"
         />
         {onUomChange && availableUoms.length > 1 ? (
           <select
             value={uom}
             onChange={(e) => onUomChange(e.target.value)}
-            className="bg-zinc-800 border-l border-zinc-700 px-3 text-xs font-semibold text-zinc-200 focus:outline-none"
+            className="bg-paper border-l border-rule-strong px-3 text-[13px] font-medium text-ink-2 focus:outline-none"
           >
             {availableUoms.map((u) => (
-              <option key={u} value={u} className="bg-zinc-900">
+              <option key={u} value={u} className="bg-sheet text-ink">
                 {u}
               </option>
             ))}
           </select>
         ) : (
-          <span className="bg-zinc-800/80 border-l border-zinc-700 px-3.5 flex items-center text-xs font-semibold text-zinc-400 select-none">
+          <span className="bg-paper border-l border-rule-strong px-3.5 flex items-center text-[13px] font-medium text-ink-2 select-none">
             {uom}
           </span>
         )}
       </div>
 
       {dualUomHint && (
-        <div className="mt-1 text-[11px] text-teal-300 font-mono flex items-center gap-1">
+        <div className="mt-1 text-[13px] text-action font-mono flex items-center gap-1">
           <span>⇄</span>
           <span>Dual UoM Preview: {dualUomHint}</span>
         </div>
       )}
 
       {error ? (
-        <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">{error}</p>
+        <p role="alert" className="text-[13px] text-madder mt-1 font-medium">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+        <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
       ) : null}
     </div>
   );
@@ -116,7 +116,6 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   helperText,
   required,
 }) => {
-  // Strip non-digits
   const digits = value.replace(/\D/g, '');
   const localDigits = digits.startsWith('91') && digits.length > 10 ? digits.slice(2) : digits;
 
@@ -126,7 +125,6 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     onChange(clean);
   };
 
-  // Format as 5 + 5 digits: "98765 43210"
   const formatted =
     localDigits.length > 5
       ? `${localDigits.slice(0, 5)} ${localDigits.slice(5)}`
@@ -134,13 +132,13 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   return (
     <div className="w-full">
-      <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+      <label className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
         {label}
-        {required && <span className="text-rose-400 ml-1">*</span>}
+        {required && <span className="text-madder ml-1">*</span>}
       </label>
-      <div className="flex rounded-lg overflow-hidden border border-zinc-800 focus-within:ring-2 focus-within:ring-teal-500">
-        <span className="bg-zinc-800 px-3 flex items-center text-xs font-semibold text-zinc-400 select-none border-r border-zinc-700">
-          🇮🇳 +91
+      <div className="flex rounded-[3px] overflow-hidden border border-rule-strong focus-within:ring-2 focus-within:ring-action/25 focus-within:border-action">
+        <span className="bg-paper px-3 flex items-center text-[13.5px] font-medium text-ink-2 select-none border-r border-rule">
+          +91
         </span>
         <input
           type="tel"
@@ -148,16 +146,15 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           maxLength={11}
           value={formatted}
           onChange={handleChange}
-          className="flex-1 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 font-mono placeholder-zinc-500 focus:outline-none min-h-[40px]"
+          className="flex-1 bg-sheet px-3.5 py-2 text-[15px] text-ink font-mono placeholder-ink-3 focus:outline-none min-h-[40px]"
           placeholder="98765 43210"
         />
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">{error}</p>
+        <p role="alert" className="text-[13px] text-madder mt-1 font-medium">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+        <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
       ) : null}
     </div>
   );
 };
-

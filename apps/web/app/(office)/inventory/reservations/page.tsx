@@ -45,26 +45,26 @@ export default function InventoryReservationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-          <Link href="/inventory/stock" className="hover:text-white">Inventory</Link>
+        <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+          <Link href="/inventory/stock" className="hover:text-ink">Inventory</Link>
           <span>/</span>
-          <span className="text-amber-400">Stock Reservations</span>
+          <span className="text-haldi">Stock Reservations</span>
         </div>
-        <h1 className="text-2xl font-bold text-white">Stock Reservations</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Stock Reservations</h1>
+        <p className="text-sm text-ink-3">
           View which Sales Orders hold which batches and release reservations with an audit reason.
         </p>
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
             <tr>
               <th className="p-3">Sales Order</th>
               <th className="p-3">Item &amp; Batch</th>
@@ -74,19 +74,19 @@ export default function InventoryReservationsPage() {
               <th className="p-3 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {reservations.map((r) => (
-              <tr key={r.id} className="hover:bg-zinc-800/40">
+              <tr key={r.id} className="hover:bg-sunken">
                 <td className="p-3">
-                  <div className="font-mono text-xs text-indigo-400 font-semibold">{r.orderNo}</div>
-                  <div className="text-xs text-zinc-400">{r.customerName}</div>
+                  <div className="font-mono text-xs text-action font-semibold">{r.orderNo}</div>
+                  <div className="text-xs text-ink-3">{r.customerName}</div>
                 </td>
                 <td className="p-3">
-                  <div className="text-white font-medium">{r.itemName}</div>
-                  <div className="text-[11px] font-mono text-zinc-500">Batch {r.batchNo}</div>
+                  <div className="text-ink font-medium">{r.itemName}</div>
+                  <div className="text-[11px] font-mono text-ink-3">Batch {r.batchNo}</div>
                 </td>
-                <td className="p-3 text-xs text-zinc-300">{r.siteName}</td>
-                <td className="p-3 text-right font-mono font-bold text-amber-400">
+                <td className="p-3 text-xs text-ink-2">{r.siteName}</td>
+                <td className="p-3 text-right font-mono font-bold text-haldi">
                   {r.qty} {r.uom}
                 </td>
                 <td className="p-3">
@@ -96,7 +96,7 @@ export default function InventoryReservationsPage() {
                   {r.status === 'ACTIVE' && (
                     <button
                       onClick={() => setReleaseTarget(r)}
-                      className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                      className="text-xs text-madder hover:text-madder font-medium"
                     >
                       Release
                     </button>
@@ -119,7 +119,7 @@ export default function InventoryReservationsPage() {
             value={releaseReason}
             onChange={(e) => setReleaseReason(e.target.value)}
             placeholder="Reason required to release reserved stock..."
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setReleaseTarget(null)}>Cancel</Button>

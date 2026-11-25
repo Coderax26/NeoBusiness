@@ -43,8 +43,8 @@ export default function NotificationsLogPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Notifications Outbox Log</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Notifications Outbox Log</h1>
+          <p className="text-sm text-ink-3">
             Delivery audit for WhatsApp, SMS, Push, and In-app alerts with one-click retry on failed dispatches.
           </p>
         </div>
@@ -54,8 +54,8 @@ export default function NotificationsLogPage() {
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                statusFilter === st ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+                statusFilter === st ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
               }`}
             >
               {st}
@@ -64,9 +64,9 @@ export default function NotificationsLogPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Channel</th>
               <th className="px-4 py-3">Recipient &amp; Template</th>
@@ -75,30 +75,30 @@ export default function NotificationsLogPage() {
               <th className="px-4 py-3 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-400">
+                <td colSpan={5} className="px-4 py-6 text-center text-sm text-ink-3">
                   No notification logs found.
                 </td>
               </tr>
             )}
             {filtered.map((n) => (
               <tr key={n.id}>
-                <td className="px-4 py-3 font-mono text-xs font-bold text-zinc-300">{n.channel}</td>
+                <td className="px-4 py-3 font-mono text-xs font-bold text-ink-2">{n.channel}</td>
                 <td className="px-4 py-3">
-                  <div className="font-semibold text-zinc-100">{n.recipient}</div>
-                  <div className="text-xs text-zinc-400">{n.template}</div>
-                  {n.errorDetail && <div className="text-xs text-rose-400">{n.errorDetail}</div>}
+                  <div className="font-semibold text-ink">{n.recipient}</div>
+                  <div className="text-xs text-ink-3">{n.template}</div>
+                  {n.errorDetail && <div className="text-xs text-madder">{n.errorDetail}</div>}
                 </td>
-                <td className="px-4 py-3 text-xs text-zinc-400">{n.timestamp}</td>
+                <td className="px-4 py-3 text-xs text-ink-3">{n.timestamp}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
                       n.status === 'SENT'
-                        ? 'bg-emerald-500/20 text-emerald-300'
+                        ? 'bg-leaf-soft text-leaf'
                         : n.status === 'FAILED'
-                          ? 'bg-rose-500/20 text-rose-300'
+                          ? 'bg-madder-soft text-madder'
                           : 'bg-blue-500/20 text-blue-300'
                     }`}
                   >

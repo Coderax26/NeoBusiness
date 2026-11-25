@@ -1,13 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Avatar, TextField, Select } from '@neo/ui';
+import { Card, Button, Avatar, useTheme } from '@neo/ui';
 import type { SessionUser } from '@neo/shared';
+import { useLocale } from '../../../src/lib/locale';
 
 export default function ProfilePage() {
+  const { theme, setTheme, density, setDensity } = useTheme();
+  const { locale, setLocale } = useLocale();
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [language, setLanguage] = useState<'en' | 'mr'>('en');
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
+  const [language, setLanguage] = useState<'en' | 'mr'>(locale);
+  const [selectedDensity, setSelectedDensity] = useState<'comfortable' | 'compact'>(density);
+  const [selectedTheme, setSelectedTheme] = useState<'paper' | 'night'>(
+    theme === 'night' || theme === 'dark' ? 'night' : 'paper',
+  );
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   // Change PIN / Password
   const [currentPin, setCurrentPin] = useState('');
@@ -17,19 +24,32 @@ export default function ProfilePage() {
   const [savingPin, setSavingPin] = useState(false);
 
   useEffect(() => {
+    setLanguage(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    setSelectedDensity(density);
+  }, [density]);
+
+  useEffect(() => {
+    setSelectedTheme(theme === 'night' || theme === 'dark' ? 'night' : 'paper');
+  }, [theme]);
+
+  useEffect(() => {
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
         if (data?.user) setUser(data.user);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleSavePreferences = () => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.dataset.density = density;
-    }
-    alert('User preferences saved successfully!');
+    setLocale(language);
+    setDensity(selectedDensity);
+    setTheme(selectedTheme);
+    setSavedMsg('Preferences saved.');
+    setTimeout(() => setSavedMsg(null), 2500);
   };
 
   const handleUpdatePin = (e: React.FormEvent) => {
@@ -57,24 +77,28 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">My Account & Preferences</h1>
-        <p className="text-xs text-zinc-400 mt-1">Manage your identity, security PIN, and interface density</p>
+      <div className="pb-4 border-b border-rule">
+        <h1 className="font-serif text-[28px] font-medium tracking-tight text-ink">
+          My Account & Preferences
+        </h1>
+        <p className="text-[13.5px] text-ink-3 mt-1">
+          Manage your identity, security PIN, theme, language, and interface density
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* User Card */}
-        <Card variant="glass" className="md:col-span-1 flex flex-col items-center text-center p-6">
+        <Card className="md:col-span-1 flex flex-col items-center text-center p-6">
           <Avatar name={user?.name || 'User'} size="lg" className="w-20 h-20 text-2xl mb-4" />
-          <h3 className="text-base font-bold text-white">{user?.name || 'Authorized Staff'}</h3>
-          <span className="text-xs text-teal-400 font-semibold mt-0.5">{user?.role || 'Staff Role'}</span>
-          <p className="text-xs text-zinc-400 mt-2 font-mono">{user?.phone || (user as any)?.email || '—'}</p>
+          <h3 className="text-[16px] font-semibold text-ink">{user?.name || 'Authorized Staff'}</h3>
+          <span className="text-[13px] text-action font-medium mt-0.5">{user?.role || 'Staff Role'}</span>
+          <p className="text-[13px] text-ink-3 mt-2 font-mono">{user?.phone || (user as any)?.email || '—'}</p>
 
-          <div className="w-full mt-6 pt-4 border-t border-zinc-800 text-left space-y-2 text-xs">
-            <div className="text-zinc-400 font-medium">Assigned Sites:</div>
-            <div className="space-y-1">
+          <div className="w-full mt-6 pt-4 border-t border-rule text-left space-y-2 text-[13px]">
+            <div className="text-ink-3 font-medium">Assigned Sites:</div>
+            <div className="space-y-1.5">
               {(user?.sites || []).map((s) => (
-                <div key={s.id} className="p-2 rounded bg-zinc-950 border border-zinc-800 text-zinc-200">
+                <div key={s.id} className="p-2 rounded-[3px] bg-paper border border-rule text-ink">
                   {s.name} ({s.siteType})
                 </div>
               ))}
@@ -85,30 +109,42 @@ export default function ProfilePage() {
         {/* Preferences & Security Forms */}
         <div className="md:col-span-2 space-y-6">
           {/* Display & Language */}
-          <Card variant="glass" className="p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white border-b border-zinc-800 pb-2">
+          <Card className="p-6 space-y-4">
+            <h3 className="text-[15px] font-semibold text-ink pb-2 bahi-section-rule">
               Interface & Regional Preferences
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Language</label>
+                <label className="block text-[13px] font-medium text-ink-2 mb-1.5">Language</label>
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white"
+                  onChange={(e) => setLanguage(e.target.value as 'en' | 'mr')}
+                  className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[13.5px] text-ink"
                 >
                   <option value="en">English (Default)</option>
-                  <option value="mr">मराठी (Marathi Preview)</option>
+                  <option value="mr">मराठी (Marathi)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Layout Density</label>
+                <label className="block text-[13px] font-medium text-ink-2 mb-1.5">Theme</label>
                 <select
-                  value={density}
-                  onChange={(e) => setDensity(e.target.value as any)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white"
+                  value={selectedTheme}
+                  onChange={(e) => setSelectedTheme(e.target.value as 'paper' | 'night')}
+                  className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[13.5px] text-ink"
+                >
+                  <option value="paper">Paper (Light Ledger)</option>
+                  <option value="night">Night (Dark)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-medium text-ink-2 mb-1.5">Layout Density</label>
+                <select
+                  value={selectedDensity}
+                  onChange={(e) => setSelectedDensity(e.target.value as 'comfortable' | 'compact')}
+                  className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[13.5px] text-ink"
                 >
                   <option value="comfortable">Comfortable (Generous spacing)</option>
                   <option value="compact">Compact (High data density)</option>
@@ -116,60 +152,72 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" variant="secondary" onClick={handleSavePreferences}>
+            <div className="pt-2 flex items-center justify-between">
+              <span className="text-[13px] text-leaf">{savedMsg}</span>
+              <Button size="sm" variant="primary" onClick={handleSavePreferences}>
                 Save Preferences
               </Button>
             </div>
           </Card>
 
-          {/* Change PIN */}
-          <Card variant="glass" className="p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white border-b border-zinc-800 pb-2">
+          {/* Security PIN & Password */}
+          <Card className="p-6 space-y-4">
+            <h3 className="text-[15px] font-semibold text-ink pb-2 bahi-section-rule">
               Security PIN & Password
             </h3>
 
             {pinMessage && (
               <div
-                className={`p-3 rounded-lg text-xs ${
-                  pinMessage.tone === 'success'
-                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-                }`}
+                className={`p-3 rounded-[3px] text-[13px] border ${pinMessage.tone === 'success'
+                  ? 'bg-leaf-soft border-leaf/30 text-leaf'
+                  : 'bg-madder-soft border-madder/30 text-madder'
+                  }`}
               >
                 {pinMessage.text}
               </div>
             )}
 
             <form onSubmit={handleUpdatePin} className="space-y-3">
-              <TextField
-                label="Current PIN / Password"
-                type="password"
-                required
-                value={currentPin}
-                onChange={(e) => setCurrentPin(e.target.value)}
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField
-                  label="New 4-6 Digit Security PIN"
+              <div>
+                <label className="block text-[13px] font-medium text-ink-2 mb-1.5">Current PIN / Password</label>
+                <input
                   type="password"
-                  inputMode="numeric"
                   required
-                  value={newPin}
-                  onChange={(e) => setNewPin(e.target.value)}
-                />
-                <TextField
-                  label="Confirm New Security PIN"
-                  type="password"
-                  inputMode="numeric"
-                  required
-                  value={confirmPin}
-                  onChange={(e) => setConfirmPin(e.target.value)}
+                  value={currentPin}
+                  onChange={(e) => setCurrentPin(e.target.value)}
+                  className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[14px] text-ink font-mono"
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[13px] font-medium text-ink-2 mb-1.5">New 4–6 Digit PIN</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value)}
+                    className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[14px] text-ink font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-ink-2 mb-1.5">Confirm New PIN</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value)}
+                    className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-[14px] text-ink font-mono"
+                  />
+                </div>
+              </div>
+
               <div className="pt-2 flex justify-end">
-                <Button type="submit" size="sm" variant="primary" loading={savingPin}>
+                <Button size="sm" variant="primary" type="submit" loading={savingPin}>
                   Update Security PIN
                 </Button>
               </div>

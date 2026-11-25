@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { Button, Badge, StatusPill, Card, Dialog } from '@neo/ui';
+import { Printer, Copy } from 'lucide-react';
+import { Button, Badge, StatusPill, Dialog } from '@neo/ui';
 import {
   ORDER_LIFECYCLE_STEPS,
   CANCEL_REASONS,
@@ -202,7 +203,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setCancelOpen(false);
   };
 
-  // Determine active step index on the 9-step lifecycle stepper
   const statusToStepIndex: Record<string, number> = {
     DRAFT: 0,
     PENDING_APPROVAL: 0,
@@ -215,17 +215,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     INVOICED: 7,
     PAID: 8,
   };
+
   if (loading) {
-    return <div className="max-w-6xl mx-auto p-6 text-sm text-zinc-400">Loading order...</div>;
+    return <div className="max-w-6xl mx-auto p-6 text-[14px] text-ink-3">Loading order...</div>;
   }
 
   if (!order) {
     return (
       <div className="max-w-6xl mx-auto p-6 space-y-3">
-        <Link href="/sales/orders" className="text-xs text-zinc-400 hover:text-white inline-block">
+        <Link href="/sales/orders" className="text-[13.5px] text-action hover:underline inline-block">
           ← Back to Orders
         </Link>
-        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400">
+        <div className="p-6 rounded-[4px] bg-sheet border border-rule text-[14px] text-ink-3">
           Order not found.
         </div>
       </div>
@@ -235,42 +236,44 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const currentStepIdx = statusToStepIndex[order.status] ?? 0;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-5 max-w-[1220px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-white font-mono">{order.orderNumber}</h1>
-            <StatusPill
-              tone={
-                order.status === 'DELIVERED' || order.status === 'CONFIRMED' || order.status === 'READY'
-                  ? 'success'
-                  : order.status === 'PENDING_APPROVAL' || order.status === 'COUNTER_OFFERED'
-                  ? 'warning'
-                  : order.status === 'CANCELLED'
-                  ? 'danger'
-                  : 'neutral'
-              }
-              label={order.status.replace('_', ' ')}
-            />
-          </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Customer:{' '}
-            <Link href={`/sales/customers/${order.customerId}`} className="text-teal-400 font-bold hover:underline">
-              {order.customerName}
+          <div className="text-[13px] text-ink-3 mb-1">
+            <Link href="/sales/orders" className="text-action hover:underline">
+              Orders
             </Link>{' '}
-            · Site: {order.siteName} · Delivery: {order.deliveryDate} (Slot {order.deliveryWindow})
-          </p>
+            /{' '}
+            <Link href={`/sales/customers/${order.customerId}`} className="hover:underline text-ink-2">
+              {order.customerName}
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-4">
+            <h1 className="font-serif text-[32px] font-medium text-ink leading-none">
+              {order.orderNumber}
+            </h1>
+            <StatusPill
+              entity="ORDER"
+              status={order.status}
+            />
+            <span className="text-[13.5px] text-ink-3">
+              {formatINR(order.grandTotal)} · deliver {order.deliveryDate} ({order.deliveryWindow})
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="text-right mr-2">
-            <span className="text-[11px] text-zinc-400 block">Order Total</span>
-            <span className="text-lg font-mono font-black text-teal-400">{formatINR(order.grandTotal)}</span>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
-            🖨️ Print
+            <Printer className="w-4 h-4" />
+            Print
           </Button>
+          <Link href="/sales/orders/new">
+            <Button variant="secondary" size="sm">
+              <Copy className="w-4 h-4" />
+              Repeat order
+            </Button>
+          </Link>
           {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
             <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
               Cancel Order
@@ -281,36 +284,36 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Live Approval / Counter-offer Banner (§4.2, AC-3) */}
       {order.status === 'PENDING_APPROVAL' && (
-        <div className="p-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-[3px] border-l-4 border-haldi bg-haldi-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print">
           <div>
-            <h2 className="text-sm font-bold text-amber-200">⏳ Waiting for Owner Approval</h2>
-            <p className="text-xs text-amber-300/80 mt-0.5">
-              {order.approvalReason || 'Order requires Owner exception approval.'} (Live polling every 30s)
+            <h2 className="text-[14.5px] font-semibold text-haldi">Waiting for Owner Approval</h2>
+            <p className="text-[13px] text-ink-2 mt-0.5">
+              {order.approvalReason || 'Order requires Owner exception approval.'} (Checks every 30s)
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={handleSimulateCounterOffer}>
-              Simulate Counter Offer (₹89.50)
+              Counter Offer (₹89.50)
             </Button>
             <Button variant="primary" size="sm" onClick={handleOwnerApprove}>
-              ✓ Owner Approve
+              Owner Approve
             </Button>
           </div>
         </div>
       )}
 
       {order.status === 'COUNTER_OFFERED' && (
-        <div className="p-4 rounded-2xl border border-indigo-500/40 bg-indigo-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-[3px] border-l-4 border-action bg-action-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print">
           <div>
-            <h2 className="text-sm font-bold text-indigo-200">
-              💬 Owner suggests ₹{order.counterOfferPrice?.toFixed(2) || '89.50'}
+            <h2 className="text-[14.5px] font-semibold text-action">
+              Owner suggests ₹{order.counterOfferPrice?.toFixed(2) || '89.50'}
             </h2>
-            <p className="text-xs text-indigo-300/80 mt-0.5">
+            <p className="text-[13px] text-ink-2 mt-0.5">
               {order.counterOfferNote || 'Accept the Owner counter offer to confirm this order immediately.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
+            <Button variant="ghost" size="sm" onClick={() => setCancelOpen(true)}>
               Cancel
             </Button>
             <Button variant="primary" size="sm" onClick={handleAcceptCounter}>
@@ -320,38 +323,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* 9-Step Lifecycle Stepper (§6) */}
-      <Card className="p-4 overflow-x-auto">
-        <div className="flex items-center justify-between min-w-[700px] gap-2">
-          {ORDER_LIFECYCLE_STEPS.map((step, idx) => {
-            const done = idx <= currentStepIdx && order.status !== 'CANCELLED';
-            const isCurrent = idx === currentStepIdx && order.status !== 'CANCELLED';
-            return (
-              <div key={step} className="flex-1 flex flex-col items-center text-center relative">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${
-                    done
-                      ? isCurrent
-                        ? 'bg-teal-500 text-white border-teal-400 ring-2 ring-teal-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                      : 'bg-zinc-900 text-zinc-500 border-zinc-800'
-                  }`}
-                >
-                  {done && !isCurrent ? '✓' : idx + 1}
-                </div>
-                <span className={`text-[11px] mt-1.5 font-semibold ${done ? 'text-white' : 'text-zinc-500'}`}>
-                  {step}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Tabs (§6) */}
-      <div className="flex border-b border-zinc-800 text-xs font-semibold gap-6 overflow-x-auto">
+      {/* Document Tabs */}
+      <div className="flex border-b border-rule text-[14px] gap-7 overflow-x-auto no-print">
         {[
-          { key: 'lines', label: `Lines (${order.lines.length})` },
+          { key: 'lines', label: `Order (${order.lines.length})` },
           { key: 'timeline', label: `Timeline (${order.timeline.length})` },
           { key: 'docs', label: 'Linked Documents' },
           { key: 'approvals', label: 'Approvals' },
@@ -360,8 +335,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
-            className={`pb-2.5 border-b-2 transition-colors ${
-              activeTab === t.key ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+            className={`pb-2.5 border-b-2 -mb-px transition-colors whitespace-nowrap ${
+              activeTab === t.key ? 'border-ink text-ink font-semibold' : 'border-transparent text-ink-2 hover:text-ink'
             }`}
           >
             {t.label}
@@ -369,107 +344,218 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'lines' && (
-        <Card className="p-0 overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
-              <tr>
-                <th className="p-3">Item</th>
-                <th className="p-3">Qty</th>
-                <th className="p-3">Unit Price</th>
-                <th className="p-3">Price Band</th>
-                <th className="p-3">Stock Reservation</th>
-                <th className="p-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/70">
-              {order.lines.map((l) => {
-                const band = evaluatePriceBand(l.unitPrice, l.floorPrice, l.targetPrice, l.floorPrice * 0.85);
-                return (
-                  <tr key={l.id}>
-                    <td className="p-3">
-                      <div className="font-bold text-white">{l.itemName}</div>
-                      <div className="text-[11px] font-mono text-zinc-400">{l.sku}</div>
-                    </td>
-                    <td className="p-3 font-mono">{l.qty} {l.uom}</td>
-                    <td className="p-3 font-mono font-bold text-white">₹{l.unitPrice}</td>
-                    <td className="p-3">
-                      <Badge tone={band.status === 'BELOW_FLOOR' ? 'warning' : 'success'}>{band.chipLabel}</Badge>
-                    </td>
-                    <td className="p-3 text-zinc-300">
-                      {l.reservedQty > 0 ? `${l.reservedQty} ${l.uom} reserved` : 'Pending confirmation'}
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-white">
-                      {formatINR(l.qty * l.unitPrice)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      {/* Main Two-Column Document View */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-0 border border-rule rounded-[4px] overflow-hidden">
+        {/* Left: Paper Well + Printable Sheet */}
+        <div className="bg-paper p-4 sm:p-7 border-b lg:border-b-0 lg:border-r border-rule">
+          {activeTab === 'lines' && (
+            <div className="bahi-print-sheet bahi-sheet-shadow bg-[#FFFEFA] text-[#1E1C19] p-6 sm:p-9 relative">
+              {/* Rubber Stamp */}
+              <div className="bahi-stamp hidden sm:block absolute top-24 right-10 px-3 py-1 text-[13px] font-semibold">
+                {order.status.replace(/_/g, ' ')}
+                <span className="block font-mono text-[10px] font-medium tracking-normal text-center">
+                  {order.deliveryDate}
+                </span>
+              </div>
 
-      {activeTab === 'timeline' && (
-        <Card className="p-5 space-y-3">
-          {order.timeline.map((ev, i) => (
-            <div key={i} className="flex items-start gap-3 text-xs border-l-2 border-teal-500/40 pl-3 py-1">
-              <div className="flex-1">
-                <span className="font-bold text-white">{ev.step}</span>
-                {ev.note && <span className="text-zinc-400 ml-2">— {ev.note}</span>}
-                <div className="text-[11px] text-zinc-500 mt-0.5">
-                  {ev.timestamp} · by {ev.user}
+              {/* Double-Ruled Letterhead */}
+              <div className="flex flex-wrap justify-between gap-4 pb-4 border-b-[3px] border-double border-[#1E1C19]">
+                <div>
+                  <div className="font-serif text-[20px] font-semibold text-[#1E1C19]">
+                    {order.siteName || 'Baramati Agro Foods Pvt. Ltd.'}
+                  </div>
+                  <div className="text-[12px] text-[#55504A] mt-1 leading-relaxed">
+                    NeoBus Office &amp; Dispatch Document
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-serif text-[18px] font-medium text-[#1E1C19]">Sales order</div>
+                  <div className="font-mono text-[13px] text-[#1E1C19]">{order.orderNumber}</div>
+                  <div className="text-[12px] text-[#55504A]">{order.createdAt.split('T')[0]}</div>
+                </div>
+              </div>
+
+              {/* Parties */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 py-4 text-[13px] text-[#55504A]">
+                <div>
+                  <div className="text-[12px] text-[#77716A] mb-0.5">Bill to</div>
+                  <div className="font-semibold text-[14px] text-[#1E1C19]">{order.customerName}</div>
+                  <div>Site: {order.siteName}</div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-[#77716A] mb-0.5">Deliver</div>
+                  <div className="font-semibold text-[14px] text-[#1E1C19]">
+                    {order.deliveryDate} · Slot {order.deliveryWindow}
+                  </div>
+                  <div>Entered by {order.createdBy}</div>
+                </div>
+              </div>
+
+              {/* Lines Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-[13px] tabular-nums">
+                  <thead>
+                    <tr className="border-y border-[#1E1C19] text-[#77716A]">
+                      <th className="py-2 px-1.5 text-left font-medium w-8">#</th>
+                      <th className="py-2 px-1.5 text-left font-medium">Item</th>
+                      <th className="py-2 px-1.5 text-left font-medium">Band</th>
+                      <th className="py-2 px-1.5 text-right font-medium">Qty</th>
+                      <th className="py-2 px-1.5 text-right font-medium">Rate</th>
+                      <th className="py-2 px-1.5 text-right font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.lines.map((l, idx) => {
+                      const band = evaluatePriceBand(l.unitPrice, l.floorPrice, l.targetPrice, l.floorPrice * 0.85);
+                      return (
+                        <tr key={l.id} className="border-b border-[#E2DACA]">
+                          <td className="py-2.5 px-1.5 text-[#77716A]">{idx + 1}</td>
+                          <td className="py-2.5 px-1.5">
+                            <div className="font-medium text-[#1E1C19]">{l.itemName}</div>
+                            <div className="text-[12px] text-[#77716A]">
+                              {l.sku ? `${l.sku} · ` : ''}
+                              {l.reservedQty > 0 ? `${l.reservedQty} ${l.uom} reserved` : 'Pending reservation'}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-1.5">
+                            <Badge tone={band.status === 'BELOW_FLOOR' ? 'warning' : 'success'}>
+                              {band.chipLabel}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-1.5 text-right font-mono">{l.qty} {l.uom}</td>
+                          <td className="py-2.5 px-1.5 text-right font-mono">{l.unitPrice.toFixed(2)}</td>
+                          <td className="py-2.5 px-1.5 text-right font-mono font-medium">
+                            {formatINR(l.qty * l.unitPrice, { showSymbol: false })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Double-Underlined Totals */}
+              <div className="w-72 ml-auto mt-4 text-[13px] tabular-nums">
+                <div className="flex justify-between py-1 px-1.5">
+                  <span className="text-[#55504A]">Subtotal</span>
+                  <span className="font-mono">{formatINR(order.subtotal, { showSymbol: false })}</span>
+                </div>
+                <div className="flex justify-between py-1 px-1.5">
+                  <span className="text-[#55504A]">GST</span>
+                  <span className="font-mono">{formatINR(order.gstTotal, { showSymbol: false })}</span>
+                </div>
+                <div className="flex justify-between py-2 px-1.5 mt-1 border-t border-[#1E1C19] border-b-[3px] border-double font-serif text-[17px] font-semibold text-[#1E1C19]">
+                  <span>Total</span>
+                  <span>{formatINR(order.grandTotal)}</span>
                 </div>
               </div>
             </div>
-          ))}
-        </Card>
-      )}
-
-      {activeTab === 'docs' && (
-        <Card className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
-            <span className="text-zinc-500 block">Dispatch Trip / Challan</span>
-            <span className="font-mono font-bold text-teal-400">{order.linkedTripNo || 'Not assigned yet'}</span>
-          </div>
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
-            <span className="text-zinc-500 block">Tax Invoice</span>
-            <span className="font-mono font-bold text-white">{order.linkedInvoiceNo || 'Pending delivery'}</span>
-          </div>
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
-            <span className="text-zinc-500 block">Linked Quote</span>
-            <span className="font-mono font-bold text-zinc-300">{order.linkedQuoteId || 'Direct order'}</span>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'approvals' && (
-        <Card className="p-5 text-xs text-zinc-300">
-          {order.approvalReason ? (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-              <strong>Exception Reason:</strong> {order.approvalReason}
-            </div>
-          ) : (
-            <span className="text-zinc-500">No approval exceptions on this order.</span>
           )}
-        </Card>
-      )}
 
-      {activeTab === 'audit' && (
-        <Card className="p-5 text-xs text-zinc-400 space-y-1">
-          <div>Created by: <strong className="text-white">{order.createdBy}</strong> at {order.createdAt}</div>
-          <div>Current status: <strong className="text-white">{order.status}</strong></div>
-        </Card>
-      )}
+          {activeTab === 'timeline' && (
+            <div className="bg-sheet border border-rule rounded-[4px] p-5 space-y-3">
+              {order.timeline.map((ev, i) => (
+                <div key={i} className="flex items-start gap-3 text-[13.5px] border-l-2 border-action/40 pl-3 py-1">
+                  <div className="flex-1">
+                    <span className="font-semibold text-ink">{ev.step}</span>
+                    {ev.note && <span className="text-ink-2 ml-2">— {ev.note}</span>}
+                    <div className="text-[12.5px] text-ink-3 mt-0.5">
+                      {ev.timestamp} · by {ev.user}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'docs' && (
+            <div className="bg-sheet border border-rule rounded-[4px] p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px]">
+              <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                <span className="text-ink-3 block text-[12.5px]">Dispatch Trip / Challan</span>
+                <span className="font-mono font-semibold text-action">{order.linkedTripNo || 'Not assigned yet'}</span>
+              </div>
+              <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                <span className="text-ink-3 block text-[12.5px]">Tax Invoice</span>
+                <span className="font-mono font-semibold text-ink">{order.linkedInvoiceNo || 'Pending delivery'}</span>
+              </div>
+              <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                <span className="text-ink-3 block text-[12.5px]">Linked Quote</span>
+                <span className="font-mono font-semibold text-ink-2">{order.linkedQuoteId || 'Direct order'}</span>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'approvals' && (
+            <div className="bg-sheet border border-rule rounded-[4px] p-5 text-[14px] text-ink-2">
+              {order.approvalReason ? (
+                <div className="p-3.5 bg-haldi-soft border-l-4 border-haldi rounded-[3px]">
+                  <strong className="text-haldi">Exception Reason:</strong> {order.approvalReason}
+                </div>
+              ) : (
+                <span className="text-ink-3">No approval exceptions on this order.</span>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'audit' && (
+            <div className="bg-sheet border border-rule rounded-[4px] p-5 text-[13.5px] text-ink-2 space-y-1.5">
+              <div>Created by: <strong className="text-ink">{order.createdBy}</strong> at {order.createdAt}</div>
+              <div>Current status: <strong className="text-ink">{order.status}</strong></div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Progress & Facts Panel */}
+        <aside className="bg-sheet p-6 space-y-6 no-print">
+          <div>
+            <h3 className="text-[14px] font-semibold text-ink pb-2 bahi-section-rule mb-3">
+              Progress
+            </h3>
+            <ul className="space-y-3 relative">
+              {ORDER_LIFECYCLE_STEPS.map((step, idx) => {
+                const done = idx <= currentStepIdx && order.status !== 'CANCELLED';
+                const isCurrent = idx === currentStepIdx && order.status !== 'CANCELLED';
+                return (
+                  <li key={step} className="flex items-start gap-3 text-[13.5px]">
+                    <span
+                      className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${
+                        isCurrent
+                          ? 'bg-sheet border-2 border-action'
+                          : done
+                          ? 'bg-leaf'
+                          : 'bg-sheet border border-rule-strong'
+                      }`}
+                    />
+                    <span className={isCurrent ? 'font-semibold text-action' : done ? 'text-ink' : 'text-ink-3'}>
+                      {step}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="pt-2">
+            <h3 className="text-[14px] font-semibold text-ink pb-2 bahi-section-rule mb-2.5">
+              Margin
+            </h3>
+            <div className="font-serif text-[28px] font-medium text-ink">
+              {(order.marginPct ?? 15).toFixed(1)}%{' '}
+              <span className="font-sans text-[13px] text-leaf font-normal">
+                {(order.marginPct ?? 15) >= 15 ? 'above 15% target' : 'below 15% target'}
+              </span>
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {/* Cancel Modal */}
       <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel Sales Order" maxWidth="sm">
-        <div className="space-y-4 my-2 text-xs">
+        <div className="space-y-4 my-2 text-[13.5px]">
           <select
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+            className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-2 text-ink"
           >
             {CANCEL_REASONS.map((r) => (
               <option key={r} value={r}>{r}</option>

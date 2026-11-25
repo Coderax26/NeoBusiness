@@ -2,14 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import {
-  KpiCard,
-  Button,
-  AgingBuckets,
-  StatCompare,
-  ExceptionCard,
-  Badge,
-} from '@neo/ui';
+import { Button, AgingBuckets, StatCompare } from '@neo/ui';
 import { formatINR, type SessionUser } from '@neo/shared';
 
 interface HomeSummary {
@@ -40,6 +33,13 @@ interface HomeSummary {
   }>;
 }
 
+function getGreetingPrefix() {
+  const hr = new Date().getHours();
+  if (hr < 12) return 'Good morning';
+  if (hr < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function RoleHomePage() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
@@ -48,9 +48,19 @@ export default function RoleHomePage() {
     totalOrders: number;
   } | null>(null);
   const [pendingExceptions, setPendingExceptions] = useState<
-    Array<{ id?: string; exception_type?: string }>
+    Array<{
+      id?: string;
+      exception_type?: string;
+      reason?: string;
+      entity_type?: string;
+      entity_id?: string;
+      title?: string;
+      waiting_minutes?: number;
+      value_at_risk?: number;
+    }>
   >([]);
   const [exceptionsLoaded, setExceptionsLoaded] = useState(false);
+  const [greeting, setGreeting] = useState('Good evening');
   const [todoList, setTodoList] = useState([
     { id: 'todo-1', label: 'Verify today’s base & floor prices', count: 'Check prices', href: '/sales/prices', done: false },
     { id: 'todo-2', label: 'Confirm draft sales orders', count: '0 pending', href: '/sales/orders', done: false },
@@ -63,6 +73,7 @@ export default function RoleHomePage() {
   ]);
 
   useEffect(() => {
+    setGreeting(getGreetingPrefix());
     let active = true;
 
     const loadDashboard = async (userData: any, overrideSiteId?: string) => {
@@ -125,7 +136,7 @@ export default function RoleHomePage() {
           }
         }
       } catch {
-        // ignore network error; empty-state defaults stay visible
+        // keep defaults
       }
 
       if (userData?.role === 'OWNER') {
@@ -139,7 +150,7 @@ export default function RoleHomePage() {
             }
           }
         } catch {
-          // ignore network error
+          // ignore
         }
       }
     };
@@ -170,16 +181,6 @@ export default function RoleHomePage() {
   const pendingCount = exceptionsLoaded
     ? pendingExceptions.length
     : (orderSummary?.counts?.PENDING_APPROVAL ?? 0);
-  const priceOverrideCount = pendingExceptions.filter(
-    (e) => e.exception_type === 'PRICE_OVERRIDE',
-  ).length;
-  const creditBreachCount = pendingExceptions.filter(
-    (e) => e.exception_type === 'CREDIT_BREACH',
-  ).length;
-  const otherExceptionCount = Math.max(
-    0,
-    pendingCount - priceOverrideCount - creditBreachCount,
-  );
 
   const toggleTodo = (id: string) => {
     setTodoList((prev) =>
@@ -187,24 +188,61 @@ export default function RoleHomePage() {
     );
   };
 
+  const resolveTopException = async (excId: string, decision: 'APPROVE' | 'REJECT') => {
+    await fetch(`/api/proxy/exceptions/${encodeURIComponent(excId)}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision, action: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED' }),
+    });
+    setPendingExceptions((prev) => prev.filter((e) => e.id !== excId));
+    setHomeSummary((prev) => (prev && prev.topException?.id === excId ? { ...prev, topException: null } : prev));
+  };
+
   const isOwner = !user || user.role === 'OWNER';
+  const firstName = (user?.name || (isOwner ? 'Owner' : 'Coordinator')).split(' ')[0];
+
+  const orderCounts = orderSummary?.counts ?? {};
+  const flowSteps = [
+    { label: 'Draft', count: orderCounts.DRAFT ?? 0, tone: 'default' },
+    { label: 'Confirmed', count: orderCounts.CONFIRMED ?? 0, tone: 'default' },
+    { label: 'Being made', count: orderCounts.IN_PRODUCTION_SOURCING ?? 0, tone: 'default' },
+    { label: 'Ready · need a trip', count: homeSummary?.readyOrdersCount ?? orderCounts.READY ?? 0, tone: 'hot' },
+    { label: 'On the road', count: orderCounts.DISPATCHED ?? 0, tone: 'default' },
+    { label: 'Delivered', count: (orderCounts.DELIVERED ?? 0) + (orderCounts.DELIVERED_FULL ?? 0), tone: 'done' },
+  ];
+
+  const decisionItems =
+    pendingExceptions.length > 0
+      ? pendingExceptions.slice(0, 3)
+      : homeSummary?.topException
+      ? [homeSummary.topException]
+      : [];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* 1. Welcoming Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+    <div className="max-w-[1200px] mx-auto space-y-6">
+      {/* 1. Morning / Evening Brief Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            {isOwner ? `Good morning, ${user?.name || 'Owner'} 👋` : `Operations Desk — ${user?.name || 'Coordinator'}`}
+          <h1 className="font-serif text-[34px] sm:text-[38px] leading-[1.1] font-medium tracking-[-0.012em] text-ink">
+            {isOwner ? `${greeting}, ${firstName}.` : `Operations Desk — ${user?.name || 'Coordinator'}`}
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            {isOwner
-              ? "Here's the pulse of your business across all active sites today."
-              : 'Your daily operations checklist and prioritized handovers.'}
+          <p className="text-[16.5px] leading-relaxed text-ink-2 mt-2 max-w-2xl">
+            {isOwner ? (
+              <>
+                You&apos;ve sold <strong className="font-semibold text-ink">{formatINR(homeSummary?.todaySalesInr ?? 0)}</strong> today across{' '}
+                {homeSummary?.todayInvoiceCount ?? 0} invoices.{' '}
+                <strong className="font-semibold text-ink">
+                  {pendingCount} {pendingCount === 1 ? 'decision is' : 'decisions are'}
+                </strong>{' '}
+                waiting for you.
+              </>
+            ) : (
+              'Your daily operations checklist and prioritized handovers.'
+            )}
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0">
           <Link href="/sales/orders/new">
             <Button variant="primary" size="md">
               + New Quick Order
@@ -212,291 +250,364 @@ export default function RoleHomePage() {
           </Link>
           <Link href="/control/approvals">
             <Button variant="secondary" size="md">
-              Approvals Inbox
+              Approvals
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Setup Wizard Progress Card (Owner only, F3-01) */}
-      {isOwner && (
-        <div className="p-4 rounded-2xl border border-teal-500/30 bg-teal-950/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/40 flex items-center justify-center text-lg font-bold">
-              🚀
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white">
-                  Your business is {homeSummary?.setupProgressPct ?? 0}% set up
-                </h2>
-                <Badge tone="brand">Setup in progress</Badge>
-              </div>
-              <p className="text-xs text-zinc-300 mt-0.5">
-                Complete Item Catalog, Suppliers, and Opening Balances to finish preparation.
-              </p>
-            </div>
-          </div>
-          <Link href="/admin/setup-wizard">
-            <Button variant="primary" size="sm">
-              Continue Setup Wizard →
-            </Button>
-          </Link>
-        </div>
-      )}
+      {/* Main Two-Column Ledger Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 pt-2">
+        {/* Left Column */}
+        <div className="space-y-8 min-w-0">
+          {isOwner ? (
+            <>
+              {/* Needs Your Decision (First, always) */}
+              <section>
+                <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+                  <h2 className="text-[15px] font-semibold text-ink">
+                    Needs your decision{' '}
+                    <span className="text-ink-3 font-medium ml-1.5">{pendingCount}</span>
+                  </h2>
+                  <Link href="/control/approvals" className="text-[13.5px] font-medium text-action hover:underline">
+                    Open approvals →
+                  </Link>
+                </div>
 
-      {/* 2. Global Banners / Needs Attention First */}
-      <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">⚠️</span>
-          <div>
-            <h2 className="text-sm font-bold text-amber-200">
-              {pendingCount} {pendingCount === 1 ? 'Approval Requires' : 'Approvals Require'} Attention Today
-            </h2>
-            <p className="text-xs text-amber-300/80 mt-0.5 leading-relaxed">
-              {exceptionsLoaded
-                ? pendingCount === 0
-                  ? 'No pending approval exceptions right now.'
-                  : `${priceOverrideCount} price override(s), ${creditBreachCount} credit breach(es), and ${otherExceptionCount} other exception(s).`
-                : `${orderSummary?.counts?.PENDING_APPROVAL ?? 0} sales order(s) awaiting approval in database.`}
-            </p>
-          </div>
-        </div>
-        <Link href="/approvals">
-          <Button variant="secondary" size="sm" className="bg-amber-500/20 text-amber-200 border-amber-500/40">
-            Resolve Exceptions →
-          </Button>
-        </Link>
-      </div>
+                {decisionItems.length === 0 ? (
+                  <div className="py-5 border-b border-rule text-[14px] text-leaf">
+                    All decisions cleared — nothing waiting in the queue.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-rule border-b border-rule">
+                    {decisionItems.map((exc: any, idx: number) => {
+                      const isCredit = String(exc.exception_type || '').includes('CREDIT');
+                      return (
+                        <div key={exc.id || idx} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-3 text-[13px]">
+                              <span className={`inline-flex items-center gap-1.5 font-semibold ${isCredit ? 'text-madder' : 'text-haldi'}`}>
+                                <span
+                                  className={`w-[7px] h-[7px] bg-current ${
+                                    isCredit ? 'rounded-[1px] rotate-45' : 'rounded-full'
+                                  }`}
+                                />
+                                {(exc.exception_type || 'APPROVAL_REQUIRED').replace(/_/g, ' ')}
+                              </span>
+                              {exc.entity_id && (
+                                <span className="text-ink-3 font-mono text-[12.5px]">{exc.entity_id}</span>
+                              )}
+                            </div>
+                            <div className="text-[15px] font-medium text-ink mt-1">
+                              {exc.title || exc.reason || `${exc.entity_type ?? 'Order'} ${exc.entity_id ?? exc.id}`}
+                            </div>
+                            <div className="text-[13px] text-ink-2 mt-0.5">
+                              {exc.reason || 'Pending owner authorization.'}
+                            </div>
+                          </div>
+                          {exc.id && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Button size="sm" variant="primary" onClick={() => resolveTopException(exc.id, 'APPROVE')}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => resolveTopException(exc.id, 'REJECT')}>
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
 
-      {/* 3. Pulse KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Today's Sales (OD-020)"
-          value={formatINR(homeSummary?.todaySalesInr ?? 0)}
-          subtitle={`${homeSummary?.todayInvoiceCount ?? 0} invoices in system`}
-          trend={{ direction: 'neutral', label: 'Live DB' }}
-          tone="default"
-        />
-        <KpiCard
-          title="Gross Margin"
-          value={
-            isOwner
-              ? `${Number(homeSummary?.grossMarginPct ?? 0).toFixed(1)}%`
-              : 'Owner Only'
-          }
-          subtitle="Live materialized pulse"
-          trend={{ direction: 'neutral', label: isOwner ? 'Owner view' : 'Restricted' }}
-          tone="success"
-        />
-        <KpiCard
-          title="Cash & Cheques in Custody"
-          value={formatINR(homeSummary?.cashCollectedInr ?? 0)}
-          subtitle={`${homeSummary?.activeTripsCount ?? 0} active routes`}
-          trend={{ direction: 'neutral', label: 'EOD handover' }}
-          tone="warning"
-        />
-        <KpiCard
-          title="Actionable Exceptions"
-          value={`${pendingCount} Pending`}
-          subtitle={
-            exceptionsLoaded
-              ? `${priceOverrideCount + creditBreachCount} commercial, ${otherExceptionCount} operational`
-              : `${orderSummary?.counts?.PENDING_APPROVAL ?? 0} orders pending approval`
-          }
-          trend={{
-            direction: pendingCount > 0 ? 'down' : 'up',
-            label: pendingCount > 0 ? 'Action required' : 'All clear',
-          }}
-          tone={pendingCount > 0 ? 'danger' : 'good'}
-        />
-      </div>
+              {/* Today in Numbers (Ruled 4-column ledger strip) */}
+              <section>
+                <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+                  <h2 className="text-[15px] font-semibold text-ink">Today in numbers</h2>
+                  <span className="text-[13px] text-ink-3">Live business pulse</span>
+                </div>
 
-      {/* 4. Owner View: Operations Status Matrix & AR Waterfall OR Coordinator To-Do Checklist */}
-      {isOwner ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Operations Status Matrix */}
-          <div className="lg:col-span-2 p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                Live Operations Status Matrix
-              </h3>
-              <span className="text-[11px] text-teal-400 font-mono">Auto-refreshed 30s</span>
-            </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-rule">
+                  <div className="py-3.5 pr-4" title="Today's Sales (OD-020)">
+                    <div className="text-[13px] text-ink-2">Sales</div>
+                    <div className="font-serif text-[28px] leading-tight font-medium text-ink mt-1 tabular-nums">
+                      {formatINR(homeSummary?.todaySalesInr ?? 0)}
+                    </div>
+                    <div className="text-[12.5px] text-ink-3 mt-1">
+                      {homeSummary?.todayInvoiceCount ?? 0} invoices today
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans">
-              <StatCompare
-                label="Orders Staged for Dispatch"
-                expected={`${homeSummary?.stagedOrdersCount ?? 0} Staged`}
-                actual={`${homeSummary?.readyOrdersCount ?? 0} Ready`}
-                variance={`${homeSummary?.stagedOrdersCount ?? 0} in pipeline`}
-                isFavorable={(homeSummary?.readyOrdersCount ?? 0) > 0}
-              />
-              <StatCompare
-                label="Active Production Batches"
-                expected="Work Orders"
-                actual={`${homeSummary?.activeBatchesCount ?? 0} Active`}
-                variance="Live factory status"
-                isFavorable={true}
-              />
-              <StatCompare
-                label="Fleet Trucks on Road"
-                expected="Dispatched"
-                actual={`${homeSummary?.activeTripsCount ?? 0} Active`}
-                variance="Live trips"
-                isFavorable={true}
-              />
-              <StatCompare
-                label="Pending Cash Handovers"
-                expected="0 Pending"
-                actual={`${homeSummary?.pendingHandoversCount ?? 0} Pending`}
-                variance={`${homeSummary?.pendingChequesCount ?? 0} cheques`}
-                isFavorable={(homeSummary?.pendingHandoversCount ?? 0) === 0}
-              />
-            </div>
+                  <div className="py-3.5 pl-4 sm:border-l border-rule pr-4">
+                    <div className="text-[13px] text-ink-2">Collected</div>
+                    <div className="font-serif text-[28px] leading-tight font-medium text-ink mt-1 tabular-nums">
+                      {formatINR(homeSummary?.cashCollectedInr ?? 0)}
+                    </div>
+                    <div className="text-[12.5px] text-ink-3 mt-1">
+                      {homeSummary?.pendingHandoversCount ?? 0} handovers pending
+                    </div>
+                  </div>
 
-            <div className="pt-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
-                Accounts Receivable Aging Breakdown
-              </h4>
-              <AgingBuckets
-                buckets={
-                  homeSummary?.arAging ?? [
-                    { label: '0 – 7 Days', amount: '0.00', count: 0, tone: 'info' },
-                    { label: '8 – 15 Days', amount: '0.00', count: 0, tone: 'warning' },
-                    { label: '16 – 30 Days', amount: '0.00', count: 0, tone: 'warning' },
-                    { label: '30+ Days (Overdue)', amount: '0.00', count: 0, tone: 'danger' },
-                  ]
-                }
-              />
-            </div>
-          </div>
+                  <div className="py-3.5 sm:pl-4 sm:border-l border-rule pr-4">
+                    <div className="text-[13px] text-ink-2">Gross Margin</div>
+                    <div className="font-serif text-[28px] leading-tight font-medium text-ink mt-1 tabular-nums">
+                      {`${Number(homeSummary?.grossMarginPct ?? 0).toFixed(1)}%`}
+                    </div>
+                    <div className="text-[12.5px] text-ink-3 mt-1">Target 15%</div>
+                  </div>
 
-          {/* Quick Exceptions Approval Mini-Feed */}
-          <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                Top Priority Exception
-              </h3>
-              <Link href="/approvals" className="text-xs text-teal-400 hover:text-teal-300">
-                See all →
-              </Link>
-            </div>
-
-            {homeSummary?.topException ? (
-              <ExceptionCard
-                id={homeSummary.topException.id}
-                type={homeSummary.topException.exception_type ?? 'APPROVAL_REQUIRED'}
-                title={`${homeSummary.topException.entity_type ?? 'Order'} ${homeSummary.topException.entity_id ?? homeSummary.topException.id}`}
-                summary={homeSummary.topException.reason ?? 'Requires owner approval.'}
-                impact="Pending review in Approvals Inbox."
-                onApprove={async () => {
-                  await fetch(`/api/proxy/exceptions/${encodeURIComponent(homeSummary.topException!.id)}/resolve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ decision: 'APPROVE' }),
-                  });
-                  setHomeSummary((prev) => (prev ? { ...prev, topException: null } : prev));
-                }}
-                onReject={async () => {
-                  await fetch(`/api/proxy/exceptions/${encodeURIComponent(homeSummary.topException!.id)}/resolve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ decision: 'REJECT' }),
-                  });
-                  setHomeSummary((prev) => (prev ? { ...prev, topException: null } : prev));
-                }}
-              />
-            ) : (
-              <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 text-xs text-zinc-400">
-                No open exceptions in database.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* Coordinator View: Interactive To-Do Checklist */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-white">Daily Operations To-Do Checklist</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Click any task to jump straight to the filtered workspace
-                </p>
-              </div>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 font-bold font-mono">
-                {todoList.filter((t) => t.done).length} / {todoList.length} Done
-              </span>
-            </div>
-
-            <div className="divide-y divide-zinc-800">
-              {todoList.map((item) => (
-                <div
-                  key={item.id}
-                  className="py-3 flex items-center justify-between hover:bg-zinc-800/40 px-3 rounded-lg transition-colors"
-                >
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleTodo(item.id)}
-                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-950 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span
-                      className={`text-xs font-medium ${
-                        item.done ? 'line-through text-zinc-500' : 'text-zinc-200'
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                  </label>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                      {item.count}
-                    </span>
-                    <Link
-                      href={item.href}
-                      className="text-xs font-semibold text-teal-400 hover:text-teal-300"
-                    >
-                      Open →
-                    </Link>
+                  <div className="py-3.5 pl-4 border-l border-rule">
+                    <div className="text-[13px] text-ink-2">Pending Approvals</div>
+                    <div className={`font-serif text-[28px] leading-tight font-medium mt-1 tabular-nums ${pendingCount > 0 ? 'text-haldi' : 'text-leaf'}`}>
+                      {pendingCount}
+                    </div>
+                    <div className="text-[12.5px] text-ink-3 mt-1">
+                      {pendingCount > 0 ? 'Needs your review' : 'All clear'}
+                    </div>
                   </div>
                 </div>
-              ))}
+              </section>
+
+              {/* Orders Moving Today (Horizontal dashed flow line) */}
+              <section>
+                <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+                  <h2 className="text-[15px] font-semibold text-ink">Orders moving today</h2>
+                  <Link href="/sales/orders" className="text-[13.5px] font-medium text-action hover:underline">
+                    All orders →
+                  </Link>
+                </div>
+
+                <div className="relative flex flex-wrap sm:flex-nowrap justify-between gap-4 pt-4 pb-2">
+                  <div
+                    aria-hidden="true"
+                    className="hidden sm:block absolute left-10 right-10 top-[34px] border-t border-dashed border-rule-strong"
+                  />
+                  {flowSteps.map((step) => (
+                    <div key={step.label} className="relative z-10 text-center min-w-[84px] flex-1">
+                      <div
+                        className={`font-serif text-[26px] leading-none font-medium bg-sheet px-2.5 py-1 inline-block tabular-nums ${
+                          step.tone === 'hot'
+                            ? 'text-action'
+                            : step.tone === 'done'
+                            ? 'text-leaf'
+                            : 'text-ink'
+                        }`}
+                      >
+                        {step.count}
+                      </div>
+                      <div
+                        className={`text-[13px] mt-1.5 ${
+                          step.tone === 'hot' ? 'text-action font-semibold' : 'text-ink-2'
+                        }`}
+                      >
+                        {step.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Live Operations Status Matrix & Accounts Receivable Aging Breakdown */}
+              <section className="space-y-4">
+                <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+                  <h3 className="text-[15px] font-semibold text-ink">
+                    Live Operations Status Matrix
+                  </h3>
+                  <span className="text-[13px] text-ink-3">Auto-refreshed 30s</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <StatCompare
+                    label="Orders Staged for Dispatch"
+                    expected={`${homeSummary?.stagedOrdersCount ?? 0} Staged`}
+                    actual={`${homeSummary?.readyOrdersCount ?? 0} Ready`}
+                    variance={`${homeSummary?.stagedOrdersCount ?? 0} in pipeline`}
+                    isFavorable={(homeSummary?.readyOrdersCount ?? 0) > 0}
+                  />
+                  <StatCompare
+                    label="Active Production Batches"
+                    expected="Work Orders"
+                    actual={`${homeSummary?.activeBatchesCount ?? 0} Active`}
+                    variance="Factory floor"
+                    isFavorable={true}
+                  />
+                  <StatCompare
+                    label="Fleet Trucks on Road"
+                    expected="Dispatched"
+                    actual={`${homeSummary?.activeTripsCount ?? 0} Active`}
+                    variance="Live trips"
+                    isFavorable={true}
+                  />
+                  <StatCompare
+                    label="Pending Cash Handovers"
+                    expected="0 Pending"
+                    actual={`${homeSummary?.pendingHandoversCount ?? 0} Pending`}
+                    variance={`${homeSummary?.pendingChequesCount ?? 0} cheques`}
+                    isFavorable={(homeSummary?.pendingHandoversCount ?? 0) === 0}
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <h4 className="text-[14px] font-semibold text-ink mb-2.5">
+                    Accounts Receivable Aging Breakdown
+                  </h4>
+                  <AgingBuckets
+                    buckets={
+                      homeSummary?.arAging ?? [
+                        { label: '0 – 7 Days', amount: '0.00', count: 0, tone: 'info' },
+                        { label: '8 – 15 Days', amount: '0.00', count: 0, tone: 'warning' },
+                        { label: '16 – 30 Days', amount: '0.00', count: 0, tone: 'warning' },
+                        { label: '30+ Days (Overdue)', amount: '0.00', count: 0, tone: 'danger' },
+                      ]
+                    }
+                  />
+                </div>
+              </section>
+            </>
+          ) : (
+            /* Coordinator View: Ruled Daily Operations To-Do Checklist */
+            <section>
+              <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+                <div>
+                  <h2 className="text-[15px] font-semibold text-ink">Daily Operations To-Do Checklist</h2>
+                  <p className="text-[13px] text-ink-3 mt-0.5">
+                    Click any task to jump straight to the filtered workspace
+                  </p>
+                </div>
+                <span className="text-[13px] font-mono text-action font-semibold">
+                  {todoList.filter((t) => t.done).length} / {todoList.length} Done
+                </span>
+              </div>
+
+              <div className="divide-y divide-rule border-b border-rule">
+                {todoList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="py-3 flex items-center justify-between hover:bg-paper/60 px-2 -mx-2 rounded-[3px] transition-colors"
+                  >
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleTodo(item.id)}
+                        className="w-4 h-4 rounded-[2px] border-rule-strong text-action focus:ring-action"
+                      />
+                      <span
+                        className={`text-[14px] font-medium ${
+                          item.done ? 'line-through text-ink-3' : 'text-ink'
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13px] font-mono px-2 py-0.5 rounded-[3px] bg-paper border border-rule text-ink-2">
+                        {item.count}
+                      </span>
+                      <Link
+                        href={item.href}
+                        className="text-[13.5px] font-medium text-action hover:underline"
+                      >
+                        Open →
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* Right Column (340px with hairline left rule) */}
+        <aside className="lg:border-l lg:border-rule lg:pl-7 space-y-7">
+          {/* Setup Progress (Owner only) */}
+          {isOwner && (
+            <div className="pb-5 border-b border-rule space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-semibold text-ink">
+                  Your business is {homeSummary?.setupProgressPct ?? 0}% set up
+                </h3>
+              </div>
+              <p className="text-[13px] text-ink-2 leading-relaxed">
+                Complete Item Catalog, Suppliers, and Opening Balances to finish preparation.
+              </p>
+              <Link href="/admin/setup-wizard" className="inline-block">
+                <Button variant="secondary" size="sm">
+                  Continue Setup Wizard →
+                </Button>
+              </Link>
             </div>
+          )}
+
+          {/* Still to do today */}
+          <div>
+            <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+              <h2 className="text-[15px] font-semibold text-ink">Still to do today</h2>
+            </div>
+            <ul className="divide-y divide-rule">
+              <li className="py-2.5 flex gap-3 items-baseline text-[14px]">
+                <span className="font-mono text-[12.5px] text-ink-3 w-14 shrink-0">Handover</span>
+                <Link href="/finance/handovers" className="hover:text-action">
+                  <span className="font-medium text-ink">Driver cash handovers</span>
+                  <span className="block text-[13px] text-ink-3">
+                    {homeSummary?.pendingHandoversCount ?? 0} waiting for verification
+                  </span>
+                </Link>
+              </li>
+              <li className="py-2.5 flex gap-3 items-baseline text-[14px]">
+                <span className="font-mono text-[12.5px] text-ink-3 w-14 shrink-0">EOD</span>
+                <Link href="/finance/eod" className="hover:text-action">
+                  <span className="font-medium text-ink">Close the day</span>
+                  <span className="block text-[13px] text-ink-3">Reconcile cash, bank &amp; cheques</span>
+                </Link>
+              </li>
+              <li className="py-2.5 flex gap-3 items-baseline text-[14px]">
+                <span className="font-mono text-[12.5px] text-ink-3 w-14 shrink-0">Prices</span>
+                <Link href="/sales/prices" className="hover:text-action">
+                  <span className="font-medium text-ink">Review daily price band</span>
+                  <span className="block text-[13px] text-ink-3">Base, floor &amp; target rates</span>
+                </Link>
+              </li>
+            </ul>
           </div>
 
-          <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 border-b border-zinc-800 pb-3">
-              Fast Shortcuts
-            </h3>
-            <div className="flex flex-col gap-2.5">
-              <Link href="/sales/orders/new">
-                <Button variant="secondary" size="md" className="w-full justify-start text-xs">
-                  📝 New Sales Order (N)
-                </Button>
-              </Link>
-              <Link href="/logistics/trips">
-                <Button variant="secondary" size="md" className="w-full justify-start text-xs">
-                  🚚 Plan Dispatch Trip
-                </Button>
-              </Link>
-              <Link href="/finance/handovers">
-                <Button variant="secondary" size="md" className="w-full justify-start text-xs">
-                  💵 Verify Driver Handover
-                </Button>
-              </Link>
-              <Link href="/finance/eod">
-                <Button variant="secondary" size="md" className="w-full justify-start text-xs">
-                  🔒 Day Closing (EOD)
-                </Button>
-              </Link>
+          {/* Fast Shortcuts */}
+          <div>
+            <div className="flex items-baseline justify-between pb-2 bahi-section-rule">
+              <h2 className="text-[15px] font-semibold text-ink">Fast Shortcuts</h2>
             </div>
+            <ul className="divide-y divide-rule text-[14px]">
+              <li>
+                <Link href="/sales/orders/new" className="flex items-center justify-between py-2.5 text-ink-2 hover:text-action">
+                  <span>New Sales Order</span>
+                  <span className="text-ink-3">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/logistics/trips" className="flex items-center justify-between py-2.5 text-ink-2 hover:text-action">
+                  <span>Plan Dispatch Trip</span>
+                  <span className="text-ink-3">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/procurement/shortfalls" className="flex items-center justify-between py-2.5 text-ink-2 hover:text-action">
+                  <span>Check Short Supplies</span>
+                  <span className="text-ink-3">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/inventory/expiry" className="flex items-center justify-between py-2.5 text-ink-2 hover:text-action">
+                  <span>Expiry Watchlist</span>
+                  <span className="text-ink-3">→</span>
+                </Link>
+              </li>
+            </ul>
           </div>
-        </div>
-      )}
+        </aside>
+      </div>
     </div>
   );
 }

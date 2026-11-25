@@ -208,13 +208,13 @@ export default function RequisitionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/procurement" className="hover:text-white">Procurement</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/procurement" className="hover:text-ink">Procurement</Link>
             <span>/</span>
-            <span className="text-indigo-400">Requisitions</span>
+            <span className="text-action">Requisitions</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Purchase Requisitions</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Purchase Requisitions</h1>
+          <p className="text-sm text-ink-3">
             Review demand from Sales Orders, Production, Min-Stock &amp; Manual requests; group by supplier to convert into POs.
           </p>
         </div>
@@ -233,22 +233,22 @@ export default function RequisitionsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
       {/* Filter bar + Convert CTA */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-sheet border border-rule rounded-[3px] p-3">
         <div className="flex flex-wrap gap-2">
           {(['ALL', 'OPEN', 'PO_CREATED', 'CANCELLED'] as const).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors${
                 statusFilter === st
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'bg-sunken text-ink-3 hover:text-ink'
               }`}
             >
               {st === 'ALL' ? 'All Statuses' : st.replace('_', ' ')}
@@ -258,7 +258,7 @@ export default function RequisitionsPage() {
           <select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value as any)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200"
+            className="bg-paper border border-rule-strong rounded-lg px-3 py-1.5 text-xs text-ink"
           >
             <option value="ALL">All Sources</option>
             <option value="SALES_ORDER_BACK_TO_BACK">Sales Order Back-to-Back</option>
@@ -284,7 +284,7 @@ export default function RequisitionsPage() {
       {viewMode === 'GROUPED' ? (
         <div className="space-y-4">
           {groupedBySupplier.length === 0 ? (
-            <Card className="p-8 text-center text-zinc-400 bg-zinc-900 border-zinc-800">
+            <Card className="p-8 text-center text-ink-3 bg-sheet border-rule">
               No open requisitions left to group.
             </Card>
           ) : (
@@ -293,8 +293,8 @@ export default function RequisitionsPage() {
                 selectedIds.includes(id),
               );
               return (
-                <Card key={group.supplierId} className="p-5 bg-zinc-900 border-zinc-800">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+                <Card key={group.supplierId} className="p-5 bg-sheet border-rule">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-rule">
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
@@ -313,40 +313,40 @@ export default function RequisitionsPage() {
                         className="h-4 w-4 accent-indigo-500"
                       />
                       <div>
-                        <h3 className="text-base font-semibold text-white">
+                        <h3 className="text-base font-semibold text-ink">
                           {group.supplierName}
                         </h3>
-                        <p className="text-xs text-zinc-400">
+                        <p className="text-xs text-ink-3">
                           {group.lines.length} open requisition(s) → will consolidate into 1 PO
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-zinc-400">Estimated PO Value</div>
-                      <div className="text-lg font-bold text-emerald-400 font-mono">
+                      <div className="text-xs text-ink-3">Estimated PO Value</div>
+                      <div className="text-lg font-bold text-leaf font-mono">
                         {formatINR(group.estimatedTotal)}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-3 divide-y divide-zinc-800/60">
+                  <div className="mt-3 divide-y divide-rule">
                     {group.lines.map((line) => (
                       <div
                         key={line.id}
                         className="py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm"
                       >
                         <div>
-                          <span className="font-mono text-xs text-indigo-400 mr-2">
+                          <span className="font-mono text-xs text-action mr-2">
                             {line.requisitionNo}
                           </span>
-                          <span className="text-zinc-200 font-medium">{line.itemName}</span>
+                          <span className="text-ink font-medium">{line.itemName}</span>
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-mono text-zinc-300">
+                        <div className="flex items-center gap-4 text-xs font-mono text-ink-2">
                           <span>
                             {line.qty} {line.uom}
                           </span>
                           <span>@ ₹{line.latestRate}/{line.uom}</span>
-                          <span className="text-zinc-400">Need by {line.neededBy}</span>
+                          <span className="text-ink-3">Need by {line.neededBy}</span>
                         </div>
                       </div>
                     ))}
@@ -357,10 +357,10 @@ export default function RequisitionsPage() {
           )}
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+              <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
                 <tr>
                   <th className="p-3 w-10">Sel</th>
                   <th className="p-3">Req #</th>
@@ -373,9 +373,9 @@ export default function RequisitionsPage() {
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-rule">
                 {filteredReqs.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-800/40">
+                  <tr key={r.id} className="hover:bg-sunken">
                     <td className="p-3">
                       <input
                         type="checkbox"
@@ -385,29 +385,29 @@ export default function RequisitionsPage() {
                         className="h-4 w-4 accent-indigo-500"
                       />
                     </td>
-                    <td className="p-3 font-mono text-xs text-indigo-400 font-semibold">
+                    <td className="p-3 font-mono text-xs text-action font-semibold">
                       {r.requisitionNo}
                     </td>
                     <td className="p-3">
-                      <div className="text-xs font-medium text-zinc-200">
+                      <div className="text-xs font-medium text-ink">
                         {SOURCE_LABELS[r.source]}
                       </div>
                       {r.sourceRefLabel && (
-                        <div className="text-[11px] text-zinc-500">{r.sourceRefLabel}</div>
+                        <div className="text-[11px] text-ink-3">{r.sourceRefLabel}</div>
                       )}
                     </td>
                     <td className="p-3">
-                      <div className="text-zinc-100 font-medium">{r.itemName}</div>
-                      <div className="text-[11px] text-zinc-500">{r.reason}</div>
+                      <div className="text-ink font-medium">{r.itemName}</div>
+                      <div className="text-[11px] text-ink-3">{r.reason}</div>
                     </td>
-                    <td className="p-3 font-mono text-zinc-200">
+                    <td className="p-3 font-mono text-ink">
                       {r.qty} {r.uom}
                     </td>
-                    <td className="p-3 text-zinc-300 text-xs">
+                    <td className="p-3 text-ink-2 text-xs">
                       <div>{r.preferredSupplierName}</div>
-                      <div className="text-zinc-500 font-mono">Last: ₹{r.latestRate}/{r.uom}</div>
+                      <div className="text-ink-3 font-mono">Last: ₹{r.latestRate}/{r.uom}</div>
                     </td>
-                    <td className="p-3 text-xs text-zinc-300 font-mono">{r.neededBy}</td>
+                    <td className="p-3 text-xs text-ink-2 font-mono">{r.neededBy}</td>
                     <td className="p-3">
                       <StatusPill
                         status={r.status}
@@ -424,7 +424,7 @@ export default function RequisitionsPage() {
                       {r.status === 'OPEN' && (
                         <button
                           onClick={() => setCancelTarget(r)}
-                          className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                          className="text-xs text-madder hover:text-madder font-medium"
                         >
                           Cancel
                         </button>
@@ -446,11 +446,11 @@ export default function RequisitionsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Item</label>
+            <label className="block text-xs text-ink-3 mb-1">Item</label>
             <select
               value={newItemId}
               onChange={(e) => setNewItemId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
               {PROCUREMENT_ITEMS.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -461,30 +461,30 @@ export default function RequisitionsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Quantity</label>
+              <label className="block text-xs text-ink-3 mb-1">Quantity</label>
               <input
                 type="number"
                 value={newQty}
                 onChange={(e) => setNewQty(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Needed By</label>
+              <label className="block text-xs text-ink-3 mb-1">Needed By</label>
               <input
                 type="date"
                 value={newNeededBy}
                 onChange={(e) => setNewNeededBy(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Preferred Supplier</label>
+            <label className="block text-xs text-ink-3 mb-1">Preferred Supplier</label>
             <select
               value={newSupplierId}
               onChange={(e) => setNewSupplierId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
               {PROCUREMENT_SUPPLIERS.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -494,13 +494,13 @@ export default function RequisitionsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Reason</label>
+            <label className="block text-xs text-ink-3 mb-1">Reason</label>
             <input
               type="text"
               placeholder="e.g., Extra weekend production buffer"
               value={newReason}
               onChange={(e) => setNewReason(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -522,25 +522,25 @@ export default function RequisitionsPage() {
       >
         {convertStep === 1 ? (
           <div className="space-y-4">
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-ink-3">
               Selected requisitions are grouped by supplier. Confirming will generate{' '}
-              <strong className="text-white">{selectedGroupsForPo.length} PO(s)</strong> (one per supplier).
+              <strong className="text-ink">{selectedGroupsForPo.length} PO(s)</strong> (one per supplier).
             </p>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {selectedGroupsForPo.map((grp) => (
                 <div
                   key={grp.supplierId}
-                  className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between"
+                  className="p-3 rounded-lg bg-paper border border-rule flex items-center justify-between"
                 >
                   <div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-sm font-semibold text-ink">
                       {grp.supplierName}
                     </div>
-                    <div className="text-xs text-zinc-400">
+                    <div className="text-xs text-ink-3">
                       {grp.lines.map((l) => `${l.itemName} (${l.qty} ${l.uom})`).join(' + ')}
                     </div>
                   </div>
-                  <div className="text-sm font-bold text-emerald-400 font-mono">
+                  <div className="text-sm font-bold text-leaf font-mono">
                     {formatINR(grp.estimatedTotal)}
                   </div>
                 </div>
@@ -557,21 +557,21 @@ export default function RequisitionsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
+            <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
               Successfully created {createdPos.length} Purchase Order(s):
             </div>
             {createdPos.map((po) => (
               <div
                 key={po.poNumber}
-                className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between"
+                className="p-3 rounded-lg bg-paper border border-rule flex items-center justify-between"
               >
                 <div>
-                  <span className="font-mono text-indigo-400 font-semibold">
+                  <span className="font-mono text-action font-semibold">
                     {po.poNumber}
                   </span>
-                  <span className="text-sm text-zinc-200 ml-2">{po.supplierName}</span>
+                  <span className="text-sm text-ink ml-2">{po.supplierName}</span>
                 </div>
-                <span className="font-mono text-sm text-white">{formatINR(po.total)}</span>
+                <span className="font-mono text-sm text-ink">{formatINR(po.total)}</span>
               </div>
             ))}
             <div className="flex justify-end gap-2">
@@ -593,7 +593,7 @@ export default function RequisitionsPage() {
         title={`Cancel ${cancelTarget?.requisitionNo ?? ''}`}
       >
         <div className="space-y-4">
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-ink-3">
             Please provide a reason for cancelling this requisition.
           </p>
           <textarea
@@ -601,7 +601,7 @@ export default function RequisitionsPage() {
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="Reason required..."
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCancelTarget(null)}>

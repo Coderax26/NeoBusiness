@@ -130,27 +130,27 @@ export default function CollectionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Collections &amp; FIFO Receipt Allocation</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Collections &amp; FIFO Receipt Allocation</h1>
+        <p className="text-sm text-ink-3">
           Record Cash, UPI, Bank, or Cheque receipts — auto-allocated oldest-invoice-first (FIFO).
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <form onSubmit={recordPayment} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
-          <h2 className="text-base font-bold text-zinc-100">Record Customer Receipt</h2>
+        <form onSubmit={recordPayment} className="rounded-[3px] border border-rule bg-sheet p-5 space-y-4">
+          <h2 className="text-base font-bold text-ink">Record Customer Receipt</h2>
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1">Customer</label>
+            <label className="block text-xs font-semibold text-ink-3 mb-1">Customer</label>
             <select
               value={selectedCustomerId}
               onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
             >
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -160,17 +160,17 @@ export default function CollectionsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1">Payment Mode</label>
+            <label className="block text-xs font-semibold text-ink-3 mb-1">Payment Mode</label>
             <div className="grid grid-cols-4 gap-1.5">
               {(['CASH', 'UPI', 'BANK', 'CHEQUE'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  className={`rounded-lg py-1.5 text-xs font-semibold ${
+                  className={`rounded-lg py-1.5 text-xs font-semibold${
                     mode === m
-                      ? 'bg-emerald-600 text-white'
-                      : 'border border-zinc-800 bg-zinc-950 text-zinc-300'
+                      ? 'bg-leaf text-white'
+                      : 'border border-rule bg-paper text-ink-2'
                   }`}
                 >
                   {m}
@@ -179,24 +179,24 @@ export default function CollectionsPage() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1">Amount (₹)</label>
+            <label className="block text-xs font-semibold text-ink-3 mb-1">Amount (₹)</label>
             <input
               type="number"
               value={amountInput}
               onChange={(e) => setAmountInput(e.target.value)}
               placeholder="0"
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono text-zinc-100"
+              className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-mono text-ink"
               required
             />
           </div>
 
           {fifoPreview.allocations.length > 0 && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1.5 text-xs">
-              <div className="font-semibold text-zinc-300">FIFO Allocation Preview:</div>
+            <div className="rounded-lg border border-rule bg-paper p-3 space-y-1.5 text-xs">
+              <div className="font-semibold text-ink-2">FIFO Allocation Preview:</div>
               {fifoPreview.allocations.map((a) => (
-                <div key={a.invoiceId} className="flex justify-between text-zinc-400">
+                <div key={a.invoiceId} className="flex justify-between text-ink-3">
                   <span className="font-mono">{a.invoiceNumber}</span>
-                  <span className="font-mono text-emerald-400">{formatINR(a.allocatedAmount)}</span>
+                  <span className="font-mono text-leaf">{formatINR(a.allocatedAmount)}</span>
                 </div>
               ))}
             </div>
@@ -204,18 +204,18 @@ export default function CollectionsPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="w-full rounded-[3px] bg-leaf py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
           >
             Save Receipt &amp; Allocate
           </button>
         </form>
 
-        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 lg:col-span-2">
-          <div className="border-b border-zinc-800 bg-zinc-950/60 px-5 py-3 text-sm font-bold text-zinc-100">
+        <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet lg:col-span-2">
+          <div className="border-b border-rule bg-paper px-5 py-3 text-sm font-bold text-ink">
             Recent Receipts
           </div>
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/40 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper text-xs uppercase text-ink-3">
               <tr>
                 <th className="px-4 py-3">Receipt #</th>
                 <th className="px-4 py-3">Customer</th>
@@ -224,32 +224,32 @@ export default function CollectionsPage() {
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {receipts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-ink-3">
                     No receipts recorded.
                   </td>
                 </tr>
               ) : (
                 receipts.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-800/40">
+                  <tr key={r.id} className="hover:bg-sunken">
                     <td className="px-4 py-3">
-                      <div className="font-mono font-bold text-zinc-100">{r.receiptNo}</div>
-                      <div className="text-xs text-zinc-500">{r.date}</div>
+                      <div className="font-mono font-bold text-ink">{r.receiptNo}</div>
+                      <div className="text-xs text-ink-3">{r.date}</div>
                     </td>
-                    <td className="px-4 py-3 text-zinc-200">{r.customerName}</td>
+                    <td className="px-4 py-3 text-ink">{r.customerName}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs font-semibold text-zinc-300">
+                      <span className="rounded bg-sunken px-2 py-0.5 text-xs font-semibold text-ink-2">
                         {r.mode}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-400">
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-leaf">
                       {formatINR(r.amount)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {r.reversed ? (
-                        <span className="text-xs font-semibold text-rose-400">REVERSED</span>
+                        <span className="text-xs font-semibold text-madder">REVERSED</span>
                       ) : reversingId === r.id ? (
                         <div className="inline-flex gap-1">
                           <input
@@ -257,12 +257,12 @@ export default function CollectionsPage() {
                             value={reverseReason}
                             onChange={(e) => setReverseReason(e.target.value)}
                             placeholder="Reason"
-                            className="w-28 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-100"
+                            className="w-28 rounded border border-rule-strong bg-paper px-2 py-1 text-xs text-ink"
                           />
                           <button
                             type="button"
                             onClick={() => confirmReverse(r.id)}
-                            className="rounded bg-rose-600 px-2 py-1 text-xs text-white"
+                            className="rounded bg-madder px-2 py-1 text-xs text-white"
                           >
                             Confirm
                           </button>
@@ -271,7 +271,7 @@ export default function CollectionsPage() {
                         <button
                           type="button"
                           onClick={() => setReversingId(r.id)}
-                          className="text-xs font-semibold text-rose-400 hover:underline"
+                          className="text-xs font-semibold text-madder hover:underline"
                         >
                           Reverse
                         </button>

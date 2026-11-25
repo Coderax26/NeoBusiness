@@ -173,13 +173,13 @@ export default function WorkOrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/production" className="hover:text-white">Production</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/production" className="hover:text-ink">Production</Link>
             <span>/</span>
             <span className="text-orange-400">Work Orders</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Production Work Orders</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Production Work Orders</h1>
+          <p className="text-sm text-ink-3">
             Track planned, running, and completed batches with BR-06 yield gauges.
           </p>
         </div>
@@ -197,7 +197,7 @@ export default function WorkOrdersPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
@@ -205,8 +205,8 @@ export default function WorkOrdersPage() {
       {viewMode === 'KANBAN' ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(['PLANNED', 'IN_PROGRESS', 'COMPLETED'] as const).map((status) => (
-            <div key={status} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <div className="text-xs font-bold uppercase text-zinc-400">
+            <div key={status} className="bg-sheet border border-rule rounded-[3px] p-4 space-y-3">
+              <div className="text-xs font-bold uppercase text-ink-3">
                 {status.replace('_', ' ')} ({workOrders.filter((w) => w.status === status).length})
               </div>
               {workOrders
@@ -214,17 +214,17 @@ export default function WorkOrdersPage() {
                 .map((wo) => (
                   <Card
                     key={wo.id}
-                    className="p-3.5 bg-zinc-950 border-zinc-800 cursor-pointer hover:border-orange-500/60"
+                    className="p-3.5 bg-paper border-rule cursor-pointer hover:border-orange-500/60"
                     onClick={() => setSelectedWo(wo)}
                   >
                     <div className="flex justify-between text-xs">
                       <span className="font-mono text-orange-400 font-bold">{wo.woNumber}</span>
-                      <span className="text-zinc-500">{wo.requiredBy}</span>
+                      <span className="text-ink-3">{wo.requiredBy}</span>
                     </div>
-                    <div className="text-sm font-semibold text-white mt-1">
+                    <div className="text-sm font-semibold text-ink mt-1">
                       {wo.finishedItemName}
                     </div>
-                    <div className="text-xs text-zinc-400 mt-1">
+                    <div className="text-xs text-ink-3 mt-1">
                       Plan: {wo.plannedQty} {wo.uom} {wo.linkedSalesOrderNo ? `· ${wo.linkedSalesOrderNo}` : ''}
                     </div>
                   </Card>
@@ -233,9 +233,9 @@ export default function WorkOrdersPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+            <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
               <tr>
                 <th className="p-3">WO #</th>
                 <th className="p-3">Finished Item &amp; BOM</th>
@@ -246,25 +246,25 @@ export default function WorkOrdersPage() {
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {workOrders.map((wo) => {
                 const y =
                   wo.issuedRmQty > 0
                     ? evaluateWoYieldStatus(wo.issuedRmQty, wo.actualOutputQty, wo.scrapQty)
                     : null;
                 return (
-                  <tr key={wo.id} className="hover:bg-zinc-800/40">
+                  <tr key={wo.id} className="hover:bg-sunken">
                     <td className="p-3 font-mono text-xs text-orange-400 font-semibold">
                       {wo.woNumber}
                     </td>
                     <td className="p-3">
-                      <div className="text-white font-medium">{wo.finishedItemName}</div>
-                      <div className="text-[11px] font-mono text-zinc-500">{wo.bomCode}</div>
+                      <div className="text-ink font-medium">{wo.finishedItemName}</div>
+                      <div className="text-[11px] font-mono text-ink-3">{wo.bomCode}</div>
                     </td>
-                    <td className="p-3 text-xs font-mono text-zinc-300">
+                    <td className="p-3 text-xs font-mono text-ink-2">
                       {wo.linkedSalesOrderNo || 'Stock'}
                     </td>
-                    <td className="p-3 text-right font-mono text-white">
+                    <td className="p-3 text-right font-mono text-ink">
                       {wo.actualOutputQty} / {wo.plannedQty} {wo.uom}
                     </td>
                     <td className="p-3">
@@ -273,7 +273,7 @@ export default function WorkOrdersPage() {
                           {y.yieldPct}% · {y.label}
                         </Badge>
                       ) : (
-                        <span className="text-xs text-zinc-500">Not started</span>
+                        <span className="text-xs text-ink-3">Not started</span>
                       )}
                     </td>
                     <td className="p-3">
@@ -298,7 +298,7 @@ export default function WorkOrdersPage() {
                       {wo.status === 'PLANNED' && (
                         <button
                           onClick={() => setCancelTarget(wo)}
-                          className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                          className="text-xs text-madder hover:text-madder font-medium"
                         >
                           Cancel
                         </button>
@@ -320,15 +320,15 @@ export default function WorkOrdersPage() {
       >
         {selectedWo && (
           <div className="space-y-4 text-sm">
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
-              <div className="text-white font-semibold">{selectedWo.finishedItemName}</div>
-              <div className="text-xs text-zinc-400">
+            <div className="p-3 rounded-lg bg-paper border border-rule space-y-1">
+              <div className="text-ink font-semibold">{selectedWo.finishedItemName}</div>
+              <div className="text-xs text-ink-3">
                 BOM: {selectedWo.bomCode} · Site: {selectedWo.siteName} · Due: {selectedWo.requiredBy}
               </div>
             </div>
             {selectedWo.issuedRmQty > 0 && (
-              <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-                <div className="text-xs text-zinc-400 mb-1">Yield Gauge (BR-06 ±3% Green Band)</div>
+              <div className="p-3 rounded-lg bg-paper border border-rule">
+                <div className="text-xs text-ink-3 mb-1">Yield Gauge (BR-06 ±3% Green Band)</div>
                 {(() => {
                   const y = evaluateWoYieldStatus(
                     selectedWo.issuedRmQty,
@@ -337,12 +337,12 @@ export default function WorkOrdersPage() {
                   );
                   return (
                     <div>
-                      <div className="flex justify-between font-mono text-white font-bold">
+                      <div className="flex justify-between font-mono text-ink font-bold">
                         <span>{y.yieldPct}% ({y.label})</span>
                         <span>Issued {selectedWo.issuedRmQty} kg → Got {selectedWo.actualOutputQty} kg</span>
                       </div>
                       {y.warningBanner && (
-                        <div className="mt-2 p-2 rounded bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs">
+                        <div className="mt-2 p-2 rounded bg-haldi-soft border border-haldi/30 text-haldi text-xs">
                           {y.warningBanner}
                         </div>
                       )}
@@ -359,11 +359,11 @@ export default function WorkOrdersPage() {
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Work Order">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Active BOM Recipe</label>
+            <label className="block text-xs text-ink-3 mb-1">Active BOM Recipe</label>
             <select
               value={newBomId}
               onChange={(e) => setNewBomId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
               {boms.filter((b: any) => b.status === 'ACTIVE').map((b: any) => (
                 <option key={b.id} value={b.id}>
@@ -374,21 +374,21 @@ export default function WorkOrdersPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Planned Qty (kg)</label>
+              <label className="block text-xs text-ink-3 mb-1">Planned Qty (kg)</label>
               <input
                 type="number"
                 value={newQty}
                 onChange={(e) => setNewQty(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Required By</label>
+              <label className="block text-xs text-ink-3 mb-1">Required By</label>
               <input
                 type="text"
                 value={newRequiredBy}
                 onChange={(e) => setNewRequiredBy(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>
@@ -411,7 +411,7 @@ export default function WorkOrdersPage() {
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="Reason required..."
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCancelTarget(null)}>Back</Button>

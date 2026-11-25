@@ -7,10 +7,10 @@ import { formatINR } from '@neo/shared';
 import { type SalesOrderRecord, type SalesOrderStatus } from '../../../../src/lib/sales-data';
 
 const BOARD_COLUMNS: { status: SalesOrderStatus; label: string; color: string }[] = [
-  { status: 'DRAFT', label: 'Drafts', color: 'border-zinc-700' },
+  { status: 'DRAFT', label: 'Drafts', color: 'border-rule-strong' },
   { status: 'PENDING_APPROVAL', label: 'Waiting for Owner', color: 'border-amber-500/40' },
   { status: 'CONFIRMED', label: 'Confirmed', color: 'border-indigo-500/40' },
-  { status: 'READY', label: 'Ready to Dispatch', color: 'border-teal-500/40' },
+  { status: 'READY', label: 'Ready to Dispatch', color: 'border-action/30' },
   { status: 'DELIVERED', label: 'Delivered', color: 'border-emerald-500/40' },
 ];
 
@@ -76,10 +76,10 @@ export default function SalesBoardPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <h1 className="text-2xl font-black text-white">Sales Board (Kanban)</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Sales Board (Kanban)</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Visual pipeline of active customer orders from draft through delivery.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function SalesBoardPage() {
       </div>
 
       {boardMsg && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-300">
+        <div className="rounded-[3px] border border-haldi/30 bg-haldi-soft px-4 py-2.5 text-xs font-medium text-haldi">
           {boardMsg}
         </div>
       )}
@@ -109,35 +109,35 @@ export default function SalesBoardPage() {
           return (
             <div
               key={col.status}
-              className={`bg-zinc-900/60 border-t-2 ${col.color} border-x border-b border-zinc-800 rounded-2xl p-3 space-y-3 min-h-[380px]`}
+              className={`bg-sheet border-t-2${col.color}border-x border-b border-rule rounded-[4px] p-3 space-y-3 min-h-[380px]`}
             >
-              <div className="flex items-center justify-between text-xs font-bold text-white pb-2 border-b border-zinc-800">
+              <div className="flex items-center justify-between text-xs font-bold text-ink pb-2 border-b border-rule">
                 <span>{col.label}</span>
                 <Badge tone="neutral">{cards.length}</Badge>
               </div>
 
               {cards.length === 0 ? (
-                <p className="text-[11px] text-zinc-600 text-center py-8">No orders</p>
+                <p className="text-[11px] text-ink-3 text-center py-8">No orders</p>
               ) : (
                 cards.map((o) => (
                   <div
                     key={o.id}
-                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl space-y-2 hover:border-teal-500/40 transition-colors"
+                    className="p-3 bg-paper border border-rule rounded-[3px] space-y-2 hover:border-action/30 transition-colors"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <Link href={`/sales/orders/${o.id}`} className="font-mono font-bold text-teal-400 hover:underline">
+                      <Link href={`/sales/orders/${o.id}`} className="font-mono font-bold text-action hover:underline">
                         {o.orderNumber}
                       </Link>
-                      <span className="font-mono font-bold text-white">{formatINR(o.grandTotal)}</span>
+                      <span className="font-mono font-bold text-ink">{formatINR(o.grandTotal)}</span>
                     </div>
-                    <div className="text-xs font-semibold text-zinc-200">{o.customerName}</div>
-                    <div className="text-[11px] text-zinc-500">
+                    <div className="text-xs font-semibold text-ink">{o.customerName}</div>
+                    <div className="text-[11px] text-ink-3">
                       {o.deliveryDate} • Slot {o.deliveryWindow}
                     </div>
                     {o.status === 'PENDING_APPROVAL' && (
                       <button
                         onClick={() => moveOrder(o.id, 'CONFIRMED')}
-                        className="w-full py-1 rounded-lg bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/25"
+                        className="w-full py-1 rounded-lg bg-leaf-soft text-leaf text-[11px] font-semibold hover:opacity-90/25"
                       >
                         ✓ Quick Approve
                       </button>
@@ -145,7 +145,7 @@ export default function SalesBoardPage() {
                     {o.status === 'CONFIRMED' && (
                       <Link
                         href={`/sales/orders/${o.id}`}
-                        className="block w-full text-center py-1 rounded-lg bg-teal-500/15 text-teal-400 text-[11px] font-semibold hover:bg-teal-500/25"
+                        className="block w-full text-center py-1 rounded-lg bg-action/15 text-action text-[11px] font-semibold hover:bg-action/25"
                       >
                         Open Order →
                       </Link>

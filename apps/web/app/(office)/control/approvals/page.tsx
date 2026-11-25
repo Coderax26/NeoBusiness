@@ -159,12 +159,12 @@ export default function ControlApprovalsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Approvals Centre</h1>
-          <p className="text-sm text-zinc-400">
-            Keyboard shortcuts: <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">J/K</kbd> navigate,{' '}
-            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">A</kbd> approve,{' '}
-            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">C</kbd> counter,{' '}
-            <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">R</kbd> reject. Step-up auth required ≥ ₹5,000.
+          <h1 className="text-2xl font-bold text-ink">Approvals Centre</h1>
+          <p className="text-sm text-ink-3">
+            Keyboard shortcuts: <kbd className="rounded bg-sunken px-1.5 py-0.5 text-xs text-ink">J/K</kbd> navigate,{' '}
+            <kbd className="rounded bg-sunken px-1.5 py-0.5 text-xs text-ink">A</kbd> approve,{' '}
+            <kbd className="rounded bg-sunken px-1.5 py-0.5 text-xs text-ink">C</kbd> counter,{' '}
+            <kbd className="rounded bg-sunken px-1.5 py-0.5 text-xs text-ink">R</kbd> reject. Step-up auth required ≥ ₹5,000.
           </p>
         </div>
 
@@ -172,8 +172,8 @@ export default function ControlApprovalsPage() {
           <button
             type="button"
             onClick={() => setTab('PENDING')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-              tab === 'PENDING' ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+              tab === 'PENDING' ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
             Pending ({exceptions.filter((e) => e.status === 'PENDING').length})
@@ -181,8 +181,8 @@ export default function ControlApprovalsPage() {
           <button
             type="button"
             onClick={() => setTab('HISTORY')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-              tab === 'HISTORY' ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+              tab === 'HISTORY' ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
             History ({exceptions.filter((e) => e.status !== 'PENDING').length})
@@ -191,7 +191,7 @@ export default function ControlApprovalsPage() {
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
@@ -215,8 +215,8 @@ export default function ControlApprovalsPage() {
               setTypeFilter(t);
               setFocusedIdx(0);
             }}
-            className={`rounded-lg px-3 py-1 text-xs font-semibold ${
-              typeFilter === t ? 'bg-teal-600 text-white' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+            className={`rounded-lg px-3 py-1 text-xs font-semibold${
+              typeFilter === t ? 'bg-action text-white' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
             {t.replace(/_/g, ' ')}
@@ -227,7 +227,7 @@ export default function ControlApprovalsPage() {
       {/* Cards */}
       <div className="space-y-4">
         {visibleList.length === 0 && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-400">
+          <div className="rounded-[4px] border border-rule bg-sheet p-8 text-center text-sm text-ink-3">
             No {tab.toLowerCase()} exceptions found.
           </div>
         )}
@@ -238,45 +238,45 @@ export default function ControlApprovalsPage() {
             <div
               key={exc.id}
               onClick={() => setFocusedIdx(idx)}
-              className={`rounded-2xl border bg-zinc-900 p-5 transition ${
-                isFocused ? 'border-teal-500 ring-1 ring-teal-500/40' : 'border-zinc-800'
+              className={`rounded-[4px] border bg-sheet p-5 transition${
+                isFocused ? 'border-action/30 ring-1 ring-teal-500/40' : 'border-rule'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold text-amber-300">
+                  <span className="rounded bg-haldi-soft px-2 py-0.5 font-bold text-haldi">
                     {exc.type.replace(/_/g, ' ')}
                   </span>
-                  <span className="text-zinc-400">{exc.siteName}</span>
+                  <span className="text-ink-3">{exc.siteName}</span>
                   {stepUp && (
                     <span className="rounded bg-purple-500/20 px-2 py-0.5 font-semibold text-purple-300">
                       🔒 Step-up Auth
                     </span>
                   )}
                 </div>
-                <div className="text-zinc-400">
+                <div className="text-ink-3">
                   Waiting {exc.waitingMinutes} min · Escalates in {exc.escalatesInMinutes} min
                   {exc.delegatedTo && ` · Delegated to ${exc.delegatedTo}`}
                 </div>
               </div>
 
-              <h2 className="mt-2 text-base font-bold text-zinc-100">{exc.title}</h2>
+              <h2 className="mt-2 text-base font-bold text-ink">{exc.title}</h2>
 
               <div className="mt-3 flex flex-wrap gap-3">
                 {Object.entries(exc.facts).map(([k, v]) => (
-                  <div key={k} className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs">
-                    <span className="text-zinc-400">{k}: </span>
-                    <span className="font-semibold text-zinc-100">{String(v)}</span>
+                  <div key={k} className="rounded-lg border border-rule bg-paper px-3 py-1.5 text-xs">
+                    <span className="text-ink-3">{k}: </span>
+                    <span className="font-semibold text-ink">{String(v)}</span>
                   </div>
                 ))}
               </div>
 
               {exc.status === 'PENDING' ? (
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-4">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rule pt-4">
                   <button
                     type="button"
                     onClick={() => attemptResolve(exc, 'APPROVE')}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                    className="rounded-lg bg-leaf px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
                   >
                     ✓ Approve ({formatINR(exc.amountInr)})
                   </button>
@@ -288,12 +288,12 @@ export default function ControlApprovalsPage() {
                         value={counterDraft[exc.id] ?? ''}
                         onChange={(e) => setCounterDraft((p) => ({ ...p, [exc.id]: e.target.value }))}
                         placeholder="Counter ₹"
-                        className="w-24 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                        className="w-24 rounded-lg border border-rule-strong bg-paper px-2 py-1.5 font-mono text-xs text-ink"
                       />
                       <button
                         type="button"
                         onClick={() => attemptResolve(exc, 'COUNTER')}
-                        className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-300"
+                        className="rounded-lg border border-haldi/30 bg-haldi-soft px-3 py-1.5 text-xs font-semibold text-haldi"
                       >
                         ↔ Counter
                       </button>
@@ -302,7 +302,7 @@ export default function ControlApprovalsPage() {
                   <button
                     type="button"
                     onClick={() => attemptResolve(exc, 'REJECT')}
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500"
+                    className="rounded-lg bg-madder px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
                   >
                     ✕ Reject
                   </button>
@@ -311,11 +311,11 @@ export default function ControlApprovalsPage() {
                     value={remarksDraft[exc.id] ?? ''}
                     onChange={(e) => setRemarksDraft((p) => ({ ...p, [exc.id]: e.target.value }))}
                     placeholder="Optional remarks..."
-                    className="ml-auto w-full sm:w-56 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100"
+                    className="ml-auto w-full sm:w-56 rounded-lg border border-rule-strong bg-paper px-3 py-1.5 text-xs text-ink"
                   />
                 </div>
               ) : (
-                <div className="mt-3 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-zinc-300">
+                <div className="mt-3 rounded-lg bg-paper border border-rule px-3 py-2 text-xs text-ink-2">
                   Resolved as <strong>{exc.status}</strong> by {exc.resolvedBy} at {exc.resolvedAt}
                   {exc.remarks && ` — "${exc.remarks}"`}
                   {exc.originOrderUnlocked && ` · Order ${exc.originOrderNo} unlocked`}
@@ -328,16 +328,16 @@ export default function ControlApprovalsPage() {
 
       {/* Step-up Auth Modal */}
       {stepUpTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               attemptResolve(stepUpTarget.exc, stepUpTarget.action, stepUpPassword);
             }}
-            className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
+            className="w-full max-w-md rounded-[4px] border border-rule bg-sheet p-6 shadow-xl"
           >
-            <h3 className="text-lg font-bold text-zinc-100">Owner Step-Up Verification (OD-002)</h3>
-            <p className="mt-1 text-xs text-zinc-400">
+            <h3 className="text-lg font-bold text-ink">Owner Step-Up Verification (OD-002)</h3>
+            <p className="mt-1 text-xs text-ink-3">
               High-value exception ({formatINR(stepUpTarget.exc.amountInr)} ≥ ₹5,000) requires Owner password.
             </p>
             <input
@@ -345,18 +345,18 @@ export default function ControlApprovalsPage() {
               value={stepUpPassword}
               onChange={(e) => setStepUpPassword(e.target.value)}
               placeholder="Enter Owner password"
-              className="mt-4 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="mt-4 w-full rounded-lg border border-rule-strong bg-paper px-3 py-2 text-sm text-ink"
               required
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setStepUpTarget(null)}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300"
+                className="rounded-lg border border-rule-strong px-4 py-2 text-sm font-semibold text-ink-2"
               >
                 Cancel
               </button>
-              <button type="submit" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
+              <button type="submit" className="rounded-lg bg-leaf px-4 py-2 text-sm font-semibold text-white">
                 Confirm &amp; Resolve
               </button>
             </div>

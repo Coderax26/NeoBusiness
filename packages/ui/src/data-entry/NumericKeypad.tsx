@@ -14,6 +14,7 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   onChange,
   onSubmit,
   allowDecimals = true,
+  submitLabel = 'Enter ↵',
   className = '',
 }) => {
   const handlePress = (char: string) => {
@@ -52,13 +53,13 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   return (
     <div className={`w-full max-w-sm mx-auto select-none ${className}`}>
       {/* Display */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 mb-3 text-right">
-        <span className="text-3xl font-mono font-bold text-white tracking-wider">
+      <div className="bg-sheet border border-rule-strong rounded-[6px] p-4 mb-3 text-right">
+        <span className="text-4xl font-semibold text-ink tabular-nums tracking-tight">
           {value || '0'}
         </span>
       </div>
 
-      {/* Grid of 56px touch buttons */}
+      {/* Grid of 56px+ touch buttons */}
       <div className="grid grid-cols-3 gap-2.5">
         {keys.flat().map((k, idx) => {
           if (!k) return <div key={idx} />;
@@ -70,10 +71,10 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
               key={idx}
               type="button"
               onClick={() => handlePress(k)}
-              className={`h-16 min-h-[56px] rounded-xl text-xl font-bold flex items-center justify-center transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-md ${
+              className={`h-[68px] min-h-[56px] rounded-[6px] text-2xl font-semibold flex items-center justify-center transition-colors active:scale-95 focus:outline-none focus:ring-2 focus:ring-action ${
                 isAction
-                  ? 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700'
-                  : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800'
+                  ? 'bg-sunken hover:bg-sheet text-haldi border border-rule-strong'
+                  : 'bg-sunken hover:bg-sheet text-ink border border-rule'
               }`}
             >
               {k === 'BACK' ? '⌫' : k}
@@ -87,7 +88,7 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
         <button
           type="button"
           onClick={() => handlePress('CLEAR')}
-          className="h-14 min-h-[56px] rounded-xl text-sm font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 active:scale-95"
+          className="h-14 min-h-[56px] rounded-[6px] text-base font-semibold bg-sheet hover:bg-sunken text-ink-2 border border-rule-strong active:scale-95"
         >
           Clear
         </button>
@@ -95,13 +96,12 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
           <button
             type="button"
             onClick={onSubmit}
-            className="h-14 min-h-[56px] rounded-xl text-base font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-lg shadow-teal-950/40 border border-teal-500/40 active:scale-95"
+            className="h-14 min-h-[56px] rounded-[6px] text-lg font-bold bg-[#F2C230] hover:bg-[#FAD14B] text-[#16140F] active:scale-95"
           >
-            Enter ↵
+            {submitLabel}
           </button>
         )}
       </div>
     </div>
   );
 };
-

@@ -142,7 +142,7 @@ export default function SalesReturnsPage() {
       id: 'returnNumber',
       header: 'Return No.',
       accessorKey: 'returnNumber',
-      cell: (info) => <span className="font-mono text-xs font-bold text-teal-400">{info.getValue() as string}</span>,
+      cell: (info) => <span className="font-mono text-xs font-bold text-action">{info.getValue() as string}</span>,
     },
     {
       id: 'order',
@@ -151,8 +151,8 @@ export default function SalesReturnsPage() {
         const r = info.row.original;
         return (
           <div className="text-xs">
-            <div className="font-bold text-white">{r.customerName}</div>
-            <Link href={`/sales/orders/${r.orderId}`} className="text-[11px] font-mono text-teal-400 hover:underline">
+            <div className="font-bold text-ink">{r.customerName}</div>
+            <Link href={`/sales/orders/${r.orderId}`} className="text-[11px] font-mono text-action hover:underline">
               {r.orderNumber}
             </Link>
           </div>
@@ -166,8 +166,8 @@ export default function SalesReturnsPage() {
         const r = info.row.original;
         return (
           <div className="text-xs">
-            <div className="text-zinc-200">{r.itemName}</div>
-            <div className="text-[11px] text-zinc-400">{r.qty} {r.uom} · {r.reason}</div>
+            <div className="text-ink">{r.itemName}</div>
+            <div className="text-[11px] text-ink-3">{r.qty} {r.uom} · {r.reason}</div>
           </div>
         );
       },
@@ -185,7 +185,7 @@ export default function SalesReturnsPage() {
       id: 'credit',
       header: 'Credit Amount',
       accessorKey: 'creditAmount',
-      cell: (info) => <span className="font-mono text-xs font-bold text-white">{formatINR(info.getValue() as number)}</span>,
+      cell: (info) => <span className="font-mono text-xs font-bold text-ink">{formatINR(info.getValue() as number)}</span>,
     },
     {
       id: 'status',
@@ -200,10 +200,10 @@ export default function SalesReturnsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <h1 className="text-2xl font-black text-white">Sales Returns &amp; Credit Notes</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Sales Returns &amp; Credit Notes</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Record returned goods against delivered orders, inspect condition, and trigger credit notes.
           </p>
         </div>
@@ -223,11 +223,11 @@ export default function SalesReturnsPage() {
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} title="Record Sales Return" maxWidth="md">
         <div className="space-y-4 my-2 text-xs">
           <div>
-            <label className="block text-zinc-300 font-semibold mb-1">Delivered Order</label>
+            <label className="block text-ink-2 font-semibold mb-1">Delivered Order</label>
             <select
               value={selectedOrderId}
               onChange={(e) => setSelectedOrderId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+              className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
             >
               {(deliveredOrders.length > 0 ? deliveredOrders : orders).map((o) => (
                 <option key={o.id} value={o.id}>
@@ -239,21 +239,21 @@ export default function SalesReturnsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-zinc-300 font-semibold mb-1">Return Qty ({firstLine.uom})</label>
+              <label className="block text-ink-2 font-semibold mb-1">Return Qty ({firstLine.uom})</label>
               <input
                 type="number"
                 min={1}
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white font-mono"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink font-mono"
               />
             </div>
             <div>
-              <label className="block text-zinc-300 font-semibold mb-1">Stock Condition</label>
+              <label className="block text-ink-2 font-semibold mb-1">Stock Condition</label>
               <select
                 value={condition}
                 onChange={(e) => setCondition(e.target.value as any)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
               >
                 <option value="RESALEABLE">Resaleable (Return to Stock)</option>
                 <option value="DAMAGED">Damaged (Scrap / Write-off)</option>
@@ -262,11 +262,11 @@ export default function SalesReturnsPage() {
           </div>
 
           <div>
-            <label className="block text-zinc-300 font-semibold mb-1">Return Reason</label>
+            <label className="block text-ink-2 font-semibold mb-1">Return Reason</label>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+              className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
             >
               {RETURN_REASONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -274,8 +274,8 @@ export default function SalesReturnsPage() {
             </select>
           </div>
 
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-300">
-            Credit Note Request Amount: <strong className="text-teal-400 font-mono">{formatINR((parseFloat(qty) || 1) * firstLine.unitPrice * (1 + firstLine.gstPct / 100))}</strong>
+          <div className="p-3 bg-paper border border-rule rounded-[3px] text-ink-2">
+            Credit Note Request Amount: <strong className="text-action font-mono">{formatINR((parseFloat(qty) || 1) * firstLine.unitPrice * (1 + firstLine.gstPct / 100))}</strong>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

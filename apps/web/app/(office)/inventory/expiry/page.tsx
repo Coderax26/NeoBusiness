@@ -75,24 +75,24 @@ export default function ExpiryWatchlistPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/inventory/stock" className="hover:text-white">Inventory</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/inventory/stock" className="hover:text-ink">Inventory</Link>
             <span>/</span>
-            <span className="text-amber-400">Batches &amp; Expiry Watchlist</span>
+            <span className="text-haldi">Batches &amp; Expiry Watchlist</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Expiry Watchlist &amp; FEFO Actions</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Expiry Watchlist &amp; FEFO Actions</h1>
+          <p className="text-sm text-ink-3">
             Grouped by urgency with suggested actions: Sell first, Discount, or Write off.
           </p>
         </div>
       </div>
 
       {/* Threshold Slider */}
-      <Card className="p-4 bg-zinc-900 border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <Card className="p-4 bg-sheet border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-zinc-300 font-medium">Expiry Horizon Threshold</span>
-            <span className="font-mono text-amber-400 font-bold" data-testid="threshold-value">
+            <span className="text-ink-2 font-medium">Expiry Horizon Threshold</span>
+            <span className="font-mono text-haldi font-bold" data-testid="threshold-value">
               ≤ {daysThreshold} days ({filteredBatches.length} batches)
             </span>
           </div>
@@ -109,21 +109,21 @@ export default function ExpiryWatchlistPage() {
 
       {/* Summary Buckets */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4 bg-rose-950/30 border-rose-500/40">
-          <div className="text-xs text-rose-300">Expired</div>
-          <div className="text-2xl font-bold text-rose-400 font-mono mt-1">{counts.expired}</div>
+        <Card className="p-4 bg-madder-soft border-madder/30">
+          <div className="text-xs text-madder">Expired</div>
+          <div className="text-2xl font-bold text-madder font-mono mt-1">{counts.expired}</div>
         </Card>
-        <Card className="p-4 bg-rose-950/20 border-rose-500/30">
-          <div className="text-xs text-rose-200">≤ 3 Days (Urgent)</div>
-          <div className="text-2xl font-bold text-rose-300 font-mono mt-1">{counts.le3}</div>
+        <Card className="p-4 bg-madder-soft border-madder/30">
+          <div className="text-xs text-madder">≤ 3 Days (Urgent)</div>
+          <div className="text-2xl font-bold text-madder font-mono mt-1">{counts.le3}</div>
         </Card>
-        <Card className="p-4 bg-amber-950/20 border-amber-500/30">
-          <div className="text-xs text-amber-200">≤ 7 Days (Warning)</div>
-          <div className="text-2xl font-bold text-amber-300 font-mono mt-1">{counts.le7}</div>
+        <Card className="p-4 bg-haldi-soft border-haldi/30">
+          <div className="text-xs text-haldi">≤ 7 Days (Warning)</div>
+          <div className="text-2xl font-bold text-haldi font-mono mt-1">{counts.le7}</div>
         </Card>
-        <Card className="p-4 bg-emerald-950/20 border-emerald-500/30">
-          <div className="text-xs text-emerald-200">≤ 30 Days</div>
-          <div className="text-2xl font-bold text-emerald-300 font-mono mt-1">{counts.le30}</div>
+        <Card className="p-4 bg-leaf-soft border-leaf/30">
+          <div className="text-xs text-leaf">≤ 30 Days</div>
+          <div className="text-2xl font-bold text-leaf font-mono mt-1">{counts.le30}</div>
         </Card>
       </div>
 
@@ -135,17 +135,17 @@ export default function ExpiryWatchlistPage() {
           return (
             <Card
               key={batch.id}
-              className="p-4 bg-zinc-900 border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              className="p-4 bg-sheet border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-4"
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-amber-400 font-bold">{batch.batchNo}</span>
+                  <span className="font-mono text-xs text-haldi font-bold">{batch.batchNo}</span>
                   <Badge variant={cls.color === 'rose' ? 'danger' : cls.color === 'amber' ? 'warning' : 'success'}>
                     {cls.label} ({batch.daysToExpiry}d)
                   </Badge>
                 </div>
-                <div className="text-base font-semibold text-white mt-1">{batch.itemName}</div>
-                <div className="text-xs text-zinc-400">
+                <div className="text-base font-semibold text-ink mt-1">{batch.itemName}</div>
+                <div className="text-xs text-ink-3">
                   {batch.siteName} ({batch.locationCode}) · {batch.onHand} {batch.uom} · Exp {batch.expiryDate}
                 </div>
               </div>

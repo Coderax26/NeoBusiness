@@ -65,8 +65,8 @@ export default function ErpExtensionsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Advanced ERP Extensions (Phase F13 / R4+)</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Advanced ERP Extensions (Phase F13 / R4+)</h1>
+          <p className="text-sm text-ink-3">
             Feature-flagged R4+ modules for CRM, Supply Chain, Quality Traceability, Bank Reconciliation, HR &amp; AI.
           </p>
         </div>
@@ -76,8 +76,8 @@ export default function ErpExtensionsPage() {
               key={p}
               type="button"
               onClick={() => setPriorityFilter(p)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                priorityFilter === p ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+                priorityFilter === p ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
               }`}
             >
               {p === 'ALL' ? 'All Priorities' : `Priority ${p}`}
@@ -88,31 +88,31 @@ export default function ErpExtensionsPage() {
 
       {/* Barcode & Batch Traceability Preview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
-          <h2 className="text-base font-bold text-zinc-100">Barcode / QR Input Abstraction</h2>
-          <p className="text-xs text-zinc-400">Supports keyboard-wedge hardware scanners and mobile camera input.</p>
+        <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
+          <h2 className="text-base font-bold text-ink">Barcode / QR Input Abstraction</h2>
+          <p className="text-xs text-ink-3">Supports keyboard-wedge hardware scanners and mobile camera input.</p>
           <input
             type="text"
             value={barcodeInput}
             onChange={(e) => setBarcodeInput(e.target.value)}
             placeholder="Scan barcode or batch number..."
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100"
+            className="w-full rounded-lg border border-rule-strong bg-paper px-3 py-2 font-mono text-sm text-ink"
           />
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs font-mono text-emerald-300">
+          <div className="rounded-lg border border-leaf/30 bg-leaf-soft p-3 text-xs font-mono text-leaf">
             Decoded Token: {barcodeInput || 'Waiting for scan'} · Ready for Floor Mode &amp; Blind Count
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-2">
-          <h2 className="text-base font-bold text-zinc-100">Batch Traceability Preview (Recall Readiness)</h2>
+        <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-2">
+          <h2 className="text-base font-bold text-ink">Batch Traceability Preview (Recall Readiness)</h2>
           {latestBatch ? (
             <>
-              <div className="text-xs text-zinc-300">Latest Batch: <strong className="font-mono text-amber-300">{latestBatch.batchNo}</strong></div>
-              <div className="text-xs text-zinc-300">Item: <strong>{latestBatch.itemName}</strong></div>
-              <div className="text-xs text-zinc-300">Site: <strong>{latestBatch.siteName}</strong></div>
+              <div className="text-xs text-ink-2">Latest Batch: <strong className="font-mono text-haldi">{latestBatch.batchNo}</strong></div>
+              <div className="text-xs text-ink-2">Item: <strong>{latestBatch.itemName}</strong></div>
+              <div className="text-xs text-ink-2">Site: <strong>{latestBatch.siteName}</strong></div>
             </>
           ) : (
-            <div className="text-xs text-zinc-400">No active inventory batches found.</div>
+            <div className="text-xs text-ink-3">No active inventory batches found.</div>
           )}
         </div>
       </div>
@@ -120,25 +120,25 @@ export default function ErpExtensionsPage() {
       {/* Extensions Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {filtered.length === 0 && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+          <div className="rounded-[3px] border border-rule bg-sheet p-6 text-sm text-ink-3">
             No feature flags configured.
           </div>
         )}
         {filtered.map((ext) => (
-          <div key={ext.id} className="flex items-start justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <div key={ext.id} className="flex items-start justify-between gap-4 rounded-[3px] border border-rule bg-sheet p-5">
             <div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="rounded bg-zinc-800 px-2 py-0.5 font-semibold text-zinc-300">{ext.domain}</span>
-                <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold text-amber-300">Priority {ext.priority}</span>
+                <span className="rounded bg-sunken px-2 py-0.5 font-semibold text-ink-2">{ext.domain}</span>
+                <span className="rounded bg-haldi-soft px-2 py-0.5 font-bold text-haldi">Priority {ext.priority}</span>
               </div>
-              <h3 className="mt-2 text-base font-bold text-zinc-100">{ext.title}</h3>
-              <p className="mt-1 text-xs text-zinc-400">{ext.description}</p>
+              <h3 className="mt-2 text-base font-bold text-ink">{ext.title}</h3>
+              <p className="mt-1 text-xs text-ink-3">{ext.description}</p>
             </div>
             <button
               type="button"
               onClick={() => toggleFlag(ext.id)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                ext.enabledFlag ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-300'
+              className={`rounded-full px-3 py-1 text-xs font-semibold${
+                ext.enabledFlag ? 'bg-leaf text-white' : 'bg-sunken text-ink-2'
               }`}
             >
               {ext.enabledFlag ? 'Flag ON' : 'Flag OFF'}

@@ -30,45 +30,47 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   const points = sparklineValues ? buildSparklineSvgPoints(sparklineValues, 100, 28) : '';
 
   const toneClasses: Record<string, string> = {
-    default: 'border-zinc-800 bg-zinc-900/60 text-zinc-100',
-    brand: 'border-teal-500/30 bg-teal-950/20 text-teal-100',
-    info: 'border-sky-500/30 bg-sky-950/20 text-sky-100',
-    success: 'border-emerald-500/30 bg-emerald-950/20 text-emerald-100',
-    warning: 'border-amber-500/30 bg-amber-950/20 text-amber-100',
-    danger: 'border-rose-500/30 bg-rose-950/20 text-rose-100',
+    default: 'border-rule bg-sheet text-ink',
+    brand: 'border-action/30 bg-sheet text-ink',
+    info: 'border-action/30 bg-sheet text-ink',
+    success: 'border-leaf/30 bg-sheet text-ink',
+    warning: 'border-haldi/40 bg-haldi-soft/50 text-ink',
+    danger: 'border-madder/40 bg-madder-soft/50 text-ink',
   };
 
   return (
     <div
       onClick={onClick}
-      className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg transition-transform hover:-translate-y-0.5 ${
-        onClick ? 'cursor-pointer' : ''
+      className={`px-4 py-3.5 rounded-[4px] border flex flex-col justify-between transition-colors ${
+        onClick ? 'cursor-pointer hover:border-action' : ''
       } ${toneClasses[tone] || toneClasses.default}`}
     >
-      <div className="flex items-start justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[13px] font-medium text-ink-2">
           {title}
         </span>
         {trend && (
           <span
-            className={`text-xs font-medium px-2 py-0.5 rounded ${
+            className={`text-[12.5px] font-medium ${
               trend.direction === 'up'
-                ? 'bg-emerald-500/15 text-emerald-400'
+                ? 'text-leaf'
                 : trend.direction === 'down'
-                ? 'bg-rose-500/15 text-rose-400'
-                : 'bg-zinc-700/20 text-zinc-400'
+                ? 'text-madder'
+                : 'text-ink-3'
             }`}
           >
-            {trend.direction === 'up' ? '↑ ' : trend.direction === 'down' ? '↓ ' : '→ '}
+            {trend.direction === 'up' ? '↑ ' : trend.direction === 'down' ? '↓ ' : ''}
             {trend.label}
           </span>
         )}
       </div>
 
-      <div className="my-3 flex items-baseline justify-between">
-        <div className="text-2xl font-bold font-mono tracking-tight text-white">{value}</div>
+      <div className="my-2 flex items-baseline justify-between">
+        <div className="text-[26px] leading-tight font-serif font-medium text-ink tabular-nums">
+          {value}
+        </div>
         {points && (
-          <svg className="w-24 h-7 text-teal-400" fill="none">
+          <svg className="w-24 h-7 text-action" fill="none">
             <polyline
               fill="none"
               stroke="currentColor"
@@ -81,7 +83,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         )}
       </div>
 
-      {subtitle && <span className="text-xs text-zinc-400">{subtitle}</span>}
+      {subtitle && <span className="text-[13px] text-ink-3">{subtitle}</span>}
     </div>
   );
 };
@@ -94,18 +96,18 @@ export const StatCompare: React.FC<{
   isFavorable?: boolean;
 }> = ({ label, expected, actual, variance, isFavorable = true }) => {
   return (
-    <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between text-xs">
+    <div className="p-3 bg-paper border border-rule rounded-[3px] flex items-center justify-between text-[13px]">
       <div>
-        <div className="text-zinc-400 font-medium">{label}</div>
-        <div className="mt-1 flex items-center gap-2 font-mono">
-          <span className="text-zinc-300">Exp: {expected}</span>
-          <span className="text-zinc-500">|</span>
-          <span className="font-bold text-white">Act: {actual}</span>
+        <div className="text-ink-2 font-medium">{label}</div>
+        <div className="mt-1 flex items-center gap-2 font-mono text-[13px]">
+          <span className="text-ink-3">Exp: {expected}</span>
+          <span className="text-rule-strong">|</span>
+          <span className="font-semibold text-ink">Act: {actual}</span>
         </div>
       </div>
       <div
-        className={`px-2 py-1 rounded font-mono font-bold ${
-          isFavorable ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'
+        className={`px-2 py-0.5 rounded-[3px] font-mono text-[12.5px] font-medium ${
+          isFavorable ? 'bg-leaf-soft text-leaf' : 'bg-madder-soft text-madder'
         }`}
       >
         {variance}
@@ -121,19 +123,19 @@ export const CreditMeter: React.FC<{
 }> = ({ used, limit, customerName }) => {
   const pct = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 100;
   const isOver = used > limit;
-  const toneClass = isOver || pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : 'bg-emerald-500';
+  const toneClass = isOver || pct > 90 ? 'bg-madder' : pct > 75 ? 'bg-haldi' : 'bg-action';
 
   return (
-    <div className="w-full p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
-      <div className="flex justify-between items-center text-xs mb-1.5">
-        <span className="font-semibold text-zinc-300">
-          {customerName ? `${customerName} Credit` : 'Credit Utilization'}
+    <div className="w-full p-3 bg-paper border border-rule rounded-[3px]">
+      <div className="flex justify-between items-center text-[13px] mb-1.5">
+        <span className="font-medium text-ink">
+          {customerName ? `${customerName} Credit` : 'Credit utilization'}
         </span>
-        <span className="font-mono text-zinc-400">
+        <span className="font-mono text-ink-2">
           {formatINR(used)} / {formatINR(limit)} ({pct}%)
         </span>
       </div>
-      <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+      <div className="w-full h-2 rounded-[1px] bg-sunken overflow-hidden">
         <div className={`h-full ${toneClass}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -145,19 +147,19 @@ export const PriceBandChip: React.FC<{
   floorPrice: string;
   targetPrice: string;
   currentPrice: string;
-}> = ({ costPrice, floorPrice, targetPrice, currentPrice }) => {
+}> = ({ floorPrice, targetPrice, currentPrice }) => {
   const numCurrent = parseFloat(currentPrice);
   const numFloor = parseFloat(floorPrice);
   const isBelow = numCurrent < numFloor;
 
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono bg-zinc-900/90 border-zinc-800">
-      <span className="text-zinc-400">Floor: ₹{floorPrice}</span>
-      <span className="text-zinc-600">•</span>
-      <span className="text-zinc-400">Target: ₹{targetPrice}</span>
+    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] border text-[13px] font-mono bg-paper border-rule-strong">
+      <span className="text-ink-2">Floor: ₹{floorPrice}</span>
+      <span className="text-rule-strong">·</span>
+      <span className="text-ink-2">Target: ₹{targetPrice}</span>
       <span
-        className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-          isBelow ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+        className={`px-2 py-0.5 rounded-[3px] text-[12.5px] font-semibold ${
+          isBelow ? 'bg-madder-soft text-madder' : 'bg-leaf-soft text-leaf'
         }`}
       >
         {isBelow ? 'Below Floor' : 'In Band'}
@@ -172,12 +174,12 @@ export const MarginBadge: React.FC<{ marginPct: number }> = ({ marginPct }) => {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[3px] text-[13px] font-mono font-semibold border ${
         isHigh
-          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+          ? 'bg-leaf-soft text-leaf border-leaf/30'
           : isMid
-          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-          : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+          ? 'bg-haldi-soft text-haldi border-haldi/30'
+          : 'bg-madder-soft text-madder border-madder/30'
       }`}
     >
       Margin: {marginPct.toFixed(1)}%
@@ -196,18 +198,18 @@ export interface TimelineEvent {
 
 export const Timeline: React.FC<{ events: TimelineEvent[] }> = ({ events }) => {
   return (
-    <div className="relative pl-6 border-l-2 border-zinc-800 space-y-6 my-4">
+    <div className="relative pl-6 border-l border-rule-strong space-y-5 my-4">
       {events.map((ev) => (
         <div key={ev.id} className="relative">
-          <span className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-teal-500 ring-4 ring-zinc-950" />
-          <div className="text-xs font-bold text-white">{ev.title}</div>
-          <div className="text-[11px] text-zinc-400 mt-0.5 flex gap-2">
+          <span className="absolute -left-[29px] top-1.5 w-2.5 h-2.5 rounded-full bg-leaf ring-4 ring-sheet" />
+          <div className="text-[14px] font-medium text-ink">{ev.title}</div>
+          <div className="text-[13px] text-ink-3 mt-0.5 flex gap-2">
             <span>By {ev.actor}</span>
-            <span>•</span>
+            <span>·</span>
             <span>{formatISTDate(ev.timestamp, true)}</span>
           </div>
           {ev.notes && (
-            <p className="mt-1 text-xs text-zinc-300 bg-zinc-900/60 p-2 rounded border border-zinc-800">
+            <p className="mt-1.5 text-[13px] text-ink-2 bg-paper p-2 rounded-[3px] border border-rule">
               {ev.notes}
             </p>
           )}
@@ -239,25 +241,26 @@ export const ExceptionCard: React.FC<ExceptionCardProps> = ({
   onCounter,
 }) => {
   return (
-    <div className="p-4 rounded-xl border border-amber-500/40 bg-zinc-900/80 shadow-md">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-          {type}
+    <div className="p-4 rounded-[4px] border border-rule-strong bg-sheet">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-haldi">
+          <span className="w-[7px] h-[7px] rounded-full bg-current" />
+          {type.replace(/_/g, ' ')}
         </span>
-        <span className="text-xs text-zinc-500 font-mono">ID: {id}</span>
+        <span className="text-[12.5px] text-ink-3 font-mono">{id}</span>
       </div>
-      <h4 className="text-sm font-bold text-white mb-1">{title}</h4>
-      <p className="text-xs text-zinc-300 mb-2 leading-relaxed">{summary}</p>
-      <div className="text-xs text-rose-300 bg-rose-950/20 p-2 rounded mb-4 border border-rose-500/20">
-        <strong>Business Impact:</strong> {impact}
+      <h4 className="text-[15px] font-medium text-ink mb-1">{title}</h4>
+      <p className="text-[13.5px] text-ink-2 mb-2 leading-relaxed">{summary}</p>
+      <div className="text-[13px] text-madder bg-madder-soft px-3 py-2 rounded-[3px] mb-3 border-l-2 border-madder">
+        <strong>Impact:</strong> {impact}
       </div>
       <div className="flex gap-2 justify-end">
         {onCounter && (
-          <Button size="sm" variant="ghost" onClick={() => onCounter(id)}>
-            Counter Offer
+          <Button size="sm" variant="secondary" onClick={() => onCounter(id)}>
+            Counter offer
           </Button>
         )}
-        <Button size="sm" variant="danger" onClick={() => onReject(id)}>
+        <Button size="sm" variant="ghost" onClick={() => onReject(id)}>
           Reject
         </Button>
         <Button size="sm" variant="primary" onClick={() => onApprove(id)}>
@@ -276,7 +279,6 @@ export interface KanbanColumn<T> {
 
 export function KanbanBoard<T extends { id: string; title: string; subtitle?: string; badge?: string }>({
   columns,
-  onMoveItem,
 }: {
   columns: KanbanColumn<T>[];
   onMoveItem?: (itemId: string, targetColId: string) => void;
@@ -284,10 +286,10 @@ export function KanbanBoard<T extends { id: string; title: string; subtitle?: st
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-x-auto pb-4">
       {columns.map((col) => (
-        <div key={col.id} className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">{col.title}</h4>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-mono">
+        <div key={col.id} className="bg-paper border border-rule rounded-[4px] p-3.5 flex flex-col">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-ink">
+            <h4 className="text-[14px] font-semibold text-ink">{col.title}</h4>
+            <span className="text-[13px] text-ink-3 font-mono">
               {col.items.length}
             </span>
           </div>
@@ -295,12 +297,12 @@ export function KanbanBoard<T extends { id: string; title: string; subtitle?: st
             {col.items.map((item) => (
               <div
                 key={item.id}
-                className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-700 transition-colors shadow-sm"
+                className="p-3 bg-sheet border border-rule rounded-[3px] hover:border-action transition-colors"
               >
-                <div className="text-xs font-bold text-white mb-1">{item.title}</div>
-                {item.subtitle && <div className="text-[11px] text-zinc-400">{item.subtitle}</div>}
+                <div className="text-[14px] font-medium text-ink mb-1">{item.title}</div>
+                {item.subtitle && <div className="text-[13px] text-ink-3">{item.subtitle}</div>}
                 {item.badge && (
-                  <span className="mt-2 inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-500/15 text-teal-300">
+                  <span className="mt-2 inline-block text-[12.5px] font-medium px-2 py-0.5 rounded-[3px] bg-action-soft text-action">
                     {item.badge}
                   </span>
                 )}
@@ -321,12 +323,11 @@ export const DocumentViewer: React.FC<{
 }> = ({ open, onClose, title, documentUrl }) => {
   return (
     <Dialog open={open} onClose={onClose} title={title} maxWidth="xl">
-      <div className="w-full h-96 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-center p-4">
+      <div className="w-full h-96 bg-paper border border-rule rounded-[4px] flex items-center justify-center p-4">
         {documentUrl ? (
-          <iframe src={documentUrl} title={title} className="w-full h-full rounded" />
+          <iframe src={documentUrl} title={title} className="w-full h-full rounded-[3px] bg-white" />
         ) : (
-          <div className="text-center text-zinc-400 text-xs">
-            <div className="text-3xl mb-2">📄</div>
+          <div className="text-center text-ink-3 text-[13.5px]">
             <span>Document Preview</span>
           </div>
         )}
@@ -347,21 +348,20 @@ export const AgingBuckets: React.FC<{
   buckets: { label: string; amount: string; count: number; tone: 'info' | 'warning' | 'danger' }[];
 }> = ({ buckets }) => {
   const toneClasses = {
-    info: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    warning: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    danger: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+    info: 'bg-sheet text-ink border-rule',
+    warning: 'bg-haldi-soft text-haldi border-haldi/30',
+    danger: 'bg-madder-soft text-madder border-madder/30',
   };
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
       {buckets.map((b, idx) => (
-        <div key={idx} className={`p-3.5 rounded-xl border ${toneClasses[b.tone]}`}>
-          <div className="text-xs font-semibold uppercase">{b.label}</div>
-          <div className="text-lg font-bold font-mono mt-1 text-white">{formatINR(b.amount)}</div>
-          <div className="text-[11px] opacity-80 mt-0.5">{b.count} invoices</div>
+        <div key={idx} className={`p-3.5 rounded-[4px] border ${toneClasses[b.tone]}`}>
+          <div className="text-[13px] font-medium text-ink-2">{b.label}</div>
+          <div className="text-[22px] font-serif font-medium mt-1 text-ink tabular-nums">{formatINR(b.amount)}</div>
+          <div className="text-[12.5px] text-ink-3 mt-0.5">{b.count} invoices</div>
         </div>
       ))}
     </div>
   );
 };
-

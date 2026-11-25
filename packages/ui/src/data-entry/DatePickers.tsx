@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { formatISTDate } from '@neo/shared';
+import React from 'react';
 
 export interface DateRange {
   startDate: string; // YYYY-MM-DD
@@ -23,19 +22,19 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 }) => {
   return (
     <div className="w-full">
-      <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+      <label className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
         {label}
       </label>
       <input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[40px]"
+        className="w-full bg-sheet border border-rule-strong rounded-[3px] px-3.5 py-2 text-[14.5px] text-ink focus:outline-none focus:ring-2 focus:ring-action/25 focus:border-action min-h-[40px]"
       />
       {error ? (
-        <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">{error}</p>
+        <p role="alert" className="text-[13px] text-madder mt-1 font-medium">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+        <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
       ) : null}
     </div>
   );
@@ -79,7 +78,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         return { startDate: toYMD(start), endDate: toYMD(end) };
       }
       case 'fy': {
-        // Indian Fiscal Year starts April 1
         const currentYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
         const start = new Date(currentYear, 3, 1);
         return { startDate: toYMD(start), endDate: toYMD(now) };
@@ -98,7 +96,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   return (
     <div className="w-full">
-      <label className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+      <label className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
         {label}
       </label>
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -107,7 +105,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             key={p.id}
             type="button"
             onClick={() => onChange(getPreset(p.id))}
-            className="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+            className="px-2.5 py-1 text-[13px] font-medium rounded-[3px] bg-paper hover:bg-sunken text-ink-2 hover:text-ink border border-rule-strong transition-colors"
           >
             {p.label}
           </button>
@@ -118,17 +116,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           type="date"
           value={range.startDate}
           onChange={(e) => onChange({ ...range, startDate: e.target.value })}
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-100 min-h-[36px]"
+          className="flex-1 bg-sheet border border-rule-strong rounded-[3px] px-3 py-1.5 text-[13.5px] text-ink min-h-[36px]"
         />
-        <span className="text-zinc-500 text-xs">to</span>
+        <span className="text-ink-3 text-[13px]">to</span>
         <input
           type="date"
           value={range.endDate}
           onChange={(e) => onChange({ ...range, endDate: e.target.value })}
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-100 min-h-[36px]"
+          className="flex-1 bg-sheet border border-rule-strong rounded-[3px] px-3 py-1.5 text-[13.5px] text-ink min-h-[36px]"
         />
       </div>
     </div>
   );
 };
-

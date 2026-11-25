@@ -35,21 +35,21 @@ export const Drawer: React.FC<DrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end">
       <div
         role="dialog"
         aria-modal="true"
-        className={`w-full ${widthClasses[width]} h-full bg-zinc-900 border-l border-zinc-800 flex flex-col shadow-2xl animate-slide-left`}
+        className={`w-full ${widthClasses[width]} h-full bg-sheet border-l border-rule-strong flex flex-col shadow-2xl text-ink`}
       >
-        <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-rule flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">{title}</h3>
-            {subtitle && <p className="text-xs text-zinc-400 mt-0.5">{subtitle}</p>}
+            <h3 className="text-[20px] font-serif font-medium text-ink tracking-tight">{title}</h3>
+            {subtitle && <p className="text-[13px] text-ink-3 mt-0.5">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 focus:outline-none"
+            className="p-1.5 text-ink-3 hover:text-ink rounded-[3px] hover:bg-paper focus:outline-none focus:ring-2 focus:ring-action"
             aria-label="Close drawer"
           >
             ✕
@@ -92,10 +92,10 @@ export const Toast: React.FC<{
   return (
     <div
       role="status"
-      className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 shadow-2xl text-sm text-zinc-100 min-w-[320px] max-w-md animate-slide-up"
+      className="flex items-center justify-between gap-4 px-4 py-3 rounded-[4px] bg-sheet border border-rule-strong shadow-lg text-[14px] text-ink min-w-[320px] max-w-md"
     >
       <div className="flex items-center gap-2">
-        <span className="text-emerald-400 font-bold">✓</span>
+        <span className="text-leaf font-bold">✓</span>
         <span>{toast.message}</span>
       </div>
 
@@ -108,7 +108,7 @@ export const Toast: React.FC<{
               toast.undoAction?.();
               onDismiss(toast.id);
             }}
-            className="text-xs text-teal-300 hover:text-teal-200 border-teal-500/40"
+            className="text-[13px] text-action"
           >
             Undo ({secondsRemaining}s)
           </Button>
@@ -116,7 +116,7 @@ export const Toast: React.FC<{
         <button
           type="button"
           onClick={() => onDismiss(toast.id)}
-          className="text-zinc-500 hover:text-zinc-300 text-xs p-1"
+          className="text-ink-3 hover:text-ink text-xs p-1"
           aria-label="Dismiss toast"
         >
           ✕
@@ -125,4 +125,3 @@ export const Toast: React.FC<{
     </div>
   );
 };
-

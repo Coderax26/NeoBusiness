@@ -89,15 +89,15 @@ export default function TripExpensesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Trip Expenses</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Trip Expenses</h1>
+          <p className="text-sm text-ink-3">
             Track fuel, toll, loading, food, and repair expenses per trip and summarise monthly spend by vehicle.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowAddModal(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          className="rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
         >
           + Log Expense
         </button>
@@ -106,9 +106,9 @@ export default function TripExpensesPage() {
       {/* Vehicle Monthly Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {totalByVehicle.map(([regNo, total]) => (
-          <div key={regNo} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="text-xs font-medium text-zinc-400">Monthly Spend · {regNo}</div>
-            <div className="mt-1 text-xl font-bold text-zinc-100">₹{total.toLocaleString('en-IN')}</div>
+          <div key={regNo} className="rounded-[3px] border border-rule bg-sheet p-4">
+            <div className="text-xs font-medium text-ink-3">Monthly Spend · {regNo}</div>
+            <div className="mt-1 text-xl font-bold text-ink">₹{total.toLocaleString('en-IN')}</div>
           </div>
         ))}
       </div>
@@ -120,10 +120,10 @@ export default function TripExpensesPage() {
             key={cat}
             type="button"
             onClick={() => setCategoryFilter(cat)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
               categoryFilter === cat
                 ? 'bg-blue-600 text-white'
-                : 'border border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
             }`}
           >
             {cat}
@@ -132,9 +132,9 @@ export default function TripExpensesPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Trip / Vehicle</th>
@@ -143,31 +143,31 @@ export default function TripExpensesPage() {
               <th className="px-4 py-3 text-right">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {filteredExpenses.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
+                <td colSpan={5} className="px-4 py-6 text-center text-sm text-ink-3">
                   No trip expenses recorded.
                 </td>
               </tr>
             ) : (
               filteredExpenses.map((exp) => (
-                <tr key={exp.id} className="hover:bg-zinc-800/40">
-                  <td className="px-4 py-3 text-zinc-400">{exp.date}</td>
+                <tr key={exp.id} className="hover:bg-sunken">
+                  <td className="px-4 py-3 text-ink-3">{exp.date}</td>
                   <td className="px-4 py-3">
-                    <Link href={`/logistics/trips/${exp.tripId}`} className="font-semibold text-blue-400 hover:underline">
+                    <Link href={`/logistics/trips/${exp.tripId}`} className="font-semibold text-action hover:underline">
                       {exp.tripNo}
                     </Link>
-                    <div className="text-xs text-zinc-400">{exp.vehicleRegNo}</div>
+                    <div className="text-xs text-ink-3">{exp.vehicleRegNo}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs font-semibold text-zinc-300">{exp.category}</span>
+                    <span className="rounded bg-sunken px-2 py-0.5 text-xs font-semibold text-ink-2">{exp.category}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-zinc-200">{exp.notes}</div>
-                    {exp.receiptName && <div className="font-mono text-xs text-zinc-500">🧾 {exp.receiptName}</div>}
+                    <div className="text-ink">{exp.notes}</div>
+                    {exp.receiptName && <div className="font-mono text-xs text-ink-3">🧾 {exp.receiptName}</div>}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-100">
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-ink">
                     ₹{exp.amount.toLocaleString('en-IN')}
                   </td>
                 </tr>
@@ -179,16 +179,16 @@ export default function TripExpensesPage() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <form onSubmit={addExpense} className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-zinc-100">Log Trip Expense</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <form onSubmit={addExpense} className="w-full max-w-md rounded-[4px] border border-rule bg-sheet p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-ink">Log Trip Expense</h2>
             <div className="mt-4 space-y-3 text-sm">
               <div>
-                <label className="block text-xs font-semibold text-zinc-400">Trip</label>
+                <label className="block text-xs font-semibold text-ink-3">Trip</label>
                 <select
                   value={newTripId}
                   onChange={(e) => setNewTripId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="mt-1 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-ink"
                 >
                   {trips.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -198,11 +198,11 @@ export default function TripExpensesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-zinc-400">Category</label>
+                <label className="block text-xs font-semibold text-ink-3">Category</label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as TripExpenseRecord['category'])}
-                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="mt-1 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-ink"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -212,23 +212,23 @@ export default function TripExpensesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-zinc-400">Amount (₹)</label>
+                <label className="block text-xs font-semibold text-ink-3">Amount (₹)</label>
                 <input
                   type="number"
                   value={newAmount}
                   onChange={(e) => setNewAmount(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="mt-1 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-ink"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-zinc-400">Notes</label>
+                <label className="block text-xs font-semibold text-ink-3">Notes</label>
                 <input
                   type="text"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                   placeholder="Pump name, toll plaza, or repair memo"
-                  className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="mt-1 w-full rounded-lg border border-rule bg-paper px-3 py-2 text-ink"
                 />
               </div>
             </div>
@@ -236,11 +236,11 @@ export default function TripExpensesPage() {
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                className="rounded-lg border border-rule-strong bg-paper px-4 py-2 text-sm font-semibold text-ink-2 hover:bg-sunken"
               >
                 Cancel
               </button>
-              <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              <button type="submit" className="rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                 Save Expense
               </button>
             </div>

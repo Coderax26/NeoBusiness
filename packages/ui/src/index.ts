@@ -43,30 +43,26 @@ export const DESIGN_TOKENS = {
   themes: {
     obsidianDark: {
       canvas: 'bg-zinc-950 text-zinc-100',
-      glassCard:
-        'backdrop-blur-md bg-zinc-900/60 border border-zinc-800/70 shadow-xl shadow-black/25',
-      elevatedCard:
-        'backdrop-blur-xl bg-zinc-900/80 border border-indigo-500/30 shadow-2xl shadow-indigo-950/30',
+      glassCard: 'bg-sheet border border-rule rounded-[4px]',
+      elevatedCard: 'bg-sheet border border-rule-strong rounded-[4px]',
     },
     cleanSlateLight: {
-      canvas: 'bg-slate-50 text-slate-900',
-      glassCard:
-        'backdrop-blur-md bg-white/80 border border-slate-200/80 shadow-lg shadow-slate-900/5',
-      elevatedCard:
-        'backdrop-blur-xl bg-white/95 border border-indigo-500/30 shadow-xl shadow-indigo-900/10',
+      canvas: 'bg-paper text-ink',
+      glassCard: 'bg-sheet border border-rule rounded-[4px]',
+      elevatedCard: 'bg-sheet border border-rule-strong rounded-[4px]',
     },
   },
   accents: {
-    emerald: { hex: '#10B981', badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-    indigo: { hex: '#6366F1', badge: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
-    amber: { hex: '#F59E0B', badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-    rose: { hex: '#EF4444', badge: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
-    neutral: { hex: '#71717A', badge: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
+    emerald: { hex: '#2D6A40', badge: 'bg-leaf-soft text-leaf border-leaf/30' },
+    indigo: { hex: '#2A4384', badge: 'bg-action-soft text-action border-action/30' },
+    amber: { hex: '#94600E', badge: 'bg-haldi-soft text-haldi border-haldi/30' },
+    rose: { hex: '#A3342B', badge: 'bg-madder-soft text-madder border-madder/30' },
+    neutral: { hex: '#77716A', badge: 'bg-sunken text-ink-2 border-rule-strong' },
   },
   typography: {
-    sans: 'Inter, system-ui, sans-serif',
-    mono: '"JetBrains Mono", monospace',
-    devanagari: '"Noto Sans Devanagari", sans-serif',
+    sans: '"IBM Plex Sans", "IBM Plex Sans Devanagari", system-ui, sans-serif',
+    mono: '"IBM Plex Mono", monospace',
+    devanagari: '"IBM Plex Sans Devanagari", "Noto Sans Devanagari", sans-serif',
     devanagariLineHeight: 1.6,
   },
   touchTargetMinPx: 48,

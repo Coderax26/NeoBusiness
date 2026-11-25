@@ -13,14 +13,14 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const variantClasses = {
-    glass: 'backdrop-blur-md bg-zinc-900/60 border border-zinc-800/80 shadow-lg',
-    elevated: 'backdrop-blur-xl bg-zinc-900/90 border border-teal-500/30 shadow-xl shadow-teal-950/20',
-    outline: 'bg-transparent border border-zinc-800',
+    glass: 'bg-sheet border border-rule',
+    elevated: 'bg-sheet border border-rule-strong',
+    outline: 'bg-transparent border border-rule',
   };
 
   const densityClasses = {
-    comfortable: 'p-6 rounded-2xl',
-    compact: 'p-4 rounded-xl',
+    comfortable: 'p-5 rounded-[4px]',
+    compact: 'p-3.5 rounded-[3px]',
   };
 
   return (
@@ -42,7 +42,7 @@ export interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeId, onChange, className = '' }) => {
   return (
-    <div className={`flex border-b border-zinc-800 gap-2 overflow-x-auto ${className}`} role="tablist">
+    <div className={`flex border-b border-rule gap-6 overflow-x-auto ${className}`} role="tablist">
       {tabs.map((tab) => {
         const isActive = tab.id === activeId;
         return (
@@ -51,17 +51,17 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeId, onChange, className 
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
-            className={`pb-3 pt-1 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 focus:outline-none ${
+            className={`pb-2.5 pt-1 text-[14px] border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 focus:outline-none ${
               isActive
-                ? 'border-teal-400 text-teal-300 font-semibold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                ? 'border-ink text-ink font-semibold'
+                : 'border-transparent text-ink-2 hover:text-ink font-medium'
             }`}
           >
             <span>{tab.label}</span>
             {tab.count !== undefined && (
               <span
-                className={`text-[11px] px-1.5 py-0.5 rounded-full ${
-                  isActive ? 'bg-teal-500/20 text-teal-200' : 'bg-zinc-800 text-zinc-400'
+                className={`text-[13px] px-1.5 py-0.5 rounded-[3px] ${
+                  isActive ? 'bg-sunken text-ink' : 'text-ink-3'
                 }`}
               >
                 {tab.count}
@@ -83,25 +83,24 @@ export const Accordion: React.FC<AccordionProps> = ({ items, defaultOpenId }) =>
   const [openId, setOpenId] = useState<string | null>(defaultOpenId || null);
 
   return (
-    <div className="divide-y divide-zinc-800 border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="divide-y divide-rule border border-rule rounded-[4px] overflow-hidden">
       {items.map((item) => {
         const isOpen = openId === item.id;
         return (
-          <div key={item.id} className="bg-zinc-900/40">
+          <div key={item.id} className="bg-sheet">
             <button
               type="button"
               onClick={() => setOpenId(isOpen ? null : item.id)}
-              className="w-full py-3.5 px-4 flex items-center justify-between text-left text-sm font-medium text-zinc-200 hover:text-white transition-colors focus:outline-none focus:bg-zinc-800/40"
+              className="w-full py-3.5 px-4 flex items-center justify-between text-left text-[14px] font-medium text-ink hover:bg-paper transition-colors focus:outline-none"
               aria-expanded={isOpen}
             >
               <span>{item.title}</span>
-              <span className={`transform transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+              <span className={`text-ink-3 text-xs transform transition-transform ${isOpen ? 'rotate-180' : ''}`}>▾</span>
             </button>
-            {isOpen && <div className="p-4 pt-1 text-sm text-zinc-300 bg-zinc-950/30">{item.content}</div>}
+            {isOpen && <div className="p-4 pt-2 text-[14px] text-ink-2 bg-paper/60 border-t border-rule">{item.content}</div>}
           </div>
         );
       })}
     </div>
   );
 };
-

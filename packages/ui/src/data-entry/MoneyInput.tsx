@@ -86,20 +86,20 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
     const inputId = id || (label ? `money-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
 
     const sizeClasses = {
-      md: 'min-h-[40px] text-sm py-2 px-3',
-      floor: 'min-h-[56px] text-lg font-bold py-3 px-4 rounded-xl',
+      md: 'min-h-[40px] text-[14.5px] py-2 px-3',
+      floor: 'min-h-[56px] text-lg font-bold py-3 px-4 rounded-[6px]',
     };
 
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-xs font-semibold text-zinc-300 mb-1.5 select-none">
+          <label htmlFor={inputId} className="block text-[13px] font-medium text-ink-2 mb-1.5 select-none">
             {label}
-            {required && <span className="text-rose-400 ml-1">*</span>}
+            {required && <span className="text-madder ml-1">*</span>}
           </label>
         )}
         <div className="relative flex items-center">
-          <span className="absolute left-3 text-zinc-500 font-medium pointer-events-none text-sm select-none">
+          <span className="absolute left-3 text-ink-3 font-medium pointer-events-none text-sm select-none">
             ₹
           </span>
           <input
@@ -115,16 +115,16 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
             }}
             onChange={(e) => setDisplayStr(e.target.value)}
             onBlur={handleBlur}
-            className={`w-full bg-zinc-900 border rounded-lg pl-7 pr-3 text-right font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
+            className={`w-full bg-sheet border rounded-[3px] pl-7 pr-3 text-right font-mono tabular-nums text-ink placeholder-ink-3 focus:outline-none focus:ring-2 focus:ring-action/25 transition-colors ${
               sizeClasses[size]
-            } ${error ? 'border-rose-500 bg-rose-950/10' : 'border-zinc-800 focus:border-teal-500'} ${className}`}
+            } ${error ? 'border-madder bg-madder-soft' : 'border-rule-strong focus:border-action'} ${className}`}
             placeholder="0.00"
           />
         </div>
         {error ? (
-          <p role="alert" className="text-xs text-rose-400 mt-1 font-medium">{error}</p>
+          <p role="alert" className="text-[13px] text-madder mt-1 font-medium">{error}</p>
         ) : helperText ? (
-          <p className="text-xs text-zinc-400 mt-1">{helperText}</p>
+          <p className="text-[13px] text-ink-3 mt-1">{helperText}</p>
         ) : null}
       </div>
     );
@@ -138,9 +138,8 @@ export const MoneyText: React.FC<{
   decimals?: number;
 }> = ({ amount, className = '', decimals = 2 }) => {
   return (
-    <span className={`font-mono text-zinc-100 select-all ${className}`}>
+    <span className={`font-mono tabular-nums text-ink select-all ${className}`}>
       {formatINR(amount, { showSymbol: true, decimals })}
     </span>
   );
 };
-

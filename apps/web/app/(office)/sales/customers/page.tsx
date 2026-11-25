@@ -395,7 +395,7 @@ export default function CustomerMasterPage() {
       header: 'Code',
       accessorKey: 'code',
       cell: (info) => (
-        <span className="font-mono text-xs font-bold text-teal-400">
+        <span className="font-mono text-xs font-bold text-action">
           {info.getValue() as string}
         </span>
       ),
@@ -408,15 +408,15 @@ export default function CustomerMasterPage() {
         const cust = info.row.original;
         return (
           <div>
-            <Link href={`/sales/customers/${cust.id}`} className="font-bold text-white text-xs hover:text-teal-400 hover:underline">
+            <Link href={`/sales/customers/${cust.id}`} className="font-bold text-ink text-xs hover:text-action hover:underline">
               {cust.businessName}
             </Link>
-            <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
+            <div className="text-[11px] text-ink-3 flex items-center gap-2 mt-0.5">
               <span>{cust.primaryContact}</span>
               <span>•</span>
               <a
                 href={`tel:${cust.phone}`}
-                className="text-teal-400 hover:underline flex items-center gap-1"
+                className="text-action hover:underline flex items-center gap-1"
               >
                 📞 {cust.phone}
               </a>
@@ -425,7 +425,7 @@ export default function CustomerMasterPage() {
                   href={`https://wa.me/91${cust.whatsappPhone}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-emerald-400 hover:underline"
+                  className="text-leaf hover:underline"
                 >
                   💬 WA
                 </a>
@@ -439,14 +439,14 @@ export default function CustomerMasterPage() {
       id: 'area',
       header: 'Site / Area',
       accessorKey: 'defaultSite',
-      cell: (info) => <span className="text-xs text-zinc-300">{info.getValue() as string}</span>,
+      cell: (info) => <span className="text-xs text-ink-2">{info.getValue() as string}</span>,
     },
     {
       id: 'creditLimit',
       header: 'Credit Limit',
       accessorKey: 'creditLimitRupees',
       cell: (info) => (
-        <span className="text-xs font-mono font-semibold text-zinc-200">
+        <span className="text-xs font-mono font-semibold text-ink">
           {formatINR(info.getValue() as number)}
         </span>
       ),
@@ -459,11 +459,11 @@ export default function CustomerMasterPage() {
         const isOver = cust.outstandingRupees > cust.creditLimitRupees;
         return (
           <div className="text-xs">
-            <span className={`font-mono font-bold ${isOver ? 'text-rose-400' : 'text-zinc-200'}`}>
+            <span className={`font-mono font-bold${isOver ? 'text-rose-400' : 'text-ink'}`}>
               {formatINR(cust.outstandingRupees)}
             </span>
             {cust.overdueDays > 0 && (
-              <span className="block text-[11px] text-amber-400 font-medium">
+              <span className="block text-[11px] text-haldi font-medium">
                 {cust.overdueDays}d overdue
               </span>
             )}
@@ -484,21 +484,21 @@ export default function CustomerMasterPage() {
     {
       id: 'actions',
       header: 'Actions',
-      cell: (info) => {
-        const cust = info.row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => openEditForm(cust)}
-              className="text-xs text-teal-400 hover:text-teal-300 font-medium"
-            >
-              Edit
-            </button>
-            <span className="text-zinc-700">|</span>
-            <button
-              onClick={() => toggleCustomerActive(cust.id)}
-              className={`text-xs font-medium ${
-                cust.active ? 'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'
+ cell: (info) => {
+ const cust = info.row.original;
+ return (
+ <div className="flex items-center gap-2">
+ <button
+ onClick={() => openEditForm(cust)}
+ className="text-xs text-action hover:text-action font-medium"
+ >
+ Edit
+ </button>
+ <span className="text-zinc-700">|</span>
+ <button
+ onClick={() => toggleCustomerActive(cust.id)}
+ className={`text-xs font-medium${
+ cust.active ?'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'
               }`}
             >
               {cust.active ? 'Deactivate' : 'Activate'}
@@ -532,13 +532,13 @@ export default function CustomerMasterPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/30 mb-1.5">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-action/10 text-action border border-action/30 mb-1.5">
             <span>👥 Buyer Accounts</span>
           </div>
-          <h1 className="text-2xl font-black text-white">Customer Master Directory</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Customer Master Directory</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Maintain customer business profiles, verified GSTINs, credit limits, contacts, and delivery terms.
           </p>
         </div>
@@ -585,19 +585,19 @@ export default function CustomerMasterPage() {
       </div>
 
       {/* 3. Filters & View Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-sheet border border-rule p-4 rounded-[4px]">
         <div className="flex items-center gap-3 flex-1 flex-wrap">
           <input
             type="text"
             placeholder="Search by name, code, or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+            className="w-full md:w-80 bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink placeholder-ink-3 focus:outline-none focus:border-action/30"
           />
           <select
             value={creditStatusFilter}
             onChange={(e) => setCreditStatusFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+            className="bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink-2 focus:outline-none focus:border-action/30"
           >
             <option value="ALL">All Credit Status</option>
             <option value="OK">OK (Within Limit)</option>
@@ -607,7 +607,7 @@ export default function CustomerMasterPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+            className="bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink-2 focus:outline-none focus:border-action/30"
           >
             <option value="ALL">All Status</option>
             <option value="ACTIVE">Active Only</option>
@@ -616,19 +616,19 @@ export default function CustomerMasterPage() {
         </div>
 
         {/* Tablet / Owner View Toggle (§4.1) */}
-        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+        <div className="flex items-center gap-1 bg-paper p-1 rounded-[3px] border border-rule">
           <button
             onClick={() => setViewMode('table')}
-            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-              viewMode === 'table' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors${
+              viewMode === 'table' ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
             }`}
           >
             📋 Table
           </button>
           <button
             onClick={() => setViewMode('cards')}
-            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-              viewMode === 'cards' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors${
+              viewMode === 'cards' ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
             }`}
           >
             🗂️ Cards
@@ -644,13 +644,13 @@ export default function CustomerMasterPage() {
           {filteredCustomers.map((cust) => (
             <div
               key={cust.id}
-              className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 space-y-4 hover:border-zinc-700 transition-all shadow-md"
+              className="bg-sheet border border-rule rounded-[4px] p-5 space-y-4 hover:border-rule-strong transition-all shadow-md"
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="font-mono text-xs font-bold text-teal-400">{cust.code}</span>
-                  <h3 className="text-sm font-bold text-white mt-0.5">{cust.businessName}</h3>
-                  <p className="text-xs text-zinc-400">{cust.primaryContact}</p>
+                  <span className="font-mono text-xs font-bold text-action">{cust.code}</span>
+                  <h3 className="text-sm font-bold text-ink mt-0.5">{cust.businessName}</h3>
+                  <p className="text-xs text-ink-3">{cust.primaryContact}</p>
                 </div>
                 <Badge
                   tone={cust.creditStatus === 'OK' ? 'success' : cust.creditStatus === 'NEAR_LIMIT' ? 'warning' : 'danger'}
@@ -659,31 +659,31 @@ export default function CustomerMasterPage() {
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-zinc-800/80">
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-rule">
                 <div>
-                  <span className="text-zinc-500 block text-[11px]">Credit Limit</span>
-                  <span className="font-mono font-bold text-zinc-200">
+                  <span className="text-ink-3 block text-[11px]">Credit Limit</span>
+                  <span className="font-mono font-bold text-ink">
                     ₹{cust.creditLimitRupees.toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block text-[11px]">Outstanding</span>
-                  <span className={`font-mono font-bold ${cust.outstandingRupees > cust.creditLimitRupees ? 'text-rose-400' : 'text-zinc-200'}`}>
+                  <span className="text-ink-3 block text-[11px]">Outstanding</span>
+                  <span className={`font-mono font-bold${cust.outstandingRupees > cust.creditLimitRupees ? 'text-rose-400' : 'text-ink'}`}>
                     ₹{cust.outstandingRupees.toLocaleString('en-IN')}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-zinc-800/80 text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-rule text-xs">
                 <a
                   href={`tel:${cust.phone}`}
-                  className="text-teal-400 hover:underline flex items-center gap-1 font-medium"
+                  className="text-action hover:underline flex items-center gap-1 font-medium"
                 >
                   📞 {cust.phone}
                 </a>
                 <button
                   onClick={() => openEditForm(cust)}
-                  className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold"
+                  className="px-2.5 py-1 bg-sunken hover:bg-sunken text-ink rounded-lg text-xs font-semibold"
                 >
                   Edit Profile →
                 </button>
@@ -702,35 +702,35 @@ export default function CustomerMasterPage() {
       >
         <div className="space-y-5 my-2">
           {/* Tab Navigation */}
-          <div className="flex border-b border-zinc-800 text-xs font-semibold gap-4 overflow-x-auto">
+          <div className="flex border-b border-rule text-xs font-semibold gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('business')}
-              className={`pb-2 border-b-2 transition-colors ${
-                activeTab === 'business' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              className={`pb-2 border-b-2 transition-colors${
+                activeTab === 'business' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               Business & GSTIN
             </button>
             <button
               onClick={() => setActiveTab('contact')}
-              className={`pb-2 border-b-2 transition-colors ${
-                activeTab === 'contact' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              className={`pb-2 border-b-2 transition-colors${
+                activeTab === 'contact' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               Contact & Delivery
             </button>
             <button
               onClick={() => setActiveTab('credit')}
-              className={`pb-2 border-b-2 transition-colors ${
-                activeTab === 'credit' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              className={`pb-2 border-b-2 transition-colors${
+                activeTab === 'credit' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               Credit & Payment Terms
             </button>
             <button
               onClick={() => setActiveTab('contacts')}
-              className={`pb-2 border-b-2 transition-colors ${
-                activeTab === 'contacts' ? 'border-teal-500 text-teal-400' : 'border-transparent text-zinc-400 hover:text-white'
+              className={`pb-2 border-b-2 transition-colors${
+                activeTab === 'contacts' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               Key Contacts ({contacts.length})
@@ -742,131 +742,131 @@ export default function CustomerMasterPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Customer Code *</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Customer Code *</label>
                   <input
                     type="text"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
                     placeholder="e.g. CUST-005"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono uppercase focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.code && <p className="text-xs text-rose-400 mt-1">{formErrors.code}</p>}
+                  {formErrors.code && <p className="text-xs text-madder mt-1">{formErrors.code}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Business Name *</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Business Name *</label>
                   <input
                     type="text"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     placeholder="e.g. Krishna Dairy Parlour"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                   />
-                  {formErrors.businessName && <p className="text-xs text-rose-400 mt-1">{formErrors.businessName}</p>}
+                  {formErrors.businessName && <p className="text-xs text-madder mt-1">{formErrors.businessName}</p>}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">GSTIN (15 Characters)</label>
+                <label className="block text-xs font-semibold text-ink-2 mb-1">GSTIN (15 Characters)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={gstin}
                     onChange={(e) => handleGstinChange(e.target.value)}
                     placeholder="e.g. 27AABCS1429B1ZB"
-                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                    className="flex-1 bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono uppercase focus:outline-none focus:border-action/30"
                   />
                   {stateName && (
-                    <div className="px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-xl text-xs text-teal-400 font-semibold flex items-center">
+                    <div className="px-3 py-2 bg-action/10 border border-action/30 rounded-[3px] text-xs text-action font-semibold flex items-center">
                       State: {stateName} ({stateCode})
                     </div>
                   )}
                 </div>
-                {formErrors.gstin && <p className="text-xs text-rose-400 mt-1">{formErrors.gstin}</p>}
+                {formErrors.gstin && <p className="text-xs text-madder mt-1">{formErrors.gstin}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Billing Address</label>
+                <label className="block text-xs font-semibold text-ink-2 mb-1">Billing Address</label>
                 <textarea
                   value={billingAddress}
                   onChange={(e) => setBillingAddress(e.target.value)}
                   rows={2}
                   placeholder="Street address, landmark, PIN code"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+                  className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                 />
               </div>
             </div>
           )}
 
           {/* Tab 2: Contact & Delivery */}
-          {activeTab === 'contact' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Primary Contact Person</label>
-                  <input
-                    type="text"
-                    value={primaryContact}
-                    onChange={(e) => setPrimaryContact(e.target.value)}
-                    placeholder="e.g. Ramesh Sharma"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Phone Number (10 digits) *</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 9822012345"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
-                  />
-                  {formErrors.phone && <p className="text-xs text-rose-400 mt-1">{formErrors.phone}</p>}
-                </div>
-              </div>
+          {activeTab === 'contact'&& (
+ <div className="space-y-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">Primary Contact Person</label>
+ <input
+ type="text"
+ value={primaryContact}
+ onChange={(e) => setPrimaryContact(e.target.value)}
+ placeholder="e.g. Ramesh Sharma"
+ className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
+ />
+ </div>
+ <div>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">Phone Number (10 digits) *</label>
+ <input
+ type="text"
+ value={phone}
+ onChange={(e) => setPhone(e.target.value)}
+ placeholder="e.g. 9822012345"
+ className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
+ />
+ {formErrors.phone && <p className="text-xs text-madder mt-1">{formErrors.phone}</p>}
+ </div>
+ </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">WhatsApp Number</label>
-                  <input
-                    type="text"
-                    value={whatsappPhone}
-                    onChange={(e) => setWhatsappPhone(e.target.value)}
-                    placeholder="Same as phone if empty"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-                <div className="flex items-center pt-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
-                    <input
-                      type="checkbox"
-                      checked={whatsappOptIn}
-                      onChange={(e) => setWhatsappOptIn(e.target.checked)}
-                      className="rounded border-zinc-700 bg-zinc-900 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span>Opt-in for automated WhatsApp invoices &amp; dispatch updates</span>
-                  </label>
-                </div>
-              </div>
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">WhatsApp Number</label>
+ <input
+ type="text"
+ value={whatsappPhone}
+ onChange={(e) => setWhatsappPhone(e.target.value)}
+ placeholder="Same as phone if empty"
+ className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
+ />
+ </div>
+ <div className="flex items-center pt-6">
+ <label className="flex items-center gap-2 cursor-pointer text-xs text-ink-2">
+ <input
+ type="checkbox"
+ checked={whatsappOptIn}
+ onChange={(e) => setWhatsappOptIn(e.target.checked)}
+ className="rounded border-rule-strong bg-sheet text-teal-600 focus:ring-action"
+ />
+ <span>Opt-in for automated WhatsApp invoices &amp; dispatch updates</span>
+ </label>
+ </div>
+ </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Default Fulfilment Site</label>
-                  <select
-                    value={defaultSite}
-                    onChange={(e) => setDefaultSite(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
-                  >
-                    <option value="Pune Central Depot">Pune Central Depot</option>
-                    <option value="Baner Transit Depot">Baner Transit Depot</option>
-                    <option value="Hadapsar Warehouse">Hadapsar Warehouse</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Preferred Delivery Window</label>
-                  <select
-                    value={deliveryWindow}
-                    onChange={(e) => setDeliveryWindow(e.target.value as CustomerRecord['deliveryWindow'])}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500"
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">Default Fulfilment Site</label>
+ <select
+ value={defaultSite}
+ onChange={(e) => setDefaultSite(e.target.value)}
+ className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
+ >
+ <option value="Pune Central Depot">Pune Central Depot</option>
+ <option value="Baner Transit Depot">Baner Transit Depot</option>
+ <option value="Hadapsar Warehouse">Hadapsar Warehouse</option>
+ </select>
+ </div>
+ <div>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">Preferred Delivery Window</label>
+ <select
+ value={deliveryWindow}
+ onChange={(e) => setDeliveryWindow(e.target.value as CustomerRecord['deliveryWindow'])}
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
                   >
                     <option value="MORNING">Morning Slot (4:00 AM - 8:00 AM)</option>
                     <option value="AFTERNOON">Afternoon Slot (1:00 PM - 4:00 PM)</option>
@@ -882,41 +882,41 @@ export default function CustomerMasterPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Credit Limit (₹)</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Credit Limit (₹)</label>
                   <input
                     type="number"
                     value={creditLimitRupees}
                     onChange={(e) => setCreditLimitRupees(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Credit Days</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Credit Days</label>
                   <input
                     type="number"
                     value={creditDays}
                     onChange={(e) => setCreditDays(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Max Overdue Days</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Max Overdue Days</label>
                   <input
                     type="number"
                     value={maxOverdueDays}
                     onChange={(e) => setMaxOverdueDays(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                 </div>
               </div>
 
               {/* Credit Limit Override Reason (OD-024) */}
               {editingCustomer && parseFloat(creditLimitRupees) !== originalCreditLimit && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
+                <div className="p-4 bg-haldi-soft border border-haldi/30 rounded-[4px] space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold text-xs">⚠️ Credit Limit Modification Detected</span>
+                    <span className="text-haldi font-bold text-xs">⚠️ Credit Limit Modification Detected</span>
                   </div>
-                  <p className="text-xs text-amber-200">
+                  <p className="text-xs text-haldi">
                     Modifying credit limit from ₹{originalCreditLimit.toLocaleString('en-IN')} to ₹{parseFloat(creditLimitRupees).toLocaleString('en-IN')} requires permission <code>customer.credit_override</code> and a mandatory audit reason.
                   </p>
                   <textarea
@@ -931,18 +931,18 @@ export default function CustomerMasterPage() {
                     }}
                     rows={2}
                     placeholder="Enter business reason for credit limit modification..."
-                    className="w-full bg-zinc-950 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="w-full bg-paper border border-haldi/30 rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-amber-400"
                   />
                   {formErrors.creditReason && (
-                    <p className="text-xs text-rose-400 font-semibold">{formErrors.creditReason}</p>
+                    <p className="text-xs text-madder font-semibold">{formErrors.creditReason}</p>
                   )}
                 </div>
               )}
 
-              <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 flex items-center justify-between">
+              <div className="p-3 bg-paper rounded-[3px] border border-rule flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-white">Manual Credit Hold</div>
-                  <p className="text-[11px] text-zinc-400">
+                  <div className="text-xs font-bold text-ink">Manual Credit Hold</div>
+                  <p className="text-[11px] text-ink-3">
                     When active, new orders are blocked from dispatch until released by Owner.
                   </p>
                 </div>
@@ -953,12 +953,12 @@ export default function CustomerMasterPage() {
                     onChange={(e) => setCreditHold(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                  <div className="w-11 h-6 bg-sunken peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-madder"></div>
                 </label>
               </div>
 
               {/* Price tier placeholder per OD-024 */}
-              <div className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-800 text-xs text-zinc-500">
+              <div className="p-3 bg-paper rounded-[3px] border border-rule text-xs text-ink-3">
                 🔒 Custom Price Tier Assignment (OD-024 deferred — default base category pricing applies).
               </div>
             </div>
@@ -967,28 +967,28 @@ export default function CustomerMasterPage() {
           {/* Tab 4: Key Contacts */}
           {activeTab === 'contacts' && (
             <div className="space-y-4">
-              <div className="p-4 bg-zinc-950/60 rounded-2xl border border-zinc-800 space-y-3">
-                <div className="text-xs font-bold text-white">Add Secondary Contact / Store Manager</div>
+              <div className="p-4 bg-paper rounded-[4px] border border-rule space-y-3">
+                <div className="text-xs font-bold text-ink">Add Secondary Contact / Store Manager</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <input
                     type="text"
                     placeholder="Contact Name"
                     value={newContactName}
                     onChange={(e) => setNewContactName(e.target.value)}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                    className="bg-sheet border border-rule rounded-[3px] px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-action/30"
                   />
                   <input
                     type="text"
                     placeholder="Phone"
                     value={newContactPhone}
                     onChange={(e) => setNewContactPhone(e.target.value)}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-teal-500"
+                    className="bg-sheet border border-rule rounded-[3px] px-3 py-1.5 text-xs text-ink font-mono focus:outline-none focus:border-action/30"
                   />
                   <div className="flex gap-2">
                     <select
                       value={newContactRole}
                       onChange={(e) => setNewContactRole(e.target.value)}
-                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-teal-500"
+                      className="bg-sheet border border-rule rounded-[3px] px-3 py-1.5 text-xs text-ink-2 focus:outline-none focus:border-action/30"
                     >
                       <option value="Manager">Manager</option>
                       <option value="Accountant">Accountant</option>
@@ -1003,27 +1003,27 @@ export default function CustomerMasterPage() {
               </div>
 
               {contacts.length === 0 ? (
-                <p className="text-xs text-zinc-500 text-center py-4">No additional contacts configured.</p>
+                <p className="text-xs text-ink-3 text-center py-4">No additional contacts configured.</p>
               ) : (
                 <div className="space-y-2">
                   {contacts.map((c) => (
                     <div
                       key={c.id}
-                      className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
+                      className="p-3 bg-sheet border border-rule rounded-[3px] flex items-center justify-between text-xs"
                     >
                       <div>
-                        <span className="font-bold text-white">{c.name}</span>
-                        <span className="text-zinc-500 ml-2">({c.role})</span>
+                        <span className="font-bold text-ink">{c.name}</span>
+                        <span className="text-ink-3 ml-2">({c.role})</span>
                         {c.isPrimary && (
-                          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-teal-500/20 text-teal-400 font-semibold">
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-action/20 text-action font-semibold">
                             Primary
                           </span>
                         )}
-                        <span className="block text-zinc-400 font-mono mt-0.5">📞 {c.phone}</span>
+                        <span className="block text-ink-3 font-mono mt-0.5">📞 {c.phone}</span>
                       </div>
                       <button
                         onClick={() => handleRemoveContact(c.id)}
-                        className="text-xs text-rose-400 hover:text-rose-300"
+                        className="text-xs text-madder hover:text-madder"
                       >
                         Remove
                       </button>
@@ -1035,7 +1035,7 @@ export default function CustomerMasterPage() {
           )}
 
           {/* Modal Footer */}
-          <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+          <div className="pt-4 border-t border-rule flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>

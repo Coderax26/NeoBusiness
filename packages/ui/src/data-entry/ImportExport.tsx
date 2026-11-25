@@ -68,11 +68,9 @@ export function CsvImportModal<T>({
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
       if (lines.length < 2) return;
 
-      const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
       const parsedRows: ValidatedRow<T>[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        // Simple CSV splitter
         const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
         const rowObj: Record<string, string> = {};
         expectedHeaders.forEach((h, colIdx) => {
@@ -117,28 +115,27 @@ export function CsvImportModal<T>({
   return (
     <Dialog open={open} onClose={onClose} title={title} maxWidth="xl">
       {step === 'upload' && (
-        <div className="space-y-6 my-2">
-          <div className="p-4 bg-teal-950/20 border border-teal-500/30 rounded-2xl flex items-center justify-between">
+        <div className="space-y-5 my-2">
+          <div className="p-4 bg-paper border border-rule rounded-[4px] flex items-center justify-between">
             <div>
-              <div className="text-xs font-bold text-white">Need the correct column format?</div>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <div className="text-[14px] font-semibold text-ink">Need the correct column format?</div>
+              <p className="text-[13px] text-ink-3 mt-0.5">
                 Download the standardized CSV template with instructions and sample rows.
               </p>
             </div>
             <Button size="sm" variant="secondary" onClick={handleDownloadTemplate}>
-              📥 Download Template
+              Download Template
             </Button>
           </div>
 
-          <div className="border-2 border-dashed border-zinc-700 hover:border-teal-500/60 rounded-3xl p-8 text-center bg-zinc-950/40 transition-colors">
-            <div className="text-4xl mb-3">📄</div>
-            <h4 className="text-sm font-bold text-white">Drop your populated CSV file here</h4>
-            <p className="text-xs text-zinc-400 mt-1 mb-4">
+          <div className="border-2 border-dashed border-rule-strong hover:border-action rounded-[4px] p-8 text-center bg-paper/60 transition-colors">
+            <h4 className="text-[15px] font-semibold text-ink">Drop your populated CSV file here</h4>
+            <p className="text-[13px] text-ink-3 mt-1 mb-4">
               Accepts CSV files with UTF-8 encoding (up to 500 rows)
             </p>
             <label className="inline-block">
               <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-              <span className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-medium text-xs cursor-pointer shadow-md">
+              <span className="inline-flex items-center px-4 py-2 rounded-[3px] bg-action hover:bg-action-hover text-white font-medium text-[13.5px] cursor-pointer">
                 Browse Files
               </span>
             </label>
@@ -148,41 +145,41 @@ export function CsvImportModal<T>({
 
       {step === 'preview' && (
         <div className="space-y-4 my-2">
-          <div className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-zinc-800 text-xs">
+          <div className="flex items-center justify-between bg-paper p-3 rounded-[3px] border border-rule text-[13px]">
             <div>
-              <span className="text-zinc-400">File:</span> <strong className="text-white">{fileName}</strong>
+              <span className="text-ink-3">File:</span> <strong className="text-ink">{fileName}</strong>
             </div>
             <div className="flex gap-3">
-              <span className="text-emerald-400 font-semibold">✓ {validCount} Valid</span>
-              {invalidCount > 0 && <span className="text-rose-400 font-semibold">✕ {invalidCount} Invalid</span>}
+              <span className="text-leaf font-semibold">✓ {validCount} Valid</span>
+              {invalidCount > 0 && <span className="text-madder font-semibold">✕ {invalidCount} Invalid</span>}
             </div>
           </div>
 
-          <div className="max-h-72 overflow-y-auto border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 font-semibold uppercase">
+          <div className="max-h-72 overflow-y-auto border border-rule rounded-[4px] overflow-hidden bg-sheet">
+            <table className="w-full text-left text-[13px]">
+              <thead className="bg-paper border-b border-ink text-ink-3 font-medium">
                 <tr>
                   <th className="p-2.5 w-16">Row</th>
                   <th className="p-2.5 w-24">Status</th>
                   <th className="p-2.5">Details / Validation Message</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-rule">
                 {rows.map((r) => (
-                  <tr key={r.rowIndex} className={r.isValid ? 'bg-zinc-950' : 'bg-rose-950/20'}>
-                    <td className="p-2.5 font-mono text-zinc-400">#{r.rowIndex}</td>
+                  <tr key={r.rowIndex} className={r.isValid ? 'bg-sheet' : 'bg-madder-soft'}>
+                    <td className="p-2.5 font-mono text-ink-3">#{r.rowIndex}</td>
                     <td className="p-2.5">
                       {r.isValid ? (
-                        <span className="text-emerald-400 font-bold">✓ Ready</span>
+                        <span className="text-leaf font-semibold">✓ Ready</span>
                       ) : (
-                        <span className="text-rose-400 font-bold">✕ Error</span>
+                        <span className="text-madder font-semibold">✕ Error</span>
                       )}
                     </td>
-                    <td className="p-2.5 text-zinc-300">
+                    <td className="p-2.5 text-ink-2">
                       {r.isValid ? (
-                        <span className="text-zinc-400">Row formatted correctly</span>
+                        <span className="text-ink-3">Row formatted correctly</span>
                       ) : (
-                        <span className="text-rose-300 font-medium">{r.errors.join('; ')}</span>
+                        <span className="text-madder font-medium">{r.errors.join('; ')}</span>
                       )}
                     </td>
                   </tr>
@@ -209,8 +206,7 @@ export function CsvImportModal<T>({
 
       {step === 'importing' && (
         <div className="text-center py-10 space-y-4">
-          <div className="text-2xl animate-spin">⏳</div>
-          <h4 className="text-sm font-bold text-white">Importing Records to Database...</h4>
+          <h4 className="text-[15px] font-semibold text-ink">Importing Records...</h4>
           <div className="max-w-xs mx-auto">
             <ProgressBar value={importProgress} />
           </div>
@@ -219,10 +215,12 @@ export function CsvImportModal<T>({
 
       {step === 'summary' && summary && (
         <div className="text-center py-8 space-y-4">
-          <div className="text-4xl">🎉</div>
-          <h4 className="text-base font-bold text-white">Import Completed</h4>
-          <p className="text-xs text-zinc-300 max-w-sm mx-auto">
-            Successfully imported <strong className="text-emerald-400 font-mono">{summary.imported}</strong> {entityName} records.
+          <div className="w-10 h-10 rounded-full bg-leaf-soft text-leaf font-bold flex items-center justify-center mx-auto">
+            ✓
+          </div>
+          <h4 className="text-[16px] font-serif font-medium text-ink">Import Completed</h4>
+          <p className="text-[13.5px] text-ink-2 max-w-sm mx-auto">
+            Successfully imported <strong className="text-leaf font-mono">{summary.imported}</strong> {entityName} records.
             {summary.skipped > 0 && (
               <span> Skipped {summary.skipped} invalid rows.</span>
             )}

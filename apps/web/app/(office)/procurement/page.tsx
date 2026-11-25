@@ -152,11 +152,11 @@ export default function ProcurementPipelineHomePage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-2xl font-bold text-ink tracking-tight">
               Procurement &amp; Suppliers Pipeline
             </h1>
           </div>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm text-ink-3 mt-1">
             End-to-end Need → Requisition → Purchase Order → GRN → 3-Way Bill → Payment flow.
           </p>
         </div>
@@ -171,12 +171,12 @@ export default function ProcurementPipelineHomePage() {
       </div>
 
       {/* Interactive Visual Pipeline */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-xl">
+      <div className="bg-sheet border border-rule rounded-[4px] p-5 shadow-xl">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">
             Live Purchase Pipeline (click any stage to open filtered workbench)
           </span>
-          <span className="text-xs text-indigo-400">M2 Procurement · BR-03 &amp; BR-05 Guarded</span>
+          <span className="text-xs text-action">M2 Procurement · BR-03 &amp; BR-05 Guarded</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-stretch">
@@ -185,21 +185,21 @@ export default function ProcurementPipelineHomePage() {
               <Link
                 href={stage.href}
                 onMouseEnter={() => setSelectedStage(stage.id)}
-                className={`flex-1 rounded-xl border bg-gradient-to-br p-4 transition-all hover:scale-[1.02] hover:border-indigo-400 ${stage.accent} ${
+                className={`flex-1 rounded-[3px] border bg-gradient-to-br p-4 transition-all hover:scale-[1.02] hover:border-indigo-400${stage.accent}${
                   selectedStage === stage.id ? 'ring-1 ring-indigo-500/60' : ''
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-zinc-300">{stage.label}</span>
-                  <span className="text-[11px] text-zinc-500 font-mono">0{idx + 1}</span>
+                  <span className="text-xs font-medium text-ink-2">{stage.label}</span>
+                  <span className="text-[11px] text-ink-3 font-mono">0{idx + 1}</span>
                 </div>
-                <div className="text-2xl font-bold text-white mt-2 font-mono">
+                <div className="text-2xl font-bold text-ink mt-2 font-mono">
                   {stage.countOrValue}
                 </div>
-                <div className="text-[11px] text-zinc-400 mt-1">{stage.subLabel}</div>
+                <div className="text-[11px] text-ink-3 mt-1">{stage.subLabel}</div>
               </Link>
               {idx < stages.length - 1 && (
-                <div className="hidden md:flex items-center justify-center px-1 text-zinc-600 font-bold select-none">
+                <div className="hidden md:flex items-center justify-center px-1 text-ink-3 font-bold select-none">
                   ▶
                 </div>
               )}
@@ -208,32 +208,32 @@ export default function ProcurementPipelineHomePage() {
         </div>
 
         {/* Exception Alert Strips */}
-        <div className="mt-4 pt-4 border-t border-zinc-800/80 flex flex-wrap gap-3">
+        <div className="mt-4 pt-4 border-t border-rule flex flex-wrap gap-3">
           <Link
             href="/procurement/shortfalls"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 transition-colors text-xs font-medium"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-madder-soft border border-madder/30 text-madder hover:opacity-90/20 transition-colors text-xs font-medium"
           >
             <span>⚠</span>
             <span>Shortfalls open ({liveStats.openShortfalls})</span>
-            <span className="text-rose-400/80">→ Recover via backup PO</span>
+            <span className="text-madder/80">→ Recover via backup PO</span>
           </Link>
 
           <Link
             href="/procurement/purchase-orders?status=WAITING_APPROVAL"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-colors text-xs font-medium"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-haldi-soft border border-haldi/30 text-haldi hover:opacity-90/20 transition-colors text-xs font-medium"
           >
             <span>⚠</span>
             <span>Price spikes waiting approval ({liveStats.priceSpikes})</span>
-            <span className="text-amber-400/80">→ Owner sign-off needed</span>
+            <span className="text-haldi">→ Owner sign-off needed</span>
           </Link>
 
           <Link
             href="/procurement/scorecards"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 transition-colors text-xs font-medium"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-action-soft border border-action/30 text-action hover:bg-action-hover/20 transition-colors text-xs font-medium"
           >
             <span>📉</span>
             <span>Missing rates alerts ({missingRatesCount})</span>
-            <span className="text-indigo-400/80">→ Update supplier quotes</span>
+            <span className="text-action">→ Update supplier quotes</span>
           </Link>
         </div>
       </div>
@@ -268,12 +268,12 @@ export default function ProcurementPipelineHomePage() {
 
       {/* Actionable Shortcuts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
+        <Card className="p-5 bg-sheet border-rule">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Ready to Convert Requisitions</h3>
+            <h3 className="text-sm font-semibold text-ink">Ready to Convert Requisitions</h3>
             <Badge variant="info">{liveStats.openReqs} open</Badge>
           </div>
-          <p className="text-xs text-zinc-400 mb-4">
+          <p className="text-xs text-ink-3 mb-4">
             Group open requisitions by supplier to generate one consolidated Purchase Order per supplier.
           </p>
           <Link href="/procurement/requisitions?view=grouped">
@@ -283,12 +283,12 @@ export default function ProcurementPipelineHomePage() {
           </Link>
         </Card>
 
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
+        <Card className="p-5 bg-sheet border-rule">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Shortfall Recovery Workbench</h3>
+            <h3 className="text-sm font-semibold text-ink">Shortfall Recovery Workbench</h3>
             <Badge variant="danger">{liveStats.openShortfalls} open</Badge>
           </div>
-          <p className="text-xs text-zinc-400 mb-4">
+          <p className="text-xs text-ink-3 mb-4">
             Ranked backup suppliers within 2% tolerance (OD-010) ready for ≤3-click backup POs.
           </p>
           <Link href="/procurement/shortfalls">
@@ -298,12 +298,12 @@ export default function ProcurementPipelineHomePage() {
           </Link>
         </Card>
 
-        <Card className="p-5 bg-zinc-900 border-zinc-800">
+        <Card className="p-5 bg-sheet border-rule">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">3-Way Bill Verification &amp; AP</h3>
+            <h3 className="text-sm font-semibold text-ink">3-Way Bill Verification &amp; AP</h3>
             <Badge variant="warning">{liveStats.billsToCheck} pending</Badge>
           </div>
-          <p className="text-xs text-zinc-400 mb-4">
+          <p className="text-xs text-ink-3 mb-4">
             Compare PO vs GRN vs Bill with ✓/✗ line indicators, approve bills, and record payments.
           </p>
           <Link href="/procurement/supplier-bills">

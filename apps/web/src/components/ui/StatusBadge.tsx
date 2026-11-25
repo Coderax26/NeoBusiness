@@ -19,15 +19,14 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${theme.className} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[3px] text-[13px] font-medium border${theme.className}${className}`}
       role="status"
       aria-label={`${entity} status: ${displayLabel}`}
     >
-      <span aria-hidden="true" className="font-bold text-[10px]">
+      <span aria-hidden="true" className="text-[11px]">
         {theme.icon}
       </span>
       <span>{displayLabel}</span>
     </span>
   );
 };
-

@@ -102,21 +102,21 @@ export default function FinanceHomePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Money &amp; Finance Control</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Money &amp; Finance Control</h1>
+          <p className="text-sm text-ink-3">
             Live receivables, cash custody (BR-07), cheques, COD settlement, and guided End-of-Day close.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/finance/collections"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="rounded-lg bg-leaf px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
           >
             + Record Payment
           </Link>
           <Link
             href="/finance/eod"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+            className="rounded-lg border border-rule bg-sheet px-4 py-2 text-sm font-semibold text-ink hover:bg-sunken"
           >
             End-of-Day Close →
           </Link>
@@ -125,67 +125,67 @@ export default function FinanceHomePage() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="text-xs font-medium text-zinc-400">Invoiced Today</div>
-          <div className="mt-1 font-mono text-xl font-bold text-zinc-100">{formatINR(invoicedToday)}</div>
+        <div className="rounded-[3px] border border-rule bg-sheet p-4">
+          <div className="text-xs font-medium text-ink-3">Invoiced Today</div>
+          <div className="mt-1 font-mono text-xl font-bold text-ink">{formatINR(invoicedToday)}</div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="text-xs font-medium text-zinc-400">Collected Today</div>
-          <div className="mt-1 font-mono text-xl font-bold text-emerald-400">{formatINR(collectedToday)}</div>
+        <div className="rounded-[3px] border border-rule bg-sheet p-4">
+          <div className="text-xs font-medium text-ink-3">Collected Today</div>
+          <div className="mt-1 font-mono text-xl font-bold text-leaf">{formatINR(collectedToday)}</div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="text-xs font-medium text-zinc-400">Total To Collect</div>
-          <div className="mt-1 font-mono text-xl font-bold text-zinc-100">{formatINR(totalToCollect)}</div>
+        <div className="rounded-[3px] border border-rule bg-sheet p-4">
+          <div className="text-xs font-medium text-ink-3">Total To Collect</div>
+          <div className="mt-1 font-mono text-xl font-bold text-ink">{formatINR(totalToCollect)}</div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="text-xs font-medium text-zinc-400">Overdue 30+ Days</div>
-          <div className="mt-1 font-mono text-xl font-bold text-rose-400">{formatINR(overdue30Plus)}</div>
+        <div className="rounded-[3px] border border-rule bg-sheet p-4">
+          <div className="text-xs font-medium text-ink-3">Overdue 30+ Days</div>
+          <div className="mt-1 font-mono text-xl font-bold text-madder">{formatINR(overdue30Plus)}</div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="text-xs font-medium text-zinc-400">Cash with Field Staff</div>
-          <div className="mt-1 font-mono text-xl font-bold text-amber-400">{formatINR(cashWithFieldStaff)}</div>
+        <div className="rounded-[3px] border border-rule bg-sheet p-4">
+          <div className="text-xs font-medium text-ink-3">Cash with Field Staff</div>
+          <div className="mt-1 font-mono text-xl font-bold text-haldi">{formatINR(cashWithFieldStaff)}</div>
         </div>
       </div>
 
       {/* AR Aging Strip */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+      <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-zinc-100">AR Aging Breakdown</h2>
-          <Link href="/finance/receivables" className="text-xs font-semibold text-emerald-400 hover:underline">
+          <h2 className="text-sm font-bold text-ink">AR Aging Breakdown</h2>
+          <Link href="/finance/receivables" className="text-xs font-semibold text-leaf hover:underline">
             View Full Aging →
           </Link>
         </div>
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-zinc-800">
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-sunken">
           <div className="bg-emerald-500" style={{ width: `${(agingTotals.b0 / agingTotals.total) * 100}%` }} />
           <div className="bg-amber-400" style={{ width: `${(agingTotals.b8 / agingTotals.total) * 100}%` }} />
           <div className="bg-orange-500" style={{ width: `${(agingTotals.b16 / agingTotals.total) * 100}%` }} />
           <div className="bg-rose-500" style={{ width: `${(agingTotals.b30 / agingTotals.total) * 100}%` }} />
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-          <div className="text-zinc-400">0–7d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b0)}</span></div>
-          <div className="text-zinc-400">8–15d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b8)}</span></div>
-          <div className="text-zinc-400">16–30d: <span className="font-mono font-semibold text-zinc-100">{formatINR(agingTotals.b16)}</span></div>
-          <div className="text-zinc-400">30+d: <span className="font-mono font-semibold text-rose-400">{formatINR(agingTotals.b30)}</span></div>
+          <div className="text-ink-3">0–7d: <span className="font-mono font-semibold text-ink">{formatINR(agingTotals.b0)}</span></div>
+          <div className="text-ink-3">8–15d: <span className="font-mono font-semibold text-ink">{formatINR(agingTotals.b8)}</span></div>
+          <div className="text-ink-3">16–30d: <span className="font-mono font-semibold text-ink">{formatINR(agingTotals.b16)}</span></div>
+          <div className="text-ink-3">30+d: <span className="font-mono font-semibold text-madder">{formatINR(agingTotals.b30)}</span></div>
         </div>
       </div>
 
       {/* Action Queues */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/finance/handovers" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
-          <div className="text-xs text-zinc-400">Pending Cash Handovers</div>
-          <div className="mt-1 text-2xl font-bold text-amber-400">{pendingHandovers}</div>
+        <Link href="/finance/handovers" className="rounded-[3px] border border-rule bg-sheet p-4 hover:border-rule-strong">
+          <div className="text-xs text-ink-3">Pending Cash Handovers</div>
+          <div className="mt-1 text-2xl font-bold text-haldi">{pendingHandovers}</div>
         </Link>
-        <Link href="/finance/cheques" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
-          <div className="text-xs text-zinc-400">Cheques to Deposit</div>
-          <div className="mt-1 text-2xl font-bold text-blue-400">{chequesToDeposit}</div>
+        <Link href="/finance/cheques" className="rounded-[3px] border border-rule bg-sheet p-4 hover:border-rule-strong">
+          <div className="text-xs text-ink-3">Cheques to Deposit</div>
+          <div className="mt-1 text-2xl font-bold text-action">{chequesToDeposit}</div>
         </Link>
-        <Link href="/finance/ptp" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
-          <div className="text-xs text-zinc-400">PTPs Due / Overdue</div>
-          <div className="mt-1 text-2xl font-bold text-rose-400">{ptpsDueToday}</div>
+        <Link href="/finance/ptp" className="rounded-[3px] border border-rule bg-sheet p-4 hover:border-rule-strong">
+          <div className="text-xs text-ink-3">PTPs Due / Overdue</div>
+          <div className="mt-1 text-2xl font-bold text-madder">{ptpsDueToday}</div>
         </Link>
-        <Link href="/finance/cod" className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700">
-          <div className="text-xs text-zinc-400">COD Pending Settlement</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-400">{codToSettle}</div>
+        <Link href="/finance/cod" className="rounded-[3px] border border-rule bg-sheet p-4 hover:border-rule-strong">
+          <div className="text-xs text-ink-3">COD Pending Settlement</div>
+          <div className="mt-1 text-2xl font-bold text-leaf">{codToSettle}</div>
         </Link>
       </div>
     </div>

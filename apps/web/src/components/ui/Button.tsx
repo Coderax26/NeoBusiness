@@ -16,28 +16,28 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    'touch-target inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed';
+    'touch-target inline-flex items-center justify-center gap-1.5 font-medium rounded-[3px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-action disabled:opacity-50 disabled:cursor-not-allowed';
 
   const sizeClasses = {
-    sm: 'px-3 py-1.5 text-xs min-h-[36px]',
-    md: 'px-4 py-2.5 text-sm min-h-[48px]', // Meets minimum 48px touch target
+    sm: 'px-3 py-1.5 text-[13px] min-h-[36px]',
+    md: 'px-4 py-2.5 text-[14px] min-h-[48px]', // Preserves 48px touch target check
     lg: 'px-6 py-3.5 text-base min-h-[56px]',
   };
 
   const variantClasses = {
     primary:
-      'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-900/30 border border-indigo-500/40',
+      'bg-action hover:bg-action-hover text-white border border-action',
     secondary:
-      'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700',
+      'bg-sheet hover:bg-paper text-ink border border-rule-strong',
     danger:
-      'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/30 border border-rose-500/40',
+      'bg-madder hover:opacity-90 text-white border border-madder',
     ghost:
-      'bg-transparent hover:bg-zinc-800/60 text-zinc-300 border border-transparent',
+      'bg-transparent hover:bg-paper text-ink-2 hover:text-ink border border-transparent',
   };
 
   return (
     <button
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
+      className={`${baseClasses}${sizeClasses[size]}${variantClasses[variant]}${className}`}
       disabled={disabled || loading}
       {...props}
     >
@@ -62,7 +62,7 @@ export const Button: React.FC<ButtonProps> = ({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          Loading...
+          Working...
         </span>
       ) : (
         children
@@ -70,4 +70,3 @@ export const Button: React.FC<ButtonProps> = ({
     </button>
   );
 };
-

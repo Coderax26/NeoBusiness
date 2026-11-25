@@ -36,24 +36,24 @@ export const Dialog: React.FC<DialogProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={`w-full ${maxWidthClasses[maxWidth]} bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl`}
+        className={`w-full ${maxWidthClasses[maxWidth]} bg-sheet border border-rule-strong rounded-[4px] p-6 shadow-xl text-ink`}
       >
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between pb-3 mb-4 border-b border-rule">
           <div>
-            <h3 id="dialog-title" className="text-lg font-bold text-white tracking-tight">
+            <h3 id="dialog-title" className="text-[20px] font-serif font-medium text-ink tracking-tight">
               {title}
             </h3>
-            {description && <p className="text-xs text-zinc-400 mt-1">{description}</p>}
+            {description && <p className="text-[13px] text-ink-2 mt-1">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white p-1 text-sm rounded-lg hover:bg-zinc-800 focus:outline-none"
+            className="text-ink-3 hover:text-ink p-1.5 text-sm rounded-[3px] hover:bg-paper focus:outline-none focus:ring-2 focus:ring-action"
             aria-label="Close dialog"
           >
             ✕
@@ -90,15 +90,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   return (
     <Dialog open={open} onClose={onCancel} title={title}>
-      <div className="my-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm">
-        <div className="font-semibold flex items-center gap-2 mb-1 text-amber-300">
-          <span>⚠️</span>
-          <span>Important Consequence:</span>
+      <div className="my-3 p-4 rounded-[3px] bg-haldi-soft border-l-4 border-haldi text-ink text-[14px]">
+        <div className="font-semibold flex items-center gap-2 mb-1 text-haldi text-[13px]">
+          <span>What will happen</span>
         </div>
-        <p className="leading-relaxed text-xs text-amber-100">{consequences}</p>
+        <p className="leading-relaxed text-[13.5px] text-ink-2">{consequences}</p>
       </div>
 
-      <div className="flex justify-end gap-3 mt-6">
+      <div className="flex justify-end gap-2.5 mt-6">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
@@ -113,4 +112,3 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     </Dialog>
   );
 };
-

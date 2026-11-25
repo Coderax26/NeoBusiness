@@ -60,14 +60,12 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-zinc-950 via-zinc-900 to-teal-950/30">
-      <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center p-4 bahi-ledger-bg">
+      <div className="w-full max-w-md bg-sheet border border-rule-strong rounded-[4px] p-8 shadow-xl">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-teal-600/20 text-teal-300 font-bold text-xl border border-teal-500/40 mb-3 shadow-md">
-            🔒
-          </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Reset Password or PIN</h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <div className="font-serif text-[22px] font-semibold text-ink mb-2">NeoBus</div>
+          <h1 className="font-serif text-[24px] font-medium text-ink tracking-tight">Reset Password or PIN</h1>
+          <p className="text-[13.5px] text-ink-3 mt-1">
             {step === 'phone'
               ? 'Enter your registered mobile number'
               : step === 'otp'
@@ -77,27 +75,27 @@ export default function ForgotPasswordPage() {
         </div>
 
         {error && (
-          <div className="mb-5 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+          <div className="mb-5 p-3 rounded-[3px] bg-madder-soft border border-madder/30 text-madder text-xs">
             ✕ {error}
           </div>
         )}
 
         {success ? (
-          <div className="text-center p-6 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-200">
+          <div className="text-center p-6 bg-leaf-soft border border-leaf/30 rounded-[4px] text-leaf">
             <div className="text-2xl mb-2">✓</div>
             <div className="font-bold text-sm">PIN Successfully Updated!</div>
-            <p className="text-xs text-emerald-300/80 mt-1">Redirecting you to login...</p>
+            <p className="text-xs text-leaf/80 mt-1">Redirecting you to login...</p>
           </div>
         ) : (
           <>
             {step === 'phone' && (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-ink-2 mb-1.5">
                     Mobile Phone Number
                   </label>
-                  <div className="flex rounded-xl overflow-hidden border border-zinc-800">
-                    <span className="bg-zinc-800 px-3 flex items-center text-xs font-semibold text-zinc-400 border-r border-zinc-700">
+                  <div className="flex rounded-[3px] overflow-hidden border border-rule">
+                    <span className="bg-sunken px-3 flex items-center text-xs font-semibold text-ink-3 border-r border-rule-strong">
                       🇮🇳 +91
                     </span>
                     <input
@@ -106,7 +104,7 @@ export default function ForgotPasswordPage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="98765 43210"
-                      className="flex-1 bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 outline-none"
+                      className="flex-1 bg-paper px-3.5 py-2.5 text-sm text-ink placeholder-ink-3 outline-none"
                     />
                   </div>
                 </div>
@@ -120,7 +118,7 @@ export default function ForgotPasswordPage() {
             {step === 'otp' && (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-ink-2 mb-1.5">
                     6-Digit SMS Verification Code
                   </label>
                   <input
@@ -131,10 +129,10 @@ export default function ForgotPasswordPage() {
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     placeholder="Enter 6-digit OTP (e.g. 123456)"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-center text-lg font-mono tracking-widest text-white outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-4 py-3 text-center text-lg font-mono tracking-widest text-ink outline-none focus:ring-2 focus:ring-action"
                   />
-                  <p className="text-[11px] text-zinc-400 mt-1">
-                    Demo OTP: <strong className="text-teal-300 font-mono">123456</strong>
+                  <p className="text-[11px] text-ink-3 mt-1">
+                    Demo OTP: <strong className="text-action font-mono">123456</strong>
                   </p>
                 </div>
 
@@ -147,7 +145,7 @@ export default function ForgotPasswordPage() {
             {step === 'new_pin' && (
               <form onSubmit={handleResetPin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-ink-2 mb-1.5">
                     New Security PIN (4-6 digits)
                   </label>
                   <input
@@ -157,12 +155,12 @@ export default function ForgotPasswordPage() {
                     required
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-center text-lg font-mono text-white outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-4 py-3 text-center text-lg font-mono text-ink outline-none focus:ring-2 focus:ring-action"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-ink-2 mb-1.5">
                     Confirm New Security PIN
                   </label>
                   <input
@@ -172,7 +170,7 @@ export default function ForgotPasswordPage() {
                     required
                     value={confirmPin}
                     onChange={(e) => setConfirmPin(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-center text-lg font-mono text-white outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-4 py-3 text-center text-lg font-mono text-ink outline-none focus:ring-2 focus:ring-action"
                   />
                 </div>
 
@@ -184,8 +182,8 @@ export default function ForgotPasswordPage() {
           </>
         )}
 
-        <div className="mt-6 pt-4 border-t border-zinc-800 text-center">
-          <Link href="/login" className="text-xs text-zinc-400 hover:text-white transition-colors">
+        <div className="mt-6 pt-4 border-t border-rule text-center">
+          <Link href="/login" className="text-xs text-ink-3 hover:text-ink transition-colors">
             ← Back to Sign In
           </Link>
         </div>

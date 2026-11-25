@@ -29,7 +29,7 @@ export function DataTable<T extends { id: string | number }>({
   columns,
   data,
   loading = false,
-  searchPlaceholder = 'Search records...',
+  searchPlaceholder = 'Filter rows...',
   onRowClick,
   enableSelection = false,
   bulkActions = [],
@@ -121,15 +121,15 @@ export function DataTable<T extends { id: string | number }>({
 
   return (
     <div className="w-full flex flex-col gap-3">
-      {/* Table Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/60 p-3 rounded-xl border border-zinc-800">
+      {/* Clean Ruled Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-rule no-print">
         <div className="flex items-center gap-2 flex-1 max-w-sm">
           <input
             type="text"
             placeholder={searchPlaceholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="w-full bg-paper border border-rule-strong rounded-[3px] px-3 py-1.5 text-[13.5px] text-ink placeholder-ink-3 focus:outline-none focus:border-action"
           />
         </div>
 
@@ -138,17 +138,17 @@ export function DataTable<T extends { id: string | number }>({
           <div className="relative group">
             <button
               type="button"
-              className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5"
+              className="px-3 py-1.5 text-[13px] font-medium rounded-[3px] bg-sheet hover:bg-paper text-ink-2 border border-rule-strong flex items-center gap-1.5"
             >
               <span>Columns ({activeColumns.length})</span>
             </button>
-            <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 bg-zinc-900 border border-zinc-700 rounded-xl p-3 shadow-2xl min-w-[180px]">
-              <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+            <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 bg-sheet border border-rule-strong rounded-[4px] p-3 shadow-xl min-w-[190px]">
+              <div className="text-[13px] font-semibold text-ink mb-2 pb-1 border-b border-rule">
                 Toggle Columns
               </div>
               <div className="flex flex-col gap-1.5">
                 {columns.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-xs text-zinc-200 cursor-pointer">
+                  <label key={c.id} className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={visibleColIds.has(c.id)}
@@ -172,14 +172,14 @@ export function DataTable<T extends { id: string | number }>({
           <button
             type="button"
             onClick={handleExportCSV}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[13px] font-medium rounded-[3px] bg-sheet hover:bg-paper text-ink-2 border border-rule-strong flex items-center gap-1.5"
           >
             <span>Export CSV</span>
           </button>
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[13px] font-medium rounded-[3px] bg-sheet hover:bg-paper text-ink-2 border border-rule-strong flex items-center gap-1.5"
           >
             <span>Print</span>
           </button>
@@ -188,9 +188,9 @@ export function DataTable<T extends { id: string | number }>({
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && bulkActions.length > 0 && (
-        <div className="flex items-center justify-between bg-teal-950/40 border border-teal-500/40 p-2.5 px-4 rounded-xl text-xs text-teal-200 animate-slide-down">
+        <div className="flex items-center justify-between bg-action-soft border border-action/30 p-2.5 px-4 rounded-[3px] text-[13.5px] text-ink">
           <span>
-            <strong className="text-white">{selectedIds.size}</strong> records selected
+            <strong className="text-action">{selectedIds.size}</strong> records selected
           </span>
           <div className="flex gap-2">
             {bulkActions.map((action, idx) => (
@@ -207,14 +207,14 @@ export function DataTable<T extends { id: string | number }>({
         </div>
       )}
 
-      {/* Table Body */}
-      <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950/40">
+      {/* Ruled Ledger Table */}
+      <div className="border-b border-rule overflow-hidden bg-sheet">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider sticky top-0 z-10">
+          <table className="w-full text-left text-[13.5px]">
+            <thead className="border-b-[1.5px] border-ink text-ink-3 font-medium sticky top-0 z-10 bg-sheet">
               <tr>
                 {enableSelection && (
-                  <th className="py-3 px-3 w-10 text-center">
+                  <th className="py-2.5 px-3 w-10 text-center">
                     <input
                       type="checkbox"
                       checked={sorted.length > 0 && selectedIds.size === sorted.length}
@@ -226,31 +226,31 @@ export function DataTable<T extends { id: string | number }>({
                   <th
                     key={col.id}
                     onClick={() => col.sortable !== false && toggleSort(col.id)}
-                    className={`py-3 px-4 ${
+                    className={`py-2.5 px-3 font-medium ${
                       col.align === 'right'
                         ? 'text-right'
                         : col.align === 'center'
                         ? 'text-center'
                         : 'text-left'
-                    } ${col.sortable !== false ? 'cursor-pointer hover:text-white select-none' : ''}`}
+                    } ${col.sortable !== false ? 'cursor-pointer hover:text-ink select-none' : ''}`}
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.header}
                       {sortCol === col.id && (
-                        <span className="text-teal-400">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                        <span className="text-action">{sortDir === 'asc' ? '▲' : '▼'}</span>
                       )}
                     </span>
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-rule tabular-nums">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
                     {enableSelection && <td className="py-3 px-3"><Skeleton height={16} width={16} /></td>}
                     {activeColumns.map((c) => (
-                      <td key={c.id} className="py-3 px-4"><Skeleton height={16} /></td>
+                      <td key={c.id} className="py-3 px-3"><Skeleton height={16} /></td>
                     ))}
                   </tr>
                 ))
@@ -265,9 +265,9 @@ export function DataTable<T extends { id: string | number }>({
                   <tr
                     key={item.id}
                     onClick={() => onRowClick?.(item)}
-                    className={`hover:bg-zinc-900/50 transition-colors ${
+                    className={`hover:bg-paper/70 transition-colors ${
                       onRowClick ? 'cursor-pointer' : ''
-                    } ${selectedIds.has(item.id) ? 'bg-teal-950/20' : ''}`}
+                    } ${selectedIds.has(item.id) ? 'bg-action-soft' : ''}`}
                   >
                     {enableSelection && (
                       <td
@@ -301,7 +301,7 @@ export function DataTable<T extends { id: string | number }>({
                       return (
                         <td
                           key={col.id}
-                          className={`py-3 px-4 ${
+                          className={`py-3 px-3 ${
                             col.align === 'right'
                               ? 'text-right font-mono'
                               : col.align === 'center'
@@ -323,4 +323,3 @@ export function DataTable<T extends { id: string | number }>({
     </div>
   );
 }
-

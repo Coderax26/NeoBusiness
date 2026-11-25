@@ -49,48 +49,48 @@ export default function AdminApprovalRulesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Approval &amp; Escalation Rules (OD-019)</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Approval &amp; Escalation Rules (OD-019)</h1>
+        <p className="text-sm text-ink-3">
           Configure delegate caps and escalation timers. Silent auto-approval without an approver is blocked.
         </p>
       </div>
 
       {errorMsg && (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-2.5 text-sm font-semibold text-rose-300">
+        <div className="rounded-[3px] border border-madder/30 bg-madder-soft px-4 py-2.5 text-sm font-semibold text-madder">
           ✕ {errorMsg}
         </div>
       )}
       {toast && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-2.5 text-sm font-medium text-emerald-300">
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
           {toast}
         </div>
       )}
 
       <div className="space-y-4">
         {policies.length === 0 && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-400">
+          <div className="rounded-[3px] border border-rule bg-sheet p-6 text-sm text-ink-3">
             No approval policies configured.
           </div>
         )}
         {policies.map((p) => (
-          <div key={p.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+          <div key={p.id} className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-mono text-sm font-bold text-zinc-100">{p.exceptionType}</span>
-              <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+              <span className="font-mono text-sm font-bold text-ink">{p.exceptionType}</span>
+              <span className="rounded-full bg-leaf-soft px-2.5 py-0.5 text-xs font-semibold text-leaf">
                 {p.active ? 'Active' : 'Paused'}
               </span>
             </div>
-            <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-zinc-300">
+            <div className="rounded-lg bg-paper border border-rule px-4 py-2.5 text-xs text-ink-2">
               Flow: <strong>Request</strong> → Delegate <strong>{p.delegateUser}</strong> (up to{' '}
               {formatINR(p.delegateCapInr)}) → <strong>{p.primaryApproverRole}</strong> after{' '}
               <strong>{p.escalationWaitMinutes} min</strong>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Require explicit approver (no silent auto-approval):</span>
+              <span className="text-ink-3">Require explicit approver (no silent auto-approval):</span>
               <button
                 type="button"
                 onClick={() => toggleRequireApprover(p, !p.requireApprover)}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1 font-semibold text-zinc-200 hover:bg-zinc-800"
+                className="rounded-lg border border-rule-strong bg-paper px-3 py-1 font-semibold text-ink hover:bg-sunken"
               >
                 {p.requireApprover ? 'Enforced (Click to Test Guard)' : 'Off'}
               </button>

@@ -8,17 +8,21 @@ function FloorHeaderBar() {
   const { isOnline, isSyncing, pendingCount, lastSyncedAt, setOnline } = useFloorOutbox();
 
   return (
-    <header className="min-h-20 bg-zinc-900 border-b border-zinc-800 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+    <header className="min-h-20 bg-sheet border-b border-rule px-6 py-3 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-4">
         <Link
           href="/floor"
-          className="w-14 h-14 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 font-black text-xl flex items-center justify-center"
+          className="w-14 h-14 rounded-[6px] bg-action text-[#16140F] font-bold text-xl flex items-center justify-center"
         >
           FL
         </Link>
         <div>
-          <div className="text-lg font-bold text-white tracking-tight">NeoBus Floor Mode</div>
-          <div className="text-sm text-zinc-400">Touch Terminal · Warehouse &amp; Production</div>
+          <div className="text-[20px] font-semibold text-ink tracking-tight">
+            NeoBus Floor Mode
+          </div>
+          <div className="text-[14px] text-ink-3 font-devanagari">
+            Touch Terminal · गोदाम व कारखाना
+          </div>
         </div>
       </div>
 
@@ -28,34 +32,38 @@ function FloorHeaderBar() {
           type="button"
           onClick={() => setOnline(!isOnline)}
           data-testid="floor-network-badge"
-          className={`min-h-[48px] px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${
+          className={`min-h-[48px] px-4 py-2 rounded-[6px] border text-[15px] font-semibold flex items-center gap-2.5 ${
             isSyncing
-              ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+              ? 'bg-action-soft border-action text-action'
               : isOnline
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                : 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+                ? 'bg-leaf-soft border-leaf/40 text-leaf'
+                : 'bg-madder-soft border-madder text-madder'
           }`}
         >
-          <span>{isSyncing ? '↻' : isOnline ? '●' : '○'}</span>
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${
+              isSyncing ? 'bg-action' : isOnline ? 'bg-leaf' : 'bg-madder'
+            }`}
+          />
           <span>
             {isSyncing
               ? `Syncing (${pendingCount})`
               : isOnline
-                ? `Online · Last sync ${lastSyncedAt}`
-                : `Offline · Queued (${pendingCount})`}
+                ? `Online · synced ${lastSyncedAt}`
+                : `Offline · queued (${pendingCount})`}
           </span>
         </button>
 
         <Link
           href="/floor"
-          className="min-h-[48px] px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold text-zinc-200 border border-zinc-700 flex items-center"
+          className="min-h-[48px] px-4 py-2 rounded-[6px] bg-sunken hover:bg-sheet text-[15px] font-semibold text-ink border border-rule-strong flex items-center"
         >
           Home
         </Link>
 
         <Link
           href="/login"
-          className="min-h-[48px] px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold text-zinc-200 border border-zinc-700 flex items-center"
+          className="min-h-[48px] px-4 py-2 rounded-[6px] bg-sunken hover:bg-sheet text-[15px] font-semibold text-ink border border-rule-strong flex items-center"
         >
           Switch User
         </Link>
@@ -71,7 +79,10 @@ export default function FloorLayout({
 }) {
   return (
     <FloorOutboxProvider>
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col text-[18px]">
+      <div
+        data-theme="floor"
+        className="min-h-screen bg-paper text-ink flex flex-col text-[18px]"
+      >
         <FloorHeaderBar />
         <main className="flex-1 p-6 max-w-6xl w-full mx-auto">{children}</main>
       </div>

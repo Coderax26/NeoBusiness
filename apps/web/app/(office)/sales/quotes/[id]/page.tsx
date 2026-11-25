@@ -93,16 +93,16 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   if (loading) {
-    return <div className="max-w-4xl mx-auto p-6 text-sm text-zinc-400">Loading quote...</div>;
+    return <div className="max-w-4xl mx-auto p-6 text-sm text-ink-3">Loading quote...</div>;
   }
 
   if (!quote) {
     return (
       <div className="max-w-4xl mx-auto p-6 space-y-3">
-        <Link href="/sales/quotes" className="text-xs text-zinc-400 hover:text-white inline-block">
+        <Link href="/sales/quotes" className="text-xs text-ink-3 hover:text-ink inline-block">
           ← Back to Quotes
         </Link>
-        <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400">
+        <div className="p-6 rounded-[4px] bg-sheet border border-rule text-sm text-ink-3">
           Quote not found.
         </div>
       </div>
@@ -112,14 +112,14 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {actionError && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-xs font-medium text-rose-300">
+        <div className="rounded-[3px] border border-madder/30 bg-madder-soft px-4 py-2.5 text-xs font-medium text-madder">
           {actionError}
         </div>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-white font-mono">{quote.quoteNumber}</h1>
+            <h1 className="text-2xl font-semibold text-ink font-mono">{quote.quoteNumber}</h1>
             <StatusPill
               tone={
                 quote.status === 'CONVERTED'
@@ -133,9 +133,9 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               label={quote.status}
             />
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-ink-3 mt-1">
             Customer:{' '}
-            <Link href={`/sales/customers/${quote.customerId}`} className="text-teal-400 font-bold hover:underline">
+            <Link href={`/sales/customers/${quote.customerId}`} className="text-action font-bold hover:underline">
               {quote.customerName}
             </Link>{' '}
             · Valid until {quote.validUntil}
@@ -163,14 +163,14 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {reminderSent && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">
+        <div className="p-3 rounded-[3px] bg-leaf-soft border border-leaf/30 text-xs text-leaf">
           ✓ WhatsApp reminder queued for {quote.customerName}.
         </div>
       )}
 
       {quote.status === 'CONVERTED' && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs">
-          <span className="text-emerald-200 font-bold">
+        <div className="p-4 rounded-[4px] bg-leaf-soft border border-leaf/30 flex items-center justify-between text-xs">
+          <span className="text-leaf font-bold">
             ✓ Quote converted to Sales Order (today&apos;s price bands re-checked).
           </span>
           <Link href={`/sales/orders/${quote.convertedOrderId || 'ord-101'}`}>
@@ -181,7 +181,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
       <Card className="p-0 overflow-hidden">
         <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
+          <thead className="bg-paper border-b border-rule text-ink-3 uppercase font-semibold">
             <tr>
               <th className="p-3">Item</th>
               <th className="p-3">Qty</th>
@@ -190,7 +190,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               <th className="p-3 text-right">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {quote.lines.map((l, idx) => {
               const todayItem = dailyPrices.find((p) => String(p.itemId) === String(l.itemId));
               const floor = todayItem?.floorPrice != null ? Number(todayItem.floorPrice) : 90;
@@ -200,17 +200,17 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               return (
                 <tr key={idx}>
                   <td className="p-3">
-                    <div className="font-bold text-white">{l.itemName}</div>
-                    <div className="text-[11px] font-mono text-zinc-400">{l.sku}</div>
+                    <div className="font-bold text-ink">{l.itemName}</div>
+                    <div className="text-[11px] font-mono text-ink-3">{l.sku}</div>
                   </td>
                   <td className="p-3 font-mono">{l.qty} {l.uom}</td>
-                  <td className="p-3 font-mono font-bold text-white">₹{l.quotedPrice}</td>
+                  <td className="p-3 font-mono font-bold text-ink">₹{l.quotedPrice}</td>
                   <td className="p-3">
                     <Badge tone={band.status === 'BELOW_FLOOR' ? 'warning' : 'success'}>
                       {band.chipLabel} (Today&apos;s floor ₹{floor})
                     </Badge>
                   </td>
-                  <td className="p-3 text-right font-mono font-bold text-white">
+                  <td className="p-3 text-right font-mono font-bold text-ink">
                     {formatINR(l.qty * l.quotedPrice)}
                   </td>
                 </tr>
@@ -226,7 +226,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             type="text"
             value={lostReason}
             onChange={(e) => setLostReason(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white"
+            className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-ink"
             placeholder="Reason quote was lost"
           />
           <div className="flex justify-end gap-2">

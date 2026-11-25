@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
+import { Search } from 'lucide-react';
 
 export interface SearchResultItem {
   id: string;
@@ -99,7 +102,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
               category: 'Customer',
               title: c.legal_name || c.trade_name,
               subtitle: c.phone,
-              href: `/customers/${c.id}`,
+              href: `/sales/customers/${c.id}`,
             }),
           );
           (data.orders || []).forEach((o: any) =>
@@ -117,7 +120,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
               category: 'Item',
               title: i.name,
               subtitle: `SKU: ${i.sku_code}`,
-              href: `/inventory/items/${i.id}`,
+              href: `/sales/items`,
             }),
           );
           (data.suppliers || []).forEach((s: any) =>
@@ -126,7 +129,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
               category: 'Supplier',
               title: s.legal_name,
               subtitle: s.phone,
-              href: `/procurement/suppliers/${s.id}`,
+              href: `/procurement/suppliers`,
             }),
           );
           (data.trips || []).forEach((t: any) =>
@@ -164,32 +167,32 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/45">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Global search palette"
-        className="w-full max-w-xl bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
+        className="w-full max-w-xl bg-sheet border border-rule-strong rounded-[4px] shadow-2xl overflow-hidden"
       >
-        <div className="p-3 border-b border-zinc-800 flex items-center gap-3">
-          <span className="text-zinc-400 text-lg">🔍</span>
+        <div className="p-3.5 border-b border-rule flex items-center gap-3">
+          <Search className="w-4 h-4 text-ink-3 shrink-0" />
           <input
             type="text"
-            className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-base"
+            className="flex-1 bg-transparent text-ink placeholder-ink-3 outline-none text-[15px]"
             placeholder="Search customers, orders, items, suppliers, trips... (ESC to close)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             autoFocus
           />
-          {loading && <span className="text-xs text-indigo-400">Searching...</span>}
+          {loading && <span className="text-[13px] text-action">Searching...</span>}
         </div>
 
-        <div className="max-h-96 overflow-y-auto divide-y divide-zinc-800/60">
+        <div className="max-h-96 overflow-y-auto divide-y divide-rule">
           {error ? (
-            <div className="p-6 text-center text-rose-400 text-sm">{error}</div>
+            <div className="p-6 text-center text-madder text-[13.5px]">{error}</div>
           ) : searchTerm.length >= 2 && results.length === 0 && !loading ? (
-            <div className="p-6 text-center text-zinc-500 text-sm">
+            <div className="p-6 text-center text-ink-3 text-[13.5px]">
               No matches found for &ldquo;{searchTerm}&rdquo;
             </div>
           ) : (
@@ -198,13 +201,13 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
                 key={`${item.category}-${item.id}`}
                 href={item.href}
                 onClick={onClose}
-                className="flex items-center justify-between p-3 hover:bg-zinc-800/70 transition-colors"
+                className="flex items-center justify-between p-3.5 hover:bg-paper transition-colors"
               >
                 <div>
-                  <div className="text-sm font-medium text-zinc-100">{item.title}</div>
-                  {item.subtitle && <div className="text-xs text-zinc-400">{item.subtitle}</div>}
+                  <div className="text-[14px] font-medium text-ink">{item.title}</div>
+                  {item.subtitle && <div className="text-[13px] text-ink-3">{item.subtitle}</div>}
                 </div>
-                <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                <span className="text-[13px] px-2 py-0.5 rounded-[3px] bg-paper text-ink-2 border border-rule">
                   {item.category}
                 </span>
               </a>

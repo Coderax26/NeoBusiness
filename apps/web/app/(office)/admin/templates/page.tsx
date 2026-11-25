@@ -32,37 +32,37 @@ export default function AdminTemplatesAndSeriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Message Templates &amp; Number Series</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Message Templates &amp; Number Series</h1>
+        <p className="text-sm text-ink-3">
           WhatsApp/SMS notification templates (OD-022 BSP) and read-only document number sequences (<code className="font-mono">doc_sequences</code>).
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
-        <h2 className="text-base font-bold text-zinc-100">Notification Templates</h2>
+      <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
+        <h2 className="text-base font-bold text-ink">Notification Templates</h2>
         {templates.length === 0 ? (
-          <p className="text-xs text-zinc-500">No notification templates configured.</p>
+          <p className="text-xs text-ink-3">No notification templates configured.</p>
         ) : (
           <div className="space-y-2">
             {templates.map((t) => (
-              <div key={t.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
+              <div key={t.id} className="rounded-lg border border-rule bg-paper p-3 text-sm">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-mono font-bold text-purple-400">{t.code} ({t.channel})</span>
-                  <span className="font-mono text-zinc-500">Provider ID: {t.providerId}</span>
+                  <span className="font-mono text-ink-3">Provider ID: {t.providerId}</span>
                 </div>
-                <p className="mt-1 text-zinc-300">{t.preview}</p>
+                <p className="mt-1 text-ink-2">{t.preview}</p>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-        <div className="border-b border-zinc-800 bg-zinc-950/60 px-5 py-3 text-sm font-bold text-zinc-100">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
+        <div className="border-b border-rule bg-paper px-5 py-3 text-sm font-bold text-ink">
           Document Number Series (Read-only in MVP)
         </div>
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/40 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Document Type</th>
               <th className="px-4 py-3">Prefix</th>
@@ -70,19 +70,19 @@ export default function AdminTemplatesAndSeriesPage() {
               <th className="px-4 py-3">Next Sample</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {series.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-zinc-500">
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-ink-3">
                   No document sequences loaded.
                 </td>
               </tr>
             ) : (
               series.map((n) => (
                 <tr key={n.docType}>
-                  <td className="px-4 py-3 font-semibold text-zinc-100">{n.docType}</td>
-                  <td className="px-4 py-3 font-mono text-zinc-400">{n.prefix}</td>
-                  <td className="px-4 py-3 font-mono text-zinc-200">{n.nextNumber}</td>
+                  <td className="px-4 py-3 font-semibold text-ink">{n.docType}</td>
+                  <td className="px-4 py-3 font-mono text-ink-3">{n.prefix}</td>
+                  <td className="px-4 py-3 font-mono text-ink">{n.nextNumber}</td>
                   <td className="px-4 py-3 font-mono font-bold text-purple-400">{n.sample}</td>
                 </tr>
               ))

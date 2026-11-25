@@ -30,7 +30,6 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
     const updated = lines.map((line) => {
       if (line.id !== id) return line;
       const next = { ...line, [field]: val };
-      // Recalculate line total using exact BigInt multiplication (gap I-4)
       const qtyStr = field === 'qty' ? val : line.qty;
       const priceStr = field === 'unitPrice' ? val : line.unitPrice;
       try {
@@ -63,10 +62,10 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
   const grandTotal = lines.reduce((acc, l) => addMoney(acc, l.lineTotal), '0.00');
 
   return (
-    <div className="w-full border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950/40">
+    <div className="w-full border border-rule rounded-[4px] overflow-hidden bg-sheet">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider">
+        <table className="w-full text-left text-[13.5px]">
+          <thead className="bg-paper border-b-[1.5px] border-ink text-ink-3 font-medium">
             <tr>
               <th className="py-2.5 px-3">Item Description</th>
               <th className="py-2.5 px-3 w-28 text-right">Quantity</th>
@@ -76,23 +75,23 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
               {!readOnly && <th className="py-2.5 px-2 w-10 text-center"></th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/60 font-mono">
+          <tbody className="divide-y divide-rule tabular-nums">
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-zinc-500 font-sans text-xs">
+                <td colSpan={6} className="py-6 text-center text-ink-3 text-[13.5px]">
                   No line items added yet. Click &quot;Add Line Item&quot; to begin.
                 </td>
               </tr>
             ) : (
               lines.map((line, idx) => (
-                <tr key={line.id} className="hover:bg-zinc-900/40 focus-within:bg-zinc-900/60">
-                  <td className="py-2 px-3 font-sans">
+                <tr key={line.id} className="hover:bg-paper/60 focus-within:bg-paper">
+                  <td className="py-2 px-3">
                     <input
                       type="text"
                       disabled={readOnly}
                       value={line.itemName}
                       onChange={(e) => updateLine(line.id, 'itemName', e.target.value)}
-                      className="w-full bg-transparent border-b border-transparent focus:border-teal-500 text-zinc-100 text-xs focus:outline-none"
+                      className="w-full bg-transparent border-b border-transparent focus:border-action text-ink text-[14px] focus:outline-none"
                     />
                   </td>
                   <td className="py-2 px-3 text-right">
@@ -102,18 +101,18 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
                       disabled={readOnly}
                       value={line.qty}
                       onChange={(e) => updateLine(line.id, 'qty', e.target.value)}
-                      className="w-full bg-transparent text-right border-b border-transparent focus:border-teal-500 text-zinc-100 text-xs focus:outline-none"
+                      className="w-full bg-transparent text-right font-mono border-b border-transparent focus:border-action text-ink text-[14px] focus:outline-none"
                     />
                   </td>
-                  <td className="py-2 px-3 font-sans">
+                  <td className="py-2 px-3">
                     <select
                       disabled={readOnly}
                       value={line.uom}
                       onChange={(e) => updateLine(line.id, 'uom', e.target.value)}
-                      className="bg-transparent text-zinc-300 text-xs focus:outline-none cursor-pointer"
+                      className="bg-transparent text-ink-2 text-[13.5px] focus:outline-none cursor-pointer"
                     >
                       {availableUoms.map((u) => (
-                        <option key={u} value={u} className="bg-zinc-900 text-zinc-100">
+                        <option key={u} value={u} className="bg-sheet text-ink">
                           {u}
                         </option>
                       ))}
@@ -126,10 +125,10 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
                       disabled={readOnly}
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.id, 'unitPrice', e.target.value)}
-                      className="w-full bg-transparent text-right border-b border-transparent focus:border-teal-500 text-zinc-100 text-xs focus:outline-none"
+                      className="w-full bg-transparent text-right font-mono border-b border-transparent focus:border-action text-ink text-[14px] focus:outline-none"
                     />
                   </td>
-                  <td className="py-2 px-3 text-right font-semibold text-zinc-100">
+                  <td className="py-2 px-3 text-right font-mono font-medium text-ink">
                     {formatINR(line.lineTotal, { showSymbol: false })}
                   </td>
                   {!readOnly && (
@@ -151,7 +150,7 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
         </table>
       </div>
 
-      <div className="p-3 bg-zinc-900/90 border-t border-zinc-800 flex items-center justify-between">
+      <div className="p-3 bg-paper border-t border-rule flex items-center justify-between">
         {!readOnly ? (
           <Button size="sm" variant="secondary" onClick={addLine}>
             + Add Line Item
@@ -160,9 +159,9 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
           <div />
         )}
 
-        <div className="flex items-center gap-3 font-sans">
-          <span className="text-xs text-zinc-400">Total Preview:</span>
-          <span className="text-base font-bold font-mono text-teal-300">
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] text-ink-2">Total:</span>
+          <span className="text-[18px] font-serif font-semibold text-ink bahi-double-underline pb-0.5 tabular-nums">
             {formatINR(grandTotal, { showSymbol: true })}
           </span>
         </div>
@@ -170,4 +169,3 @@ export const LineItemGrid: React.FC<LineItemGridProps> = ({
     </div>
   );
 };
-

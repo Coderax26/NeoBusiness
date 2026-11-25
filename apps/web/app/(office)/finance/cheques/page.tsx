@@ -5,11 +5,11 @@ import { formatINR, processChequeTransition, type ChequeStatus } from '@neo/shar
 import { type ChequeRecord } from '../../../../src/lib/finance-data';
 
 const STATUS_STYLE: Record<ChequeStatus, string> = {
-  RECEIVED: 'bg-zinc-800 text-zinc-300',
+  RECEIVED: 'bg-sunken text-ink-2',
   DEPOSITED: 'bg-blue-500/15 text-blue-400',
-  CLEARED: 'bg-emerald-500/15 text-emerald-400',
-  BOUNCED: 'bg-rose-500/15 text-rose-400',
-  RETURNED: 'bg-amber-500/15 text-amber-400',
+  CLEARED: 'bg-leaf-soft text-leaf',
+  BOUNCED: 'bg-madder-soft text-madder',
+  RETURNED: 'bg-haldi-soft text-haldi',
 };
 
 export default function ChequesBoardPage() {
@@ -79,21 +79,21 @@ export default function ChequesBoardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Cheques &amp; PDC Lifecycle Board</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-ink">Cheques &amp; PDC Lifecycle Board</h1>
+        <p className="text-sm text-ink-3">
           Track cheques from Received → Deposited → Cleared / Bounced → Returned. Bounces reverse allocation and alert AR.
         </p>
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm font-medium text-blue-300">
+        <div className="rounded-[3px] border border-action/30 bg-action-soft px-4 py-2.5 text-sm font-medium text-action">
           {toast}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/60 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Cheque #</th>
               <th className="px-4 py-3">Customer / Bank</th>
@@ -103,27 +103,27 @@ export default function ChequesBoardPage() {
               <th className="px-4 py-3 text-right">Lifecycle Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {cheques.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-zinc-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-ink-3">
                   No cheques recorded.
                 </td>
               </tr>
             ) : (
               cheques.map((c) => (
-                <tr key={c.id} className="hover:bg-zinc-800/40">
-                  <td className="px-4 py-3 font-mono font-bold text-zinc-100">{c.chequeNo}</td>
+                <tr key={c.id} className="hover:bg-sunken">
+                  <td className="px-4 py-3 font-mono font-bold text-ink">{c.chequeNo}</td>
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-zinc-200">{c.customerName}</div>
-                    <div className="text-xs text-zinc-400">{c.bankName}</div>
+                    <div className="font-semibold text-ink">{c.customerName}</div>
+                    <div className="text-xs text-ink-3">{c.bankName}</div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{c.pdcDate}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-100">
+                  <td className="px-4 py-3 text-xs text-ink-3">{c.pdcDate}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-ink">
                     {formatINR(c.amount)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[c.status]}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STATUS_STYLE[c.status]}`}>
                       {c.status}
                     </span>
                   </td>
@@ -133,7 +133,7 @@ export default function ChequesBoardPage() {
                         <button
                           type="button"
                           onClick={() => handleAction(c, 'DEPOSIT')}
-                          className="rounded border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-400 hover:bg-blue-500/20"
+                          className="rounded border border-action/30 bg-action-soft px-2.5 py-1 text-xs font-semibold text-action hover:bg-action-hover/20"
                         >
                           Deposit
                         </button>
@@ -143,14 +143,14 @@ export default function ChequesBoardPage() {
                           <button
                             type="button"
                             onClick={() => handleAction(c, 'CLEAR')}
-                            className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20"
+                            className="rounded border border-leaf/30 bg-leaf-soft px-2.5 py-1 text-xs font-semibold text-leaf hover:opacity-90/20"
                           >
                             Clear
                           </button>
                           <button
                             type="button"
                             onClick={() => handleAction(c, 'BOUNCE')}
-                            className="rounded border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-400 hover:bg-rose-500/20"
+                            className="rounded border border-madder/30 bg-madder-soft px-2.5 py-1 text-xs font-semibold text-madder hover:opacity-90/20"
                           >
                             Bounce
                           </button>
@@ -160,7 +160,7 @@ export default function ChequesBoardPage() {
                         <button
                           type="button"
                           onClick={() => handleAction(c, 'RETURN')}
-                          className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400 hover:bg-amber-500/20"
+                          className="rounded border border-haldi/30 bg-haldi-soft px-2.5 py-1 text-xs font-semibold text-haldi hover:opacity-90/20"
                         >
                           Return to Customer
                         </button>

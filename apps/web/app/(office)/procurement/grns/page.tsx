@@ -73,34 +73,34 @@ export default function GoodsReceivedPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/procurement" className="hover:text-white">Procurement</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/procurement" className="hover:text-ink">Procurement</Link>
             <span>/</span>
-            <span className="text-indigo-400">Goods Received (GRNs)</span>
+            <span className="text-action">Goods Received (GRNs)</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Goods Received Notes</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Goods Received Notes</h1>
+          <p className="text-sm text-ink-3">
             Office receipt inspection (Ordered vs Received comparison) and BR-05 Blind Storekeeper preview.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+        <div className="flex items-center gap-2 bg-sheet border border-rule rounded-[3px] p-1">
           <button
             onClick={() => setViewRoleMode('OFFICE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
               viewRoleMode === 'OFFICE'
                 ? 'bg-indigo-600 text-white'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-ink-3 hover:text-ink'
             }`}
           >
             Office Comparison View
           </button>
           <button
             onClick={() => setViewRoleMode('BLIND_STOREKEEPER')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
               viewRoleMode === 'BLIND_STOREKEEPER'
-                ? 'bg-amber-600 text-white'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-haldi text-white'
+                : 'text-ink-3 hover:text-ink'
             }`}
           >
             Blind GRN (Storekeeper)
@@ -109,9 +109,9 @@ export default function GoodsReceivedPage() {
       </div>
 
       {/* Office List */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
             <tr>
               <th className="p-3">GRN #</th>
               <th className="p-3">Date</th>
@@ -123,23 +123,23 @@ export default function GoodsReceivedPage() {
               <th className="p-3 text-right">Inspect</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {grns.map((g) => (
               <tr
                 key={g.id}
-                className={`hover:bg-zinc-800/40 cursor-pointer ${
+                className={`hover:bg-sunken cursor-pointer${
                   selectedGrn?.id === g.id ? 'bg-indigo-500/10' : ''
                 }`}
                 onClick={() => setSelectedGrn(g)}
               >
-                <td className="p-3 font-mono text-xs text-indigo-400 font-semibold">
+                <td className="p-3 font-mono text-xs text-action font-semibold">
                   {g.grnNumber}
                 </td>
-                <td className="p-3 text-xs font-mono text-zinc-300">{g.receivedDate}</td>
-                <td className="p-3 text-zinc-100 font-medium">{g.supplierName}</td>
-                <td className="p-3 font-mono text-xs text-zinc-300">{g.poNumber}</td>
-                <td className="p-3 text-xs text-zinc-300">{g.receivedBy}</td>
-                <td className="p-3 font-mono text-xs text-zinc-200">{g.lines.length}</td>
+                <td className="p-3 text-xs font-mono text-ink-2">{g.receivedDate}</td>
+                <td className="p-3 text-ink font-medium">{g.supplierName}</td>
+                <td className="p-3 font-mono text-xs text-ink-2">{g.poNumber}</td>
+                <td className="p-3 text-xs text-ink-2">{g.receivedBy}</td>
+                <td className="p-3 font-mono text-xs text-ink">{g.lines.length}</td>
                 <td className="p-3">
                   {g.hasShortfall ? (
                     <StatusPill status="SHORTFALL" tone="rose" />
@@ -150,7 +150,7 @@ export default function GoodsReceivedPage() {
                 <td className="p-3 text-right">
                   <button
                     onClick={() => setSelectedGrn(g)}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                    className="text-xs text-action hover:text-action font-medium"
                   >
                     Compare →
                   </button>
@@ -162,16 +162,16 @@ export default function GoodsReceivedPage() {
       </div>
 
       {/* Comparison / Blind View Panel */}
-      <Card className="p-5 bg-zinc-900 border-zinc-800">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+      <Card className="p-5 bg-sheet border-rule">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-rule">
           <div>
-            <h2 className="text-base font-semibold text-white">
+            <h2 className="text-base font-semibold text-ink">
               {selectedGrn?.grnNumber ?? '—'} —{' '}
               {viewRoleMode === 'OFFICE'
                 ? 'Office Comparison (Ordered vs Received)'
                 : 'Blind GRN View (Storekeeper — No Ordered Qty or Price)'}
             </h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-ink-3">
               PO: {selectedGrn?.poNumber ?? '—'} · Supplier: {selectedGrn?.supplierName ?? '—'} · Site: {selectedGrn?.siteName ?? '—'}
             </p>
           </div>
@@ -185,7 +185,7 @@ export default function GoodsReceivedPage() {
         {viewRoleMode === 'OFFICE' ? (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-800">
+              <thead className="text-xs uppercase text-ink-3 border-b border-rule">
                 <tr>
                   <th className="py-2">Item</th>
                   <th className="py-2 text-right">Ordered Qty</th>
@@ -195,26 +195,26 @@ export default function GoodsReceivedPage() {
                   <th className="py-2 text-right">Short Value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-rule">
                 {(selectedGrn?.lines ?? []).map((line) => (
                   <tr key={line.lineId}>
                     <td className="py-3">
-                      <div className="text-white font-medium">{line.itemName}</div>
-                      <div className="text-xs font-mono text-zinc-500">{line.itemSku}</div>
+                      <div className="text-ink font-medium">{line.itemName}</div>
+                      <div className="text-xs font-mono text-ink-3">{line.itemSku}</div>
                     </td>
-                    <td className="py-3 text-right font-mono text-zinc-300">
+                    <td className="py-3 text-right font-mono text-ink-2">
                       {line.orderedQty} {line.uom}
                     </td>
-                    <td className="py-3 text-right font-mono text-emerald-400 font-semibold">
+                    <td className="py-3 text-right font-mono text-leaf font-semibold">
                       {line.receivedQty} {line.uom}
                     </td>
-                    <td className="py-3 text-right font-mono text-rose-400 font-semibold">
+                    <td className="py-3 text-right font-mono text-madder font-semibold">
                       {line.shortQty > 0 ? `-${line.shortQty} ${line.uom}` : '0'}
                     </td>
-                    <td className="py-3 text-right font-mono text-zinc-300">
+                    <td className="py-3 text-right font-mono text-ink-2">
                       ₹{line.unitPrice}/{line.uom}
                     </td>
-                    <td className="py-3 text-right font-mono text-rose-400">
+                    <td className="py-3 text-right font-mono text-madder">
                       {formatINR(line.shortQty * line.unitPrice)}
                     </td>
                   </tr>
@@ -224,23 +224,23 @@ export default function GoodsReceivedPage() {
           </div>
         ) : (
           <div className="mt-4" data-testid="blind-grn-dom">
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs mb-3">
+            <div className="p-3 rounded-lg bg-haldi-soft border border-haldi/30 text-haldi text-xs mb-3">
               BR-05 Blind Receiving Active: Storekeeper sees only item SKU, description, and physical count field. Ordered quantities and supplier rates are stripped.
             </div>
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-800">
+              <thead className="text-xs uppercase text-ink-3 border-b border-rule">
                 <tr>
                   <th className="py-2">SKU</th>
                   <th className="py-2">Item</th>
                   <th className="py-2 text-right">Physical Count Captured</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-rule">
                 {blindMaskedLines.map((line) => (
                   <tr key={line.lineId}>
-                    <td className="py-3 font-mono text-xs text-indigo-400">{line.itemSku}</td>
-                    <td className="py-3 text-white font-medium">{line.itemName}</td>
-                    <td className="py-3 text-right font-mono text-emerald-400">
+                    <td className="py-3 font-mono text-xs text-action">{line.itemSku}</td>
+                    <td className="py-3 text-ink font-medium">{line.itemName}</td>
+                    <td className="py-3 text-right font-mono text-leaf">
                       {line.receivedQty} {line.uom}
                     </td>
                   </tr>

@@ -51,13 +51,13 @@ export default function StockCountsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/inventory/stock" className="hover:text-white">Inventory</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/inventory/stock" className="hover:text-ink">Inventory</Link>
             <span>/</span>
-            <span className="text-amber-400">Physical Stock Counts</span>
+            <span className="text-haldi">Physical Stock Counts</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Cycle Count &amp; Variance Review</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Cycle Count &amp; Variance Review</h1>
+          <p className="text-sm text-ink-3">
             Enter physical counts, review system vs counted variance, and post bulk adjustments.
           </p>
         </div>
@@ -67,20 +67,20 @@ export default function StockCountsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
       {counts.map((sheet) => (
-        <Card key={sheet.id} className="p-5 bg-zinc-900 border-zinc-800 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+        <Card key={sheet.id} className="p-5 bg-sheet border-rule space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-rule">
             <div>
-              <span className="font-mono text-sm text-amber-400 font-bold mr-2">
+              <span className="font-mono text-sm text-haldi font-bold mr-2">
                 {sheet.sheetNo}
               </span>
               <StatusPill status={sheet.status} tone={sheet.status === 'POSTED' ? 'emerald' : 'amber'} />
-              <div className="text-xs text-zinc-400 mt-1">
+              <div className="text-xs text-ink-3 mt-1">
                 {sheet.siteName} · {sheet.locationCode} · {sheet.category}
               </div>
             </div>
@@ -92,7 +92,7 @@ export default function StockCountsPage() {
           </div>
 
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-800">
+            <thead className="text-xs uppercase text-ink-3 border-b border-rule">
               <tr>
                 <th className="py-2">Item</th>
                 <th className="py-2 text-right">System Qty</th>
@@ -100,13 +100,13 @@ export default function StockCountsPage() {
                 <th className="py-2 text-right">Variance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-rule">
               {sheet.lines.map((line) => {
                 const variance = line.countedQty - line.systemQty;
                 return (
                   <tr key={line.itemId}>
-                    <td className="py-3 text-white font-medium">{line.itemName}</td>
-                    <td className="py-3 text-right font-mono text-zinc-300">
+                    <td className="py-3 text-ink font-medium">{line.itemName}</td>
+                    <td className="py-3 text-right font-mono text-ink-2">
                       {line.systemQty} {line.uom}
                     </td>
                     <td className="py-3 text-right">
@@ -117,11 +117,11 @@ export default function StockCountsPage() {
                         onChange={(e) =>
                           updateCounted(sheet.id, line.itemId, Number(e.target.value))
                         }
-                        className="w-28 text-right bg-zinc-950 border border-zinc-700 rounded px-2 py-1 font-mono text-white"
+                        className="w-28 text-right bg-paper border border-rule-strong rounded px-2 py-1 font-mono text-ink"
                       />
                     </td>
                     <td
-                      className={`py-3 text-right font-mono font-bold ${
+                      className={`py-3 text-right font-mono font-bold${
                         variance === 0
                           ? 'text-emerald-400'
                           : variance < 0

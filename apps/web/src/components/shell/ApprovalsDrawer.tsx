@@ -167,7 +167,7 @@ export const ApprovalsDrawer: React.FC<{
     <Drawer
       open={open}
       onClose={onClose}
-      title="Approvals & Exceptions Inbox"
+      title="Approvals & Exceptions"
       subtitle={`${exceptions.length} decisions waiting for your authorization`}
       width="lg"
     >
@@ -175,15 +175,14 @@ export const ApprovalsDrawer: React.FC<{
         {decisionError && (
           <div
             role="alert"
-            className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300"
+            className="p-3 rounded-[3px] bg-madder-soft border border-madder/30 text-[13px] text-madder"
           >
             {decisionError}
           </div>
         )}
         {exceptions.length === 0 ? (
           <EmptyState
-            icon="🎉"
-            title="All caught up!"
+            title="All caught up"
             description="There are no pending price overrides, credit breaches, or supplier rate exceptions waiting for decision."
           />
         ) : (
@@ -203,14 +202,14 @@ export const ApprovalsDrawer: React.FC<{
                 }}
               />
               {counterTargetId === exc.id && (
-                <div className="p-3 rounded-xl bg-zinc-900 border border-teal-500/40 flex items-center gap-2 text-xs">
-                  <label className="text-zinc-300 font-semibold">Counter Price (₹):</label>
+                <div className="p-3 rounded-[3px] bg-paper border border-action/30 flex items-center gap-2 text-[13px]">
+                  <label className="text-ink-2 font-medium">Counter Price (₹):</label>
                   <input
                     type="number"
                     step="0.5"
                     value={counterPrice}
                     onChange={(e) => setCounterPrice(e.target.value)}
-                    className="w-28 bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    className="w-28 bg-sheet border border-rule-strong rounded-[3px] px-2.5 py-1.5 text-ink font-mono"
                   />
                   <Button size="sm" variant="primary" onClick={() => handleSubmitCounter(exc.id)}>
                     Send Counter

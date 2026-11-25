@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { can, type SessionUser } from '@neo/shared';
@@ -9,21 +9,203 @@ import { ApprovalsDrawer } from '../../src/components/shell/ApprovalsDrawer';
 import { NotificationsDrawer } from '../../src/components/shell/NotificationsDrawer';
 import { HelpModal } from '../../src/components/shell/HelpModal';
 import { LockScreenOverlay } from '../../src/components/shell/LockScreenOverlay';
-import { TourEngine, Avatar, Kbd } from '@neo/ui';
+import { TourEngine, Avatar, Kbd, useTheme } from '@neo/ui';
+import { NAV_ICONS, ACTION_ICONS } from '../../src/lib/icons';
+import { useLocale } from '../../src/lib/locale';
 
-interface NavItem {
+interface SubTabItem {
   label: string;
   href: string;
-  icon: string;
   permission?: string;
-  badge?: string;
 }
 
-interface NavSection {
-  title: string;
-  accent: string; // Module colour accent (§3.3)
-  items: NavItem[];
+interface ModuleConfig {
+  id: string;
+  label: string;
+  labelMr: string;
+  href: string;
+  iconKey: keyof typeof NAV_ICONS;
+  matchPrefixes: string[];
+  permission?: string;
+  tabs: SubTabItem[];
 }
+
+const MODULES: ModuleConfig[] = [
+  {
+    id: 'today',
+    label: 'Today',
+    labelMr: 'आज',
+    href: '/home',
+    iconKey: 'today',
+    matchPrefixes: ['/home', '/control/dashboard', '/control/analytics', '/control/notifications'],
+    tabs: [
+      { label: 'Today', href: '/home' },
+      { label: 'Control Tower', href: '/control/dashboard', permission: 'dashboard.read_pulse' },
+      { label: 'Analytics', href: '/control/analytics', permission: 'analytics.read_customers' },
+      { label: 'Notifications', href: '/control/notifications', permission: 'audit.view' },
+    ],
+  },
+  {
+    id: 'approvals',
+    label: 'Approvals',
+    labelMr: 'मंजुरी',
+    href: '/control/approvals',
+    iconKey: 'approvals',
+    matchPrefixes: ['/control/approvals'],
+    permission: 'exception.resolve',
+    tabs: [
+      { label: 'Approvals Queue', href: '/control/approvals', permission: 'exception.resolve' },
+    ],
+  },
+  {
+    id: 'sales',
+    label: 'Sales',
+    labelMr: 'विक्री',
+    href: '/sales/orders',
+    iconKey: 'sales',
+    matchPrefixes: ['/sales'],
+    tabs: [
+      { label: 'Orders', href: '/sales/orders', permission: 'order.view' },
+      { label: 'Quotes', href: '/sales/quotes', permission: 'quote.view' },
+      { label: 'Customers', href: '/sales/customers', permission: 'customer.view' },
+      { label: "Today's prices", href: '/sales/prices', permission: 'price.set_daily' },
+      { label: 'Items', href: '/sales/items', permission: 'order.view' },
+      { label: 'Returns', href: '/sales/returns', permission: 'order.view' },
+      { label: 'Board', href: '/sales/board', permission: 'order.view' },
+    ],
+  },
+  {
+    id: 'purchase',
+    label: 'Purchase',
+    labelMr: 'खरेदी',
+    href: '/procurement',
+    iconKey: 'purchase',
+    matchPrefixes: ['/procurement'],
+    tabs: [
+      { label: 'Overview', href: '/procurement', permission: 'po.read' },
+      { label: 'Purchase Orders', href: '/procurement/purchase-orders', permission: 'po.read' },
+      { label: 'Requisitions', href: '/procurement/requisitions', permission: 'requisition.read' },
+      { label: 'Goods Received', href: '/procurement/grns', permission: 'grn.read' },
+      { label: 'Suppliers & Rates', href: '/procurement/suppliers', permission: 'supplier.read' },
+      { label: 'Supplier Bills', href: '/procurement/supplier-bills', permission: 'po.read' },
+      { label: 'Short supplies', href: '/procurement/shortfalls', permission: 'po.read' },
+      { label: 'Scorecards', href: '/procurement/scorecards', permission: 'supplier.read' },
+    ],
+  },
+  {
+    id: 'stock',
+    label: 'Stock',
+    labelMr: 'साठा',
+    href: '/inventory/stock',
+    iconKey: 'stock',
+    matchPrefixes: ['/inventory', '/control/stock-alerts'],
+    tabs: [
+      { label: 'Stock Overview', href: '/inventory/stock', permission: 'inventory.read' },
+      { label: 'Check Availability', href: '/inventory/availability', permission: 'inventory.read' },
+      { label: 'Expiry Watchlist', href: '/inventory/expiry', permission: 'inventory.read' },
+      { label: 'Transfers', href: '/inventory/transfers', permission: 'inventory.transfer' },
+      { label: 'Adjustments', href: '/inventory/adjustments', permission: 'inventory.adjust' },
+      { label: 'Stock Ledger', href: '/inventory/ledger', permission: 'inventory.read' },
+      { label: 'Reservations', href: '/inventory/reservations', permission: 'inventory.read' },
+      { label: 'Physical Counts', href: '/inventory/stock-counts', permission: 'inventory.read' },
+      { label: 'Stock Alerts', href: '/control/stock-alerts', permission: 'inventory.read' },
+    ],
+  },
+  {
+    id: 'factory',
+    label: 'Factory',
+    labelMr: 'कारखाना',
+    href: '/production',
+    iconKey: 'factory',
+    matchPrefixes: ['/production'],
+    tabs: [
+      { label: 'Overview', href: '/production', permission: 'wo.read' },
+      { label: 'Work Orders', href: '/production/work-orders', permission: 'wo.read' },
+      { label: 'Recipes & BOMs', href: '/production/boms', permission: 'wo.read' },
+      { label: 'RM Requisitions', href: '/production/requisitions', permission: 'requisition.read' },
+      { label: 'Wastage Log', href: '/production/wastage', permission: 'wo.read' },
+      { label: 'Attendance', href: '/production/attendance', permission: 'wo.read' },
+      { label: 'Floor Terminal', href: '/floor' },
+    ],
+  },
+  {
+    id: 'delivery',
+    label: 'Delivery',
+    labelMr: 'वितरण',
+    href: '/logistics/dispatch',
+    iconKey: 'delivery',
+    matchPrefixes: ['/logistics'],
+    tabs: [
+      { label: 'Dispatch Board', href: '/logistics/dispatch', permission: 'fleet.view' },
+      { label: 'Plan Trip', href: '/logistics/trips/new', permission: 'fleet.view' },
+      { label: 'Trips & ePOD', href: '/logistics/trips', permission: 'fleet.view' },
+      { label: 'Delivery Issues', href: '/logistics/issues', permission: 'fleet.view' },
+      { label: 'Trip Expenses', href: '/logistics/expenses', permission: 'fleet.view' },
+      { label: 'Vehicles', href: '/logistics/vehicles', permission: 'fleet.view' },
+      { label: 'Monitoring', href: '/logistics/monitoring', permission: 'fleet.view' },
+    ],
+  },
+  {
+    id: 'money',
+    label: 'Money',
+    labelMr: 'पैसे',
+    href: '/finance',
+    iconKey: 'money',
+    matchPrefixes: ['/finance'],
+    tabs: [
+      { label: 'Overview', href: '/finance', permission: 'finance.view' },
+      { label: 'Tax Invoices', href: '/finance/invoices', permission: 'finance.view' },
+      { label: 'To Collect (AR)', href: '/finance/receivables', permission: 'finance.view' },
+      { label: 'Collections', href: '/finance/collections', permission: 'finance.view' },
+      { label: 'Cash Handovers', href: '/finance/handovers', permission: 'receipt.verify_handover' },
+      { label: 'Cheques & PDC', href: '/finance/cheques', permission: 'finance.view' },
+      { label: 'Credit Notes', href: '/finance/credit-notes', permission: 'finance.view' },
+      { label: 'COD Settlement', href: '/finance/cod', permission: 'finance.view' },
+      { label: 'Promises to Pay', href: '/finance/ptp', permission: 'finance.view' },
+      { label: 'Payables', href: '/finance/payables', permission: 'finance.view' },
+      { label: 'Day Closing (EOD)', href: '/finance/eod', permission: 'eod.signoff' },
+      { label: 'Tally XML Export', href: '/finance/tally', permission: 'finance.view' },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    labelMr: 'अहवाल',
+    href: '/reports',
+    iconKey: 'reports',
+    matchPrefixes: ['/reports'],
+    permission: 'report.view',
+    tabs: [
+      { label: 'Report Library', href: '/reports', permission: 'report.view' },
+      { label: 'Scheduled Reports', href: '/reports/scheduled', permission: 'report.view' },
+    ],
+  },
+];
+
+const SETTINGS_TABS: SubTabItem[] = [
+  { label: 'Company', href: '/admin/company', permission: 'admin.manage' },
+  { label: 'Users', href: '/admin/users', permission: 'admin.manage' },
+  { label: 'Roles', href: '/admin/roles', permission: 'admin.manage' },
+  { label: 'Sites', href: '/admin/sites', permission: 'admin.manage' },
+  { label: 'Opening Balances', href: '/admin/opening-balances', permission: 'admin.manage' },
+  { label: 'Business Rules', href: '/admin/business-rules', permission: 'config.edit' },
+  { label: 'Approval Rules', href: '/admin/approval-rules', permission: 'config.edit' },
+  { label: 'Templates & Series', href: '/admin/templates', permission: 'config.edit' },
+  { label: 'Audit Trail', href: '/control/audit', permission: 'audit.view' },
+  { label: 'System Health', href: '/admin/system', permission: 'admin.manage' },
+  { label: 'Go-Live Checklist', href: '/admin/rollout', permission: 'admin.manage' },
+  { label: 'Extensions', href: '/extensions' },
+  { label: 'Help & Training', href: '/help' },
+];
+
+const CREATE_MENU_ITEMS = [
+  { label: 'New sales order', href: '/sales/orders/new', shortcut: 'O' },
+  { label: 'Record a payment', href: '/finance/collections', shortcut: 'P' },
+  { label: 'Receive goods (GRN)', href: '/procurement/grns', shortcut: 'G' },
+  { label: 'New purchase order', href: '/procurement/purchase-orders', shortcut: 'B' },
+  { label: 'Plan a trip', href: '/logistics/trips/new', shortcut: 'T' },
+  { label: 'Stock adjustment', href: '/inventory/adjustments', shortcut: 'A' },
+];
 
 export default function OfficeLayout({
   children,
@@ -32,13 +214,19 @@ export default function OfficeLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
+  const { locale, setLocale } = useLocale();
 
   const [user, setUser] = useState<SessionUser | null>(null);
   const [activeSite, setActiveSite] = useState<string>('all');
   const [siteToast, setSiteToast] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Shell UI states
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [moreTabsOpen, setMoreTabsOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [approvalsOpen, setApprovalsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -78,13 +266,31 @@ export default function OfficeLayout({
       .catch(() => router.push('/login'));
   }, [router]);
 
-  // Global Keyboard Shortcuts (Ctrl+K, ?, N)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    setIsOffline(!navigator.onLine);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  // Global Keyboard Shortcuts (Ctrl+K, N, ?)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setSearchOpen((prev) => !prev);
-      } else if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+      } else if (!inInput && e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setCreateMenuOpen((prev) => !prev);
+      } else if (e.key === '?' && !inInput) {
         e.preventDefault();
         setHelpOpen(true);
       }
@@ -101,7 +307,7 @@ export default function OfficeLayout({
     }
     const siteObj = user?.sites?.find((s) => s.id === newSiteId);
     const siteName = newSiteId === 'all' ? 'All Sites' : siteObj?.name || newSiteId;
-    setSiteToast(`Active site switched to: ${siteName}`);
+    setSiteToast(`Switched site to ${siteName}`);
     setTimeout(() => setSiteToast(null), 3000);
   };
 
@@ -110,353 +316,410 @@ export default function OfficeLayout({
     router.push('/login');
   };
 
-  const navSections: NavSection[] = [
-    {
-      title: 'Home',
-      accent: '#0F766E', // Teal
-      items: [
-        { label: 'Today Board', href: '/home', icon: '🏠' },
-        { label: 'Control Tower', href: '/control/dashboard', icon: '🗼', permission: 'dashboard.read_pulse' },
-        {
-          label: 'Approvals Centre',
-          href: '/control/approvals',
-          icon: '⚖️',
-          permission: 'exception.resolve',
-          ...(pendingApprovalsCount > 0 ? { badge: String(pendingApprovalsCount) } : {}),
-        },
-        { label: 'Executive Analytics', href: '/control/analytics', icon: '📈', permission: 'analytics.read_customers' },
-        { label: 'Notifications Log', href: '/control/notifications', icon: '🔔', permission: 'audit.view' },
-      ],
-    },
-    {
-      title: 'Sales (Commercial)',
-      accent: '#0F766E',
-      items: [
-        { label: "Today's Prices", href: '/sales/prices', icon: '🏷️', permission: 'price.set_daily' },
-        { label: 'Orders', href: '/sales/orders', icon: '📝', permission: 'order.view' },
-        { label: 'Quotes', href: '/sales/quotes', icon: '📋', permission: 'quote.view' },
-        { label: 'Customers', href: '/sales/customers', icon: '👥', permission: 'customer.view' },
-      ],
-    },
-    {
-      title: 'Purchase (Procurement)',
-      accent: '#6366F1', // Indigo
-      items: [
-        { label: 'Procurement Home', href: '/procurement', icon: '🧭', permission: 'po.read' },
-        { label: 'Requisitions', href: '/procurement/requisitions', icon: '📥', permission: 'requisition.read' },
-        { label: 'Purchase Orders', href: '/procurement/purchase-orders', icon: '📦', permission: 'po.read' },
-        { label: 'Goods Received (GRN)', href: '/procurement/grns', icon: '🚚', permission: 'grn.read' },
-        { label: 'Shortfall Workbench', href: '/procurement/shortfalls', icon: '⚠', permission: 'po.read' },
-        { label: 'Supplier Bills (AP)', href: '/procurement/supplier-bills', icon: '🧾', permission: 'po.read' },
-        { label: 'Suppliers & Rates', href: '/procurement/suppliers', icon: '🏭', permission: 'supplier.read' },
-        { label: 'Scorecards & Trends', href: '/procurement/scorecards', icon: '📈', permission: 'supplier.read' },
-      ],
-    },
-    {
-      title: 'Stock (Inventory)',
-      accent: '#F59E0B', // Amber
-      items: [
-        { label: 'Stock Overview', href: '/inventory/stock', icon: '📊', permission: 'inventory.read' },
-        { label: 'Check Availability (ATP)', href: '/inventory/availability', icon: '✅', permission: 'inventory.read' },
-        { label: 'Expiry Watchlist', href: '/inventory/expiry', icon: '⏳', permission: 'inventory.read' },
-        { label: 'Inter-Site Transfers', href: '/inventory/transfers', icon: '🔄', permission: 'inventory.transfer' },
-        { label: 'Stock Adjustments', href: '/inventory/adjustments', icon: '⚖️', permission: 'inventory.adjust' },
-        { label: 'Stock Ledger', href: '/inventory/ledger', icon: '📒', permission: 'inventory.read' },
-        { label: 'Reservations', href: '/inventory/reservations', icon: '🔒', permission: 'inventory.read' },
-        { label: 'Physical Counts', href: '/inventory/stock-counts', icon: '🔢', permission: 'inventory.read' },
-        { label: 'Stock Alerts', href: '/control/stock-alerts', icon: '🚨', permission: 'inventory.read' },
-      ],
-    },
-    {
-      title: 'Factory (Production)',
-      accent: '#EA580C', // Orange
-      items: [
-        { label: 'Production Overview', href: '/production', icon: '📊', permission: 'wo.read' },
-        { label: 'Recipes & BOMs', href: '/production/boms', icon: '🧪', permission: 'wo.read' },
-        { label: 'Work Orders', href: '/production/work-orders', icon: '⚙️', permission: 'wo.read' },
-        { label: 'RM Requisitions', href: '/production/requisitions', icon: '📥', permission: 'requisition.read' },
-        { label: 'Wastage Log', href: '/production/wastage', icon: '🗑️', permission: 'wo.read' },
-        { label: 'Attendance & Labour', href: '/production/attendance', icon: '👷', permission: 'wo.read' },
-        { label: 'Floor Terminal', href: '/floor', icon: '📱' },
-      ],
-    },
-    {
-      title: 'Delivery (Logistics)',
-      accent: '#2563EB', // Blue
-      items: [
-        { label: 'Live Dispatch Board', href: '/logistics/dispatch', icon: '📡', permission: 'fleet.view' },
-        { label: 'Plan Trip (Builder)', href: '/logistics/trips/new', icon: '🗺️', permission: 'fleet.view' },
-        { label: 'Trips & ePOD', href: '/logistics/trips', icon: '🚚', permission: 'fleet.view' },
-        { label: 'Delivery Issues', href: '/logistics/issues', icon: '⚠️', permission: 'fleet.view' },
-        { label: 'Trip Expenses', href: '/logistics/expenses', icon: '⛽', permission: 'fleet.view' },
-        { label: 'Vehicles Master', href: '/logistics/vehicles', icon: '🚛', permission: 'fleet.view' },
-        { label: 'Fleet Monitoring', href: '/logistics/monitoring', icon: '📊', permission: 'fleet.view' },
-      ],
-    },
-    {
-      title: 'Money (Finance)',
-      accent: '#16A34A', // Green
-      items: [
-        { label: 'Finance Home', href: '/finance', icon: '💰', permission: 'finance.view' },
-        { label: 'Tax Invoices', href: '/finance/invoices', icon: '💳', permission: 'finance.view' },
-        { label: 'Receivables (AR)', href: '/finance/receivables', icon: '📊', permission: 'finance.view' },
-        { label: 'Collections (Receipts)', href: '/finance/collections', icon: '🧾', permission: 'finance.view' },
-        { label: 'Cash Handovers', href: '/finance/handovers', icon: '💵', permission: 'receipt.verify_handover' },
-        { label: 'Cheques & PDC', href: '/finance/cheques', icon: '🏦', permission: 'finance.view' },
-        { label: 'Credit Notes', href: '/finance/credit-notes', icon: '📝', permission: 'finance.view' },
-        { label: 'COD Settlement', href: '/finance/cod', icon: '🪙', permission: 'finance.view' },
-        { label: 'Promises to Pay', href: '/finance/ptp', icon: '🤝', permission: 'finance.view' },
-        { label: 'Supplier Payables', href: '/finance/payables', icon: '📤', permission: 'finance.view' },
-        { label: 'Day Closing (EOD)', href: '/finance/eod', icon: '🔒', permission: 'eod.signoff' },
-        { label: 'Tally XML Export', href: '/finance/tally', icon: '📦', permission: 'finance.view' },
-        { label: 'Report Library', href: '/reports', icon: '📈', permission: 'report.view' },
-        { label: 'Scheduled Reports', href: '/reports/scheduled', icon: '⏰', permission: 'report.view' },
-      ],
-    },
-    {
-      title: 'Admin & Control',
-      accent: '#8B5CF6', // Purple
-      items: [
-        { label: 'Opening Balances', href: '/admin/opening-balances', icon: '⚖️', permission: 'admin.manage' },
-        { label: 'Users & Access', href: '/admin/users', icon: '👤', permission: 'admin.manage' },
-        { label: 'Roles & Matrix', href: '/admin/roles', icon: '🛡️', permission: 'admin.manage' },
-        { label: 'Sites & Locations', href: '/admin/sites', icon: '🏢', permission: 'admin.manage' },
-        { label: 'Company Profile', href: '/admin/company', icon: '🏛️', permission: 'admin.manage' },
-        { label: 'Business Rules', href: '/admin/business-rules', icon: '⚙️', permission: 'config.edit' },
-        { label: 'Approval Rules', href: '/admin/approval-rules', icon: '🔁', permission: 'config.edit' },
-        { label: 'Templates & Series', href: '/admin/templates', icon: '✉️', permission: 'config.edit' },
-        { label: 'Audit Trail', href: '/control/audit', icon: '📜', permission: 'audit.view' },
-        { label: 'System Health', href: '/admin/system', icon: '🩺', permission: 'admin.manage' },
-        { label: 'Rollout Gate (F14)', href: '/admin/rollout', icon: '🚀', permission: 'admin.manage' },
-        { label: 'ERP Extensions (R4)', href: '/extensions', icon: '🧩' },
-        { label: 'Help & Training', href: '/help', icon: '🎓' },
-      ],
-    },
-  ];
+  const visibleModules = useMemo(
+    () =>
+      MODULES.filter((mod) => {
+        if (!mod.permission) return true;
+        return can(user, mod.permission);
+      }),
+    [user],
+  );
 
-  // Breadcrumbs generator
-  const pathParts = pathname.split('/').filter(Boolean);
-  const breadcrumbItems = pathParts.map((p, idx) => ({
-    label: p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, ' '),
-    href: '/' + pathParts.slice(0, idx + 1).join('/'),
-  }));
+  const isSettingsPath =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/control/audit') ||
+    pathname.startsWith('/extensions') ||
+    pathname.startsWith('/help');
+
+  const activeModule = useMemo(() => {
+    if (isSettingsPath) return null;
+    return (
+      MODULES.find((m) => m.matchPrefixes.some((p) => pathname.startsWith(p))) ?? MODULES[0]
+    );
+  }, [pathname, isSettingsPath]);
+
+  const activeTabs = useMemo(() => {
+    const raw = isSettingsPath ? SETTINGS_TABS : activeModule?.tabs ?? [];
+    return raw.filter((tab) => !tab.permission || can(user, tab.permission));
+  }, [isSettingsPath, activeModule, user]);
+
+  const visibleTabs = activeTabs.slice(0, 5);
+  const overflowTabs = activeTabs.slice(5);
+
+  const todayDateStr = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('en-IN', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date());
+    } catch {
+      return '';
+    }
+  }, []);
 
   const tourSteps = [
-    { targetElementId: 'site-switcher', title: 'Site Switcher', content: 'Switch between factory plants, distribution hubs, or view aggregated data across All Sites.' },
-    { targetElementId: 'command-palette-btn', title: 'Universal Command Palette', content: 'Press Ctrl+K anytime to quickly locate customers, orders, trips, or execute fast actions.' },
-    { targetElementId: 'approvals-btn', title: 'Approvals & Exceptions Inbox', content: 'Authorize below-floor price overrides, credit limit breaches, or supplier spikes directly without leaving your screen.' },
-    { targetElementId: 'notifications-btn', title: 'Live System Notifications', content: 'Stay informed on staged orders ready to load, disputed handovers, and stock expiry alerts.' },
+    { targetElementId: 'site-switcher', title: 'Site Switcher', content: 'Switch between factory plants, hubs, or view All Sites together.' },
+    { targetElementId: 'command-palette-btn', title: 'Search Everything (Ctrl+K)', content: 'Press Ctrl+K anytime to jump directly to a customer, order, item, or trip.' },
+    { targetElementId: 'approvals-btn', title: 'Approvals Queue', content: 'Review below-floor prices, credit limit requests, and supplier price rises.' },
+    { targetElementId: 'notifications-btn', title: 'Notifications', content: 'Stay informed on staged orders, cash handovers, and stock expiry.' },
   ];
 
+  const isNight = theme === 'night' || theme === 'dark';
+
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-100 font-sans">
-      {/* 1. Sidebar */}
+    <div className="flex min-h-screen bg-paper text-ink font-sans">
+      {/* 1. Desktop Bahi-Khata Sidebar */}
       <aside
-        className={`${
-          sidebarCollapsed ? 'w-20' : 'w-64'
-        } border-r border-zinc-800 bg-zinc-900/40 flex flex-col justify-between shrink-0 transition-all duration-200 select-none z-20`}
+        className={`hidden lg:flex ${
+          sidebarCollapsed ? 'w-[72px]' : 'w-[236px]'
+        } bg-paper relative flex-col justify-between shrink-0 transition-all duration-150 select-none z-20 no-print`}
       >
-        <div>
-          {/* Logo & Collapse button */}
-          <div className="h-16 px-4 border-b border-zinc-800 flex items-center justify-between">
-            <Link href="/home" className="flex items-center gap-2.5 font-bold tracking-tight text-white">
-              <span className="w-8 h-8 rounded-xl bg-teal-600/30 border border-teal-500/40 text-teal-300 inline-flex items-center justify-center text-sm font-black shadow-md">
-                NB
-              </span>
-              {!sidebarCollapsed && <span className="text-base font-extrabold tracking-tight">NeoBus ERP</span>}
+        {/* Signature Double Madder Margin Rule */}
+        <div
+          aria-hidden="true"
+          className="absolute top-0 bottom-0 right-0 bahi-margin-rule pointer-events-none"
+        />
+
+        <div className={sidebarCollapsed ? 'px-2 pt-5' : 'pl-4 pt-5'}>
+          {/* Brand Wordmark & Collapse */}
+          <div className={`flex items-center justify-between pb-4 ${sidebarCollapsed ? 'px-1' : 'px-3.5 pr-6'}`}>
+            <Link href="/home" className="min-w-0">
+              <div className="font-serif text-[23px] font-semibold tracking-tight text-ink leading-none">
+                {sidebarCollapsed ? 'NB' : 'NeoBus'}
+              </div>
+              {!sidebarCollapsed && (
+                <div className="text-[12.5px] text-ink-3 mt-1 truncate">
+                  {user?.sites?.[0]?.name || 'Baramati Agro Foods'}
+                </div>
+              )}
             </Link>
             <button
               type="button"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="text-zinc-500 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 text-xs"
+              className="text-ink-3 hover:text-ink p-1 rounded-[3px] hover:bg-sheet"
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {sidebarCollapsed ? '»' : '«'}
+              {sidebarCollapsed ? (
+                <ACTION_ICONS.chevronRight className="w-4 h-4" />
+              ) : (
+                <ACTION_ICONS.chevronLeft className="w-4 h-4" />
+              )}
             </button>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-3 space-y-5 overflow-y-auto max-h-[calc(100vh-140px)]">
-            {navSections.map((section) => {
-              const visibleItems = section.items.filter(
-                (item) => !item.permission || can(user, item.permission),
-              );
-              if (visibleItems.length === 0) return null;
+          {/* Primary + New Action Button + Create Menu */}
+          <div className={`relative mb-4 ${sidebarCollapsed ? 'px-1' : 'pr-[22px]'}`}>
+            <button
+              type="button"
+              onClick={() => setCreateMenuOpen((o) => !o)}
+              className={`w-full h-[38px] bg-action hover:bg-action-hover text-white rounded-[3px] font-medium text-[14px] flex items-center ${
+                sidebarCollapsed ? 'justify-center' : 'px-3.5 gap-2'
+              } transition-colors`}
+              title="Create new record (N)"
+            >
+              <ACTION_ICONS.plus className="w-4 h-4 shrink-0" />
+              {!sidebarCollapsed && (
+                <>
+                  <span>New</span>
+                  <kbd className="ml-auto font-mono text-[11.5px] px-1.5 py-0 rounded-[2px] border border-white/35 text-white/90">
+                    N
+                  </kbd>
+                </>
+              )}
+            </button>
+
+            {createMenuOpen && (
+              <div
+                className="absolute left-0 top-full mt-1.5 w-60 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50"
+                onMouseLeave={() => setCreateMenuOpen(false)}
+              >
+                {CREATE_MENU_ITEMS.map((item) => (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    onClick={() => setCreateMenuOpen(false)}
+                    className="flex items-center justify-between px-3.5 py-2 text-[13.5px] text-ink hover:bg-paper transition-colors"
+                  >
+                    <span>{item.label}</span>
+                    <Kbd>{item.shortcut}</Kbd>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 9 Clean Module Links with Index-Tab Active State */}
+          <nav className="space-y-0.5 overflow-y-auto max-h-[calc(100vh-280px)]">
+            {visibleModules.map((mod) => {
+              const Icon = NAV_ICONS[mod.iconKey];
+              const isActive = !isSettingsPath && activeModule?.id === mod.id;
+              const badgeCount = mod.id === 'approvals' ? pendingApprovalsCount : 0;
 
               return (
-                <div key={section.title}>
+                <Link
+                  key={mod.id}
+                  href={mod.href}
+                  title={sidebarCollapsed ? mod.label : undefined}
+                  className={`flex items-center gap-3 h-[38px] text-[14.5px] transition-colors relative z-10 ${
+                    sidebarCollapsed ? 'justify-center px-2 rounded-[3px]' : 'px-3.5 rounded-l-[3px]'
+                  } ${
+                    isActive
+                      ? 'bg-sheet text-ink font-semibold mr-0 shadow-[inset_1px_0_0_var(--rule),inset_0_1px_0_var(--rule),inset_0_-1px_0_var(--rule)]'
+                      : 'text-ink-2 hover:text-ink hover:bg-sheet/50 mr-3'
+                  }`}
+                >
+                  <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-action' : 'text-ink-2'}`} strokeWidth={1.75} />
                   {!sidebarCollapsed && (
-                    <div
-                      className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.accent }} />
-                      <span>{section.title}</span>
-                    </div>
+                    <span className="truncate">{locale === 'mr' ? mod.labelMr : mod.label}</span>
                   )}
-                  <div className="space-y-0.5">
-                    {visibleItems.map((item) => {
-                      const isActive = pathname === item.href;
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          title={sidebarCollapsed ? item.label : undefined}
-                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                            isActive
-                              ? 'bg-teal-500/15 text-teal-300 font-semibold border border-teal-500/30'
-                              : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <span className="text-sm">{item.icon}</span>
-                            {!sidebarCollapsed && <span>{item.label}</span>}
-                          </span>
-                          {!sidebarCollapsed && item.badge && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300">
-                              {item.badge}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
+                  {!sidebarCollapsed && badgeCount > 0 && (
+                    <span className="ml-auto text-[12px] font-semibold bg-madder text-white rounded-full px-1.5 leading-[18px]">
+                      {badgeCount}
+                    </span>
+                  )}
+                </Link>
               );
             })}
           </nav>
         </div>
 
-        {/* Sidebar Footer / User Profile summary */}
-        <div className="p-3 border-t border-zinc-800 bg-zinc-900/60">
-          <Link
-            href="/me"
-            className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-zinc-800/60 transition-colors"
-          >
-            <Avatar name={user?.name || 'User'} size="sm" />
-            {!sidebarCollapsed && (
-              <div className="truncate">
-                <div className="text-xs font-semibold text-white truncate">{user?.name || 'Loading...'}</div>
-                <div className="text-[10px] text-zinc-400">{user?.role || ''}</div>
+        {/* Sidebar Footer: Settings, Help, User, Language & Theme */}
+        <div className={`${sidebarCollapsed ? 'px-2 pb-4' : 'pl-4 pr-5 pb-4'} pt-2.5 border-t border-rule mr-0`}>
+          <div className="space-y-0.5 mb-2">
+            <Link
+              href="/admin/company"
+              className={`flex items-center gap-3 h-[36px] px-3 text-[14px] rounded-[3px] transition-colors ${
+                isSettingsPath ? 'bg-sheet text-ink font-semibold' : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+              } ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+              title="Settings"
+            >
+              <NAV_ICONS.settings className="w-[17px] h-[17px] shrink-0" strokeWidth={1.75} />
+              {!sidebarCollapsed && <span>Settings</span>}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className={`w-full flex items-center gap-3 h-[36px] px-3 text-[14px] text-ink-2 hover:text-ink hover:bg-sheet/50 rounded-[3px] transition-colors ${
+                sidebarCollapsed ? 'justify-center px-2' : ''
+              }`}
+              title="Help & Shortcuts (?)"
+            >
+              <NAV_ICONS.help className="w-[17px] h-[17px] shrink-0" strokeWidth={1.75} />
+              {!sidebarCollapsed && <span>Help</span>}
+            </button>
+          </div>
+
+          {!sidebarCollapsed && (
+            <div className="px-3 pt-2 border-t border-rule flex items-center gap-2.5">
+              <Link href="/me" className="flex items-center gap-2.5 min-w-0 flex-1 group">
+                <Avatar name={user?.name || 'User'} size="sm" />
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold text-ink truncate group-hover:text-action">
+                    {user?.name || 'Loading...'}
+                  </div>
+                  <div className="text-[12px] text-ink-3 truncate">{user?.role || ''}</div>
+                </div>
+              </Link>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLocale(locale === 'en' ? 'mr' : 'en')}
+                  className="text-[12px] px-1.5 py-0.5 rounded-[3px] border border-rule-strong text-ink-2 hover:text-ink"
+                  title="Switch language (English / Marathi)"
+                >
+                  {locale === 'en' ? 'मराठी' : 'EN'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme(isNight ? 'paper' : 'night')}
+                  className="p-1 rounded-[3px] border border-rule-strong text-ink-2 hover:text-ink"
+                  title={isNight ? 'Switch to Paper theme' : 'Switch to Night theme'}
+                  aria-label="Toggle theme"
+                >
+                  {isNight ? <ACTION_ICONS.sun className="w-3.5 h-3.5" /> : <ACTION_ICONS.moon className="w-3.5 h-3.5" />}
+                </button>
               </div>
-            )}
-          </Link>
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* 2. Main Workspace Layout */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar (§3) */}
-        <header className="h-16 border-b border-zinc-800 bg-zinc-900/30 px-6 flex items-center justify-between shrink-0 sticky top-0 z-10 backdrop-blur-md">
-          <div className="flex items-center gap-4">
-            {/* Site Switcher (§3, F2-03) */}
-            <div
-              id="site-switcher"
-              className="flex items-center gap-2 bg-zinc-800/60 border border-zinc-700/60 rounded-xl px-3 py-1.5 text-xs"
-            >
-              <span className="text-zinc-400">Site:</span>
+      {/* 2. Main Sheet Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 bg-sheet pb-16 lg:pb-0">
+        {/* Topbar with Module Tabs */}
+        <header className="h-[60px] border-b border-rule px-4 sm:px-8 flex items-center justify-between gap-4 shrink-0 sticky top-0 z-10 bg-sheet no-print">
+          {/* Left: Module Sub-Tabs or Today's Date */}
+          <div className="flex items-center gap-5 h-full overflow-x-auto min-w-0">
+            {pathname === '/home' ? (
+              <span className="text-[13.5px] text-ink-3 whitespace-nowrap">{todayDateStr}</span>
+            ) : (
+              <>
+                {visibleTabs.map((tab) => {
+                  const isTabActive =
+                    pathname === tab.href ||
+                    (tab.href !== '/procurement' &&
+                      tab.href !== '/production' &&
+                      tab.href !== '/finance' &&
+                      pathname.startsWith(tab.href + '/'));
+                  return (
+                    <Link
+                      key={tab.href}
+                      href={tab.href}
+                      className={`h-full flex items-center text-[14px] border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                        isTabActive
+                          ? 'border-ink text-ink font-semibold'
+                          : 'border-transparent text-ink-2 hover:text-ink'
+                      }`}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+                {overflowTabs.length > 0 && (
+                  <div className="relative h-full flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setMoreTabsOpen((o) => !o)}
+                      className="text-[13.5px] text-ink-2 hover:text-ink flex items-center gap-1 py-1 px-1.5 rounded-[3px]"
+                    >
+                      <span>More</span>
+                      <ACTION_ICONS.chevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    {moreTabsOpen && (
+                      <div
+                        className="absolute left-0 top-full mt-0.5 w-52 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50"
+                        onMouseLeave={() => setMoreTabsOpen(false)}
+                      >
+                        {overflowTabs.map((tab) => (
+                          <Link
+                            key={tab.href}
+                            href={tab.href}
+                            onClick={() => setMoreTabsOpen(false)}
+                            className={`block px-3.5 py-2 text-[13.5px] hover:bg-paper ${
+                              pathname === tab.href ? 'font-semibold text-action' : 'text-ink-2'
+                            }`}
+                          >
+                            {tab.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right: Site Switcher, Search, Approvals, Notifications, User */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div id="site-switcher" className="hidden md:flex items-center gap-1 text-[13.5px] text-ink-2">
               <select
-                className="bg-transparent text-white font-medium outline-none cursor-pointer"
+                className="bg-transparent text-ink-2 hover:text-ink font-medium outline-none cursor-pointer pr-1 py-1"
                 value={activeSite}
                 onChange={(e) => handleSiteChange(e.target.value)}
+                aria-label="Active site"
               >
-                {user?.role === 'OWNER' && <option value="all" className="bg-zinc-900">All Sites (Aggregated)</option>}
+                {user?.role === 'OWNER' && <option value="all">All Sites (Aggregated)</option>}
                 {(user?.sites || []).map((s) => (
-                  <option key={s.id} value={s.id} className="bg-zinc-900">
+                  <option key={s.id} value={s.id}>
                     {s.name} ({s.siteType})
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Global Search Command Button (Ctrl+K, F2-04) */}
             <button
               id="command-palette-btn"
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-3 bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-700/50 rounded-xl px-3.5 py-1.5 text-xs text-zinc-400 transition-colors"
+              className="hidden sm:flex items-center gap-2.5 w-60 lg:w-72 h-[36px] bg-paper border border-rule-strong hover:border-action rounded-[3px] px-3 text-[13.5px] text-ink-3 transition-colors"
             >
-              <span>🔍 Search records...</span>
+              <ACTION_ICONS.search className="w-4 h-4 shrink-0" />
+              <span className="truncate">Search orders, customers...</span>
               <Kbd>Ctrl+K</Kbd>
             </button>
-          </div>
 
-          <div className="flex items-center gap-3">
-            {/* Approvals Badge Button (✅ F2-05) */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="sm:hidden w-9 h-9 border border-rule-strong rounded-[3px] flex items-center justify-center text-ink-2"
+              aria-label="Search"
+            >
+              <ACTION_ICONS.search className="w-4 h-4" />
+            </button>
+
             <button
               id="approvals-btn"
               type="button"
               onClick={() => setApprovalsOpen(true)}
-              className="relative p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm flex items-center gap-1.5"
-              title="Approvals & Exceptions Queue"
+              className="relative w-9 h-9 border border-rule-strong bg-sheet hover:bg-paper rounded-[3px] flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
+              title="Approvals queue"
+              aria-label="Approvals queue"
             >
-              <span>✅</span>
+              <ACTION_ICONS.checkCircle className="w-4 h-4" />
               {pendingApprovalsCount > 0 && (
-                <span className="text-xs font-bold text-amber-300">{pendingApprovalsCount}</span>
-              )}
-            </button>
-
-            {/* Notifications Bell (🔔 F2-06) */}
-            <button
-              id="notifications-btn"
-              type="button"
-              onClick={() => setNotificationsOpen(true)}
-              className="relative p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm"
-              title="System Notifications"
-            >
-              <span>🔔</span>
-              {unreadNotifsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-teal-500 text-white font-bold text-[10px] flex items-center justify-center">
-                  {unreadNotifsCount}
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-madder text-white text-[11px] font-semibold flex items-center justify-center">
+                  {pendingApprovalsCount}
                 </span>
               )}
             </button>
 
-            {/* Help Button (? F2-11) */}
             <button
+              id="notifications-btn"
               type="button"
-              onClick={() => setHelpOpen(true)}
-              className="p-2 rounded-xl bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 text-sm font-bold w-9 h-9 flex items-center justify-center"
-              title="Help & Shortcuts (?)"
+              onClick={() => setNotificationsOpen(true)}
+              className="relative w-9 h-9 border border-rule-strong bg-sheet hover:bg-paper rounded-[3px] flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
+              title="Notifications"
+              aria-label="Notifications"
             >
-              ?
+              <ACTION_ICONS.bell className="w-4 h-4" />
+              {unreadNotifsCount > 0 && (
+                <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-madder" />
+              )}
             </button>
 
-            {/* User Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-teal-500 focus:outline-none"
+                className="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-action"
+                aria-label="Account menu"
               >
                 <Avatar name={user?.name || 'U'} size="sm" />
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-2 z-50 text-xs">
-                  <div className="px-3 py-2 border-b border-zinc-800">
-                    <div className="font-bold text-white truncate">{user?.name}</div>
-                    <div className="text-[10px] text-teal-400 font-semibold">{user?.role}</div>
+                <div className="absolute right-0 mt-2 w-52 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50 text-[13.5px]">
+                  <div className="px-3.5 py-2 border-b border-rule">
+                    <div className="font-semibold text-ink truncate">{user?.name}</div>
+                    <div className="text-[12.5px] text-ink-3">{user?.role}</div>
                   </div>
                   <Link
                     href="/me"
                     onClick={() => setUserMenuOpen(false)}
-                    className="block px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg"
+                    className="flex items-center gap-2 px-3.5 py-2 text-ink-2 hover:text-ink hover:bg-paper"
                   >
-                    👤 My Profile
+                    <ACTION_ICONS.user className="w-4 h-4" />
+                    My Profile
                   </Link>
                   <Link
                     href="/floor"
                     onClick={() => setUserMenuOpen(false)}
-                    className="block px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg"
+                    className="flex items-center gap-2 px-3.5 py-2 text-ink-2 hover:text-ink hover:bg-paper"
                   >
-                    📱 Switch to Floor Mode
+                    <ACTION_ICONS.phone className="w-4 h-4" />
+                    Switch to Floor Mode
                   </Link>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                    className="w-full flex items-center gap-2 text-left px-3.5 py-2 text-madder hover:bg-madder-soft"
                   >
-                    ↪ Sign Out
+                    <ACTION_ICONS.logout className="w-4 h-4" />
+                    Sign Out
                   </button>
                 </div>
               )}
@@ -464,46 +727,96 @@ export default function OfficeLayout({
           </div>
         </header>
 
-        {/* Breadcrumb Navigation Bar */}
-        <div className="px-6 py-2.5 bg-zinc-900/20 border-b border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400 select-none">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <Link href="/home" className="hover:text-white flex items-center gap-1">
-              <span>🏠</span>
-              <span>Home</span>
-            </Link>
-            {breadcrumbItems.map((b, idx) => (
-              <React.Fragment key={b.href}>
-                <span className="text-zinc-600">›</span>
-                {idx === breadcrumbItems.length - 1 ? (
-                  <span className="text-zinc-200 font-semibold">{b.label}</span>
-                ) : (
-                  <Link href={b.href} className="hover:text-white">
-                    {b.label}
-                  </Link>
-                )}
-              </React.Fragment>
-            ))}
+        {/* Show connectivity banner ONLY when offline */}
+        {isOffline && (
+          <div className="px-8 py-2 bg-haldi-soft border-b border-haldi/30 text-[13px] text-haldi font-medium no-print">
+            Offline — changes will sync once connection returns.
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-indicator" />
-              Live Connected (30s)
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Site Switch Feedback Toast */}
         {siteToast && (
-          <div className="fixed top-20 right-6 z-50 p-3 rounded-xl bg-teal-950/90 border border-teal-500/40 text-teal-200 text-xs shadow-xl animate-fade-in flex items-center gap-2">
-            <span>✓</span>
+          <div className="fixed top-20 right-6 z-50 px-4 py-2.5 rounded-[4px] bg-sheet border border-rule-strong text-ink text-[13.5px] shadow-xl flex items-center gap-2">
+            <ACTION_ICONS.check className="w-4 h-4 text-leaf" />
             <span>{siteToast}</span>
           </div>
         )}
 
-        {/* Main Viewport Content */}
-        <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+        {/* Main Content */}
+        <main className="flex-1 px-4 py-5 sm:px-9 sm:py-7 overflow-y-auto">{children}</main>
       </div>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-[62px] bg-sheet border-t border-rule flex items-center justify-around px-2 z-30 no-print">
+        {[
+          { id: 'today', label: 'Today', href: '/home', Icon: NAV_ICONS.today },
+          { id: 'approvals', label: 'Approvals', href: '/control/approvals', Icon: NAV_ICONS.approvals, badge: pendingApprovalsCount },
+          { id: 'sales', label: 'Sales', href: '/sales/orders', Icon: NAV_ICONS.sales },
+          { id: 'money', label: 'Money', href: '/finance', Icon: NAV_ICONS.money },
+        ].map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={`relative flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 ${
+                isActive ? 'text-action font-semibold' : 'text-ink-3'
+              }`}
+            >
+              <item.Icon className="w-5 h-5" />
+              <span>{item.label}</span>
+              {item.badge ? (
+                <span className="absolute top-0 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-madder text-white text-[10.5px] font-semibold flex items-center justify-center">
+                  {item.badge}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setMobileMoreOpen((o) => !o)}
+          className="flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 text-ink-3"
+        >
+          <ACTION_ICONS.more className="w-5 h-5" />
+          <span>More</span>
+        </button>
+      </nav>
+
+      {mobileMoreOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/40 flex items-end" onClick={() => setMobileMoreOpen(false)}>
+          <div
+            className="w-full bg-sheet border-t border-rule-strong rounded-t-[8px] p-4 space-y-2 max-h-[75vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[14px] font-semibold text-ink pb-2 border-b border-ink">All Sections</div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {visibleModules.map((mod) => {
+                const Icon = NAV_ICONS[mod.iconKey];
+                return (
+                  <Link
+                    key={mod.id}
+                    href={mod.href}
+                    onClick={() => setMobileMoreOpen(false)}
+                    className="flex items-center gap-2.5 p-3 rounded-[4px] border border-rule bg-paper text-[14px] text-ink"
+                  >
+                    <Icon className="w-4 h-4 text-action" />
+                    <span>{mod.label}</span>
+                  </Link>
+                );
+              })}
+              <Link
+                href="/admin/company"
+                onClick={() => setMobileMoreOpen(false)}
+                className="flex items-center gap-2.5 p-3 rounded-[4px] border border-rule bg-paper text-[14px] text-ink"
+              >
+                <NAV_ICONS.settings className="w-4 h-4 text-action" />
+                <span>Settings</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Dialogs & Drawers */}
       <SearchPalette

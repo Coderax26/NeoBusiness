@@ -51,8 +51,8 @@ export default function DeliveryIssuesDeskPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Delivery Issues Desk</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Delivery Issues Desk</h1>
+          <p className="text-sm text-ink-3">
             Review driver-reported shortages, damaged stock, or customer disputes with photo evidence and resolve them.
           </p>
         </div>
@@ -62,10 +62,10 @@ export default function DeliveryIssuesDeskPage() {
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
                 filterStatus === status
                   ? 'bg-blue-600 text-white'
-                  : 'border border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
               }`}
             >
               {status}
@@ -76,37 +76,37 @@ export default function DeliveryIssuesDeskPage() {
 
       <div className="grid grid-cols-1 gap-4">
         {filteredIssues.length === 0 ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-400">
+          <div className="rounded-[3px] border border-rule bg-sheet p-8 text-center text-sm text-ink-3">
             No delivery issues found.
           </div>
         ) : (
           filteredIssues.map((issue) => (
-            <div key={issue.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+            <div key={issue.id} className="rounded-[3px] border border-rule bg-sheet p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-zinc-100">{issue.issueNo}</span>
-                    <span className="rounded bg-rose-500/15 px-2 py-0.5 text-xs font-semibold text-rose-400">{issue.type}</span>
+                    <span className="font-mono text-sm font-bold text-ink">{issue.issueNo}</span>
+                    <span className="rounded bg-madder-soft px-2 py-0.5 text-xs font-semibold text-madder">{issue.type}</span>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        issue.status === 'OPEN' ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                        issue.status === 'OPEN' ? 'bg-haldi-soft text-haldi' : 'bg-leaf-soft text-leaf'
                       }`}
                     >
                       {issue.status}
                     </span>
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-zinc-200">
+                  <div className="mt-1 text-sm font-semibold text-ink">
                     {issue.customerName} · Order {issue.stopOrderNo} ·{' '}
-                    <Link href={`/logistics/trips/${issue.tripId}`} className="text-blue-400 hover:underline">
+                    <Link href={`/logistics/trips/${issue.tripId}`} className="text-action hover:underline">
                       {issue.tripNo}
                     </Link>
                   </div>
-                  <p className="mt-1.5 text-sm text-zinc-400">{issue.description}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+                  <p className="mt-1.5 text-sm text-ink-3">{issue.description}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-ink-3">
                     <span>Reported: {issue.reportedAt}</span>
-                    {issue.photoName && <span className="font-mono text-zinc-300">📷 {issue.photoName}</span>}
+                    {issue.photoName && <span className="font-mono text-ink-2">📷 {issue.photoName}</span>}
                     {issue.resolutionOutcome && (
-                      <span className="font-semibold text-emerald-400">Outcome: {issue.resolutionOutcome}</span>
+                      <span className="font-semibold text-leaf">Outcome: {issue.resolutionOutcome}</span>
                     )}
                   </div>
                 </div>
@@ -115,7 +115,7 @@ export default function DeliveryIssuesDeskPage() {
                   <button
                     type="button"
                     onClick={() => setResolvingIssue(issue)}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    className="rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                   >
                     Resolve Issue
                   </button>
@@ -128,20 +128,20 @@ export default function DeliveryIssuesDeskPage() {
 
       {/* Resolve Modal */}
       {resolvingIssue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-zinc-100">Resolve {resolvingIssue.issueNo}</h2>
-            <p className="mt-1 text-xs text-zinc-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-[4px] border border-rule bg-sheet p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-ink">Resolve {resolvingIssue.issueNo}</h2>
+            <p className="mt-1 text-xs text-ink-3">
               Select resolution outcome for {resolvingIssue.customerName} ({resolvingIssue.stopOrderNo}).
             </p>
             <div className="mt-4 space-y-2">
               {(['REDELIVER', 'CREDIT_NOTE', 'WRITE_OFF'] as const).map((outcome) => (
                 <label
                   key={outcome}
-                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 text-sm ${
+                  className={`flex cursor-pointer items-center justify-between rounded-[3px] border p-3 text-sm${
                     selectedOutcome === outcome
                       ? 'border-blue-500 bg-blue-500/15 font-semibold text-blue-300'
-                      : 'border-zinc-800 bg-zinc-950 text-zinc-300'
+                      : 'border-rule bg-paper text-ink-2'
                   }`}
                 >
                   <span>{outcome.replace('_', ' ')}</span>
@@ -158,14 +158,14 @@ export default function DeliveryIssuesDeskPage() {
               <button
                 type="button"
                 onClick={() => setResolvingIssue(null)}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                className="rounded-lg border border-rule-strong bg-paper px-4 py-2 text-sm font-semibold text-ink-2 hover:bg-sunken"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmResolve}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 Confirm Resolution
               </button>

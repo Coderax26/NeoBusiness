@@ -52,8 +52,8 @@ export default function OpeningBalancesWizardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Opening Balances Wizard (OD-023)</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Opening Balances Wizard (OD-023)</h1>
+          <p className="text-sm text-ink-3">
             CSV import lifecycle: DRAFT → Owner SIGNED_OFF (with cut-off date) → IMPORTED → REVERSED.
           </p>
         </div>
@@ -63,23 +63,23 @@ export default function OpeningBalancesWizardPage() {
       </div>
 
       {toast && (
-        <div className="rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-2.5 text-sm font-medium text-purple-200">
+        <div className="rounded-[3px] border border-purple-500/40 bg-purple-950/30 px-4 py-2.5 text-sm font-medium text-purple-200">
           {toast}
         </div>
       )}
 
       {/* Lifecycle Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[3px] border border-rule bg-sheet p-5">
         <div className="flex items-center gap-3 text-sm">
-          <span className="font-mono font-bold text-zinc-100">{batch.batchNo}</span>
-          <label className="text-xs font-semibold text-zinc-400">
+          <span className="font-mono font-bold text-ink">{batch.batchNo}</span>
+          <label className="text-xs font-semibold text-ink-3">
             Cut-off Date:{' '}
             <input
               type="date"
               value={batch.cutoffDate}
               onChange={(e) => setBatch((prev) => ({ ...prev, cutoffDate: e.target.value }))}
               disabled={batch.status !== 'DRAFT'}
-              className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-100"
+              className="rounded border border-rule-strong bg-paper px-2 py-1 text-ink"
             />
           </label>
         </div>
@@ -88,7 +88,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('SIGN_OFF')}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-ink hover:bg-purple-500"
             >
               Owner Sign-off
             </button>
@@ -97,7 +97,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('IMPORT')}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              className="rounded-lg bg-leaf px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               Import Atomic CSV
             </button>
@@ -106,7 +106,7 @@ export default function OpeningBalancesWizardPage() {
             <button
               type="button"
               onClick={() => runAction('REVERSE')}
-              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500"
+              className="rounded-lg bg-madder px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               Reverse Batch
             </button>
@@ -115,9 +115,9 @@ export default function OpeningBalancesWizardPage() {
       </div>
 
       {/* Preview Table */}
-      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+      <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper text-xs uppercase text-ink-3">
             <tr>
               <th className="px-4 py-3">Party Type</th>
               <th className="px-4 py-3">Party Name</th>
@@ -125,21 +125,21 @@ export default function OpeningBalancesWizardPage() {
               <th className="px-4 py-3">Validation</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {batch.rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-zinc-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-ink-3">
                   No opening balance rows staged yet.
                 </td>
               </tr>
             )}
             {batch.rows.map((r) => (
               <tr key={r.id}>
-                <td className="px-4 py-3 text-xs font-semibold text-zinc-400">{r.partyType}</td>
-                <td className="px-4 py-3 font-semibold text-zinc-100">{r.partyName}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-100">{formatINR(r.openingBalance)}</td>
+                <td className="px-4 py-3 text-xs font-semibold text-ink-3">{r.partyType}</td>
+                <td className="px-4 py-3 font-semibold text-ink">{r.partyName}</td>
+                <td className="px-4 py-3 text-right font-mono font-semibold text-ink">{formatINR(r.openingBalance)}</td>
                 <td className="px-4 py-3">
-                  <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+                  <span className="rounded-full bg-leaf-soft px-2.5 py-0.5 text-xs font-semibold text-leaf">
                     Valid
                   </span>
                 </td>

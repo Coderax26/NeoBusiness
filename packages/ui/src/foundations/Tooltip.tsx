@@ -21,7 +21,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, className =
       {visible && (
         <span
           role="tooltip"
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-lg pointer-events-none whitespace-nowrap z-50"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[13px] font-medium rounded-[3px] bg-ink text-paper shadow-md pointer-events-none whitespace-nowrap z-50"
         >
           {content}
         </span>
@@ -47,14 +47,14 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md', classNam
     .toUpperCase();
 
   const sizeClasses = {
-    sm: 'w-7 h-7 text-xs',
-    md: 'w-9 h-9 text-sm',
+    sm: 'w-7 h-7 text-[12px] font-semibold',
+    md: 'w-9 h-9 text-[13px] font-semibold',
     lg: 'w-12 h-12 text-base font-semibold',
   };
 
   return (
     <div
-      className={`inline-flex items-center justify-center rounded-full bg-teal-900/60 border border-teal-500/30 text-teal-200 overflow-hidden select-none ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-full bg-ink text-paper overflow-hidden select-none ${sizeClasses[size]} ${className}`}
       title={name}
     >
       {src ? (
@@ -65,4 +65,3 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md', classNam
     </div>
   );
 };
-

@@ -25,31 +25,31 @@ export interface StatusPillProps {
 }
 
 const TONE_CLASSES: Record<StatusPillTone, string> = {
-  success: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  warning: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  danger: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-  rose: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-  info: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  sky: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  indigo: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-  neutral: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  slate: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  success: 'text-leaf',
+  emerald: 'text-leaf',
+  warning: 'text-haldi',
+  amber: 'text-haldi',
+  danger: 'text-madder',
+  rose: 'text-madder',
+  info: 'text-action',
+  sky: 'text-action',
+  indigo: 'text-action',
+  neutral: 'text-ink-2',
+  slate: 'text-ink-2',
 };
 
-const SYMBOLS: Record<StatusPillTone, string> = {
-  success: '✓',
-  emerald: '✓',
-  warning: '▲',
-  amber: '▲',
-  danger: '✕',
-  rose: '✕',
-  info: '●',
-  sky: '●',
-  indigo: '●',
-  neutral: '○',
-  slate: '○',
+const SHAPE_CLASSES: Record<StatusPillTone, string> = {
+  success: 'w-[7px] h-[7px] rounded-full bg-current',
+  emerald: 'w-[7px] h-[7px] rounded-full bg-current',
+  warning: 'w-[7px] h-[7px] rounded-full bg-current',
+  amber: 'w-[7px] h-[7px] rounded-full bg-current',
+  danger: 'w-[7px] h-[7px] rounded-[1px] rotate-45 bg-current',
+  rose: 'w-[7px] h-[7px] rounded-[1px] rotate-45 bg-current',
+  info: 'w-[7px] h-[7px] rounded-full bg-current',
+  sky: 'w-[7px] h-[7px] rounded-full bg-current',
+  indigo: 'w-[7px] h-[7px] rounded-full bg-current',
+  neutral: 'w-[7px] h-[7px] rounded-full border border-current bg-transparent',
+  slate: 'w-[7px] h-[7px] rounded-full border border-current bg-transparent',
 };
 
 export const StatusPill: React.FC<StatusPillProps> = ({
@@ -70,16 +70,14 @@ export const StatusPill: React.FC<StatusPillProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+      className={`inline-flex items-center gap-1.5 text-[13px] font-semibold ${
         TONE_CLASSES[resolvedTone] || TONE_CLASSES.neutral
       } ${className}`}
       role="status"
       aria-label={`${entity} status: ${resolvedLabel}`}
       title={human?.description || String(resolvedLabel)}
     >
-      <span aria-hidden="true" className="font-bold text-[10px]">
-        {SYMBOLS[resolvedTone] || SYMBOLS.neutral}
-      </span>
+      <span aria-hidden="true" className={SHAPE_CLASSES[resolvedTone] || SHAPE_CLASSES.neutral} />
       <span>{children ?? resolvedLabel}</span>
     </span>
   );

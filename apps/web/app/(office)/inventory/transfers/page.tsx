@@ -87,13 +87,13 @@ export default function InventoryTransfersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/inventory/stock" className="hover:text-white">Inventory</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/inventory/stock" className="hover:text-ink">Inventory</Link>
             <span>/</span>
-            <span className="text-amber-400">Inter-Site Transfers</span>
+            <span className="text-haldi">Inter-Site Transfers</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Inter-Site Stock Transfers</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Inter-Site Stock Transfers</h1>
+          <p className="text-sm text-ink-3">
             Draft → Dispatched → Received → Completed lifecycle with FEFO batch selection.
           </p>
         </div>
@@ -103,20 +103,20 @@ export default function InventoryTransfersPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl p-2">
+      <div className="flex flex-wrap gap-1.5 bg-sheet border border-rule rounded-[3px] p-2">
         {['ALL', 'DRAFT', 'DISPATCHED', 'RECEIVED', 'COMPLETED', 'CANCELLED'].map((st) => (
           <button
             key={st}
             onClick={() => setStatusFilter(st)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
               statusFilter === st
-                ? 'bg-amber-600 text-white'
-                : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                ? 'bg-haldi text-white'
+                : 'bg-sunken text-ink-3 hover:text-ink'
             }`}
           >
             {st}
@@ -124,9 +124,9 @@ export default function InventoryTransfersPage() {
         ))}
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
             <tr>
               <th className="p-3">Transfer #</th>
               <th className="p-3">Route</th>
@@ -136,20 +136,20 @@ export default function InventoryTransfersPage() {
               <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {filtered.map((t) => (
-              <tr key={t.id} className="hover:bg-zinc-800/40">
-                <td className="p-3 font-mono text-xs text-amber-400 font-semibold">
+              <tr key={t.id} className="hover:bg-sunken">
+                <td className="p-3 font-mono text-xs text-haldi font-semibold">
                   {t.transferNo}
                 </td>
-                <td className="p-3 text-xs text-zinc-200">
+                <td className="p-3 text-xs text-ink">
                   {t.fromSite} ({t.fromLocation}) → {t.toSite} ({t.toLocation})
                 </td>
                 <td className="p-3">
-                  <div className="text-white font-medium">{t.itemName}</div>
-                  <div className="text-[11px] font-mono text-zinc-500">Batch {t.batchNo}</div>
+                  <div className="text-ink font-medium">{t.itemName}</div>
+                  <div className="text-[11px] font-mono text-ink-3">Batch {t.batchNo}</div>
                 </td>
-                <td className="p-3 text-right font-mono text-white">
+                <td className="p-3 text-right font-mono text-ink">
                   {t.qty} {t.uom}
                 </td>
                 <td className="p-3">
@@ -169,13 +169,13 @@ export default function InventoryTransfersPage() {
                     <>
                       <button
                         onClick={() => transition(t.id, 'DISPATCHED', 'dispatch')}
-                        className="text-xs text-sky-400 hover:text-sky-300 font-medium"
+                        className="text-xs text-action hover:text-action font-medium"
                       >
                         Dispatch
                       </button>
                       <button
                         onClick={() => transition(t.id, 'CANCELLED', 'cancel')}
-                        className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+                        className="text-xs text-madder hover:text-madder font-medium"
                       >
                         Cancel
                       </button>
@@ -184,7 +184,7 @@ export default function InventoryTransfersPage() {
                   {t.status === 'DISPATCHED' && (
                     <button
                       onClick={() => transition(t.id, 'RECEIVED', 'receive')}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+                      className="text-xs text-leaf hover:text-leaf font-medium"
                     >
                       Receive
                     </button>
@@ -192,7 +192,7 @@ export default function InventoryTransfersPage() {
                   {t.status === 'RECEIVED' && (
                     <button
                       onClick={() => transition(t.id, 'COMPLETED', 'complete')}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+                      className="text-xs text-leaf hover:text-leaf font-medium"
                     >
                       Complete
                     </button>
@@ -207,11 +207,11 @@ export default function InventoryTransfersPage() {
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Stock Transfer (FEFO)">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Source Item &amp; Batch (FEFO)</label>
+            <label className="block text-xs text-ink-3 mb-1">Source Item &amp; Batch (FEFO)</label>
             <select
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
               {stockRows.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -222,23 +222,23 @@ export default function InventoryTransfersPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Destination Site</label>
+              <label className="block text-xs text-ink-3 mb-1">Destination Site</label>
               <select
                 value={toSite}
                 onChange={(e) => setToSite(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               >
                 <option value="Baramati Plant">Baramati Plant</option>
                 <option value="Pune Central Depot">Pune Central Depot</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Quantity</label>
+              <label className="block text-xs text-ink-3 mb-1">Quantity</label>
               <input
                 type="number"
                 value={qty}
                 onChange={(e) => setQty(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               />
             </div>
           </div>

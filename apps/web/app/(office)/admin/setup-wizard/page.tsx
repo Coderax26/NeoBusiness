@@ -100,21 +100,21 @@ export default function SetupWizardPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Top Banner / Progress */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+      <div className="bg-sheet border border-rule rounded-[4px] p-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-rule">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-500/15 text-teal-400 border border-teal-500/30 mb-2">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-action/15 text-action border border-action/30 mb-2">
               <span>🚀 First-Time Business Setup</span>
             </div>
-            <h1 className="text-2xl font-black text-white">Owner Setup Wizard</h1>
-            <p className="text-xs text-zinc-400 mt-1">
+            <h1 className="text-2xl font-semibold text-ink">Owner Setup Wizard</h1>
+            <p className="text-xs text-ink-3 mt-1">
               Complete these 8 essential setup steps to prepare your system for live sales, inventory, and billing.
             </p>
           </div>
           <div className="text-right">
-            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Overall Progress</div>
-            <div className="text-2xl font-black text-teal-400 mt-0.5">{progressPercent}% Set Up</div>
-            <div className="text-xs text-zinc-500">{completedCount} of {steps.length} steps completed</div>
+            <div className="text-xs font-bold text-ink-3 uppercase tracking-wider">Overall Progress</div>
+            <div className="text-2xl font-semibold text-action mt-0.5">{progressPercent}% Set Up</div>
+            <div className="text-xs text-ink-3">{completedCount} of {steps.length} steps completed</div>
           </div>
         </div>
 
@@ -133,22 +133,22 @@ export default function SetupWizardPage() {
               <button
                 key={s.id}
                 onClick={() => setCurrentStepIdx(idx)}
-                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${isActive
-                  ? 'bg-zinc-800 border-teal-500/80 shadow-md ring-1 ring-teal-500/40'
-                  : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/60'
+                className={`w-full text-left p-3.5 rounded-[4px] border transition-all flex items-start gap-3${isActive
+                  ? 'bg-sunken border-action/30 shadow-md ring-1 ring-teal-500/40'
+                  : 'bg-sheet border-rule hover:bg-sunken'
                   }`}
               >
                 <div className="mt-0.5">
                   {s.status === 'COMPLETED' ? (
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-500/40">
+                    <span className="w-5 h-5 rounded-full bg-leaf-soft text-leaf flex items-center justify-center text-xs font-bold border border-leaf/30">
                       ✓
                     </span>
                   ) : s.status === 'SKIPPED' ? (
-                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold border border-amber-500/40">
+                    <span className="w-5 h-5 rounded-full bg-haldi-soft text-haldi flex items-center justify-center text-xs font-bold border border-haldi/30">
                       ⏭
                     </span>
                   ) : (
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${isActive ? 'bg-teal-500/20 text-teal-400 border-teal-500/50' : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border${isActive ? 'bg-action/20 text-action border-action/30' : 'bg-sunken text-ink-3 border-rule-strong'
                       }`}>
                       {s.id}
                     </span>
@@ -156,11 +156,11 @@ export default function SetupWizardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-zinc-300'}`}>
+                    <span className={`text-xs font-bold truncate${isActive ? 'text-white' : 'text-ink-2'}`}>
                       {s.title}
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400 truncate mt-0.5">{s.subtitle}</p>
+                  <p className="text-[11px] text-ink-3 truncate mt-0.5">{s.subtitle}</p>
                 </div>
               </button>
             );
@@ -170,9 +170,9 @@ export default function SetupWizardPage() {
         {/* Active Step Panel */}
         <div className="lg:col-span-8">
           <Card className="p-6 space-y-6">
-            <div className="border-b border-zinc-800 pb-4">
+            <div className="border-b border-rule pb-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-action uppercase tracking-wider">
                   Step {activeStep.id} of {steps.length}
                 </span>
                 <Badge
@@ -187,24 +187,24 @@ export default function SetupWizardPage() {
                   {activeStep.status}
                 </Badge>
               </div>
-              <h2 className="text-xl font-bold text-white mt-1">{activeStep.title}</h2>
-              <p className="text-xs text-zinc-300 mt-1">{activeStep.description}</p>
+              <h2 className="text-xl font-bold text-ink mt-1">{activeStep.title}</h2>
+              <p className="text-xs text-ink-2 mt-1">{activeStep.description}</p>
             </div>
 
             {/* Step Content / Previews */}
             {activeStep.id === 1 && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Company Registered Name</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">Company Registered Name</label>
                   <input
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-sm text-ink focus:outline-none focus:border-action/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">GSTIN (15 characters)</label>
+                  <label className="block text-xs font-semibold text-ink-2 mb-1">GSTIN (15 characters)</label>
                   <input
                     type="text"
                     value={gstin}
@@ -213,22 +213,22 @@ export default function SetupWizardPage() {
                       setGstinError(null);
                     }}
                     placeholder="e.g. 27ABCDE1234F1Z5"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white font-mono uppercase focus:outline-none focus:border-teal-500"
+                    className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-sm text-ink font-mono uppercase focus:outline-none focus:border-action/30"
                   />
-                  {gstinError && <p className="text-xs text-rose-400 mt-1">{gstinError}</p>}
+                  {gstinError && <p className="text-xs text-madder mt-1">{gstinError}</p>}
                 </div>
-                <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 text-xs text-zinc-400">
+                <div className="p-3 bg-paper rounded-[3px] border border-rule text-xs text-ink-3">
                   💡 Your GSTIN determines the default home state (e.g. <strong>27</strong> = Maharashtra) for IGST vs CGST/SGST determination on invoices.
                 </div>
               </div>
             )}
 
             {activeStep.id >= 2 && activeStep.id <= 7 && (
-              <div className="p-6 bg-zinc-950/50 border border-zinc-800 rounded-2xl text-center space-y-4">
+              <div className="p-6 bg-paper border border-rule rounded-[4px] text-center space-y-4">
                 <div className="text-3xl">📁</div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Dedicated Master Workspace Available</h3>
-                  <p className="text-xs text-zinc-400 max-w-md mx-auto mt-1">
+                  <h3 className="text-sm font-bold text-ink">Dedicated Master Workspace Available</h3>
+                  <p className="text-xs text-ink-3 max-w-md mx-auto mt-1">
                     You can add records one by one through the interactive form or bulk-upload using our standard Excel/CSV templates.
                   </p>
                 </div>
@@ -243,24 +243,24 @@ export default function SetupWizardPage() {
             )}
 
             {activeStep.id === 8 && (
-              <div className="p-6 bg-teal-950/20 border border-teal-500/30 rounded-2xl space-y-4">
+              <div className="p-6 bg-action-soft border border-action/30 rounded-[4px] space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">⚖️</span>
                   <div>
-                    <h3 className="text-sm font-bold text-white">Opening Balances Sign-Off (OD-023)</h3>
-                    <p className="text-xs text-zinc-300">
+                    <h3 className="text-sm font-bold text-ink">Opening Balances Sign-Off (OD-023)</h3>
+                    <p className="text-xs text-ink-2">
                       Upload customer receivable ledgers and initial stock counts signed by the business owner.
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-ink-3">
                   Once opening balances are imported, opening ledger entries are locked and subsequent adjustments require approval.
                 </p>
               </div>
             )}
 
             {/* Actions Footer */}
-            <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <div className="pt-4 border-t border-rule flex items-center justify-between">
               <Button
                 variant="ghost"
                 size="sm"

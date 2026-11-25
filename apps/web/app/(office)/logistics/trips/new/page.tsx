@@ -161,29 +161,29 @@ export default function PlanNewTripPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/logistics/dispatch" className="hover:text-white">Logistics</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/logistics/dispatch" className="hover:text-ink">Logistics</Link>
             <span>/</span>
-            <span className="text-blue-400">Plan Trip</span>
+            <span className="text-action">Plan Trip</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Visual Trip Builder</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Visual Trip Builder</h1>
+          <p className="text-sm text-ink-3">
             Select or drag READY orders into a vehicle, check capacity &amp; credit holds, generate challans + e-way refs, and dispatch.
           </p>
         </div>
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
           {toast}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left: Ready Orders Pool */}
-        <Card className="lg:col-span-4 p-4 bg-zinc-900 border-zinc-800 space-y-3">
+        <Card className="lg:col-span-4 p-4 bg-sheet border-rule space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Ready Orders ({availableOrders.length})</h2>
+            <h2 className="text-sm font-semibold text-ink">Ready Orders ({availableOrders.length})</h2>
             <Button
               variant="secondary"
               disabled={checkedIds.length === 0}
@@ -197,7 +197,7 @@ export default function PlanNewTripPage() {
             <select
               value={areaFilter}
               onChange={(e) => setAreaFilter(e.target.value)}
-              className="bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white"
+              className="bg-paper border border-rule-strong rounded-lg px-2 py-1.5 text-xs text-ink"
             >
               <option value="ALL">All Areas</option>
               <option value="Baramati East">Baramati East</option>
@@ -208,7 +208,7 @@ export default function PlanNewTripPage() {
             <select
               value={windowFilter}
               onChange={(e) => setWindowFilter(e.target.value)}
-              className="bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white"
+              className="bg-paper border border-rule-strong rounded-lg px-2 py-1.5 text-xs text-ink"
             >
               <option value="ALL">All Windows</option>
               <option value="10-12">10–12</option>
@@ -222,7 +222,7 @@ export default function PlanNewTripPage() {
                 key={order.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData('text/plain', order.id)}
-                className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs flex items-start gap-2.5"
+                className="p-3 rounded-lg bg-paper border border-rule text-xs flex items-start gap-2.5"
               >
                 <input
                   type="checkbox"
@@ -238,15 +238,15 @@ export default function PlanNewTripPage() {
                 />
                 <div className="flex-1">
                   <div className="flex justify-between font-mono">
-                    <span className="text-blue-400 font-bold">{order.orderNo}</span>
-                    <span className="text-zinc-300">{order.weightKg} kg</span>
+                    <span className="text-action font-bold">{order.orderNo}</span>
+                    <span className="text-ink-2">{order.weightKg} kg</span>
                   </div>
-                  <div className="text-white font-medium mt-0.5">{order.customerName}</div>
-                  <div className="text-zinc-500">
+                  <div className="text-ink font-medium mt-0.5">{order.customerName}</div>
+                  <div className="text-ink-3">
                     {order.area} · {order.deliveryWindow} · {formatINR(order.valueInr)}
                   </div>
                   {order.creditHold && (
-                    <div className="mt-1 text-rose-400 font-semibold">⚠ Credit Hold</div>
+                    <div className="mt-1 text-madder font-semibold">⚠ Credit Hold</div>
                   )}
                 </div>
               </div>
@@ -256,7 +256,7 @@ export default function PlanNewTripPage() {
 
         {/* Center: Trip Canvas */}
         <Card
-          className="lg:col-span-5 p-4 bg-zinc-900 border-zinc-800 space-y-4"
+          className="lg:col-span-5 p-4 bg-sheet border-rule space-y-4"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -267,11 +267,11 @@ export default function PlanNewTripPage() {
         >
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] text-zinc-400 mb-1">Vehicle</label>
+              <label className="block text-[11px] text-ink-3 mb-1">Vehicle</label>
               <select
                 value={vehicleId}
                 onChange={(e) => setVehicleId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
               >
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -281,11 +281,11 @@ export default function PlanNewTripPage() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] text-zinc-400 mb-1">Driver</label>
+              <label className="block text-[11px] text-ink-3 mb-1">Driver</label>
               <select
                 value={driverId}
                 onChange={(e) => setDriverId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-xs text-white"
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
               >
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
@@ -295,16 +295,16 @@ export default function PlanNewTripPage() {
           </div>
 
           {/* Capacity Meter */}
-          <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
+          <div className="p-3 rounded-lg bg-paper border border-rule space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-zinc-300 font-medium">Truck Capacity Meter</span>
-              <span className="font-mono font-bold text-white">
+              <span className="text-ink-2 font-medium">Truck Capacity Meter</span>
+              <span className="font-mono font-bold text-ink">
                 {readiness.totalWeightKg} / {readiness.capacityKg} kg
               </span>
             </div>
-            <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-sunken rounded-full overflow-hidden">
               <div
-                className={`h-full ${
+                className={`h-full${
                   readiness.isOverCapacity
                     ? 'bg-rose-500'
                     : capPct > 85
@@ -315,7 +315,7 @@ export default function PlanNewTripPage() {
               />
             </div>
             {readiness.isOverCapacity && (
-              <div className="text-xs text-rose-400 font-semibold">
+              <div className="text-xs text-madder font-semibold">
                 ⚠ This trip is {readiness.overCapacityKg} kg over the truck&apos;s limit.
               </div>
             )}
@@ -328,30 +328,30 @@ export default function PlanNewTripPage() {
               return (
                 <div
                   key={stop.id}
-                  className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs space-y-2"
+                  className="p-3 rounded-lg bg-paper border border-rule text-xs space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-mono text-blue-400 font-bold mr-2">
+                      <span className="font-mono text-action font-bold mr-2">
                         #{idx + 1} {stop.orderNo}
                       </span>
-                      <span className="text-white font-semibold">{stop.customerName}</span>
+                      <span className="text-ink font-semibold">{stop.customerName}</span>
                       {stop.creditHold && (
                         <Badge variant="danger" className="ml-2">Credit Hold</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => moveStop(idx, -1)} className="px-1.5 py-0.5 bg-zinc-800 rounded">↑</button>
-                      <button onClick={() => moveStop(idx, 1)} className="px-1.5 py-0.5 bg-zinc-800 rounded">↓</button>
+                      <button onClick={() => moveStop(idx, -1)} className="px-1.5 py-0.5 bg-sunken rounded">↑</button>
+                      <button onClick={() => moveStop(idx, 1)} className="px-1.5 py-0.5 bg-sunken rounded">↓</button>
                       <button
                         onClick={() => setStops((prev) => prev.filter((s) => s.id !== stop.id))}
-                        className="px-1.5 py-0.5 text-rose-400"
+                        className="px-1.5 py-0.5 text-madder"
                       >
                         ✕
                       </button>
                     </div>
                   </div>
-                  <div className="flex justify-between text-zinc-400 font-mono">
+                  <div className="flex justify-between text-ink-3 font-mono">
                     <span>{stop.weightKg} kg · {stop.area}</span>
                     <span>{formatINR(stop.valueInr)}</span>
                   </div>
@@ -368,19 +368,19 @@ export default function PlanNewTripPage() {
                             ),
                           )
                         }
-                        className="w-full bg-zinc-900 border border-amber-500/40 rounded px-2 py-1 text-xs text-white"
+                        className="w-full bg-sheet border border-haldi/30 rounded px-2 py-1 text-xs text-ink"
                       />
                     </div>
                   )}
                   {stop.challanGenerated && (
-                    <div className="text-emerald-400 font-mono">✓ Challan DC-2026-80{idx + 1} ready</div>
+                    <div className="text-leaf font-mono">✓ Challan DC-2026-80{idx + 1} ready</div>
                   )}
                 </div>
               );
             })}
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
             <input
               type="checkbox"
               checked={loadingConfirmed}
@@ -404,9 +404,9 @@ export default function PlanNewTripPage() {
         </Card>
 
         {/* Right: Route Preview */}
-        <Card className="lg:col-span-3 p-4 bg-zinc-900 border-zinc-800 space-y-3">
-          <h3 className="text-sm font-semibold text-white">Route Sequence Preview</h3>
-          <svg viewBox="0 0 340 190" className="w-full h-48 bg-zinc-950 rounded-xl border border-zinc-800">
+        <Card className="lg:col-span-3 p-4 bg-sheet border-rule space-y-3">
+          <h3 className="text-sm font-semibold text-ink">Route Sequence Preview</h3>
+          <svg viewBox="0 0 340 190" className="w-full h-48 bg-paper rounded-[3px] border border-rule">
             <circle cx="35" cy="95" r="7" fill="#3b82f6" />
             {stops.map((s, idx) => (
               <g key={s.id}>
@@ -418,7 +418,7 @@ export default function PlanNewTripPage() {
             ))}
           </svg>
           {readiness.blockers.length > 0 && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+            <div className="p-3 rounded-lg bg-haldi-soft border border-haldi/30 text-xs text-haldi space-y-1">
               <div className="font-bold">Dispatch Gate Blockers:</div>
               {readiness.blockers.map((b) => (
                 <div key={b}>• {b}</div>

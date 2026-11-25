@@ -62,13 +62,13 @@ export default function ProductionAttendancePage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-            <Link href="/production" className="hover:text-white">Production</Link>
+          <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
+            <Link href="/production" className="hover:text-ink">Production</Link>
             <span>/</span>
             <span className="text-orange-400">Attendance &amp; Labour</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Factory Attendance &amp; Worker Master</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-bold text-ink">Factory Attendance &amp; Worker Master</h1>
+          <p className="text-sm text-ink-3">
             Daily In/Out register, assigned Work Orders, and monthly hours summary (G-M4-2).
           </p>
         </div>
@@ -77,9 +77,9 @@ export default function ProductionAttendancePage() {
         </Button>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-950/80 border-b border-zinc-800 text-xs uppercase text-zinc-400">
+          <thead className="bg-paper border-b border-rule text-xs uppercase text-ink-3">
             <tr>
               <th className="p-3">Worker</th>
               <th className="p-3">Station &amp; Shift</th>
@@ -89,21 +89,21 @@ export default function ProductionAttendancePage() {
               <th className="p-3 text-right">Punch</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {workers.map((w) => (
-              <tr key={w.id} className="hover:bg-zinc-800/40">
+              <tr key={w.id} className="hover:bg-sunken">
                 <td className="p-3">
-                  <div className="text-white font-medium">{w.name}</div>
-                  <div className="text-[11px] font-mono text-zinc-500">{w.code}</div>
+                  <div className="text-ink font-medium">{w.name}</div>
+                  <div className="text-[11px] font-mono text-ink-3">{w.code}</div>
                 </td>
-                <td className="p-3 text-xs text-zinc-300">
+                <td className="p-3 text-xs text-ink-2">
                   <div>{w.station}</div>
                   <Badge variant="default">{w.shift}</Badge>
                 </td>
                 <td className="p-3 font-mono text-xs text-orange-400">
                   {w.assignedWoNo || 'Unassigned'}
                 </td>
-                <td className="p-3 text-right font-mono text-xs text-zinc-200">
+                <td className="p-3 text-right font-mono text-xs text-ink">
                   {w.hoursToday}h / {w.monthlyHours}h
                 </td>
                 <td className="p-3">
@@ -133,14 +133,14 @@ export default function ProductionAttendancePage() {
             placeholder="Worker full name..."
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <input
             type="text"
             placeholder="Station"
             value={newStation}
             onChange={(e) => setNewStation(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-sm text-white"
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button>

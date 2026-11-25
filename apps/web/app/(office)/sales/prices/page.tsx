@@ -191,25 +191,25 @@ export default function TodaysPricesPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-24">
       {/* 1. Header & Date Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-5">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/30 mb-1.5">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-action/10 text-action border border-action/30 mb-1.5">
             <span>🏷️ Daily Commercial Desk</span>
           </div>
-          <h1 className="text-2xl font-black text-white">Today&apos;s Prices — Base & Floor Sheet</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h1 className="text-2xl font-semibold text-ink">Today&apos;s Prices — Base & Floor Sheet</h1>
+          <p className="text-xs text-ink-3 mt-0.5">
             Publish daily minimum floor and target selling prices. Orders cannot be priced without today&apos;s rates.
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5">
-            <span className="text-xs text-zinc-400">Price Date:</span>
+          <div className="flex items-center gap-2 bg-sheet border border-rule rounded-[3px] px-3 py-1.5">
+            <span className="text-xs text-ink-3">Price Date:</span>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-xs text-white font-mono focus:outline-none"
+              className="bg-transparent text-xs text-ink font-mono focus:outline-none"
             />
           </div>
           <Button variant="secondary" size="sm" onClick={() => setSharePreviewOpen(true)}>
@@ -220,21 +220,21 @@ export default function TodaysPricesPage() {
 
       {/* Read-only past date banner */}
       {isReadOnlyDate && (
-        <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-zinc-300">
+        <div className="p-3 rounded-[3px] bg-sheet border border-rule-strong text-xs text-ink-2">
           🔒 Viewing historical price sheet for <strong>{selectedDate}</strong> (read-only). Switch back to today ({todayStr}) to publish updates.
         </div>
       )}
 
       {/* Missing today alert (§3) */}
       {missingCount > 0 && (
-        <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-[4px] border border-haldi/30 bg-haldi-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl">⚠️</span>
             <div>
-              <h2 className="text-sm font-bold text-amber-200">
+              <h2 className="text-sm font-bold text-haldi">
                 {missingCount} {missingCount === 1 ? 'item has' : 'items have'} no price for today
               </h2>
-              <p className="text-xs text-amber-300/80">
+              <p className="text-xs text-haldi">
                 Set Floor & Target prices below or use bulk tools so coordinators can take orders for them.
               </p>
             </div>
@@ -243,7 +243,7 @@ export default function TodaysPricesPage() {
             variant="secondary"
             size="sm"
             onClick={() => setMissingOnly(!missingOnly)}
-            className="bg-amber-500/20 text-amber-200 border-amber-500/40"
+            className="bg-haldi-soft text-haldi border-haldi/30"
           >
             {missingOnly ? 'Show All Items' : `Filter Missing (${missingCount})`}
           </Button>
@@ -251,13 +251,13 @@ export default function TodaysPricesPage() {
       )}
 
       {publishSuccess && (
-        <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-xs font-semibold text-emerald-300">
+        <div className="p-4 rounded-[4px] border border-leaf/30 bg-leaf-soft text-xs font-semibold text-leaf">
           ✓ {publishSuccess}
         </div>
       )}
 
       {publishError && (
-        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-xs font-semibold text-rose-300">
+        <div className="p-4 rounded-[4px] border border-madder/30 bg-madder-soft text-xs font-semibold text-madder">
           ❌ {publishError}
         </div>
       )}
@@ -271,8 +271,8 @@ export default function TodaysPricesPage() {
 
       {/* Bulk Tools Bar */}
       {canEdit && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/80 border border-zinc-800 p-3.5 rounded-2xl">
-          <div className="text-xs text-zinc-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-sheet border border-rule p-3.5 rounded-[4px]">
+          <div className="text-xs text-ink-3">
             Bulk Tools {selectedIds.length > 0 ? `(${selectedIds.length} selected)` : '(applies to all rows)'}:
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -292,9 +292,9 @@ export default function TodaysPricesPage() {
       )}
 
       {/* Price Grid */}
-      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-x-auto">
+      <div className="bg-sheet border border-rule rounded-[4px] overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 uppercase font-semibold">
+          <thead className="bg-paper border-b border-rule text-ink-3 uppercase font-semibold">
             <tr>
               <th className="p-3 w-10">
                 <input
@@ -312,7 +312,7 @@ export default function TodaysPricesPage() {
               <th className="p-3">vs Yesterday</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/70">
+          <tbody className="divide-y divide-rule">
             {visibleRows.map((row) => {
               const suggestedFloor = calculateAutoFloorPrice(row.landedCost, row.minMarginPct);
               const changePct =
@@ -326,7 +326,7 @@ export default function TodaysPricesPage() {
                 isOwner && row.floorPrice !== null && row.floorPrice < suggestedFloor;
 
               return (
-                <tr key={row.itemId} className="hover:bg-zinc-900/80">
+                <tr key={row.itemId} className="hover:bg-sheet">
                   <td className="p-3">
                     <input
                       type="checkbox"
@@ -335,27 +335,27 @@ export default function TodaysPricesPage() {
                     />
                   </td>
                   <td className="p-3">
-                    <div className="font-bold text-white">{row.itemName}</div>
-                    <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
-                      <span className="font-mono text-teal-400">{row.sku}</span>
+                    <div className="font-bold text-ink">{row.itemName}</div>
+                    <div className="text-[11px] text-ink-3 flex items-center gap-2 mt-0.5">
+                      <span className="font-mono text-action">{row.sku}</span>
                       <span>•</span>
                       <span>{row.category.replace('_', ' ')}</span>
                       <span>•</span>
                       <span>per {row.uom}</span>
                     </div>
                   </td>
-                  <td className="p-3 font-mono text-zinc-400">
+                  <td className="p-3 font-mono text-ink-3">
                     ₹{row.yesterdayFloor} / ₹{row.yesterdayTarget}
                   </td>
                   {isOwner && (
-                    <td className="p-3 font-mono text-zinc-300">
-                      ₹{row.landedCost} <span className="text-zinc-500">({row.minMarginPct}%)</span>
+                    <td className="p-3 font-mono text-ink-2">
+                      ₹{row.landedCost} <span className="text-ink-3">({row.minMarginPct}%)</span>
                     </td>
                   )}
                   {isOwner && (
                     <td className="p-3">
-                      <span className="font-mono font-bold text-teal-400">₹{suggestedFloor.toFixed(2)}</span>
-                      <span className="block text-[10px] text-zinc-500">cost / (1−margin)</span>
+                      <span className="font-mono font-bold text-action">₹{suggestedFloor.toFixed(2)}</span>
+                      <span className="block text-[10px] text-ink-3">cost / (1−margin)</span>
                     </td>
                   )}
                   <td className="p-3">
@@ -366,16 +366,16 @@ export default function TodaysPricesPage() {
                       value={row.floorPrice ?? ''}
                       onChange={(e) => handlePriceChange(row.itemId, 'floorPrice', e.target.value)}
                       placeholder="Set floor"
-                      className={`w-24 bg-zinc-950 border rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none ${
+                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none${
                         isFloorBelowSuggested
                           ? 'border-amber-500'
                           : row.floorPrice === null
                           ? 'border-rose-500/60'
-                          : 'border-zinc-700 focus:border-teal-500'
+                          : 'border-rule-strong focus:border-action/30'
                       }`}
                     />
                     {isFloorBelowSuggested && (
-                      <span className="block text-[10px] text-amber-400 mt-0.5">Below suggested ₹{suggestedFloor}</span>
+                      <span className="block text-[10px] text-haldi mt-0.5">Below suggested ₹{suggestedFloor}</span>
                     )}
                   </td>
                   <td className="p-3">
@@ -386,16 +386,16 @@ export default function TodaysPricesPage() {
                       value={row.targetPrice ?? ''}
                       onChange={(e) => handlePriceChange(row.itemId, 'targetPrice', e.target.value)}
                       placeholder="Set target"
-                      className={`w-24 bg-zinc-950 border rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:outline-none ${
+                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none${
                         isTargetBelowFloor
                           ? 'border-rose-500'
                           : row.targetPrice === null
                           ? 'border-rose-500/60'
-                          : 'border-zinc-700 focus:border-teal-500'
+                          : 'border-rule-strong focus:border-action/30'
                       }`}
                     />
                     {isTargetBelowFloor && (
-                      <span className="block text-[10px] text-rose-400 mt-0.5">Must be ≥ Floor</span>
+                      <span className="block text-[10px] text-madder mt-0.5">Must be ≥ Floor</span>
                     )}
                   </td>
                   <td className="p-3 font-mono">
@@ -403,14 +403,14 @@ export default function TodaysPricesPage() {
                       <Badge tone="danger">Missing</Badge>
                     ) : (
                       <span
-                        className={`font-bold ${
+                        className={`font-bold${
                           isBigChange
                             ? 'text-amber-400'
                             : changePct > 0
                             ? 'text-emerald-400'
                             : changePct < 0
                             ? 'text-rose-400'
-                            : 'text-zinc-400'
+                            : 'text-ink-3'
                         }`}
                       >
                         {changePct > 0 ? `+${changePct.toFixed(1)}%` : `${changePct.toFixed(1)}%`}
@@ -427,10 +427,10 @@ export default function TodaysPricesPage() {
 
       {/* Sticky Publish Bar (§3) */}
       {canEdit && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-4xl bg-zinc-900/95 backdrop-blur-md border border-teal-500/40 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between gap-4">
-          <div className="text-xs text-zinc-200">
-            <strong className="text-teal-400">{changedRows.length} items changed</strong>
-            <span className="text-zinc-400 ml-2">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-4xl bg-sheet border border-action/30 rounded-[4px] p-3.5 shadow-2xl flex items-center justify-between gap-4">
+          <div className="text-xs text-ink">
+            <strong className="text-action">{changedRows.length} items changed</strong>
+            <span className="text-ink-3 ml-2">
               {hasInvalidTarget ? '⚠️ Fix Target < Floor errors before publishing' : 'Ready to publish daily rate sheet'}
             </span>
           </div>
@@ -452,11 +452,11 @@ export default function TodaysPricesPage() {
         title="Confirm Daily Price Publication"
         maxWidth="sm"
       >
-        <div className="space-y-4 my-2 text-xs text-zinc-300">
+        <div className="space-y-4 my-2 text-xs text-ink-2">
           <p>
             You are publishing prices for <strong>{selectedDate}</strong> ({changedRows.length} items modified).
           </p>
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-200">
+          <div className="p-3 bg-haldi-soft border border-haldi/30 rounded-[3px] text-haldi">
             ℹ️ Impact Check: <strong>2 open quotes</strong> reference items in this sheet. New sales orders will immediately enforce these floor & target bands.
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -478,10 +478,10 @@ export default function TodaysPricesPage() {
         maxWidth="md"
       >
         <div className="space-y-4 my-2">
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-ink-3">
             Floor prices, landed costs, and margins are strictly hidden from this customer-facing sheet.
           </p>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs text-zinc-200 whitespace-pre-wrap">
+          <div className="bg-paper border border-rule rounded-[3px] p-4 font-mono text-xs text-ink whitespace-pre-wrap">
             {`*NeoFresh Daily Rate Card — ${selectedDate}*\n\n` +
               rows
                 .filter((r) => r.targetPrice !== null)
