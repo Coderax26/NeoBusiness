@@ -14,6 +14,7 @@ export interface AdminUserRecord {
   status: 'ACTIVE' | 'DISABLED';
   lastLogin: string;
   devicesCount: number;
+  hasPin?: boolean;
 }
 
 export interface SiteRecord {

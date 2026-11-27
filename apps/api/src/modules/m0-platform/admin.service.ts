@@ -48,6 +48,7 @@ export class AdminService {
         'u.last_login_at',
         'u.created_at',
         'u.updated_at',
+        this.knex.raw('(u.pin_hash IS NOT NULL OR u.password_hash IS NOT NULL) as has_pin'),
       );
 
     if (filter.role) {
@@ -207,6 +208,7 @@ export class AdminService {
       .where('id', id)
       .update({
         pin_hash: pinHash,
+        password_hash: null,
         updated_at: new Date(),
         updated_by: updaterId || null,
       });
