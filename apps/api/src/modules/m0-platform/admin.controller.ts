@@ -19,7 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
-import { RequirePermission } from './rbac.service.js';
+import { RbacGuard, RequirePermission } from './rbac.service.js';
 import { AdminService } from './admin.service.js';
 import {
   CreateUserDto,
@@ -34,7 +34,7 @@ import {
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -88,6 +88,14 @@ export class AdminController {
     @Req() req: any,
   ) {
     return this.adminService.resetPin(id, dto.pin, req.user?.id);
+  }
+
+  @Post('users/:id/revoke-sessions')
+  @RequirePermission('config.edit')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke all active refresh sessions for a user' })
+  async revokeSessions(@Param('id') id: string, @Req() req: any) {
+    return this.adminService.revokeUserSessions(id, req.user?.sub || req.user?.id);
   }
 
   // ─── Sites & Locations ──────────────────────────────────────────────────────

@@ -118,20 +118,27 @@ export class LedgerService implements LedgerPort {
       .returning('*');
 
     const receiptId = String(receipt.id);
+    const totalReceived = Money.of(cmd.amount);
+    let remainingBudget = totalReceived;
     let allocatedAmount = Money.zero();
 
-    // 2. Allocate to invoices (FIFO default) or use provided allocations
+    // 2. Allocate to invoices (FIFO default, capped by receipt amount) or use explicit allocations
     const targetInvoices =
       cmd.allocations ??
       (await this.getOpenInvoicesForAllocation(cmd.customerId, trx));
 
     for (const alloc of targetInvoices) {
+      if (!cmd.allocations && remainingBudget.isZero()) break;
+
       const inv = await trx('invoices').where('id', alloc.invoiceId).first();
       if (!inv || Money.of(inv.balance_due).isZero()) continue;
 
       const due = Money.of(inv.balance_due);
-      const allocAmt = Money.of(alloc.amount);
-      const actualAmt = allocAmt.isLessThan(due) ? allocAmt : due;
+      const requestedAlloc = Money.of(alloc.amount);
+      let actualAmt = requestedAlloc.isLessThan(due) ? requestedAlloc : due;
+      if (!cmd.allocations && remainingBudget.isLessThan(actualAmt)) {
+        actualAmt = remainingBudget;
+      }
 
       if (actualAmt.isZero()) continue;
 
@@ -147,7 +154,7 @@ export class LedgerService implements LedgerPort {
       const newBalance = Money.of(inv.total_amount).sub(newPaid);
       let newStatus = inv.status;
       if (newBalance.isZero()) newStatus = 'PAID';
-      if (!newPaid.isZero()) newStatus = 'PARTIAL';
+      else if (!newPaid.isZero()) newStatus = 'PARTIAL';
       else newStatus = 'UNPAID';
 
       await trx('invoices').where('id', alloc.invoiceId).update({
@@ -157,26 +164,62 @@ export class LedgerService implements LedgerPort {
         updated_at: new Date(),
       });
 
+      // When fully paid and order already delivered, close linked sales order
+      if (newStatus === 'PAID' && inv.sales_order_id) {
+        const linkedOrder = await trx('sales_orders')
+          .where('id', inv.sales_order_id)
+          .first('order_status');
+        if (
+          linkedOrder &&
+          ['DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(
+            linkedOrder.order_status,
+          )
+        ) {
+          await trx('sales_orders').where('id', inv.sales_order_id).update({
+            order_status: 'CLOSED',
+            updated_at: new Date(),
+          });
+          await trx('order_status_log').insert({
+            order_id: inv.sales_order_id,
+            from_status: linkedOrder.order_status,
+            to_status: 'CLOSED',
+            by_user: cmd.collectedByUserId,
+            reason: `Invoice ${inv.invoice_no} paid in full via receipt ${receiptNo}`,
+          });
+        }
+      }
+
       allocatedAmount = allocatedAmount.add(actualAmt);
+      if (!cmd.allocations) {
+        remainingBudget = remainingBudget.sub(actualAmt);
+      }
     }
 
-    // 3. Post customer_ledger_entries CREDIT (reduces AR balance)
+    const creditAmount = allocatedAmount.isLessThan(totalReceived)
+      ? totalReceived
+      : allocatedAmount;
+
+    // 3. Post customer_ledger_entries CREDIT (reduces AR balance) and sync cached AR balance
     const prevCustomerBal = await this.getCustomerBalance(cmd.customerId, trx);
-    const newCustomerBal = prevCustomerBal.sub(allocatedAmount);
+    const newCustomerBal = prevCustomerBal.sub(creditAmount);
     await trx('customer_ledger_entries').insert({
       site_id: cmd.siteId,
       customer_id: cmd.customerId,
       entry_type: 'RECEIPT',
-      credit: allocatedAmount.toStorageString(),
+      credit: creditAmount.toStorageString(),
       ref_id: receiptId,
       ref_no: receiptNo,
       running_balance: newCustomerBal.toStorageString(),
+    });
+    await trx('customers').where('id', cmd.customerId).update({
+      current_ar_balance: newCustomerBal.toStorageString(),
+      updated_at: new Date(),
     });
 
     // 4. Post custody_ledger COLLECTION (+amount) — agent wallet increases
     // Only CASH and CHEQUE go into physical custody wallet
     const custodyAmount = ['CASH', 'CHEQUE'].includes(cmd.paymentMode)
-      ? allocatedAmount
+      ? creditAmount
       : Money.zero();
     if (!custodyAmount.isZero()) {
       const prevCustodyBal = await this.getCustodyBalance(
@@ -467,6 +510,23 @@ export class LedgerService implements LedgerPort {
           status: newStatus,
           updated_at: new Date(),
         });
+
+        if (newStatus === 'PAID' && inv.sales_order_id) {
+          const linkedOrder = await trx('sales_orders')
+            .where('id', inv.sales_order_id)
+            .first('order_status');
+          if (
+            linkedOrder &&
+            ['DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(
+              linkedOrder.order_status,
+            )
+          ) {
+            await trx('sales_orders').where('id', inv.sales_order_id).update({
+              order_status: 'CLOSED',
+              updated_at: new Date(),
+            });
+          }
+        }
 
         postedAllocations.push({
           invoiceId: alloc.invoiceId,

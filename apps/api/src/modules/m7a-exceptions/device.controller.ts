@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, Req, Logger } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 
 /**
  * Device registration DTO.
@@ -31,7 +31,7 @@ interface RegisterDeviceDto {
  * a device. Every user can register their own device.
  */
 @Controller('devices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 export class DeviceController {
   private readonly logger = new Logger(DeviceController.name);
 

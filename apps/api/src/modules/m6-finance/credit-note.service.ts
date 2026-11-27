@@ -67,7 +67,7 @@ export class CreditNoteService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.worker = new Worker(
-      'domain-events',
+      'm6-credit-note-events',
       async (job) => this.handle(job.data as DomainJob),
       { connection: getRedisConnection() },
     );
@@ -77,7 +77,7 @@ export class CreditNoteService implements OnModuleInit, OnModuleDestroy {
       );
     });
     this.logger.log(
-      'CreditNoteService started (listening on domain-events queue)',
+      'CreditNoteService started (listening on m6-credit-note-events queue)',
     );
   }
 

@@ -21,11 +21,11 @@ export default function FinanceHomePage() {
       storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
     Promise.allSettled([
       fetch(`/api/proxy/invoices${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`/api/proxy/collections/receipts${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/collections${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`/api/proxy/analytics/ar/aging${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`/api/proxy/handovers${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`/api/proxy/cheques${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`/api/proxy/ptp${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/handovers`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/cheques`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/ptp`).then((r) => (r.ok ? r.json() : [])),
       fetch(`/api/proxy/cod-settlements/pending${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([invRes, rcpRes, arRes, hndRes, chqRes, ptpRes, codRes]) => {

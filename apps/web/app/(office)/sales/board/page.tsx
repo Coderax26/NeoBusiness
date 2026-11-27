@@ -48,30 +48,24 @@ export default function SalesBoardPage() {
       .catch(() => setOrders([]));
   }, []);
 
-  const moveOrder = async (orderId: string, nextStatus: SalesOrderStatus) => {
+  const moveOrder = async (orderId: string, endpoint: 'confirm' | 'mark-ready', targetStatus: SalesOrderStatus) => {
     setBoardMsg(null);
-    if (nextStatus === 'CONFIRMED') {
-      try {
-        const res = await fetch(`/api/proxy/orders/${encodeURIComponent(orderId)}/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ remarks: 'Confirmed from Sales Board' }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => null);
-          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
-        }
-        setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)),
-        );
-      } catch (err) {
-        setBoardMsg(`Failed to confirm order: ${(err as Error).message}`);
+    try {
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(orderId)}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks: `Updated from Sales Board (${targetStatus})` }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
-      return;
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: targetStatus } : o)),
+      );
+    } catch (err) {
+      setBoardMsg(`Failed to update order: ${(err as Error).message}`);
     }
-    setBoardMsg(
-      `Order status "${nextStatus}" is updated automatically via production/allocation workflow.`,
-    );
   };
 
   return (
@@ -105,11 +99,15 @@ export default function SalesBoardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {BOARD_COLUMNS.map((col) => {
-          const cards = orders.filter((o) => o.status === col.status);
+          const cards = orders.filter((o) =>
+            col.status === 'DELIVERED'
+              ? ['DELIVERED', 'DELIVERED_FULL', 'DELIVERED_PARTIAL', 'CLOSED'].includes(o.status)
+              : o.status === col.status,
+          );
           return (
             <div
               key={col.status}
-              className={`bg-sheet border-t-2 ${col.color}border-x border-b border-rule rounded-[4px] p-3 space-y-3 min-h-[380px]`}
+              className={`bg-sheet border-t-2 ${col.color} border-x border-b border-rule rounded-[4px] p-3 space-y-3 min-h-[380px]`}
             >
               <div className="flex items-center justify-between text-xs font-bold text-ink pb-2 border-b border-rule">
                 <span>{col.label}</span>
@@ -134,21 +132,29 @@ export default function SalesBoardPage() {
                     <div className="text-[11px] text-ink-3">
                       {o.deliveryDate} • Slot {o.deliveryWindow}
                     </div>
-                    {o.status === 'PENDING_APPROVAL' && (
+                    {o.status === 'DRAFT' && (
                       <button
-                        onClick={() => moveOrder(o.id, 'CONFIRMED')}
-                        className="w-full py-1 rounded-lg bg-leaf-soft text-leaf text-[11px] font-semibold hover:opacity-90/25"
+                        onClick={() => moveOrder(o.id, 'confirm', 'CONFIRMED')}
+                        className="w-full py-1 rounded-lg bg-leaf-soft text-leaf text-[11px] font-semibold hover:opacity-90"
                       >
-                        ✓ Quick Approve
+                        ✓ Confirm Draft
                       </button>
                     )}
-                    {o.status === 'CONFIRMED' && (
+                    {o.status === 'PENDING_APPROVAL' && (
                       <Link
-                        href={`/sales/orders/${o.id}`}
-                        className="block w-full text-center py-1 rounded-lg bg-action/15 text-action text-[11px] font-semibold hover:bg-action/25"
+                        href="/control/approvals"
+                        className="block w-full text-center py-1 rounded-lg bg-haldi-soft text-haldi text-[11px] font-semibold hover:opacity-90"
                       >
-                        Open Order →
+                        Review Exception →
                       </Link>
+                    )}
+                    {o.status === 'CONFIRMED' && (
+                      <button
+                        onClick={() => moveOrder(o.id, 'mark-ready', 'READY')}
+                        className="w-full py-1 rounded-lg bg-action/15 text-action text-[11px] font-semibold hover:bg-action/25"
+                      >
+                        Mark Ready →
+                      </button>
                     )}
                   </div>
                 ))

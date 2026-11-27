@@ -15,7 +15,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { FleetService } from './fleet.service.js';
 import {
   CreateExpenseDto,
@@ -30,7 +30,7 @@ import {
 
 @ApiTags('M5 Fleet, Dispatch & Delivery')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller()
 export class FleetController {
   constructor(private readonly fleet: FleetService) {}

@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { CollectionService } from './collection.service.js';
 import { LedgerService } from './ledger.service.js';
 import {
@@ -46,7 +47,7 @@ export class CollectionController {
   })
   @ApiResponse({ status: 201, description: 'Collection logged' })
   async logCollection(@Body() dto: LogCollectionDto, @Req() req: any) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const result = await this.collectionService.logCollection({
       siteId,
       customerId: dto.customerId,
@@ -89,7 +90,8 @@ export class CollectionController {
   @ApiResponse({ status: 200, description: 'Receipts list' })
   async list(@Query() query: ListCollectionsQueryDto, @Req() req: any) {
     const siteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const result = await this.collectionService.listReceipts({
       ...query,
       siteId,
@@ -115,7 +117,7 @@ export class CollectionController {
   @ApiOperation({ summary: "Get current user's collections for today" })
   @ApiResponse({ status: 200, description: "Today's user collections" })
   async getMyCollections(@Query('date') date: string, @Req() req: any) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const collections = await this.collectionService.getMyCollections(
       req.user.id,
       siteId,

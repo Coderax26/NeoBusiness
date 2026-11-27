@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { InventoryService } from './inventory.service.js';
 import { InventoryController } from './inventory.controller.js';
 import { InventoryExpiryJob } from './inventory-expiry.job.js';
@@ -8,6 +8,7 @@ import { LedgerPostingService } from './ledger-posting.service.js';
 import { ConfigModule } from '@nestjs/config';
 import { INVENTORY_PORT } from '../../shared/ports/ports.interface.js';
 
+@Global()
 @Module({
   providers: [
     InventoryService,

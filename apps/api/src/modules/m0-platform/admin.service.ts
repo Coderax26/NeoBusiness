@@ -138,11 +138,17 @@ export class AdminService {
         'created_at',
       ]);
 
-    if (dto.assignedSiteId) {
+    const targetSites = Array.from(
+      new Set([
+        ...(Array.isArray(dto.siteIds) ? dto.siteIds.filter(Boolean) : []),
+        ...(dto.assignedSiteId ? [dto.assignedSiteId] : []),
+      ]),
+    );
+    for (const siteId of targetSites) {
       await this.knex('user_site_access')
         .insert({
           user_id: id,
-          site_id: dto.assignedSiteId,
+          site_id: siteId,
           granted_by: creatorId || null,
         })
         .onConflict(['user_id', 'site_id'])
@@ -166,35 +172,80 @@ export class AdminService {
     if (dto.fullName !== undefined) updateData.full_name = dto.fullName;
     if (dto.role !== undefined) updateData.role = dto.role;
     if (dto.assignedSiteId !== undefined) updateData.assigned_site_id = dto.assignedSiteId;
+    else if (Array.isArray(dto.siteIds) && dto.siteIds.length > 0) {
+      updateData.assigned_site_id = dto.siteIds[0];
+    }
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
     if (dto.preferredLanguage !== undefined) updateData.preferred_language = dto.preferredLanguage;
 
-    const [updated] = await this.knex('users')
-      .where('id', id)
-      .update(updateData)
-      .returning([
-        'id',
-        'full_name',
-        'phone',
-        'role',
-        'assigned_site_id',
-        'preferred_language',
-        'is_active',
-        'updated_at',
-      ]);
+    const updated = await this.knex.transaction(async (trx) => {
+      const [row] = await trx('users')
+        .where('id', id)
+        .update(updateData)
+        .returning([
+          'id',
+          'full_name',
+          'phone',
+          'role',
+          'assigned_site_id',
+          'preferred_language',
+          'is_active',
+          'updated_at',
+        ]);
 
-    if (dto.assignedSiteId) {
-      await this.knex('user_site_access')
-        .insert({
-          user_id: id,
-          site_id: dto.assignedSiteId,
-          granted_by: updaterId || null,
-        })
-        .onConflict(['user_id', 'site_id'])
-        .ignore();
-    }
+      const shouldReconcileSites =
+        dto.siteIds !== undefined || dto.assignedSiteId !== undefined;
+      if (shouldReconcileSites) {
+        const nextSites = Array.from(
+          new Set(
+            dto.siteIds !== undefined
+              ? [
+                  ...dto.siteIds.filter(Boolean),
+                  ...(dto.assignedSiteId ? [dto.assignedSiteId] : []),
+                ]
+              : dto.assignedSiteId
+                ? [dto.assignedSiteId]
+                : [],
+          ),
+        );
+
+        if (nextSites.length === 0) {
+          await trx('user_site_access').where('user_id', id).del();
+        } else {
+          await trx('user_site_access')
+            .where('user_id', id)
+            .whereNotIn('site_id', nextSites)
+            .del();
+          for (const siteId of nextSites) {
+            await trx('user_site_access')
+              .insert({
+                user_id: id,
+                site_id: siteId,
+                granted_by: updaterId || null,
+              })
+              .onConflict(['user_id', 'site_id'])
+              .ignore();
+          }
+        }
+      }
+
+      if (dto.isActive === false || shouldReconcileSites) {
+        await trx('refresh_tokens').where('user_id', id).del();
+      }
+
+      return row;
+    });
 
     return updated;
+  }
+
+  async revokeUserSessions(id: string, _actorId?: string) {
+    const user = await this.knex('users').where('id', id).first('id');
+    if (!user) {
+      throw new NotFoundException(`User ${id} not found`);
+    }
+    const revokedCount = await this.knex('refresh_tokens').where('user_id', id).del();
+    return { userId: id, revokedCount, message: 'Sessions revoked' };
   }
 
   async resetPin(id: string, pin: string, updaterId?: string) {
@@ -517,7 +568,7 @@ export class AdminService {
       dbOk = false;
     }
     const [outboxRes, queuedNotifRes, failedNotifRes] = await Promise.all([
-      this.knex('outbox_events').whereNull('published_at').count('* as c').first(),
+      this.knex('outbox_events').whereNull('processed_at').count('* as c').first(),
       this.knex('notification_outbox').where('status', 'QUEUED').count('* as c').first(),
       this.knex('notification_outbox').where('status', 'FAILED').count('* as c').first(),
     ]);

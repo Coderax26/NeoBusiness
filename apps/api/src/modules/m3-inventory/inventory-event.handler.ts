@@ -46,7 +46,7 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
       },
     );
     this.worker = new Worker(
-      'domain-events',
+      'm3-inventory-events',
       async (job) => this.handle(job.data as DomainJob),
       { connection: getRedisConnection() },
     );
@@ -95,48 +95,76 @@ export class InventoryEventHandler implements OnModuleInit, OnModuleDestroy {
       case 'order.cancelled':
         await this.inventory.release(event.aggregate_id);
         return;
-      case 'grn.posted':
+      case 'grn.posted': {
+        const siteId = this.stringValue(payload.siteId);
+        const poOrGrnId = String(payload.poId ?? payload.grnId ?? event.aggregate_id);
+        const grnId = typeof payload.grnId === 'string' && payload.grnId.length > 0
+          ? payload.grnId
+          : String(event.aggregate_id);
+        const grnNo = typeof payload.grnNo === 'string' && payload.grnNo.length > 0
+          ? payload.grnNo
+          : undefined;
+        const locationId = typeof payload.locationId === 'string' && payload.locationId.length > 0
+          ? payload.locationId
+          : undefined;
+        const receivedBy = typeof payload.receivedBy === 'string' && payload.receivedBy.length > 0
+          ? payload.receivedBy
+          : undefined;
+
+        const lines = this.arrayPayload(payload.lines);
+        if (lines.length > 0) {
+          for (const line of lines) {
+            const receivedQty = this.stringValue(line.receivedQty);
+            const requestedQty =
+              typeof line.requestedQty === 'string' && line.requestedQty.length > 0
+                ? line.requestedQty
+                : receivedQty;
+            await this.inventory.receiveGRN(
+              siteId,
+              poOrGrnId,
+              this.stringValue(line.itemId),
+              requestedQty,
+              receivedQty,
+              {
+                grnId,
+                grnNo,
+                locationId,
+                receivedBy,
+                batchLotNo:
+                  typeof line.batchLotNo === 'string' && line.batchLotNo.length > 0
+                    ? line.batchLotNo
+                    : undefined,
+                mfgDate:
+                  typeof line.mfgDate === 'string' || line.mfgDate instanceof Date
+                    ? line.mfgDate
+                    : undefined,
+                expiryDate:
+                  typeof line.expiryDate === 'string' || line.expiryDate instanceof Date
+                    ? line.expiryDate
+                    : undefined,
+              },
+            );
+          }
+          return;
+        }
+
         await this.inventory.receiveGRN(
-          this.stringValue(payload.siteId),
+          siteId,
           this.stringValue(payload.poId ?? event.aggregate_id),
           this.stringValue(payload.itemId),
-          this.stringValue(payload.requestedQty),
+          this.stringValue(payload.requestedQty ?? payload.receivedQty),
           this.stringValue(payload.receivedQty),
         );
         return;
-      case 'trip.loaded': {
-        const lines = this.arrayPayload(payload.lines).map((line) => ({
-          itemId: this.stringValue(line.itemId),
-          batchId: this.stringValue(line.batchId),
-          qty: this.stringValue(line.qty),
-        }));
-        await this.inventory.postDispatch(event.aggregate_id, lines);
-        return;
       }
-      case 'delivery.completed': {
-        const delivered = this.arrayPayload(payload.deliveredLines).map(
-          (line) => ({
-            itemId: this.stringValue(line.itemId),
-            batchId: this.stringValue(line.batchId),
-            qty: this.stringValue(line.deliveredQty),
-          }),
+      case 'trip.loaded':
+      case 'delivery.completed':
+        // Dispatch stock deductions and ePOD returns are committed synchronously
+        // inside FleetService transactions to prevent double-posting.
+        this.logger.debug(
+          `M3 skipped async stock mutation for ${event.event_type} (handled synchronously by M5)`,
         );
-        const returned = this.arrayPayload(payload.returnedLines).map(
-          (line) => ({
-            itemId: this.stringValue(line.itemId),
-            batchId: this.stringValue(line.batchId),
-            qty: this.stringValue(line.returnedQty),
-            damaged: Boolean(line.damaged),
-          }),
-        );
-        if (delivered.length > 0) {
-          await this.inventory.postDispatch(event.aggregate_id, delivered);
-        }
-        if (returned.length > 0) {
-          await this.inventory.postReturn(event.aggregate_id, returned);
-        }
         return;
-      }
       case 'exception.resolved': {
         const exceptionType = this.stringValue(payload.exceptionType);
         if (exceptionType === 'STOCK_VARIANCE') {

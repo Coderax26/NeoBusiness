@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { CodSettlementService } from './cod-settlement.service.js';
 import {
   ListPendingCodQueryDto,
@@ -41,7 +42,8 @@ export class CodSettlementController {
   @ApiResponse({ status: 200, description: 'Pending COD stops' })
   async listPending(@Query() query: ListPendingCodQueryDto, @Req() req: any) {
     const siteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const stops = await this.codService.listPendingCodStops(siteId);
     return wrapResponse(stops);
   }
@@ -59,7 +61,7 @@ export class CodSettlementController {
     @Body() dto: SettleCodStopDto,
     @Req() req: any,
   ) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const receipt = await this.codService.settleStopById(stopId, siteId);
     return wrapResponse(receipt);
   }

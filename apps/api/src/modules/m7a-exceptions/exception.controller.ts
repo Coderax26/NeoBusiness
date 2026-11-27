@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ExceptionService } from './exception.service.js';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 
 /**
  * Query DTO for listing exceptions.
@@ -44,7 +44,7 @@ interface ResolveExceptionDto {
  * RLS: GET endpoints are scoped to the caller's site_ids automatically.
  */
 @Controller('exceptions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 export class ExceptionController {
   constructor(private readonly exceptionSvc: ExceptionService) {}
 
@@ -121,12 +121,15 @@ export class ExceptionController {
   async resolve(
     @Param('id') id: string,
     @Body() dto: ResolveExceptionDto,
+    @Req() req: any,
   ): Promise<{ status: string; exceptionId: string }> {
+    const resolvedByUserId = req.user?.id || req.user?.sub;
     const finalStatus = await this.exceptionSvc.resolve(
       id,
       dto.action,
       dto.remarks,
       dto.counter,
+      resolvedByUserId ? String(resolvedByUserId) : undefined,
     );
 
     return { status: finalStatus, exceptionId: id };

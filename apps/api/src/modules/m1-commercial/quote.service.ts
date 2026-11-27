@@ -3,11 +3,19 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { Money } from '../../shared/utils/money.util.js';
+import {
+  CREDIT_PORT,
+  EXCEPTION_PORT,
+  type CreditPort,
+  type ExceptionPort,
+} from '../../shared/ports/ports.interface.js';
 import { ItemService } from './item.service.js';
 import { PricingService } from './pricing.service.js';
 
@@ -20,7 +28,9 @@ export class QuoteService {
     private readonly docNumber: DocNumberService,
     private readonly items: ItemService,
     private readonly pricing: PricingService,
-  ) {}
+    @Optional() @Inject(CREDIT_PORT) private readonly credit?: CreditPort,
+    @Optional() @Inject(EXCEPTION_PORT) private readonly exceptionPort?: ExceptionPort,
+  ) { }
 
   /**
    * Create a new quote.
@@ -188,6 +198,7 @@ export class QuoteService {
     quoteNo: string;
     orderId: string;
     orderNo: string;
+    orderStatus?: string;
     status: string;
     totalAmount: string;
     validUntil: Date;
@@ -258,61 +269,188 @@ export class QuoteService {
         ? siteId
         : String(quote.site_id);
 
-    const { orderId, orderNo } = await this.knex.transaction(async (trx) => {
-      const genOrderNo = await this.docNumber.next('SALES_ORDER', targetSiteId, null, trx);
-      const anyBelowFloor = validationResults.some((r) => !r.inBand);
-      const orderStatus = anyBelowFloor ? 'PENDING_APPROVAL' : 'CONFIRMED';
+    const creditEval = this.credit
+      ? await this.credit.evaluate(
+        String(quote.customer_id),
+        String(quote.total_amount || '0.00'),
+      )
+      : { status: 'OK' as const };
 
-      const [newOrder] = await trx('sales_orders')
-        .insert({
-          order_no: genOrderNo,
-          customer_id: quote.customer_id,
-          fulfillment_site_id: targetSiteId,
-          order_status: orderStatus,
-          total_amount: String(quote.total_amount || '0.00'),
-          delivery_date: today,
-          delivery_time_window: '10-12',
-          credit_flag: 'OK',
-          payment_terms: 'CREDIT',
-          source_quote_id: quoteId,
-          confirmed_at: orderStatus === 'CONFIRMED' ? new Date() : null,
-          created_by: userId,
-          updated_by: userId,
-        })
-        .returning(['id', 'order_no']);
+    const { orderId, orderNo, orderStatus, insertedLines } =
+      await this.knex.transaction(async (trx) => {
+        const genOrderNo = await this.docNumber.next(
+          'SALES_ORDER',
+          targetSiteId,
+          null,
+          trx,
+        );
+        const anyBelowFloor = validationResults.some((r) => !r.inBand);
+        const needsHold = anyBelowFloor || creditEval.status === 'HOLD';
+        const status = needsHold ? 'PENDING_APPROVAL' : 'CONFIRMED';
 
-      for (const line of quoteLines) {
-        const lineTotal = Money.of(line.quoted_unit_price).mul(line.qty);
-        await trx('sales_order_lines').insert({
+        const [newOrder] = await trx('sales_orders')
+          .insert({
+            order_no: genOrderNo,
+            customer_id: quote.customer_id,
+            fulfillment_site_id: targetSiteId,
+            order_status: status,
+            total_amount: String(quote.total_amount || '0.00'),
+            delivery_date: today,
+            delivery_time_window: '10-12',
+            credit_flag: creditEval.status,
+            payment_terms: creditEval.status === 'COD_ONLY' ? 'COD' : 'CREDIT',
+            source_quote_id: quoteId,
+            confirmed_at: status === 'CONFIRMED' ? new Date() : null,
+            created_by: userId,
+            updated_by: userId,
+          })
+          .returning(['id', 'order_no']);
+
+        const createdLineRows: Array<{
+          id: string;
+          item_id: string;
+          ordered_qty: string;
+          quoted_unit_price: string;
+          inBand: boolean;
+          floorPrice: string;
+        }> = [];
+
+        for (const line of quoteLines) {
+          const lineTotal = Money.of(line.quoted_unit_price).mul(line.qty);
+          const [insertedLine] = await trx('sales_order_lines')
+            .insert({
+              order_id: newOrder.id,
+              item_id: line.item_id,
+              ordered_qty: line.qty,
+              quoted_unit_price: line.quoted_unit_price,
+              floor_price_snapshot:
+                line.floor_price_snapshot || line.quoted_unit_price,
+              target_price_snapshot:
+                line.target_price_snapshot || line.quoted_unit_price,
+              landed_cost_snapshot: line.landed_cost_snapshot || '0.00',
+              margin_pct_snapshot: line.margin_pct_snapshot ?? null,
+              line_margin_pct: line.margin_pct_snapshot ?? null,
+              line_total: lineTotal.toStorageString(),
+              created_by: userId,
+              updated_by: userId,
+            })
+            .returning('id');
+          const v = validationResults.find((r) => r.itemId === String(line.item_id));
+          createdLineRows.push({
+            id: String(insertedLine.id),
+            item_id: String(line.item_id),
+            ordered_qty: String(line.qty),
+            quoted_unit_price: String(line.quoted_unit_price),
+            inBand: v ? v.inBand : true,
+            floorPrice: v ? v.floorPrice : String(line.floor_price_snapshot || '0.00'),
+          });
+        }
+
+        await trx('order_status_log').insert({
           order_id: newOrder.id,
-          item_id: line.item_id,
-          ordered_qty: line.qty,
-          quoted_unit_price: line.quoted_unit_price,
-          floor_price_snapshot: line.floor_price_snapshot || line.quoted_unit_price,
-          target_price_snapshot: line.target_price_snapshot || line.quoted_unit_price,
-          landed_cost_snapshot: line.landed_cost_snapshot || '0.00',
-          margin_pct_snapshot: line.margin_pct_snapshot ?? null,
-          line_margin_pct: line.margin_pct_snapshot ?? null,
-          line_total: lineTotal.toStorageString(),
-          created_by: userId,
-          updated_by: userId,
+          from_status: '',
+          to_status: status,
+          by_user: userId,
+          reason: `Converted from Quote ${quote.quote_no}`,
         });
-      }
 
-      await trx('quotes').where('id', quoteId).update({
-        status: 'CONVERTED',
-        updated_by: userId,
-        updated_at: new Date(),
+        if (status === 'CONFIRMED') {
+          await trx('outbox_events').insert({
+            aggregate_id: String(newOrder.id),
+            event_type: 'order.confirmed',
+            payload: {
+              orderId: String(newOrder.id),
+              customerId: String(quote.customer_id),
+              siteId: targetSiteId,
+              lines: createdLineRows.map((l) => ({
+                orderLineId: l.id,
+                itemId: l.item_id,
+                qty: l.ordered_qty,
+                unitPrice: l.quoted_unit_price,
+              })),
+              deliveryDate: today,
+              creditFlag: creditEval.status,
+            },
+            module_source: 'm1',
+            published_at: trx.raw('NOW()'),
+          });
+        }
+
+        await trx('quotes').where('id', quoteId).update({
+          status: 'CONVERTED',
+          updated_by: userId,
+          updated_at: new Date(),
+        });
+
+        return {
+          orderId: String(newOrder.id),
+          orderNo: String(newOrder.order_no),
+          orderStatus: status,
+          insertedLines: createdLineRows,
+        };
       });
 
-      return { orderId: String(newOrder.id), orderNo: String(newOrder.order_no) };
-    });
+    if (orderStatus === 'PENDING_APPROVAL' && this.exceptionPort) {
+      const belowLine = insertedLines.find((l) => !l.inBand);
+      if (belowLine) {
+        await this.exceptionPort
+          .raise(
+            'PRICE_OVERRIDE',
+            'sales_order_lines',
+            belowLine.id,
+            userId,
+            {
+              title: 'Quote Conversion Below Floor',
+              summary: `Converted quote ${quote.quote_no} line below floor price`,
+              facts: [
+                { label: 'Order', value: orderNo },
+                { label: 'Requested Price', value: belowLine.quoted_unit_price },
+                { label: 'Floor Price', value: belowLine.floorPrice },
+              ],
+              impact: 'Order cannot be confirmed until owner approves price override.',
+              actions: [
+                { code: 'APPROVE', label: 'Approve Price' },
+                { code: 'REJECT', label: 'Reject' },
+              ],
+              valueAtRisk: String(quote.total_amount || '0.00'),
+            },
+            targetSiteId,
+          )
+          .catch(() => { });
+      }
+      if (creditEval.status === 'HOLD') {
+        await this.exceptionPort
+          .raise(
+            'CREDIT_BREACH',
+            'sales_orders',
+            orderId,
+            userId,
+            {
+              title: 'Credit Limit Breach on Quote Conversion',
+              summary: (creditEval as any).reason || 'Order exceeds credit limit',
+              facts: [
+                { label: 'Order', value: orderNo },
+                { label: 'Order Total', value: String(quote.total_amount || '0.00') },
+              ],
+              impact: 'Order cannot dispatch until credit breach is resolved.',
+              actions: [
+                { code: 'APPROVE', label: 'Approve Credit' },
+                { code: 'REJECT', label: 'Reject Order' },
+              ],
+              valueAtRisk: String(quote.total_amount || '0.00'),
+            },
+            targetSiteId,
+          )
+          .catch(() => { });
+      }
+    }
 
     return {
       quoteId,
       quoteNo: quote.quote_no,
       orderId,
       orderNo,
+      orderStatus,
       status: 'CONVERTED',
       totalAmount: quote.total_amount,
       validUntil: quote.valid_until,

@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { ChequeService } from './cheque.service.js';
 import {
   DepositChequeDto,
@@ -41,7 +42,7 @@ export class ChequeController {
   @ApiOperation({ summary: 'List cheques with status and date filters' })
   @ApiResponse({ status: 200, description: 'Cheques list' })
   async list(@Query() query: ListChequesQueryDto, @Req() req: any) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const cheques = await this.chequeService.listCheques(
       siteId,
       query.status,

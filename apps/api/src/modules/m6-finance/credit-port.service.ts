@@ -107,8 +107,11 @@ export class CreditPortService implements CreditPort {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
 
-    if (order.order_status !== 'CONFIRMED') {
-      return { allowed: false, reason: `Order not in CONFIRMED status` };
+    if (!['CONFIRMED', 'READY'].includes(order.order_status)) {
+      return {
+        allowed: false,
+        reason: `Order must be CONFIRMED or READY to dispatch (current: ${order.order_status})`,
+      };
     }
 
     const customerId = order.customer_id;

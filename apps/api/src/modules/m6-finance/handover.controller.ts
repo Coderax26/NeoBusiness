@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { HandoverService } from './handover.service.js';
 import {
   InitiateHandoverDto,
@@ -44,7 +45,7 @@ export class HandoverController {
   async getMyWallet(@Req() req: any) {
     const wallet = await this.handoverService.getAgentWallet(
       req.user.id,
-      req.user.siteId,
+      resolveUserSiteId(req.user) || '',
     );
     return wrapResponse(wallet);
   }
@@ -62,7 +63,7 @@ export class HandoverController {
   ) {
     const expected = await this.handoverService.getExpectedHandover(
       userId,
-      req.user.siteId,
+      resolveUserSiteId(req.user) || '',
     );
     return wrapResponse(expected);
   }
@@ -78,7 +79,7 @@ export class HandoverController {
   async initiateHandover(@Body() dto: InitiateHandoverDto, @Req() req: any) {
     const handedBy = dto.handedByUserId || req.user.id;
     const result = await this.handoverService.initiateHandover({
-      siteId: req.user.siteId,
+      siteId: resolveUserSiteId(req.user) || '',
       handedByUserId: handedBy,
       receivedByUserId: dto.receivedByUserId || req.user.id,
       notes: dto.notes,
@@ -137,7 +138,8 @@ export class HandoverController {
   @ApiResponse({ status: 200, description: 'Handovers list' })
   async list(@Query() query: ListHandoversQueryDto, @Req() req: any) {
     const siteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const result = await this.handoverService.listHandovers({
       ...query,
       siteId,

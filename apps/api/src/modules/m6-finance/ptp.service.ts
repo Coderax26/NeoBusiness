@@ -92,7 +92,7 @@ export class PTPService {
    * Get all PTPs for a site (Coordinator/Owner view)
    */
   async getPTPs(
-    siteId: string,
+    siteId?: string,
     filters?: {
       status?: string;
       fromDate?: string;

@@ -40,22 +40,95 @@ export default function TripDetailPage() {
   const [selectedStopEpod, setSelectedStopEpod] = useState<TripStopDetail | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const normalizeTrip = (t: any): TripRecord => ({
+    id: String(t.id),
+    tripNo: String(t.tripNo ?? t.trip_no ?? t.id),
+    tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
+    vehicleId: String(t.vehicleId ?? t.vehicle_id ?? ''),
+    vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? 'Vehicle'),
+    driverId: String(t.driverId ?? t.driver_id ?? ''),
+    driverName: String(t.driverName ?? t.driver_name ?? 'Driver'),
+    status: (t.status ?? 'LOADING') as TripRecord['status'],
+    loadingConfirmed: t.status !== 'LOADING',
+    lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16),
+    unloggedReturnsCount: Number(t.unloggedReturnsCount ?? 0),
+    codHandedOver: Boolean(t.codHandedOver ?? false),
+    expensesEntered: Number(t.expenses_count ?? 0) > 0,
+    openIssuesCount: Number(t.open_issues_count ?? 0),
+    stops: Array.isArray(t.stops)
+      ? t.stops.map((s: any, idx: number) => {
+          const rawSt = String(s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING');
+          const deliveryStatus: TripStopDetail['deliveryStatus'] =
+            rawSt === 'DELIVERED_FULL' || rawSt === 'DELIVERED'
+              ? 'DELIVERED'
+              : rawSt === 'DELIVERED_PARTIAL' || rawSt === 'PARTIAL'
+                ? 'PARTIAL'
+                : rawSt === 'FAILED'
+                  ? 'FAILED'
+                  : 'PENDING';
+          return {
+            stopId: String(s.stopId ?? s.id),
+            seq: Number(s.seq ?? s.sequence_no ?? idx + 1),
+            orderNo: String(s.orderNo ?? s.order_no ?? s.sales_order_id ?? 'Order'),
+            customerName: String(s.customerName ?? s.customer_name ?? 'Customer'),
+            area: String(s.area ?? s.site_name ?? ''),
+            weightKg: Number(s.weightKg ?? s.total_weight_kg ?? 50),
+            valueInr: Number(s.valueInr ?? s.order_value ?? s.total_amount ?? 0),
+            deliveryStatus,
+            expectedCodInr: Number(s.expectedCodInr ?? s.cod_amount ?? s.cash_to_collect ?? 0),
+            collectedCodInr: Number(s.collectedCodInr ?? s.cod_collected_amount ?? s.actual_cash_collected ?? 0),
+            challanNo: s.challanNo ?? s.challan_no,
+            ewayBillRef: s.ewayBillRef ?? s.eway_bill_no,
+            epodSignedBy: s.epodSignedBy ?? s.epod_signature_url,
+            epodPhotoName: s.epodPhotoName ?? s.epod_photo_url,
+            gpsX: Number(s.gpsX ?? 100),
+            gpsY: Number(s.gpsY ?? 100),
+            lines: Array.isArray(s.lines) ? s.lines : [],
+          } as TripStopDetail & { lines?: any[] };
+        })
+      : [],
+  });
+
   useEffect(() => {
     if (!tripId) return;
     let active = true;
     Promise.all([
       fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`).then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/proxy/trip-expenses').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/issues').then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/trip-expenses?tripId=${encodeURIComponent(tripId)}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/issues?tripId=${encodeURIComponent(tripId)}`).then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([tData, expData, issData]) => {
         if (!active) return;
         const t = tData?.data || tData;
-        if (t && t.id) setTrip(t);
+        if (t && t.id) setTrip(normalizeTrip(t));
         const eRows = Array.isArray(expData) ? expData : Array.isArray(expData?.data) ? expData.data : [];
-        setTripExpenses(eRows.filter((e: any) => String(e.tripId || e.trip_id) === tripId));
+        setTripExpenses(
+          eRows.map((e: any) => ({
+            id: String(e.id),
+            tripId: String(e.trip_id ?? e.tripId ?? tripId),
+            tripNo: String(e.trip_no ?? e.tripNo ?? ''),
+            vehicleRegNo: String(e.registration_no ?? e.vehicleRegNo ?? ''),
+            category: String(e.type ?? e.category ?? 'OTHER') as any,
+            amount: Number(e.amount ?? 0),
+            date: String(e.logged_at ?? e.date ?? '').slice(0, 10),
+            notes: String(e.notes ?? e.type ?? ''),
+          })),
+        );
         const iRows = Array.isArray(issData) ? issData : Array.isArray(issData?.data) ? issData.data : [];
-        setTripIssues(iRows.filter((i: any) => String(i.tripId || i.trip_id) === tripId));
+        setTripIssues(
+          iRows.map((i: any) => ({
+            id: String(i.id),
+            issueNo: `ISS-${String(i.id).slice(0, 6).toUpperCase()}`,
+            tripId: String(i.trip_id ?? i.tripId ?? tripId),
+            tripNo: String(i.trip_no ?? i.tripNo ?? ''),
+            stopOrderNo: String(i.stop_id ?? ''),
+            customerName: String(i.customer_name ?? 'Stop'),
+            type: (i.category ?? 'DISPUTE') as any,
+            description: String(i.category ?? ''),
+            status: (i.status === 'OPEN' ? 'OPEN' : 'RESOLVED') as any,
+            reportedAt: String(i.created_at ?? '').slice(0, 10),
+          })),
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -86,26 +159,50 @@ export default function TripDetailPage() {
     );
   }
 
-  function updateStopStatus(stopId: string, nextStatus: TripStopDetail['deliveryStatus']) {
-    setTrip((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        lastUpdated: 'Just now',
-        stops: prev.stops.map((s) =>
-          s.stopId === stopId
-            ? {
-                ...s,
-                deliveryStatus: nextStatus,
-                collectedCodInr:
-                  nextStatus === 'DELIVERED' ? s.expectedCodInr : nextStatus === 'FAILED' ? 0 : s.collectedCodInr,
-                epodSignedBy: nextStatus === 'DELIVERED' ? s.epodSignedBy ?? 'Receiver Verified' : s.epodSignedBy,
-              }
-            : s,
-        ),
-      };
-    });
-    setStatusMessage(`Updated stop status to ${nextStatus}.`);
+  async function updateStopStatus(stopId: string, nextStatus: TripStopDetail['deliveryStatus']) {
+    if (!trip) return;
+    const stop: any = trip.stops.find((s) => s.stopId === stopId);
+    if (!stop) return;
+    try {
+      const stopLines = Array.isArray(stop.lines) ? stop.lines : [];
+      const payloadLines = stopLines.map((l: any) => {
+        const loaded = Number(l.loaded_qty ?? 0);
+        const delivered = nextStatus === 'PARTIAL' ? Math.max(0, loaded * 0.5) : loaded;
+        const returned = Math.max(0, loaded - delivered);
+        return {
+          itemId: String(l.item_id),
+          deliveredQty: delivered,
+          returnedQty: returned,
+          ...(l.batch_id ? { batchId: String(l.batch_id) } : {}),
+        };
+      });
+      const res = await fetch(`/api/proxy/stops/${encodeURIComponent(stopId)}/deliver`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `stop-deliver-${stopId}-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          epodMethod: 'SIGNATURE',
+          epodSignatureUrl: 'office-verified-signature',
+          capturedAt: new Date().toISOString(),
+          gpsLat: 18.15,
+          gpsLng: 74.58,
+          codCollectedAmount: nextStatus === 'DELIVERED' ? stop.expectedCodInr : stop.collectedCodInr,
+          lines: payloadLines,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      if (data && data.id) {
+        setTrip(normalizeTrip(data));
+      }
+      setStatusMessage(`Recorded stop ${nextStatus} via ePOD API.`);
+    } catch (err) {
+      setStatusMessage(`Failed to update stop: ${(err as Error).message}`);
+    }
   }
 
   function toggleCodHandover() {

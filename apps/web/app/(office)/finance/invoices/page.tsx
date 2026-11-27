@@ -12,26 +12,76 @@ const STATUS_COLORS: Record<InvoiceRecord['status'], string> = {
   CANCELLED: 'bg-sunken text-ink-3',
 };
 
+const mapInvoiceRow = (r: any): InvoiceRecord => {
+  const rawStatus = String(r.status || 'UNPAID');
+  const mappedStatus: InvoiceRecord['status'] =
+    rawStatus === 'UNPAID' || rawStatus === 'NOT_PAID'
+      ? 'NOT_PAID'
+      : rawStatus === 'PARTIAL' || rawStatus === 'PART_PAID'
+        ? 'PART_PAID'
+        : rawStatus === 'PAID'
+          ? 'PAID'
+          : rawStatus === 'OVERDUE'
+            ? 'OVERDUE'
+            : 'CANCELLED';
+  const invDate = String(r.invoice_date || r.invoiceDate || '').slice(0, 10);
+  const due = String(r.due_date || r.dueDate || '').slice(0, 10);
+  const diffDays = due
+    ? Math.max(0, Math.floor((Date.now() - new Date(due).getTime()) / 86400000))
+    : 0;
+  return {
+    id: String(r.id),
+    invoiceNo: String(r.invoice_no || r.invoiceNo || r.id),
+    invoiceDate: invDate,
+    dueDate: due,
+    daysOverdue: Number(r.daysOverdue ?? (mappedStatus !== 'PAID' ? diffDays : 0)),
+    customerId: String(r.customer_id || r.customerId || ''),
+    customerName: String(r.customer_name || r.customerName || 'Customer'),
+    status: mappedStatus,
+    totalAmount: Number(r.total_amount ?? r.totalAmount ?? 0),
+    paidAmount: Number(r.paid_amount ?? r.paidAmount ?? 0),
+    balanceAmount: Number(r.balance_due ?? r.balanceAmount ?? 0),
+    irnStatus: 'DISABLED_MVP',
+    lines: Array.isArray(r.lines) ? r.lines : [],
+  };
+};
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [eligibleOrders, setEligibleOrders] = useState<any[]>([]);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [generating, setGenerating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | InvoiceRecord['status']>('ALL');
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const loadInvoices = () => {
     fetch('/api/proxy/invoices')
       .then((r) => (r.ok ? r.json() : []))
       .then((res) => {
-        if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setInvoices(rows);
+        setInvoices(rows.map(mapInvoiceRow));
       })
       .catch(() => {});
-    return () => {
-      active = false;
-    };
+  };
+
+  useEffect(() => {
+    loadInvoices();
+    fetch('/api/proxy/orders')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const eligible = rows.filter((o: any) =>
+          ['CONFIRMED', 'READY', 'DISPATCHED', 'DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(
+            o.order_status,
+          ),
+        );
+        setEligibleOrders(eligible);
+        if (eligible.length > 0) setSelectedOrderId(String(eligible[0].id));
+      })
+      .catch(() => {});
   }, []);
 
   const filtered = useMemo(
@@ -39,13 +89,46 @@ export default function InvoicesPage() {
     [invoices, statusFilter],
   );
 
+  async function handleGenerateInvoice() {
+    if (!selectedOrderId) return;
+    setGenerating(true);
+    try {
+      const orderObj = eligibleOrders.find((o) => String(o.id) === selectedOrderId);
+      const res = await fetch('/api/proxy/invoices/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: selectedOrderId,
+          ...(orderObj?.fulfillment_site_id ? { siteId: String(orderObj.fulfillment_site_id) } : {}),
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      const invNo = payload?.data?.invoiceNo || payload?.invoiceNo || 'Invoice';
+      setGenerateOpen(false);
+      setToast(`Generated ${invNo} successfully.`);
+      loadInvoices();
+    } catch (err) {
+      setToast(`Failed to generate invoice: ${(err as Error).message}`);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function requestCancel(invoiceId: string) {
     if (!cancelReason.trim()) return;
-    await fetch(`/api/proxy/invoices/${encodeURIComponent(invoiceId)}/cancel`, {
+    const res = await fetch(`/api/proxy/invoices/${encodeURIComponent(invoiceId)}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: cancelReason }),
-    }).catch(() => {});
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      setToast(`Failed to void invoice: ${err?.message || err?.error?.message || res.status}`);
+      return;
+    }
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.id === invoiceId ? { ...inv, status: 'CANCELLED', balanceAmount: 0 } : inv,
@@ -65,6 +148,13 @@ export default function InvoicesPage() {
             GST &amp; Exempt mixed-line invoices, HSN summary, PDF sharing, and void requests (e-Invoice IRN disabled for MVP).
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setGenerateOpen(true)}
+          className="rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover"
+        >
+          + Generate Invoice
+        </button>
       </div>
 
       {toast && (
@@ -152,6 +242,49 @@ export default function InvoicesPage() {
           </tbody>
         </table>
       </div>
+
+      {generateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-[4px] border border-rule bg-sheet p-6 space-y-4 shadow-xl">
+            <h2 className="text-lg font-bold text-ink">Generate Tax Invoice from Order</h2>
+            {eligibleOrders.length === 0 ? (
+              <p className="text-xs text-ink-3">No confirmed/dispatched orders available to invoice.</p>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-ink-3 mb-1">Sales Order</label>
+                <select
+                  value={selectedOrderId}
+                  onChange={(e) => setSelectedOrderId(e.target.value)}
+                  className="w-full rounded-[3px] border border-rule-strong bg-paper px-3 py-2 text-sm text-ink"
+                >
+                  {eligibleOrders.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.order_no} · {o.customer_name || 'Customer'} ({o.order_status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setGenerateOpen(false)}
+                className="rounded-[3px] border border-rule-strong bg-paper px-4 py-2 text-sm font-semibold text-ink-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedOrderId || generating}
+                onClick={handleGenerateInvoice}
+                className="rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-60"
+              >
+                {generating ? 'Generating...' : 'Generate Invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">

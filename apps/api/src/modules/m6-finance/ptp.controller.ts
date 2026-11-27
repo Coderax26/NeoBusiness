@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { PTPService } from './ptp.service.js';
 import {
   CreatePtpDto,
@@ -49,7 +50,7 @@ export class PtpController {
   })
   @ApiResponse({ status: 201, description: 'PTP logged' })
   async create(@Body() dto: CreatePtpDto, @Req() req: any) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const ptp = await this.ptpService.createPTP({
       siteId,
       customerId: dto.customerId,
@@ -85,7 +86,10 @@ export class PtpController {
   @ApiOperation({ summary: "Get PTPs due today for current site's follow-ups" })
   @ApiResponse({ status: 200, description: 'Due PTP list' })
   async getDueToday(@Query('date') date: string, @Req() req: any) {
-    const ptps = await this.ptpService.getPTPsDueToday(req.user.siteId, date);
+    const ptps = await this.ptpService.getPTPsDueToday(
+      resolveUserSiteId(req.user) || '',
+      date,
+    );
     return wrapResponse(ptps);
   }
 
@@ -94,7 +98,9 @@ export class PtpController {
   @ApiOperation({ summary: 'List PTP follow-ups with filters' })
   @ApiResponse({ status: 200, description: 'PTP list' })
   async list(@Query() query: ListPtpQueryDto, @Req() req: any) {
-    const ptps = await this.ptpService.getPTPs(req.user.siteId, {
+    const ptps = await this.ptpService.getPTPs(
+      req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user),
+      {
       customerId: query.customerId,
       status: query.status,
       fromDate: query.fromDate,

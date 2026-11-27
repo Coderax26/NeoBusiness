@@ -7,7 +7,7 @@ import {
   type TripRecord,
 } from '../../../../src/lib/logistics-data';
 
-const CATEGORIES: Array<TripExpenseRecord['category']> = ['FUEL', 'TOLL', 'LOADING', 'FOOD', 'REPAIR'];
+const CATEGORIES: Array<TripExpenseRecord['category']> = ['FUEL', 'TOLL', 'OTHER' as any];
 
 export default function TripExpensesPage() {
   const [expenses, setExpenses] = useState<TripExpenseRecord[]>([]);
@@ -30,9 +30,26 @@ export default function TripExpensesPage() {
         if (!active) return;
         const eRows = Array.isArray(expRes) ? expRes : Array.isArray(expRes?.data) ? expRes.data : [];
         const tRows = Array.isArray(trpRes) ? trpRes : Array.isArray(trpRes?.data) ? trpRes.data : [];
-        setExpenses(eRows);
-        setTrips(tRows);
-        if (tRows.length > 0) setNewTripId(String(tRows[0].id));
+        setExpenses(
+          eRows.map((e: any) => ({
+            id: String(e.id),
+            tripId: String(e.trip_id ?? e.tripId ?? ''),
+            tripNo: String(e.trip_no ?? e.tripNo ?? ''),
+            vehicleRegNo: String(e.registration_no ?? e.vehicleRegNo ?? 'Vehicle'),
+            category: String(e.type ?? e.category ?? 'OTHER') as any,
+            amount: Number(e.amount ?? 0),
+            date: String(e.logged_at ?? e.date ?? '').slice(0, 10),
+            notes: String(e.notes ?? e.type ?? ''),
+          })),
+        );
+        const mappedTrips = tRows.map((t: any) => ({
+          ...t,
+          id: String(t.id),
+          tripNo: String(t.trip_no ?? t.tripNo ?? t.id),
+          vehicleRegNo: String(t.registration_no ?? t.vehicleRegNo ?? ''),
+        }));
+        setTrips(mappedTrips);
+        if (mappedTrips.length > 0) setNewTripId(mappedTrips[0].id);
       })
       .catch(() => {});
     return () => {
@@ -48,7 +65,7 @@ export default function TripExpensesPage() {
   const totalByVehicle = useMemo(() => {
     const map = new Map<string, number>();
     for (const exp of expenses) {
-      map.set(exp.vehicleRegNo, (map.get(exp.vehicleRegNo) ?? 0) + exp.amount);
+      map.set(exp.vehicleRegNo, (map.get(exp.vehicleRegNo) ?? 0) + Number(exp.amount || 0));
     }
     return Array.from(map.entries());
   }, [expenses]);
@@ -59,27 +76,31 @@ export default function TripExpensesPage() {
     const parsedAmount = Number(newAmount) || 0;
     if (parsedAmount <= 0 || !trip) return;
 
-    const record: TripExpenseRecord = {
-      id: `exp-${Date.now()}`,
-      tripId: trip.id,
-      tripNo: trip.tripNo,
-      vehicleRegNo: trip.vehicleRegNo,
-      category: newCategory,
-      amount: parsedAmount,
-      date: new Date().toISOString().slice(0, 10),
-      notes: newNotes || `${newCategory} expense`,
-      receiptName: 'receipt-uploaded.jpg',
-    };
-    await fetch('/api/proxy/trip-expenses', {
+    const expenseType = ['FUEL', 'TOLL', 'OTHER'].includes(newCategory) ? newCategory : 'OTHER';
+    const res = await fetch(`/api/proxy/trips/${encodeURIComponent(trip.id)}/expenses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tripId: trip.id,
-        category: newCategory,
+        type: expenseType,
         amount: parsedAmount,
-        notes: record.notes,
       }),
-    }).catch(() => {});
+    });
+    const created = await res.json().catch(() => null);
+    if (!res.ok) {
+      alert(created?.message || created?.error?.message || `Failed to log expense (HTTP ${res.status})`);
+      return;
+    }
+
+    const record: TripExpenseRecord = {
+      id: String(created?.id ?? `exp-${Date.now()}`),
+      tripId: trip.id,
+      tripNo: trip.tripNo,
+      vehicleRegNo: trip.vehicleRegNo,
+      category: expenseType as any,
+      amount: parsedAmount,
+      date: new Date().toISOString().slice(0, 10),
+      notes: newNotes || `${expenseType} expense`,
+    };
     setExpenses((prev) => [record, ...prev]);
     setShowAddModal(false);
     setNewNotes('');

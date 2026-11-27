@@ -187,17 +187,53 @@ export class FleetService {
   }
 
   async getTrip(tripId: string, runner: Knex | Knex.Transaction = this.knex) {
-    const trip = await runner('delivery_trips').where('id', tripId).first();
+    const trip = await runner('delivery_trips as dt')
+      .leftJoin('vehicles as v', 'dt.vehicle_id', 'v.id')
+      .leftJoin('users as d', 'dt.driver_id', 'd.id')
+      .leftJoin('sites as s', 'dt.site_id', 's.id')
+      .where('dt.id', tripId)
+      .first(
+        'dt.*',
+        'v.registration_no',
+        'v.vehicle_type',
+        'v.capacity_kg',
+        'd.full_name as driver_name',
+        'd.phone as driver_phone',
+        's.name as site_name',
+      );
     if (!trip) throw new NotFoundException('Trip not found');
-    const stops = await runner('delivery_stops')
-      .where('trip_id', tripId)
-      .orderBy('sequence_no');
+
+    const stops = await runner('delivery_stops as ds')
+      .leftJoin('customers as c', 'ds.customer_id', 'c.id')
+      .leftJoin('sales_orders as so', 'ds.sales_order_id', 'so.id')
+      .where('ds.trip_id', tripId)
+      .select(
+        'ds.*',
+        'c.business_name as customer_name',
+        'so.order_no',
+        'so.total_amount as order_value',
+      )
+      .orderBy('ds.sequence_no');
     const stopIds = stops.map((stop) => stop.id);
     const lines = stopIds.length
-      ? await runner('delivery_stop_lines').whereIn('stop_id', stopIds)
+      ? await runner('delivery_stop_lines as dsl')
+          .leftJoin('items as i', 'dsl.item_id', 'i.id')
+          .whereIn('dsl.stop_id', stopIds)
+          .select('dsl.*', 'i.name as item_name', 'i.primary_uom as uom')
       : [];
+
+    const [expensesRow, openIssuesRow] = await Promise.all([
+      runner('trip_expenses').where('trip_id', tripId).count('* as cnt').first(),
+      runner('issue_reports')
+        .where({ trip_id: tripId, status: 'OPEN' })
+        .count('* as cnt')
+        .first(),
+    ]);
+
     return {
       ...trip,
+      expenses_count: Number((expensesRow as any)?.cnt ?? 0),
+      open_issues_count: Number((openIssuesRow as any)?.cnt ?? 0),
       stops: stops.map((stop) => ({
         ...stop,
         lines: lines.filter((line) => line.stop_id === stop.id),
@@ -280,6 +316,7 @@ export class FleetService {
         }
       }
 
+      // Validate all stop lines are supplied before mutating stock or trip state
       const linesByStop = new Map<string, DispatchLine[]>();
       for (const line of lines) {
         const current = linesByStop.get(line.stopId) ?? [];
@@ -293,6 +330,12 @@ export class FleetService {
             `No loading lines supplied for stop ${stop.id}`,
           );
         }
+      }
+
+      // Single idempotent stock posting path: postDispatch synchronously once per stop
+      // and persist each line's batch_id / loaded_qty individually.
+      for (const stop of stops) {
+        const stopLines = linesByStop.get(String(stop.id)) ?? [];
         await this.inventory.postDispatch(
           String(stop.id),
           stopLines.map((line) => ({
@@ -301,31 +344,16 @@ export class FleetService {
             qty: String(line.qty),
           })),
         );
-        await this.outbox.raise(
-          trx,
-          'trip.loaded',
-          String(trip.id),
-          {
-            tripId: String(trip.id),
-            siteId: String(trip.site_id),
-            lines: stopLines.map((line) => ({
-              itemId: line.itemId,
-              batchId: line.batchId,
-              qty: String(line.qty),
-            })),
-          },
-          'm5',
-        );
-        await trx('delivery_stop_lines')
-          .where('stop_id', stop.id)
-          .update({
-            batch_id: stopLines[0].batchId,
-            loaded_qty: String(
-              stopLines.reduce((sum, line) => sum + line.qty, 0),
-            ),
-            updated_at: Clock.nowUtc(),
-            updated_by: userId,
-          });
+        for (const line of stopLines) {
+          await trx('delivery_stop_lines')
+            .where({ stop_id: stop.id, item_id: line.itemId })
+            .update({
+              batch_id: line.batchId,
+              loaded_qty: String(line.qty),
+              updated_at: Clock.nowUtc(),
+              updated_by: userId,
+            });
+        }
       }
 
       await trx('delivery_trips').where('id', tripId).update({
@@ -334,6 +362,26 @@ export class FleetService {
         updated_at: Clock.nowUtc(),
         updated_by: userId,
       });
+
+      // Transition linked sales orders to DISPATCHED
+      for (const orderId of orderIds) {
+        const so = await trx('sales_orders')
+          .where('id', orderId)
+          .first('order_status');
+        if (so && ['CONFIRMED', 'READY', 'IN_PRODUCTION_SOURCING'].includes(so.order_status)) {
+          await trx('sales_orders')
+            .where('id', orderId)
+            .update({ order_status: 'DISPATCHED', updated_at: Clock.nowUtc() });
+          await trx('order_status_log').insert({
+            order_id: orderId,
+            from_status: so.order_status,
+            to_status: 'DISPATCHED',
+            by_user: userId,
+            reason: `Dispatched on trip ${trip.trip_no}`,
+          });
+        }
+      }
+
       await this.outbox.raise(
         trx,
         'trip.dispatched',
@@ -350,7 +398,6 @@ export class FleetService {
         },
         'm5',
       );
-      await this.ledger.postInvoice(String(trip.id));
       return this.getTrip(tripId, trx);
     });
   }
@@ -440,6 +487,25 @@ export class FleetService {
           ]);
         }
       }
+      // Transition linked sales order status on delivery
+      if (stop.sales_order_id) {
+        const so = await trx('sales_orders')
+          .where('id', stop.sales_order_id)
+          .first('order_status');
+        if (so && ['CONFIRMED', 'READY', 'DISPATCHED'].includes(so.order_status)) {
+          await trx('sales_orders')
+            .where('id', stop.sales_order_id)
+            .update({ order_status: status, updated_at: Clock.nowUtc() });
+          await trx('order_status_log').insert({
+            order_id: stop.sales_order_id,
+            from_status: so.order_status,
+            to_status: status,
+            by_user: userId,
+            reason: `Stop ${stopId} finalized (${status})`,
+          });
+        }
+      }
+
       await this.outbox.raise(
         trx,
         returnedQty > 0 ? 'delivery.partial' : 'delivery.completed',
@@ -889,6 +955,9 @@ export class FleetService {
   async confirmLoading(tripId: string, verifiedCratesCount: number, userId: string) {
     const trip = await this.knex('delivery_trips').where('id', tripId).first();
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
+    if (trip.status !== 'LOADING') {
+      throw new ConflictException(`Trip must be in LOADING status (current: ${trip.status})`);
+    }
     const [updated] = await this.knex('delivery_trips')
       .where('id', tripId)
       .update({
@@ -920,13 +989,14 @@ export class FleetService {
   async listExpenses(filter: { siteId?: string; tripId?: string }) {
     let query = this.knex('trip_expenses as te')
       .leftJoin('delivery_trips as dt', 'te.trip_id', 'dt.id')
+      .leftJoin('vehicles as v', 'dt.vehicle_id', 'v.id')
       .leftJoin('sites as s', 'te.site_id', 's.id')
-      .select('te.*', 'dt.trip_no', 's.name as site_name');
+      .select('te.*', 'dt.trip_no', 'v.registration_no', 's.name as site_name');
     if (this.isUuid(filter.siteId))
       query = query.where('te.site_id', filter.siteId);
     if (this.isUuid(filter.tripId))
       query = query.where('te.trip_id', filter.tripId);
-    return query.orderBy('te.created_at', 'desc');
+    return query.orderBy('te.logged_at', 'desc');
   }
 
   async updateVehicle(
@@ -1506,19 +1576,9 @@ export class FleetService {
   }
 
   async settleTrip(id: string, body: Record<string, unknown>, userId?: string) {
-    const now = new Date();
-    const [trip] = await this.knex('delivery_trips')
-      .where('id', id)
-      .update({
-        status: 'COMPLETED',
-        closed_at: now,
-        closed_by: userId && this.isUuid(userId) ? userId : null,
-        updated_at: now,
-        updated_by: userId && this.isUuid(userId) ? userId : null,
-      })
-      .returning('*');
-    if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-    return { tripId: id, ...body, status: trip.status };
+    const actor = userId && this.isUuid(userId) ? userId : '';
+    const closed = await this.closeTrip(id, actor);
+    return { tripId: id, ...body, status: closed.status, trip: closed };
   }
 
   getReportCatalog() {

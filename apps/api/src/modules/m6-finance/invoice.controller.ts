@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { InvoiceService } from './invoice.service.js';
 import {
   GenerateInvoiceDto,
@@ -43,7 +44,7 @@ export class InvoiceController {
   @ApiOperation({ summary: 'Generate tax invoice from confirmed sales order' })
   @ApiResponse({ status: 201, description: 'Invoice generated' })
   async generate(@Body() dto: GenerateInvoiceDto, @Req() req: any) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const result = await this.invoiceService.generateFromOrder(
       dto.orderId,
       siteId,
@@ -62,7 +63,9 @@ export class InvoiceController {
   @ApiOperation({ summary: 'List invoices with filtering and pagination' })
   @ApiResponse({ status: 200, description: 'Invoices list' })
   async list(@Query() query: ListInvoicesQueryDto, @Req() req: any) {
-    const siteId = query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+    const siteId =
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const result = await this.invoiceService.listInvoices({
       ...query,
       siteId,

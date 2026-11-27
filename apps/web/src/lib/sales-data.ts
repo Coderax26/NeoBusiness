@@ -46,9 +46,13 @@ export type SalesOrderStatus =
   | 'READY'
   | 'DISPATCHED'
   | 'DELIVERED'
+  | 'DELIVERED_FULL'
+  | 'DELIVERED_PARTIAL'
   | 'INVOICED'
   | 'PAID'
-  | 'CANCELLED';
+  | 'CLOSED'
+  | 'CANCELLED'
+  | 'REJECTED';
 
 export interface SalesOrderRecord {
   id: string;

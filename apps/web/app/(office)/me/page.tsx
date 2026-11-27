@@ -44,19 +44,40 @@ export default function ProfilePage() {
       .catch(() => { });
   }, []);
 
-  const handleSavePreferences = () => {
+  const handleSavePreferences = async () => {
     setLocale(language);
     setDensity(selectedDensity);
     setTheme(selectedTheme);
-    setSavedMsg('Preferences saved.');
-    setTimeout(() => setSavedMsg(null), 2500);
+    setSavedMsg('Saving...');
+    try {
+      const res = await fetch('/api/proxy/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preferredLanguage: language,
+          uiPreferences: { theme: selectedTheme, density: selectedDensity },
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setSavedMsg('Preferences saved.');
+    } catch (err) {
+      setSavedMsg(`Failed to sync preferences: ${(err as Error).message}`);
+    }
+    setTimeout(() => setSavedMsg(null), 3000);
   };
 
-  const handleUpdatePin = (e: React.FormEvent) => {
+  const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinMessage(null);
 
-    if (newPin.length < 4 || newPin.length > 6) {
+    if (!currentPin.trim()) {
+      setPinMessage({ text: 'Current PIN or password is required.', tone: 'error' });
+      return;
+    }
+    if (!/^\d{4,6}$/.test(newPin)) {
       setPinMessage({ text: 'PIN must be 4 to 6 numeric digits.', tone: 'error' });
       return;
     }
@@ -66,13 +87,28 @@ export default function ProfilePage() {
     }
 
     setSavingPin(true);
-    setTimeout(() => {
-      setSavingPin(false);
+    try {
+      const res = await fetch('/api/proxy/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentCredential: currentPin,
+          newCredential: newPin,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
       setPinMessage({ text: 'Security PIN updated successfully!', tone: 'success' });
       setCurrentPin('');
       setNewPin('');
       setConfirmPin('');
-    }, 700);
+    } catch (err) {
+      setPinMessage({ text: (err as Error).message || 'Failed to update security PIN.', tone: 'error' });
+    } finally {
+      setSavingPin(false);
+    }
   };
 
   return (

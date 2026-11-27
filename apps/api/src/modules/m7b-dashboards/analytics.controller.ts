@@ -6,7 +6,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AnalyticsService } from './analytics.service.js';
 import {
   CustomerProfitabilityResponseDto,
@@ -18,7 +18,7 @@ import {
 
 @ApiTags('M7b Analytics — Strategic Insights')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}

@@ -28,13 +28,24 @@ export default function CloseTripChecklistPage() {
         const t = res.data || res;
         setTripNo(String(t.tripNo || t.trip_no || tripId));
         const stops = Array.isArray(t.stops) ? t.stops : [];
-        setPendingStopsCount(stops.filter((s: any) => s.deliveryStatus === 'PENDING').length);
+        setPendingStopsCount(
+          stops.filter((s: any) => (s.deliveryStatus ?? s.status ?? 'PENDING') === 'PENDING').length,
+        );
         setUnloggedReturnsCount(Number(t.unloggedReturnsCount ?? 0));
-        setUncollectedCodOrdersCount(stops.filter((s: any) => (s.expectedCodInr ?? 0) > (s.collectedCodInr ?? 0)).length);
+        setUncollectedCodOrdersCount(
+          stops.filter(
+            (s: any) =>
+              Boolean(s.is_cod ?? (s.expectedCodInr ?? 0) > 0) &&
+              Number(s.expectedCodInr ?? s.cod_amount ?? 0) >
+                Number(s.collectedCodInr ?? s.cod_collected_amount ?? 0),
+          ).length,
+        );
         setCodHandedOver(Boolean(t.codHandedOver ?? true));
-        setExpensesEntered(Boolean(t.expensesEntered ?? true));
-        setOpenIssuesCount(Number(t.openIssuesCount ?? 0));
-        setTripClosed(t.status === 'CLOSED');
+        setExpensesEntered(
+          t.expensesEntered !== undefined ? Boolean(t.expensesEntered) : true,
+        );
+        setOpenIssuesCount(Number(t.openIssuesCount ?? t.open_issues_count ?? 0));
+        setTripClosed(t.status === 'CLOSED' || t.status === 'COMPLETED');
       })
       .catch(() => {});
     return () => {
@@ -66,8 +77,13 @@ export default function CloseTripChecklistPage() {
 
   async function handleCloseTrip() {
     if (!checklist.canClose || tripClosed) return;
-    await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}/close`, { method: 'POST' }).catch(() => {});
-    setTripClosed(true);
+    const res = await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}/close`, { method: 'POST' });
+    if (res.ok) {
+      setTripClosed(true);
+    } else {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || err?.error?.message || `Failed to close trip (HTTP ${res.status})`);
+    }
   }
 
   return (

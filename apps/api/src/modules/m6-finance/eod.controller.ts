@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { EodService } from './eod.service.js';
 import {
   InitiateEodDto,
@@ -44,7 +45,7 @@ export class EodController {
   })
   @ApiResponse({ status: 201, description: 'EOD process initiated' })
   async initiateClosing(@Body() dto: InitiateEodDto, @Req() req: any) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const result = await this.eodService.initiateClosing(
       siteId,
       req.user.id,
@@ -58,7 +59,7 @@ export class EodController {
   @ApiOperation({ summary: 'Get EOD status for a specific date and site' })
   @ApiResponse({ status: 200, description: 'EOD record status' })
   async getByDate(@Param('date') date: string, @Req() req: any) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -74,7 +75,7 @@ export class EodController {
   })
   @ApiResponse({ status: 200, description: '4-check evaluation status' })
   async getChecklist(@Param('date') date: string, @Req() req: any) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -96,7 +97,7 @@ export class EodController {
     @Body() dto: SignOffEodDto,
     @Req() req: any,
   ) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -111,7 +112,7 @@ export class EodController {
   @ApiResponse({ status: 200, description: 'Deposit slip data' })
   async getDepositSlip(@Param('date') date: string, @Req() req: any) {
     const slip = await this.eodService.generateDepositSlip(
-      req.user.siteId,
+      resolveUserSiteId(req.user) || '',
       date,
     );
     return wrapResponse(slip);

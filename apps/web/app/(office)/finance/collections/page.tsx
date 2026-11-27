@@ -19,7 +19,7 @@ export default function CollectionsPage() {
     let active = true;
     Promise.all([
       fetch('/api/proxy/invoices').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/collections/receipts').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/collections').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/customers').then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([invRes, rcpRes, custRes]) => {
@@ -27,12 +27,54 @@ export default function CollectionsPage() {
         const iRows = Array.isArray(invRes) ? invRes : Array.isArray(invRes?.data) ? invRes.data : [];
         const rRows = Array.isArray(rcpRes) ? rcpRes : Array.isArray(rcpRes?.data) ? rcpRes.data : [];
         const cRows = Array.isArray(custRes) ? custRes : Array.isArray(custRes?.data) ? custRes.data : [];
-        setInvoices(iRows);
-        setReceipts(rRows);
         const mappedCusts = cRows.map((c: any) => ({
           id: String(c.id),
           name: String(c.business_name || c.name || 'Customer'),
         }));
+        const custMap = new Map<string, string>(mappedCusts.map((c: { id: string; name: string }) => [c.id, c.name]));
+
+        setInvoices(
+          iRows.map((inv: any) => {
+            const rawSt = String(inv.status || 'UNPAID');
+            const st: InvoiceRecord['status'] =
+              rawSt === 'UNPAID'
+                ? 'NOT_PAID'
+                : rawSt === 'PARTIAL'
+                  ? 'PART_PAID'
+                  : (rawSt as InvoiceRecord['status']);
+            return {
+              id: String(inv.id),
+              invoiceNo: String(inv.invoice_no || inv.invoiceNo || inv.id),
+              invoiceDate: String(inv.invoice_date || inv.invoiceDate || '').slice(0, 10),
+              dueDate: String(inv.due_date || inv.dueDate || '').slice(0, 10),
+              daysOverdue: 0,
+              customerId: String(inv.customer_id || inv.customerId || ''),
+              customerName: String(inv.customer_name || inv.customerName || custMap.get(String(inv.customer_id)) || 'Customer'),
+              status: st,
+              totalAmount: Number(inv.total_amount ?? inv.totalAmount ?? 0),
+              paidAmount: Number(inv.paid_amount ?? inv.paidAmount ?? 0),
+              balanceAmount: Number(inv.balance_due ?? inv.balanceAmount ?? 0),
+              irnStatus: 'DISABLED_MVP',
+              lines: [],
+            };
+          }),
+        );
+
+        setReceipts(
+          rRows.map((r: any) => ({
+            id: String(r.id),
+            receiptNo: String(r.receipt_no || r.receiptNo || r.id),
+            date: String(r.collected_at || r.created_at || r.date || '').slice(0, 10),
+            customerId: String(r.customer_id || r.customerId || ''),
+            customerName: String(r.customer_name || r.customerName || custMap.get(String(r.customer_id)) || 'Customer'),
+            mode: (r.payment_mode === 'BANK_TRANSFER' ? 'BANK' : r.payment_mode || r.mode || 'CASH') as ReceiptRecord['mode'],
+            amount: Number(r.amount ?? 0),
+            collectedBy: String(r.collector_name || r.collectedBy || 'Accounts'),
+            allocations: Array.isArray(r.allocations) ? r.allocations : [],
+            reversed: Boolean(r.reversed ?? false),
+          })),
+        );
+
         setCustomers(mappedCusts);
         if (mappedCusts.length > 0) setSelectedCustomerId(mappedCusts[0].id);
       })
@@ -71,52 +113,68 @@ export default function CollectionsPage() {
     if (parsedAmount <= 0 || !selectedCustomerId) return;
 
     const customerName = customers.find((c) => c.id === selectedCustomerId)?.name ?? 'Customer';
-    const nextNo = `RCP-2026-0${412 + receipts.length}`;
-
-    await fetch('/api/proxy/collections/receipts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customerId: selectedCustomerId,
-        mode,
-        amount: parsedAmount,
-      }),
-    }).catch(() => {});
-
-    const newReceipt: ReceiptRecord = {
-      id: `rcp-${Date.now()}`,
-      receiptNo: nextNo,
-      date: new Date().toISOString().slice(0, 10),
-      customerId: selectedCustomerId,
-      customerName,
-      mode,
-      amount: parsedAmount,
-      allocations: fifoPreview.allocations.map((a) => ({
-        invoiceId: a.invoiceId,
-        invoiceNo: a.invoiceNumber,
-        allocatedAmount: a.allocatedAmount,
-      })),
-      collectedBy: 'Accounts',
-      reversed: false,
+    const paymentModeMap: Record<ReceiptRecord['mode'], 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER'> = {
+      CASH: 'CASH',
+      CHEQUE: 'CHEQUE',
+      UPI: 'UPI',
+      BANK: 'BANK_TRANSFER',
     };
 
-    setReceipts((prev) => [newReceipt, ...prev]);
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        const hit = fifoPreview.allocations.find((a) => a.invoiceId === inv.id);
-        if (!hit) return inv;
-        const nextPaid = inv.paidAmount + hit.allocatedAmount;
-        const nextBal = Number(subMoney(inv.totalAmount, nextPaid));
-        return {
-          ...inv,
-          paidAmount: nextPaid,
-          balanceAmount: nextBal,
-          status: nextBal <= 0 ? 'PAID' : 'PART_PAID',
-        };
-      }),
-    );
-    setAmountInput('');
-    setToast(`Recorded ${nextNo} (${formatINR(parsedAmount)} via ${mode}) with FIFO invoice allocation.`);
+    try {
+      const res = await fetch('/api/proxy/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: selectedCustomerId,
+          paymentMode: paymentModeMap[mode],
+          amount: parsedAmount.toFixed(2),
+          idempotencyKey: `col-${selectedCustomerId}-${Date.now()}`,
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      const created = payload?.data ?? payload;
+      const nextNo = String(created?.receiptNo || created?.receipt_no || `RCP-${Date.now()}`);
+
+      const newReceipt: ReceiptRecord = {
+        id: String(created?.receiptId || created?.id || `rcp-${Date.now()}`),
+        receiptNo: nextNo,
+        date: new Date().toISOString().slice(0, 10),
+        customerId: selectedCustomerId,
+        customerName,
+        mode,
+        amount: parsedAmount,
+        allocations: fifoPreview.allocations.map((a) => ({
+          invoiceId: a.invoiceId,
+          invoiceNo: a.invoiceNumber,
+          allocatedAmount: a.allocatedAmount,
+        })),
+        collectedBy: 'Accounts',
+        reversed: false,
+      };
+
+      setReceipts((prev) => [newReceipt, ...prev]);
+      setInvoices((prev) =>
+        prev.map((inv) => {
+          const hit = fifoPreview.allocations.find((a) => a.invoiceId === inv.id);
+          if (!hit) return inv;
+          const nextPaid = inv.paidAmount + hit.allocatedAmount;
+          const nextBal = Number(subMoney(inv.totalAmount, nextPaid));
+          return {
+            ...inv,
+            paidAmount: nextPaid,
+            balanceAmount: nextBal,
+            status: nextBal <= 0 ? 'PAID' : 'PART_PAID',
+          };
+        }),
+      );
+      setAmountInput('');
+      setToast(`Recorded ${nextNo} (${formatINR(parsedAmount)} via ${mode}) with FIFO invoice allocation.`);
+    } catch (err) {
+      setToast(`Failed to record receipt: ${(err as Error).message}`);
+    }
   }
 
   function confirmReverse(receiptId: string) {

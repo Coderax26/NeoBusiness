@@ -479,7 +479,7 @@ export class TallyExportService implements OnModuleInit, OnModuleDestroy {
    * Get export history for audit
    */
   async getExportHistory(
-    siteId: string,
+    siteId?: string,
     limit = 50,
   ): Promise<
     Array<{

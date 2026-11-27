@@ -17,7 +17,7 @@ export default function TallyExportPage() {
     Promise.allSettled([
       fetch('/api/proxy/tally/batches').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/invoices').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/collections/receipts').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/collections').then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([batchRes, invRes, rcpRes]) => {
         if (!active) return;

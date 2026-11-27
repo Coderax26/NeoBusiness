@@ -16,7 +16,9 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const normalizedPhone = phone.length === 10 ? `+91${phone}` : phone;
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || phone.length < 10) {
       setError('Please enter a valid 10-digit mobile number.');
@@ -24,26 +26,38 @@ export default function ForgotPasswordPage() {
     }
     setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const res = await fetch('/api/proxy/auth/forgot-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalizedPhone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
       setStep('otp');
-    }, 600);
+    } catch (err) {
+      setError((err as Error).message || 'Unable to send OTP.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp !== '123456' && otp.length !== 6) {
-      setError('Invalid verification code. For demo use: 123456');
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError('Please enter the 6-digit numeric verification code.');
       return;
     }
     setError(null);
     setStep('new_pin');
   };
 
-  const handleResetPin = (e: React.FormEvent) => {
+  const handleResetPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPin.length < 4 || newPin.length > 6) {
-      setError('PIN must be 4 to 6 digits.');
+    if (!/^\d{4,6}$/.test(newPin)) {
+      setError('PIN must be 4 to 6 numeric digits.');
       return;
     }
     if (newPin !== confirmPin) {
@@ -52,11 +66,27 @@ export default function ForgotPasswordPage() {
     }
     setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const res = await fetch('/api/proxy/auth/reset-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          otp: otp.trim(),
+          newPin,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || 'Invalid or expired OTP');
+      }
       setSuccess(true);
       setTimeout(() => router.push('/login'), 2000);
-    }, 800);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to reset PIN.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -128,11 +158,11 @@ export default function ForgotPasswordPage() {
                     required
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit OTP (e.g. 123456)"
+                    placeholder="Enter 6-digit OTP"
                     className="w-full bg-paper border border-rule rounded-[3px] px-4 py-3 text-center text-lg font-mono tracking-widest text-ink outline-none focus:ring-2 focus:ring-action"
                   />
                   <p className="text-[11px] text-ink-3 mt-1">
-                    Demo OTP: <strong className="text-action font-mono">123456</strong>
+                    Enter the 6-digit verification code sent to {normalizedPhone}.
                   </p>
                 </div>
 

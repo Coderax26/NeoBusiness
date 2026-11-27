@@ -64,7 +64,7 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.worker = new Worker(
-      'domain-events',
+      'm6-cod-events',
       async (job) => this.handle(job.data as DomainJob),
       { connection: getRedisConnection() },
     );
@@ -74,7 +74,7 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
       );
     });
     this.logger.log(
-      'CodSettlementService started (listening on domain-events queue)',
+      'CodSettlementService started (listening on m6-cod-events queue)',
     );
   }
 

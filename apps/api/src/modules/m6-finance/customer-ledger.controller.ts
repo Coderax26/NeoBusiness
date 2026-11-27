@@ -19,6 +19,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { PdfGeneratorService } from '../../shared/services/pdf-generator.service.js';
 import { LedgerService } from './ledger.service.js';
 import { WorklistService } from './worklist.service.js';
@@ -47,7 +48,7 @@ export class CustomerLedgerController {
     @Query() query: CustomerLedgerQueryDto,
     @Req() req: any,
   ) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const entries = await this.ledgerService.getCustomerLedger(
       customerId,
       siteId,
@@ -65,28 +66,28 @@ export class CustomerLedgerController {
     @Req() req: any,
     @Res() res: any,
   ) {
-    const siteId = req.user.siteId;
+    const siteId = resolveUserSiteId(req.user) || '';
     const entries = await this.ledgerService.getCustomerLedger(customerId, siteId, limit || 50);
     const balance = await this.ledgerService.getCustomerBalance(customerId);
     const customer = await this.ledgerService['knex']('customers').where('id', customerId).first();
 
     const pdfGen = new PdfGeneratorService();
     const buffer = await pdfGen.generateCustomerStatement({
-      customerName: customer?.legal_name || 'Customer',
+      customerName: customer?.business_name || customer?.legal_name || 'Customer',
       statementDate: new Date().toISOString().split('T')[0],
       currentBalance: balance.toStorageString(),
       entries: entries.map((e: any) => ({
-        date: new Date(e.created_at || Date.now()).toISOString().split('T')[0],
-        refNo: e.ref_no || e.ref_id || '-',
-        type: e.entry_type || 'TXN',
-        debit: e.debit_amount ? String(e.debit_amount) : '-',
-        credit: e.credit_amount ? String(e.credit_amount) : '-',
-        balance: String(e.running_balance || '0'),
+        date: new Date(e.date || e.created_at || Date.now()).toISOString().split('T')[0],
+        refNo: e.refNo || e.ref_no || e.ref_id || '-',
+        type: e.type || e.entry_type || 'TXN',
+        debit: e.debit || (e.debit_amount ? String(e.debit_amount) : '-'),
+        credit: e.credit || (e.credit_amount ? String(e.credit_amount) : '-'),
+        balance: String(e.balance || e.running_balance || '0'),
       })),
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="Statement-${customer?.name || customerId}.pdf"`);
+    res.setHeader('Content-Disposition', `inline; filename="Statement-${customer?.business_name || customer?.name || customerId}.pdf"`);
     res.send(buffer);
   }
 
@@ -111,7 +112,8 @@ export class CustomerLedgerController {
   @ApiResponse({ status: 200, description: 'AR aging summary' })
   async getArAging(@Query() query: ArAgingQueryDto, @Req() req: any) {
     const siteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const aging = await this.ledgerService.getArAging(siteId, query.asOfDate);
     return wrapResponse(aging);
   }
@@ -126,7 +128,8 @@ export class CustomerLedgerController {
     @Req() req?: any,
   ) {
     const effectiveSiteId =
-      siteId || (req?.user?.role === 'OWNER' ? undefined : req?.user?.siteId);
+      siteId ||
+      (req?.user?.role === 'OWNER' ? undefined : resolveUserSiteId(req?.user));
     const invoices = await this.ledgerService.getOpenInvoices(
       customerId,
       effectiveSiteId,
@@ -144,7 +147,7 @@ export class CustomerLedgerController {
   async getMyWorklist(@Query('date') date: string, @Req() req: any) {
     const items = await this.worklistService.getMyWorklist(
       req.user.id,
-      req.user.siteId,
+      resolveUserSiteId(req.user) || '',
       date,
     );
     return wrapResponse(items);
@@ -179,7 +182,7 @@ export class CustomerLedgerController {
   ) {
     const items = await this.worklistService.getMyWorklist(
       userId || req.user.id,
-      req.user.siteId,
+      resolveUserSiteId(req.user) || '',
       date,
     );
     return wrapResponse(items);

@@ -17,7 +17,6 @@ import { OrderController } from './order.controller.js';
 import { QuoteController } from './quote.controller.js';
 import { M7aExceptionsModule } from '../m7a-exceptions/m7a-exceptions.module.js';
 import {
-  CREDIT_PORT,
   ITEM_PORT,
   PRICING_PORT,
 } from '../../shared/ports/ports.interface.js';
@@ -53,10 +52,6 @@ import {
       provide: ITEM_PORT,
       useExisting: ItemService,
     },
-    {
-      provide: CREDIT_PORT,
-      useExisting: CreditService,
-    },
   ],
   controllers: [
     CustomerController,
@@ -75,7 +70,6 @@ import {
     DocNumberService,
     PRICING_PORT,
     ITEM_PORT,
-    CREDIT_PORT,
   ],
 })
 export class M1CommercialModule {}

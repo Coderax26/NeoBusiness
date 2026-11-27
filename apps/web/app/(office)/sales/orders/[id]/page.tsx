@@ -15,7 +15,12 @@ import { type SalesOrderRecord } from '../../../../../src/lib/sales-data';
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [order, setOrder] = useState<SalesOrderRecord | null>(null);
+  const [siteId, setSiteId] = useState<string>('');
+  const [exceptions, setExceptions] = useState<any[]>([]);
+  const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ text: string; tone: 'success' | 'error' } | null>(null);
   const [activeTab, setActiveTab] = useState<'lines' | 'timeline' | 'docs' | 'approvals' | 'audit'>('lines');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
@@ -25,6 +30,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const subtotal = Number(r.total_amount ?? r.subtotal ?? 0);
     const gstTotal = Number(r.gst_total ?? r.tax_total ?? Number((subtotal * 0.05).toFixed(2)));
     const grandTotal = Number(r.grand_total ?? r.grandTotal ?? subtotal + gstTotal);
+    const exList = Array.isArray(r.exceptions) ? r.exceptions : [];
+    const mappedTimeline = Array.isArray(r.timeline)
+      ? r.timeline
+      : Array.isArray(r.statusLog) && r.statusLog.length > 0
+        ? r.statusLog.map((row: any) => ({
+            step: String(row.to_status || 'Updated'),
+            timestamp: new Date(row.at || Date.now()).toLocaleTimeString('en-IN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            user: String(row.actor_name || r.created_by_name || 'System'),
+            note: row.reason || undefined,
+          }))
+        : [
+            {
+              step: String(r.order_status || r.status || 'Created'),
+              timestamp: new Date(r.created_at || Date.now()).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              user: String(r.created_by_name || 'Coordinator'),
+            },
+          ];
+
     return {
       id: String(r.id),
       orderNumber: String(r.order_no || r.orderNumber || r.id),
@@ -40,9 +69,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       gstTotal,
       grandTotal,
       marginPct: r.margin_pct != null ? Number(r.margin_pct) : 15,
+      approvalReason:
+        exList.find((e: any) => e.status === 'PENDING')?.context_payload_json?.summary ||
+        r.approval_reason ||
+        undefined,
       counterOfferPrice: r.counter_offer_price != null ? Number(r.counter_offer_price) : undefined,
       counterOfferNote: r.counter_offer_note || undefined,
       cancelReason: r.cancel_reason || undefined,
+      linkedInvoiceNo: r.linkedInvoiceNo || r.invoice?.invoice_no || undefined,
+      linkedTripNo: r.linkedTripNo || r.trip?.trip_no || undefined,
+      linkedQuoteId: r.source_quote_id || r.linkedQuoteId || undefined,
       lines: rawLines.map((l: any, idx: number) => ({
         id: String(l.id || `${r.id}-line-${idx}`),
         itemId: String(l.item_id || l.itemId || ''),
@@ -50,7 +86,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         itemName: String(l.item_name || l.itemName || 'Item'),
         category: (l.item_category || l.category || 'PROCESSED_FG') as any,
         qty: Number(l.qty || l.ordered_qty || 0),
-        uom: String(l.uom || 'kg'),
+        uom: String(l.uom || l.primary_uom || 'kg'),
         unitPrice: Number(l.unit_price ?? l.quoted_unit_price ?? l.unitPrice ?? 0),
         gstPct: Number(l.gst_pct ?? l.gstPct ?? 5),
         floorPrice: Number(l.floor_price ?? l.floor_price_snapshot ?? l.floorPrice ?? 0),
@@ -63,36 +99,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             Number(l.qty || l.ordered_qty || 0) * Number(l.unit_price ?? l.quoted_unit_price ?? l.unitPrice ?? 0),
         ),
       })),
-      timeline: Array.isArray(r.timeline)
-        ? r.timeline
-        : [
-            {
-              step: String(r.order_status || r.status || 'Created'),
-              timestamp: new Date(r.created_at || Date.now()).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-              user: String(r.created_by_name || 'Coordinator'),
-            },
-          ],
+      timeline: mappedTimeline,
     };
   };
 
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/proxy/orders/${encodeURIComponent(id)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((r) => {
-        if (!active || !r || !r.id) return;
+  const refreshOrder = async (silent = false) => {
+    try {
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(id)}`);
+      if (!res.ok) return;
+      const r = await res.json();
+      if (r && r.id) {
         setOrder(mapOrderDetail(r));
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+        setSiteId(String(r.fulfillment_site_id || ''));
+        setExceptions(Array.isArray(r.exceptions) ? r.exceptions : []);
+        setInvoiceStatus(r.invoiceStatus || r.invoice?.status || null);
+      }
+    } catch {
+      // ignore network failure
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshOrder();
   }, [id]);
 
   // Poll every 30s for live approval/counter updates (§4.2, OD-021)
@@ -120,87 +150,138 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const res = await fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}/accept-counter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remarks: 'Counter-offer accepted by customer' }),
+        body: JSON.stringify({
+          remarks: 'Counter-offer accepted by customer',
+          counterPrice: suggested,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
-      setOrder((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'CONFIRMED',
-              lines: prev.lines.map((l, i) => (i === 0 ? { ...l, unitPrice: suggested } : l)),
-              timeline: [
-                ...prev.timeline,
-                {
-                  step: 'Confirmed',
-                  timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                  user: 'Coordinator',
-                  note: `Accepted Owner counter offer ₹${suggested}`,
-                },
-              ],
-            }
-          : prev,
-      );
+      await refreshOrder(true);
+      setActionMsg({
+        text: `Accepted Owner counter-offer (₹${suggested}) and confirmed order.`,
+        tone: 'success',
+      });
     } catch (err) {
       alert(`Failed to accept counter-offer: ${(err as Error).message}`);
     }
   };
 
-  const handleSimulateCounterOffer = () => {
-    setOrder((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: 'COUNTER_OFFERED',
-            counterOfferPrice: 89.5,
-            counterOfferNote: 'Owner suggests ₹89.50 (meets split margin target)',
-          }
-        : prev,
-    );
+  const handleTransition = async (endpoint: string, successLabel: string, body: Record<string, unknown> = {}) => {
+    if (!order) return;
+    setActionMsg(null);
+    setBusyAction(endpoint);
+    try {
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const errOrData = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(errOrData?.message || errOrData?.error?.message || `HTTP ${res.status}`);
+      }
+      await refreshOrder(true);
+      setActionMsg({ text: successLabel, tone: 'success' });
+    } catch (err) {
+      setActionMsg({ text: (err as Error).message, tone: 'error' });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
-  const handleOwnerApprove = () => {
-    setOrder((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: 'CONFIRMED',
-            timeline: [
-              ...prev.timeline,
-              {
-                step: 'Approved & Confirmed',
-                timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                user: 'Owner',
-              },
-            ],
-          }
-        : prev,
-    );
+  const handleGenerateInvoice = async () => {
+    if (!order) return;
+    setActionMsg(null);
+    setBusyAction('invoice');
+    try {
+      const res = await fetch('/api/proxy/invoices/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          ...(siteId ? { siteId } : {}),
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      const invNo = payload?.data?.invoiceNo || payload?.invoiceNo || 'Invoice';
+      await refreshOrder(true);
+      setActionMsg({ text: `${invNo} generated successfully.`, tone: 'success' });
+    } catch (err) {
+      setActionMsg({ text: `Failed to generate invoice: ${(err as Error).message}`, tone: 'error' });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
-  const handleConfirmCancel = () => {
-    setOrder((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: 'CANCELLED',
-            cancelReason,
-            timeline: [
-              ...prev.timeline,
-              {
-                step: 'Cancelled',
-                timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                user: 'Coordinator',
-                note: cancelReason,
-              },
-            ],
-          }
-        : prev,
-    );
-    setCancelOpen(false);
+  const handleExceptionAction = async (
+    action: 'APPROVED' | 'COUNTERED',
+    counterPrice?: number,
+  ) => {
+    if (!order) return;
+    const pendingEx = exceptions.find((ex: any) => ex.status === 'PENDING');
+    if (!pendingEx) {
+      setActionMsg({ text: 'No pending approval exception found for this order.', tone: 'error' });
+      return;
+    }
+    setActionMsg(null);
+    setBusyAction(action);
+    try {
+      const res = await fetch(`/api/proxy/exceptions/${encodeURIComponent(pendingEx.id)}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          remarks:
+            action === 'APPROVED'
+              ? 'Approved from Order Detail'
+              : `Counter-offer ₹${counterPrice}`,
+          ...(counterPrice ? { counter: { orderId: order.id, counterPrice: String(counterPrice) } } : {}),
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await refreshOrder(true);
+      setActionMsg({
+        text: action === 'APPROVED' ? 'Exception approved & order confirmed.' : 'Counter-offer recorded.',
+        tone: 'success',
+      });
+    } catch (err) {
+      setActionMsg({ text: (err as Error).message, tone: 'error' });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!order) return;
+    setActionMsg(null);
+    setBusyAction('cancel');
+    try {
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      setCancelOpen(false);
+      await refreshOrder(true);
+      setActionMsg({ text: 'Order cancelled and reservations released.', tone: 'success' });
+    } catch (err) {
+      setActionMsg({ text: `Failed to cancel order: ${(err as Error).message}`, tone: 'error' });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const statusToStepIndex: Record<string, number> = {
@@ -212,8 +293,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     READY: 4,
     DISPATCHED: 5,
     DELIVERED: 6,
+    DELIVERED_FULL: 6,
+    DELIVERED_PARTIAL: 6,
     INVOICED: 7,
     PAID: 8,
+    CLOSED: 8,
   };
 
   if (loading) {
@@ -233,7 +317,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const currentStepIdx = statusToStepIndex[order.status] ?? 0;
+  const baseStepIdx = statusToStepIndex[order.status] ?? 0;
+  const currentStepIdx =
+    invoiceStatus === 'PAID'
+      ? 8
+      : order.linkedInvoiceNo && baseStepIdx < 7
+        ? 7
+        : baseStepIdx;
+  const isTerminal = ['CANCELLED', 'REJECTED', 'CLOSED'].includes(order.status);
 
   return (
     <div className="space-y-5 max-w-[1220px] mx-auto">
@@ -264,6 +355,73 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {order.status === 'DRAFT' && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busyAction !== null}
+              onClick={() => handleTransition('confirm', 'Order confirmed.')}
+            >
+              Confirm Order
+            </Button>
+          )}
+          {(order.status === 'CONFIRMED' || order.status === 'IN_PRODUCTION_SOURCING') && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busyAction !== null}
+              onClick={() => handleTransition('mark-ready', 'Order marked READY for dispatch.')}
+            >
+              Mark Ready for Dispatch →
+            </Button>
+          )}
+          {order.status === 'READY' && (
+            <>
+              <Link href="/logistics/trips/new">
+                <Button variant="primary" size="sm">
+                  Plan Dispatch Trip →
+                </Button>
+              </Link>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={busyAction !== null}
+                onClick={() => handleTransition('mark-dispatched', 'Order marked DISPATCHED.')}
+              >
+                Mark Dispatched
+              </Button>
+            </>
+          )}
+          {order.status === 'DISPATCHED' && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busyAction !== null}
+              onClick={() => handleTransition('mark-delivered', 'Order marked DELIVERED.')}
+            >
+              Mark Delivered →
+            </Button>
+          )}
+          {!order.linkedInvoiceNo &&
+            ['CONFIRMED', 'READY', 'DISPATCHED', 'DELIVERED', 'DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(
+              order.status,
+            ) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={busyAction !== null}
+                onClick={handleGenerateInvoice}
+              >
+                Generate Invoice
+              </Button>
+            )}
+          {order.linkedInvoiceNo && invoiceStatus !== 'PAID' && (
+            <Link href="/finance/collections">
+              <Button variant="primary" size="sm">
+                Record Payment ({order.linkedInvoiceNo}) →
+              </Button>
+            </Link>
+          )}
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
             <Printer className="w-4 h-4" />
             Print
@@ -274,7 +432,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               Repeat order
             </Button>
           </Link>
-          {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
+          {!isTerminal && (
             <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
               Cancel Order
             </Button>
@@ -282,8 +440,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
+      {actionMsg && (
+        <div
+          className={`p-3 rounded-[3px] border text-[13px] font-medium no-print ${
+            actionMsg.tone === 'success'
+              ? 'bg-leaf-soft border-leaf/30 text-leaf'
+              : 'bg-madder-soft border-madder/30 text-madder'
+          }`}
+        >
+          {actionMsg.text}
+        </div>
+      )}
+
       {/* Live Approval / Counter-offer Banner (§4.2, AC-3) */}
-      {order.status === 'PENDING_APPROVAL' && (
+      {order.status === 'PENDING_APPROVAL' && !order.counterOfferPrice && (
         <div className="p-4 rounded-[3px] border-l-4 border-haldi bg-haldi-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print">
           <div>
             <h2 className="text-[14.5px] font-semibold text-haldi">Waiting for Owner Approval</h2>
@@ -292,17 +462,28 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={handleSimulateCounterOffer}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={busyAction !== null}
+              onClick={() => handleExceptionAction('COUNTERED', 89.5)}
+            >
               Counter Offer (₹89.50)
             </Button>
-            <Button variant="primary" size="sm" onClick={handleOwnerApprove}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busyAction !== null}
+              onClick={() => handleExceptionAction('APPROVED')}
+            >
               Owner Approve
             </Button>
           </div>
         </div>
       )}
 
-      {order.status === 'COUNTER_OFFERED' && (
+      {(order.status === 'COUNTER_OFFERED' ||
+        (order.status === 'PENDING_APPROVAL' && order.counterOfferPrice != null)) && (
         <div className="p-4 rounded-[3px] border-l-4 border-action bg-action-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print">
           <div>
             <h2 className="text-[14.5px] font-semibold text-action">

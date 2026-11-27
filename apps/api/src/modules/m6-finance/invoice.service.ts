@@ -59,11 +59,16 @@ export class InvoiceService {
       if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
       if (
-        order.order_status !== 'CONFIRMED' &&
-        order.order_status !== 'DISPATCHED'
+        ![
+          'CONFIRMED',
+          'READY',
+          'DISPATCHED',
+          'DELIVERED_FULL',
+          'DELIVERED_PARTIAL',
+        ].includes(order.order_status)
       ) {
         throw new BadRequestException(
-          `Order must be CONFIRMED or DISPATCHED to invoice`,
+          `Order must be CONFIRMED, READY, DISPATCHED, or DELIVERED to invoice`,
         );
       }
 
@@ -96,14 +101,23 @@ export class InvoiceService {
         .first('*');
       if (!customer) throw new NotFoundException('Customer not found');
 
-      // Get site for GST determination
-      const site = await trx('sites').where('id', siteId).first('site_type');
-      const supplierStateCode = site?.site_type ?? '00';
-      const placeOfSupply =
-        options?.placeOfSupplyStateCode ??
-        customer.state_code ??
-        supplierStateCode;
-      const isInterState = supplierStateCode !== placeOfSupply;
+      // Get company GSTIN state code (2-digit prefix) for GST intra/inter-state determination
+      const profileRow = await trx('business_rule_config')
+        .where({ key: 'COMPANY_PROFILE', scope: 'GLOBAL' })
+        .first('value_json');
+      const profileJson =
+        typeof profileRow?.value_json === 'string'
+          ? JSON.parse(profileRow.value_json)
+          : profileRow?.value_json;
+      const supplierStateCode = String(profileJson?.gstin || '27AAACN1234F1Z5').slice(0, 2);
+      const rawPlace = String(
+        options?.placeOfSupplyStateCode ?? customer.state_code ?? supplierStateCode,
+      ).trim();
+      const stateAlias: Record<string, string> = { MH: '27', KA: '29', GJ: '24', DL: '07', TN: '33' };
+      const normalizedSupplier = stateAlias[supplierStateCode.toUpperCase()] ?? supplierStateCode;
+      const normalizedPlace = stateAlias[rawPlace.toUpperCase()] ?? rawPlace.slice(0, 2);
+      const placeOfSupply = rawPlace;
+      const isInterState = normalizedSupplier !== normalizedPlace;
 
       // Generate invoice number
       const invoiceNo = await this.docNumber.next('INVOICE', siteId, null, trx);
@@ -134,13 +148,14 @@ export class InvoiceService {
         if (taxTreatment === 'TAXABLE' && taxRate > 0) {
           lineTaxAmount = lineTotal.mul(taxRate);
           totalTaxable = totalTaxable.add(lineTotal);
+          totalAmount = totalAmount.add(lineTaxAmount);
 
           if (isInterState) {
             lineIGST = lineTaxAmount;
             totalIGST = totalIGST.add(lineIGST);
           } else {
             lineCGST = lineTaxAmount.div(2);
-            lineSGST = lineTaxAmount.div(2);
+            lineSGST = lineTaxAmount.sub(lineCGST);
             totalCGST = totalCGST.add(lineCGST);
             totalSGST = totalSGST.add(lineSGST);
           }
@@ -183,7 +198,7 @@ export class InvoiceService {
           sgst: totalSGST.toStorageString(),
           igst: totalIGST.toStorageString(),
           status: 'UNPAID',
-          is_cod: false,
+          is_cod: Boolean(options?.isCOD),
           place_of_supply_state_code: placeOfSupply,
           created_by: userId,
           updated_by: userId,
@@ -219,11 +234,16 @@ export class InvoiceService {
         current_ar_balance: newBal.toStorageString(),
       });
 
-      // Update order status
-      await trx('sales_orders').where('id', orderId).update({
-        order_status: 'DISPATCHED',
-        updated_at: new Date(),
-      });
+      // Update order status only if dispatch-linked invoice was generated from pre-dispatch state
+      if (
+        options?.tripId &&
+        ['CONFIRMED', 'READY'].includes(order.order_status)
+      ) {
+        await trx('sales_orders').where('id', orderId).update({
+          order_status: 'DISPATCHED',
+          updated_at: new Date(),
+        });
+      }
 
       this.logger.log(
         `Invoice generated: ${invoiceNo} (${totalAmount.toStorageString()}) for order ${orderId}`,
@@ -298,23 +318,25 @@ export class InvoiceService {
     limit?: number;
     offset?: number;
   }) {
-    let query = this.knex('invoices');
+    let query = this.knex('invoices as inv')
+      .leftJoin('customers as c', 'inv.customer_id', 'c.id')
+      .leftJoin('sales_orders as so', 'inv.sales_order_id', 'so.id');
     if (options.siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.siteId)) {
-      query = query.where('site_id', options.siteId);
+      query = query.where('inv.site_id', options.siteId);
     }
-    if (options.customerId) query = query.where('customer_id', options.customerId);
-    if (options.status) query = query.where('status', options.status);
-    if (options.fromDate) query = query.where('invoice_date', '>=', options.fromDate);
-    if (options.toDate) query = query.where('invoice_date', '<=', options.toDate);
+    if (options.customerId) query = query.where('inv.customer_id', options.customerId);
+    if (options.status) query = query.where('inv.status', options.status);
+    if (options.fromDate) query = query.where('inv.invoice_date', '>=', options.fromDate);
+    if (options.toDate) query = query.where('inv.invoice_date', '<=', options.toDate);
 
-    const countRow = await query.clone().count<{ count: string }>('id as count').first();
+    const countRow = await query.clone().count<{ count: string }>('inv.id as count').first();
     const limit = options.limit ?? 50;
     const offset = options.offset ?? 0;
     const items = await query
-      .orderBy('invoice_date', 'desc')
+      .orderBy('inv.invoice_date', 'desc')
       .limit(limit)
       .offset(offset)
-      .select('*');
+      .select('inv.*', 'c.business_name as customer_name', 'so.order_no as order_no');
 
     return {
       items,

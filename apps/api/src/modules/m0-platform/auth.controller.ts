@@ -9,8 +9,11 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
+  BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
+import { randomInt } from 'crypto';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -25,6 +28,12 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+  private readonly otpStore = new Map<
+    string,
+    { otpHash: string; expiresAt: number; attempts: number }
+  >();
+
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
@@ -137,8 +146,9 @@ export class AuthController {
     }
 
     const profile = await this.authService.getUserWithSites(userId);
+    const { password_hash, pin_hash, ...safeProfile } = profile ?? {};
     return {
-      ...profile,
+      ...safeProfile,
       uiPreferences: body.uiPreferences,
       updatedAt: new Date().toISOString(),
     };
@@ -150,40 +160,115 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change own password or PIN (G-M0-6)' })
   async changePassword(
-    @Body() body: { currentCredential: string; newCredential: string },
+    @Body() body: { currentCredential?: string; newCredential?: string },
     @Req() req: any,
   ) {
     const userId = String(req.user?.sub || req.user?.id || '');
+    const currentCredential = String(body?.currentCredential ?? '').trim();
+    const newCredential = String(body?.newCredential ?? '').trim();
+
+    if (!currentCredential || !newCredential) {
+      throw new BadRequestException(
+        'Both currentCredential and newCredential are required',
+      );
+    }
+    if (newCredential.length < 4 || newCredential.length > 64) {
+      throw new BadRequestException(
+        'newCredential must be between 4 and 64 characters',
+      );
+    }
+
     const knex = this.authService['knex'];
-    const user = await knex('users').where('id', userId).first('id', 'password_hash', 'pin_hash');
-    if (user && body?.currentCredential) {
-      const currentHash = user.password_hash || user.pin_hash;
-      if (currentHash) {
-        const matches = await bcrypt.compare(body.currentCredential, currentHash);
-        if (!matches) {
-          throw new UnauthorizedException('Current PIN or password is incorrect');
-        }
-      }
+    const user = await knex('users')
+      .where('id', userId)
+      .first('id', 'password_hash', 'pin_hash');
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
-    if (body?.newCredential) {
-      const newHash = await bcrypt.hash(String(body.newCredential), 10);
-      await knex('users')
-        .where('id', userId)
-        .update({ pin_hash: newHash, password_hash: null, updated_at: new Date(), updated_by: userId });
+
+    const currentHash = user.password_hash || user.pin_hash;
+    if (!currentHash) {
+      throw new UnauthorizedException('No existing PIN or password set');
     }
+
+    const matches = await bcrypt.compare(currentCredential, currentHash);
+    if (!matches) {
+      throw new UnauthorizedException('Current PIN or password is incorrect');
+    }
+
+    const newHash = await bcrypt.hash(newCredential, 10);
+    await knex('users')
+      .where('id', userId)
+      .update({
+        pin_hash: newHash,
+        password_hash: null,
+        updated_at: new Date(),
+        updated_by: userId,
+      });
+
     return {
       userId,
-      changed: Boolean(body?.newCredential),
+      changed: true,
       message: 'Credential updated successfully',
     };
   }
 
   @Post('forgot-pin')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Trigger SMS OTP for PIN/password reset (G-M0-5)' })
   async forgotPin(@Body() body: { phone: string }) {
+    const normalizedPhone = String(body?.phone ?? '').trim();
+    if (!normalizedPhone || normalizedPhone.replace(/\D/g, '').length < 10) {
+      throw new BadRequestException('A valid registered phone number is required');
+    }
+
+    const knex = this.authService['knex'];
+    const digits = normalizedPhone.replace(/\D/g, '');
+    const candidates = Array.from(
+      new Set([
+        normalizedPhone,
+        digits,
+        digits.length === 10 ? `+91${digits}` : normalizedPhone,
+        digits.length === 12 && digits.startsWith('91')
+          ? `+${digits}`
+          : normalizedPhone,
+      ]),
+    );
+
+    const user = await knex('users')
+      .whereIn('phone', candidates)
+      .where('is_active', true)
+      .first('id', 'phone', 'full_name');
+
+    if (user) {
+      const otp = String(randomInt(100000, 999999));
+      const otpHash = await bcrypt.hash(otp, 10);
+      const expiresAt = Date.now() + 5 * 60 * 1000;
+      for (const key of [normalizedPhone, String(user.phone)]) {
+        this.otpStore.set(key, { otpHash, expiresAt, attempts: 0 });
+      }
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.debug(`PIN reset OTP generated for ${user.phone}: ${otp}`);
+      }
+      await knex('notification_outbox')
+        .insert({
+          channel: 'SMS',
+          recipient_type: 'USER',
+          recipient_ref: String(user.phone),
+          template_code: 'OTP_LOGIN_SMS',
+          payload_json: JSON.stringify({
+            otp,
+            userName: user.full_name,
+            purpose: 'PIN_RESET',
+          }),
+          status: 'QUEUED',
+        })
+        .catch(() => {});
+    }
+
     return {
-      phone: body.phone,
+      phone: normalizedPhone,
       channel: 'SMS',
       otpDispatched: true,
       expiresInSeconds: 300,
@@ -191,25 +276,75 @@ export class AuthController {
   }
 
   @Post('reset-pin')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP and set new PIN/password (G-M0-5)' })
   async resetPin(@Body() body: { phone: string; otp: string; newPin: string }) {
+    const normalizedPhone = String(body?.phone ?? '').trim();
+    const otp = String(body?.otp ?? '').trim();
+    const newPin = String(body?.newPin ?? '').trim();
+
+    if (!normalizedPhone || !otp || !newPin) {
+      throw new BadRequestException('phone, otp, and newPin are required');
+    }
+    if (!/^\d{4,6}$/.test(newPin)) {
+      throw new BadRequestException('newPin must be 4 to 6 numeric digits');
+    }
+
+    const record = this.otpStore.get(normalizedPhone);
+    if (!record || record.expiresAt < Date.now() || record.attempts >= 5) {
+      if (record) this.otpStore.delete(normalizedPhone);
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    record.attempts += 1;
+    const otpValid = await bcrypt.compare(otp, record.otpHash);
+    if (!otpValid) {
+      if (record.attempts >= 5) this.otpStore.delete(normalizedPhone);
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
     const knex = this.authService['knex'];
-    if (body?.phone && body?.newPin && body?.otp) {
-      const newHash = await bcrypt.hash(String(body.newPin), 10);
-      await knex('users')
-        .where('phone', body.phone)
+    const digits = normalizedPhone.replace(/\D/g, '');
+    const candidates = Array.from(
+      new Set([
+        normalizedPhone,
+        digits,
+        digits.length === 10 ? `+91${digits}` : normalizedPhone,
+        digits.length === 12 && digits.startsWith('91')
+          ? `+${digits}`
+          : normalizedPhone,
+      ]),
+    );
+
+    const user = await knex('users')
+      .whereIn('phone', candidates)
+      .where('is_active', true)
+      .first('id', 'phone');
+    if (!user) {
+      this.otpStore.delete(normalizedPhone);
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const newHash = await bcrypt.hash(newPin, 10);
+    await knex.transaction(async (trx) => {
+      await trx('users')
+        .where('id', user.id)
         .update({
           pin_hash: newHash,
           password_hash: null,
-          failed_attempts: 0,
-          locked_until: null,
           updated_at: new Date(),
+          updated_by: user.id,
         });
-    }
+      await trx('refresh_tokens').where('user_id', user.id).del();
+    });
+
+    this.otpStore.delete(normalizedPhone);
+    this.otpStore.delete(String(user.phone));
+
     return {
-      phone: body.phone,
-      reset: Boolean(body.otp && body.newPin),
+      phone: normalizedPhone,
+      reset: true,
       message: 'PIN reset complete',
     };
   }

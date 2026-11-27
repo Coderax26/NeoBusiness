@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { OpeningBalanceService } from './opening-balance.service.js';
 import {
   OpeningBalanceDraftDto,
@@ -71,7 +72,7 @@ export class OpeningBalanceController {
     @Body() dto: OpeningBalanceImportDto,
     @Req() req: any,
   ) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const result = await this.obService.importBalances(
       dto.rows,
       siteId,
@@ -89,7 +90,7 @@ export class OpeningBalanceController {
     @Body() dto: OpeningBalanceReverseDto,
     @Req() req: any,
   ) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId) || '';
     const result = await this.obService.reverseOpeningBalance(
       dto.partyId,
       dto.entityType,

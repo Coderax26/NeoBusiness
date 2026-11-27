@@ -120,7 +120,42 @@ export class OrderController {
     @Body() dto: AcceptCounterDto,
     @Req() req: any,
   ) {
-    return this.orderSvc.acceptCounter(id, dto.remarks, req.user.id);
+    return this.orderSvc.acceptCounter(
+      id,
+      dto.remarks,
+      req.user.id,
+      dto.counterPrice,
+    );
+  }
+
+  @Post(':id/mark-ready')
+  @RequirePermission('order.confirm_in_band')
+  async markReady(
+    @Param('id') id: string,
+    @Body() dto: ConfirmOrderDto,
+    @Req() req: any,
+  ) {
+    return this.orderSvc.markReady(id, req.user.id, dto?.remarks);
+  }
+
+  @Post(':id/mark-dispatched')
+  @RequirePermission('order.confirm_in_band')
+  async markDispatched(
+    @Param('id') id: string,
+    @Body() dto: ConfirmOrderDto,
+    @Req() req: any,
+  ) {
+    return this.orderSvc.markDispatched(id, req.user.id, dto?.remarks);
+  }
+
+  @Post(':id/mark-delivered')
+  @RequirePermission('order.confirm_in_band')
+  async markDelivered(
+    @Param('id') id: string,
+    @Body() dto: ConfirmOrderDto,
+    @Req() req: any,
+  ) {
+    return this.orderSvc.markDelivered(id, req.user.id, dto?.remarks);
   }
 
   /**
@@ -278,25 +313,116 @@ export class OrderController {
   }
 
   /**
-   * GET /orders/:id - Get order detail
+   * GET /orders/:id - Get order detail with customer, site, item, invoice, trip, and timeline joins
    */
   @Get(':id')
   @RequirePermission('order.view')
   async getOne(@Param('id') id: string) {
-    const order = await this.orderSvc['knex']('sales_orders')
-      .where('id', id)
-      .first();
+    const knex = this.orderSvc['knex'];
+    const order = await knex('sales_orders as so')
+      .leftJoin('customers as c', 'so.customer_id', 'c.id')
+      .leftJoin('sites as s', 'so.fulfillment_site_id', 's.id')
+      .leftJoin('users as u', 'so.created_by', 'u.id')
+      .where('so.id', id)
+      .first(
+        'so.*',
+        'c.business_name as customer_name',
+        'c.customer_code as customer_code',
+        'c.gstin as customer_gstin',
+        's.name as site_name',
+        'u.full_name as created_by_name',
+      );
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
-    const lines = await this.orderSvc['knex']('sales_order_lines').where(
-      'order_id',
-      id,
-    );
-    const statusLog = await this.orderSvc['knex']('order_status_log')
-      .where('order_id', id)
-      .orderBy('at', 'desc');
+    const lines = await knex('sales_order_lines as sol')
+      .leftJoin('items as i', 'sol.item_id', 'i.id')
+      .where('sol.order_id', id)
+      .select(
+        'sol.*',
+        'i.name as item_name',
+        'i.sku_code',
+        'i.primary_uom as uom',
+        'i.item_category',
+        'i.tax_rate_pct',
+      );
 
-    return { ...order, lines, statusLog };
+    const statusLog = await knex('order_status_log as osl')
+      .leftJoin('users as u', 'osl.by_user', 'u.id')
+      .where('osl.order_id', id)
+      .select('osl.*', 'u.full_name as actor_name')
+      .orderBy('osl.at', 'asc');
+
+    const invoice = await knex('invoices')
+      .where('sales_order_id', id)
+      .where('status', '!=', 'CANCELLED')
+      .orderBy('created_at', 'desc')
+      .first('id', 'invoice_no', 'status', 'total_amount', 'balance_due');
+
+    const stop = await knex('delivery_stops as ds')
+      .leftJoin('delivery_trips as dt', 'ds.trip_id', 'dt.id')
+      .where('ds.sales_order_id', id)
+      .orderBy('ds.created_at', 'desc')
+      .first('ds.id as stop_id', 'ds.trip_id', 'ds.status as stop_status', 'dt.trip_no', 'dt.status as trip_status');
+
+    const lineIds = lines.map((l: any) => String(l.id));
+    const exceptions = await knex('exception_approvals')
+      .where(function () {
+        this.where({ reference_table: 'sales_orders', reference_id: id });
+        if (lineIds.length > 0) {
+          this.orWhere(function () {
+            this.where('reference_table', 'sales_order_lines').whereIn(
+              'reference_id',
+              lineIds,
+            );
+          });
+        }
+      })
+      .orderBy('created_at', 'desc');
+
+    const counteredEx = exceptions.find((ex: any) => ex.status === 'COUNTERED');
+    let counterOfferPrice: number | undefined;
+    let counterOfferNote: string | undefined;
+    if (counteredEx) {
+      counterOfferNote = counteredEx.owner_remarks ?? undefined;
+      const ev = await knex('exception_events')
+        .where({ exception_id: counteredEx.id, event: 'RESOLVED' })
+        .orderBy('at', 'desc')
+        .first('metadata_json');
+      const meta =
+        typeof ev?.metadata_json === 'string'
+          ? JSON.parse(ev.metadata_json)
+          : ev?.metadata_json;
+      const raw =
+        meta?.counter?.counterPrice ??
+        meta?.counter?.proposedPrice ??
+        meta?.counter?.price;
+      if (raw !== undefined && raw !== null) counterOfferPrice = Number(raw);
+    }
+
+    const timeline = statusLog.map((row: any) => ({
+      step: String(row.to_status || 'Updated'),
+      timestamp: new Date(row.at || Date.now()).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      user: String(row.actor_name || order.created_by_name || 'System'),
+      note: row.reason || undefined,
+    }));
+
+    return {
+      ...order,
+      lines,
+      statusLog,
+      timeline,
+      invoice: invoice ?? null,
+      linkedInvoiceNo: invoice?.invoice_no ?? undefined,
+      invoiceStatus: invoice?.status ?? undefined,
+      trip: stop ?? null,
+      linkedTripNo: stop?.trip_no ?? undefined,
+      exceptions,
+      counter_offer_price: counterOfferPrice,
+      counter_offer_note: counterOfferNote,
+    };
   }
 
   /**

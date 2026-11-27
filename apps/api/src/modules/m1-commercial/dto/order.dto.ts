@@ -88,6 +88,12 @@ export class AcceptCounterDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  counterPrice?: number;
 }
 
 /**

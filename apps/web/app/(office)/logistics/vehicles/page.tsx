@@ -115,7 +115,7 @@ export default function VehiclesPage() {
     setFormOpen(true);
   };
 
-  const handleSaveVehicle = () => {
+  const handleSaveVehicle = async () => {
     const errors: Record<string, string> = {};
     const cleanReg = regNo.trim().toUpperCase();
     if (!cleanReg) errors.regNo = 'Registration number is required.';
@@ -125,28 +125,83 @@ export default function VehiclesPage() {
       return;
     }
 
-    const newRec: VehicleRecord = {
-      id: editingVehicle ? editingVehicle.id : `veh-${Date.now()}`,
-      registrationNumber: cleanReg,
-      vehicleType,
-      capacityKg: parseInt(capacityKg, 10) || 1000,
-      capacityCrates: parseInt(capacityCrates, 10) || 50,
-      ownershipType,
-      defaultDriverName: driverName.trim(),
-      defaultDriverPhone: driverPhone.trim(),
-      fitnessExpiryDate: fitnessExpiry,
-      insuranceExpiryDate: insuranceExpiry,
-      pucExpiryDate: pucExpiry,
-      status: editingVehicle ? editingVehicle.status : 'AVAILABLE',
-      active: editingVehicle ? editingVehicle.active : true,
-    };
+    const capKgNum = parseInt(capacityKg, 10) || 1000;
+    const capCratesNum = parseInt(capacityCrates, 10) || 50;
 
-    if (editingVehicle) {
-      setVehicles((prev) => prev.map((v) => (v.id === editingVehicle.id ? newRec : v)));
-    } else {
-      setVehicles((prev) => [newRec, ...prev]);
+    try {
+      if (editingVehicle) {
+        const res = await fetch(`/api/proxy/vehicles/${encodeURIComponent(editingVehicle.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            registrationNo: cleanReg,
+            vehicleType,
+            capacityKg: capKgNum,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+        }
+        const updated = await res.json();
+        setVehicles((prev) =>
+          prev.map((v) =>
+            v.id === editingVehicle.id
+              ? {
+                  ...v,
+                  registrationNumber: updated?.registration_no ?? cleanReg,
+                  vehicleType: updated?.vehicle_type ?? vehicleType,
+                  capacityKg: Number(updated?.capacity_kg ?? capKgNum),
+                  capacityCrates: capCratesNum,
+                }
+              : v,
+          ),
+        );
+      } else {
+        const storedSite =
+          typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+        const meRes = await fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const siteId =
+          (storedSite && storedSite !== 'all' ? storedSite : null) ||
+          meRes?.user?.activeSiteId ||
+          meRes?.user?.sites?.[0]?.id ||
+          '';
+        const res = await fetch('/api/proxy/vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            siteId,
+            registrationNo: cleanReg,
+            vehicleType,
+            capacityKg: capKgNum,
+            capacityCrates: capCratesNum,
+          }),
+        });
+        const created = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(created?.message || created?.error?.message || `HTTP ${res.status}`);
+        }
+        const newRec: VehicleRecord = {
+          id: String(created?.id ?? `veh-${Date.now()}`),
+          registrationNumber: String(created?.registration_no ?? cleanReg),
+          vehicleType: String(created?.vehicle_type ?? vehicleType) as VehicleRecord['vehicleType'],
+          capacityKg: Number(created?.capacity_kg ?? capKgNum),
+          capacityCrates: capCratesNum,
+          ownershipType,
+          defaultDriverName: driverName.trim(),
+          defaultDriverPhone: driverPhone.trim(),
+          fitnessExpiryDate: fitnessExpiry,
+          insuranceExpiryDate: insuranceExpiry,
+          pucExpiryDate: pucExpiry,
+          status: 'AVAILABLE',
+          active: true,
+        };
+        setVehicles((prev) => [newRec, ...prev]);
+      }
+      setFormOpen(false);
+    } catch (err) {
+      setFormErrors({ regNo: (err as Error).message });
     }
-    setFormOpen(false);
   };
 
   // Helper for expiry check

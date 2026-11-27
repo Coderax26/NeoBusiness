@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -32,6 +33,12 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   assignedSiteId?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  siteIds?: string[];
 
   @ApiPropertyOptional({ example: '1234' })
   @IsOptional()
@@ -66,6 +73,12 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   assignedSiteId?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  siteIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

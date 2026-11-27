@@ -64,58 +64,109 @@ export class OrderService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    // Register handler for PRICE_OVERRIDE type.
-    // When M7a's resolve() is called, this listener gets invoked.
-    this.exceptionPort.onResolved(
-      'PRICE_OVERRIDE',
-      async (exceptionId, action, remarks, counterJson) => {
-        this.logger.log(
-          `PRICE_OVERRIDE handler invoked: ${exceptionId} → ${action}`,
-        );
+    const resolveOrderException = async (
+      exceptionId: string,
+      action: string,
+      remarks: string,
+      counterJson?: object,
+    ) => {
+      this.logger.log(`Exception handler invoked: ${exceptionId} → ${action}`);
+      try {
+        const card = await this.knex('exception_approvals')
+          .where({ id: exceptionId })
+          .first('reference_table', 'reference_id', 'exception_type');
 
-        if (action !== 'APPROVED' && action !== 'COUNTERED') return;
+        let orderId: string | null = (counterJson as any)?.orderId
+          ? String((counterJson as any).orderId)
+          : null;
 
-        try {
-          // Parse counter JSON: if action is COUNTERED, extract order_id and counter price
-          let orderId: string;
-          let counterPrice: string | null = null;
-
-          if (action === 'COUNTERED' && counterJson) {
-            orderId = (counterJson as any).orderId;
-            counterPrice = (counterJson as any).counterPrice;
-          } else {
-            // APPROVED case: the caller already has the order_id reference_id
-            // For now, we'll mark the order for manual re-processing (TODO: improve with proper reference tracking)
-            orderId = (counterJson as any)?.orderId
-              ? (counterJson as any).orderId
-              : 'PENDING_REPROCESSING';
+        if (!orderId && card) {
+          if (card.reference_table === 'sales_orders') {
+            orderId = String(card.reference_id);
+          } else if (card.reference_table === 'sales_order_lines') {
+            const line = await this.knex('sales_order_lines')
+              .where({ id: card.reference_id })
+              .first('order_id');
+            if (line?.order_id) orderId = String(line.order_id);
           }
-
-          if (!orderId || orderId === 'PENDING_REPROCESSING') {
-            this.logger.warn(
-              `PRICE_OVERRIDE resolved without orderId reference; integration pending`,
-            );
-            return;
-          }
-
-          // For APPROVED case, the caller should have already confirmed the line at the approved price.
-          // For COUNTERED, we need to re-process the line with the counter price.
-          // TODO: Implement actual order re-processing with counter price.
-          if (action === 'APPROVED') {
-            this.logger.debug(`Order ${orderId} approved at requested price`);
-          } else if (action === 'COUNTERED') {
-            this.logger.debug(
-              `Order ${orderId} counter accepted at price ${counterPrice}`,
-            );
-            // TODO: Re-apply pricing evaluation at counter price.
-          }
-        } catch (err) {
-          this.logger.error(
-            `PRICE_OVERRIDE handler failed: ${(err as Error).message}`,
-          );
         }
-      },
-    );
+
+        if (!orderId || orderId === 'PENDING_REPROCESSING') {
+          this.logger.warn(
+            `Exception ${exceptionId} resolved without resolvable orderId`,
+          );
+          return;
+        }
+
+        const rawCounter =
+          (counterJson as any)?.counterPrice ??
+          (counterJson as any)?.proposedPrice ??
+          (counterJson as any)?.price;
+        const counterPrice =
+          rawCounter !== undefined && rawCounter !== null
+            ? String(rawCounter)
+            : null;
+
+        await this.knex.transaction(async (trx) => {
+          const order = await trx('sales_orders')
+            .where({ id: orderId })
+            .forUpdate()
+            .first('id', 'order_status', 'created_by');
+          if (!order) return;
+
+          if (action === 'APPROVED') {
+            if (order.order_status === 'PENDING_APPROVAL') {
+              await trx('sales_orders').where({ id: orderId }).update({
+                order_status: 'CONFIRMED',
+                confirmed_at: new Date(),
+                updated_at: new Date(),
+              });
+              await trx('order_status_log').insert({
+                order_id: orderId,
+                from_status: order.order_status,
+                to_status: 'CONFIRMED',
+                by_user: order.created_by,
+                reason: remarks || `Exception ${exceptionId} approved by owner`,
+              });
+            }
+          } else if (action === 'COUNTERED') {
+            await trx('order_status_log').insert({
+              order_id: orderId,
+              from_status: order.order_status,
+              to_status: order.order_status,
+              by_user: order.created_by,
+              reason: `Owner counter-offer${counterPrice ? ` ₹${counterPrice}` : ''}: ${remarks || ''}`.trim(),
+            });
+          } else if (action === 'REJECTED') {
+            await trx('sales_orders').where({ id: orderId }).update({
+              order_status: 'REJECTED',
+              updated_at: new Date(),
+            });
+            await trx('order_status_log').insert({
+              order_id: orderId,
+              from_status: order.order_status,
+              to_status: 'REJECTED',
+              by_user: order.created_by,
+              reason: remarks || `Exception ${exceptionId} rejected by owner`,
+            });
+          }
+        });
+
+        if (action === 'APPROVED') {
+          const lines = await this.knex('sales_order_lines')
+            .where({ order_id: orderId })
+            .select('*');
+          await this.emitOrderConfirmedEvent(orderId, lines, 'OK').catch(() => {});
+        }
+      } catch (err) {
+        this.logger.error(
+          `Exception handler failed for ${exceptionId}: ${(err as Error).message}`,
+        );
+      }
+    };
+
+    this.exceptionPort.onResolved('PRICE_OVERRIDE', resolveOrderException);
+    this.exceptionPort.onResolved('CREDIT_BREACH', resolveOrderException);
 
     this.logger.log('OrderService initialized');
   }
@@ -260,7 +311,13 @@ export class OrderService implements OnModuleInit {
       const order = await trx('sales_orders')
         .where('id', orderId)
         .forUpdate()
-        .first('id', 'order_status', 'customer_id', 'credit_flag');
+        .first(
+          'id',
+          'order_status',
+          'customer_id',
+          'credit_flag',
+          'fulfillment_site_id',
+        );
 
       if (!order) throw new NotFoundException(`Order ${orderId} not found`);
       if (order.order_status !== 'DRAFT') {
@@ -349,9 +406,12 @@ export class OrderService implements OnModuleInit {
         .update({
           order_status: finalStatus,
           total_amount: totalAmount,
-          confirmed_at: new Date(),
+          confirmed_at: finalStatus === 'CONFIRMED' ? new Date() : null,
           credit_flag: evaluation.status,
-          approved_by: evaluation.status === 'OK' ? userId : null,
+          approved_by:
+            finalStatus === 'CONFIRMED' && evaluation.status === 'OK'
+              ? userId
+              : null,
         });
 
       // Status log
@@ -367,10 +427,12 @@ export class OrderService implements OnModuleInit {
             : 'Credit hold - awaiting approval'),
       });
 
-      // Emit domain event
-      await this.emitOrderConfirmedEvent(orderId, lines, evaluation.status);
+      // Emit domain event only when order actually moves to CONFIRMED
+      if (finalStatus === 'CONFIRMED') {
+        await this.emitOrderConfirmedEvent(orderId, lines, evaluation.status);
+      }
 
-      this.logger.log(`Order ${orderId} confirmed with status ${finalStatus}`);
+      this.logger.log(`Order ${orderId} confirm result: status=${finalStatus}`);
       return { orderId, status: finalStatus };
     });
   }
@@ -490,12 +552,13 @@ export class OrderService implements OnModuleInit {
     orderId: string,
     remarks: string | undefined,
     userId: string,
-  ): Promise<{ orderId: string; status: string }> {
+    explicitCounterPrice?: number,
+  ): Promise<{ orderId: string; status: string; totalAmount?: string }> {
     return this.knex.transaction(async (trx) => {
       const order = await trx('sales_orders')
         .where('id', orderId)
         .forUpdate()
-        .first('id', 'order_status', 'customer_id');
+        .first('id', 'order_status', 'customer_id', 'total_amount');
 
       if (!order) throw new NotFoundException(`Order ${orderId} not found`);
       if (order.order_status !== 'PENDING_APPROVAL') {
@@ -504,12 +567,80 @@ export class OrderService implements OnModuleInit {
         );
       }
 
-      // The counter price should have been stored in the exception metadata
-      // For now, we'll just confirm the order - in real flow, the price would be updated
+      const lines = await trx('sales_order_lines')
+        .where('order_id', orderId)
+        .select('*');
+      const lineIds = lines.map((l: any) => String(l.id));
+
+      // Locate latest COUNTERED exception event for this order or its lines
+      let counterPriceValue =
+        explicitCounterPrice !== undefined && explicitCounterPrice > 0
+          ? Money.of(explicitCounterPrice)
+          : null;
+
+      if (!counterPriceValue && lineIds.length > 0) {
+        const latestEvent = await trx('exception_events as ee')
+          .join('exception_approvals as ea', 'ee.exception_id', 'ea.id')
+          .where(function () {
+            this.where({ 'ea.reference_table': 'sales_orders', 'ea.reference_id': orderId })
+              .orWhere(function () {
+                this.where('ea.reference_table', 'sales_order_lines').whereIn(
+                  'ea.reference_id',
+                  lineIds,
+                );
+              });
+          })
+          .andWhere('ee.event', 'RESOLVED')
+          .orderBy('ee.at', 'desc')
+          .first('ee.metadata_json');
+
+        const meta =
+          typeof latestEvent?.metadata_json === 'string'
+            ? JSON.parse(latestEvent.metadata_json)
+            : latestEvent?.metadata_json;
+        const c = meta?.counter;
+        const raw = c?.counterPrice ?? c?.proposedPrice ?? c?.price;
+        if (raw !== undefined && raw !== null && Number(raw) > 0) {
+          counterPriceValue = Money.of(raw);
+        }
+      }
+
+      let recalculatedTotal = Money.zero();
+      for (const line of lines) {
+        let unitPrice = Money.of(line.quoted_unit_price);
+        const floor = Money.of(line.floor_price_snapshot || '0');
+        const wasBelowFloor = unitPrice.isLessThan(floor);
+        if (counterPriceValue && (wasBelowFloor || lines.length === 1)) {
+          unitPrice = counterPriceValue;
+          const lineTotal = unitPrice.mul(Number(line.ordered_qty));
+          const cost = Money.of(line.landed_cost_snapshot || '0');
+          const margin = Money.marginPct(unitPrice, cost);
+          await trx('sales_order_lines')
+            .where('id', line.id)
+            .update({
+              quoted_unit_price: unitPrice.toStorageString(),
+              line_total: lineTotal.toStorageString(),
+              margin_pct_snapshot: margin ? margin.toNumber() : line.margin_pct_snapshot,
+            });
+          line.quoted_unit_price = unitPrice.toStorageString();
+          line.line_total = lineTotal.toStorageString();
+          recalculatedTotal = recalculatedTotal.add(lineTotal);
+        } else {
+          recalculatedTotal = recalculatedTotal.add(
+            Money.of(line.line_total || unitPrice.mul(Number(line.ordered_qty)).toStorageString()),
+          );
+        }
+      }
+
+      const finalTotal =
+        lines.length > 0 ? recalculatedTotal.toStorageString() : String(order.total_amount || '0.00');
+
       await trx('sales_orders').where('id', orderId).update({
         order_status: 'CONFIRMED',
+        total_amount: finalTotal,
         confirmed_at: new Date(),
         approved_by: userId,
+        updated_at: new Date(),
       });
 
       await trx('order_status_log').insert({
@@ -517,22 +648,22 @@ export class OrderService implements OnModuleInit {
         from_status: 'PENDING_APPROVAL',
         to_status: 'CONFIRMED',
         by_user: userId,
-        reason: remarks ?? 'Counter price accepted',
+        reason:
+          remarks ??
+          (counterPriceValue
+            ? `Counter price ₹${counterPriceValue.toStorageString()} accepted`
+            : 'Counter price accepted'),
       });
 
-      // Emit order confirmed event
-      const lines = await trx('sales_order_lines')
-        .where('order_id', orderId)
-        .select('*');
       await this.emitOrderConfirmedEvent(orderId, lines, 'OK');
 
       this.logger.log(`Order ${orderId} confirmed with counter price`);
-      return { orderId, status: 'CONFIRMED' };
+      return { orderId, status: 'CONFIRMED', totalAmount: finalTotal };
     });
   }
 
   /**
-   * Cancel an order (releases any reservations).
+   * Cancel an order (releases any active stock reservations & emits order.cancelled).
    */
   async cancel(
     orderId: string,
@@ -543,7 +674,7 @@ export class OrderService implements OnModuleInit {
       const order = await trx('sales_orders')
         .where('id', orderId)
         .forUpdate()
-        .first('id', 'order_status');
+        .first('id', 'order_status', 'fulfillment_site_id');
 
       if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
@@ -554,9 +685,48 @@ export class OrderService implements OnModuleInit {
         );
       }
 
-      await trx('sales_orders')
-        .where('id', orderId)
-        .update({ order_status: 'CANCELLED' });
+      await trx('sales_orders').where('id', orderId).update({
+        order_status: 'CANCELLED',
+        updated_at: new Date(),
+      });
+
+      // Release any active stock reservations belonging to this order's lines
+      const lines = await trx('sales_order_lines')
+        .where('order_id', orderId)
+        .select('id');
+      const targetIds = [orderId, ...lines.map((l: any) => String(l.id))];
+      const activeReservations = await trx('stock_reservations')
+        .whereIn('order_id', targetIds)
+        .andWhere('status', 'ACTIVE')
+        .select('id', 'site_id', 'item_id', 'batch_id', 'qty');
+
+      if (activeReservations.length > 0) {
+        await trx('stock_reservations')
+          .whereIn(
+            'id',
+            activeReservations.map((r: any) => r.id),
+          )
+          .update({ status: 'RELEASED', updated_at: new Date() });
+
+        for (const r of activeReservations) {
+          const item = await trx('items')
+            .where({ id: r.item_id })
+            .first('primary_uom');
+          await trx('stock_ledger_txns').insert({
+            site_id: r.site_id,
+            item_id: r.item_id,
+            batch_id: r.batch_id,
+            txn_type: 'RELEASE',
+            qty: String(r.qty),
+            uom: item?.primary_uom ?? 'KG',
+            reference_table: 'sales_orders',
+            reference_id: orderId,
+            reference_no: `cancel:${orderId}`,
+            note: `Order cancelled: ${reason}`,
+            created_by: userId,
+          });
+        }
+      }
 
       await trx('order_status_log').insert({
         order_id: orderId,
@@ -566,11 +736,83 @@ export class OrderService implements OnModuleInit {
         reason,
       });
 
-      // TODO: Release reservations via InventoryPort when M3 is ready
-      // await this.inventoryPort.release(orderId);
+      await trx('outbox_events').insert({
+        aggregate_id: orderId,
+        event_type: 'order.cancelled',
+        payload: {
+          orderId,
+          siteId: order.fulfillment_site_id,
+          lineIds: lines.map((l: any) => String(l.id)),
+          reason,
+        },
+        module_source: 'm1',
+        published_at: trx.raw('NOW()'),
+      });
 
       this.logger.log(`Order ${orderId} cancelled: ${reason}`);
       return { orderId, status: 'CANCELLED' };
+    });
+  }
+
+  async markReady(orderId: string, userId: string, remarks?: string) {
+    return this.transitionStatus(
+      orderId,
+      ['CONFIRMED', 'IN_PRODUCTION_SOURCING'],
+      'READY',
+      userId,
+      remarks ?? 'Marked ready for dispatch',
+    );
+  }
+
+  async markDispatched(orderId: string, userId: string, remarks?: string) {
+    return this.transitionStatus(
+      orderId,
+      ['CONFIRMED', 'READY'],
+      'DISPATCHED',
+      userId,
+      remarks ?? 'Order dispatched',
+    );
+  }
+
+  async markDelivered(orderId: string, userId: string, remarks?: string) {
+    return this.transitionStatus(
+      orderId,
+      ['DISPATCHED'],
+      'DELIVERED_FULL',
+      userId,
+      remarks ?? 'Order delivered',
+    );
+  }
+
+  private async transitionStatus(
+    orderId: string,
+    allowedFrom: string[],
+    toStatus: string,
+    userId: string,
+    reason: string,
+  ): Promise<{ orderId: string; status: string }> {
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status');
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+      if (!allowedFrom.includes(order.order_status)) {
+        throw new ConflictException(
+          `Cannot move order from ${order.order_status} to ${toStatus}`,
+        );
+      }
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({ order_status: toStatus, updated_at: new Date() });
+      await trx('order_status_log').insert({
+        order_id: orderId,
+        from_status: order.order_status,
+        to_status: toStatus,
+        by_user: userId,
+        reason,
+      });
+      return { orderId, status: toStatus };
     });
   }
 
@@ -587,12 +829,12 @@ export class OrderService implements OnModuleInit {
   }> {
     const orderRow = await this.knex('sales_orders')
       .where('id', orderId)
-      .first('status', 'customer_id');
+      .first('order_status', 'customer_id');
     if (!orderRow) {
       throw new NotFoundException(`Order ${orderId} not found`);
     }
 
-    if (orderRow.status !== 'DRAFT') {
+    if (orderRow.order_status !== 'DRAFT') {
       throw new BadRequestException(
         `Order status must be DRAFT for credit evaluation`,
       );

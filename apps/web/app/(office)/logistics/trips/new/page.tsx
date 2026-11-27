@@ -18,9 +18,11 @@ interface DraftStop extends ReadyOrderItem {
 }
 
 export default function PlanNewTripPage() {
+  const [siteId, setSiteId] = useState('');
   const [readyPool, setReadyPool] = useState<ReadyOrderItem[]>([]);
   const [vehicles, setVehicles] = useState<Array<{ id: string; regNo: string; model: string; capacityKg: number; capacityCrates: number }>>([]);
   const [drivers, setDrivers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+  const [stockBatches, setStockBatches] = useState<any[]>([]);
   const [areaFilter, setAreaFilter] = useState('ALL');
   const [windowFilter, setWindowFilter] = useState('ALL');
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
@@ -28,28 +30,62 @@ export default function PlanNewTripPage() {
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [loadingConfirmed, setLoadingConfirmed] = useState(false);
+  const [savedTrip, setSavedTrip] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     Promise.all([
+      fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/proxy/orders?status=READY').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/orders?status=CONFIRMED').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/vehicles').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/drivers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
     ])
-      .then(([ordRes, vehRes, drvRes]) => {
+      .then(([meRes, readyRes, confRes, vehRes, drvRes, stkRes]) => {
         if (!active) return;
-        const oRows = Array.isArray(ordRes) ? ordRes : Array.isArray(ordRes?.data) ? ordRes.data : [];
-        const mappedOrders: ReadyOrderItem[] = oRows.map((o: any) => ({
+        const storedSite =
+          typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+        const resolvedSite =
+          (storedSite && storedSite !== 'all' ? storedSite : null) ||
+          meRes?.user?.activeSiteId ||
+          meRes?.user?.sites?.[0]?.id ||
+          '';
+        if (resolvedSite) setSiteId(String(resolvedSite));
+
+        const rRows = Array.isArray(readyRes) ? readyRes : Array.isArray(readyRes?.data) ? readyRes.data : [];
+        const cRows = Array.isArray(confRes) ? confRes : Array.isArray(confRes?.data) ? confRes.data : [];
+        const combined = [...rRows, ...cRows];
+        const mappedOrders: ReadyOrderItem[] = combined.map((o: any, idx: number) => ({
           id: String(o.id),
           orderNo: String(o.order_no || o.orderNumber || o.id),
+          customerId: String(o.customer_id || o.customerId || ''),
           customerName: String(o.customer_name || o.customerName || 'Customer'),
-          area: String(o.area || o.city || 'Pune'),
-          deliveryWindow: String(o.delivery_time_window || o.deliveryWindow || '10-12'),
-          weightKg: Number(o.total_weight_kg ?? o.weightKg ?? 50),
+          siteId: String(o.fulfillment_site_id || resolvedSite || ''),
+          area: String(o.area || o.city || o.site_name || 'Main Route'),
+          deliveryWindow: (o.delivery_time_window || o.deliveryWindow || '10-12') as ReadyOrderItem['deliveryWindow'],
+          weightKg: Number(
+            o.total_weight_kg ??
+              o.weightKg ??
+              (Array.isArray(o.lines)
+                ? o.lines.reduce((s: number, l: any) => s + Number(l.ordered_qty || l.qty || 0), 0) || 50
+                : 50),
+          ),
           crates: Number(o.total_crates ?? o.crates ?? 2),
           valueInr: Number(o.total_amount ?? o.valueInr ?? 0),
-          codExpectedInr: Number(o.cod_expected_inr ?? 0),
+          status: 'READY',
+          rawStatus: String(o.order_status || 'READY'),
+          creditHold: o.credit_flag === 'HOLD' || Boolean(o.credit_hold),
+          gpsX: 95 + (idx % 4) * 60,
+          gpsY: 55 + Math.floor(idx / 4) * 65,
+          lines: Array.isArray(o.lines)
+            ? o.lines.map((l: any) => ({
+                itemId: String(l.item_id || l.itemId || ''),
+                qty: Number(l.ordered_qty ?? l.qty ?? 1),
+              }))
+            : [],
         }));
         setReadyPool(mappedOrders);
 
@@ -67,11 +103,14 @@ export default function PlanNewTripPage() {
         const dRows = Array.isArray(drvRes) ? drvRes : Array.isArray(drvRes?.data) ? drvRes.data : [];
         const mappedDrivers = dRows.map((d: any) => ({
           id: String(d.id),
-          name: String(d.full_name || d.name || 'Driver'),
+          name: String(d.fullName || d.full_name || d.name || 'Driver'),
           phone: String(d.phone || ''),
         }));
         setDrivers(mappedDrivers);
         if (mappedDrivers.length > 0) setDriverId(mappedDrivers[0].id);
+
+        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+        setStockBatches(sRows);
       })
       .catch(() => {});
     return () => {
@@ -133,23 +172,121 @@ export default function PlanNewTripPage() {
     setStops(copy);
   };
 
-  const handleGenerateChallans = () => {
+  const handleGenerateChallans = async () => {
+    if (savedTrip?.id && Array.isArray(savedTrip.stops)) {
+      setBusy(true);
+      try {
+        for (const st of savedTrip.stops) {
+          await fetch(
+            `/api/proxy/trips/${encodeURIComponent(savedTrip.id)}/stops/${encodeURIComponent(st.id)}/challan`,
+            { method: 'POST' },
+          );
+        }
+        setStops((prev) => prev.map((s) => ({ ...s, challanGenerated: true })));
+        setToast(`Generated ${savedTrip.stops.length} delivery challan(s) on trip ${savedTrip.trip_no || ''}.`);
+      } catch (err) {
+        setToast(`Failed to generate challans: ${(err as Error).message}`);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setStops((prev) => prev.map((s) => ({ ...s, challanGenerated: true })));
-    setToast(`Generated ${stops.length} delivery challan(s).`);
+    setToast(`Prepared ${stops.length} delivery challan(s). Save trip to issue PDFs.`);
   };
 
-  const handleSaveTrip = () => {
-    fetch('/api/bff/trips', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleId, driverId, stops }),
-    }).catch(() => {});
-    setToast('Trip saved! Confirm loading on floor or below to enable Dispatch.');
+  const handleSaveTrip = async () => {
+    const resolvedSiteId = siteId || stops[0]?.siteId || '';
+    if (!resolvedSiteId || !vehicleId || !driverId || stops.length === 0) {
+      setToast('Site, vehicle, driver, and at least one stop are required to save a trip.');
+      return null;
+    }
+    setBusy(true);
+    try {
+      const payload = {
+        siteId: resolvedSiteId,
+        tripDate: new Date().toISOString().split('T')[0],
+        vehicleId,
+        driverId,
+        stops: stops.map((s, idx) => ({
+          customerId: s.customerId || '',
+          salesOrderId: s.id,
+          sequenceNo: idx + 1,
+          isCod: Boolean(s.creditHold),
+          codAmount: s.creditHold ? s.valueInr : 0,
+          lines: (s.lines || []).map((l) => ({
+            itemId: l.itemId,
+            loadedQty: Number(l.qty || 1),
+          })),
+        })),
+      };
+      const res = await fetch('/api/proxy/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      const created = data?.data ?? data;
+      setSavedTrip(created);
+      setToast(`Trip ${created?.trip_no || ''} saved in LOADING state!`);
+      return created;
+    } catch (err) {
+      setToast(`Failed to save trip: ${(err as Error).message}`);
+      return null;
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleDispatch = () => {
+  const handleDispatch = async () => {
     if (!readiness.canDispatch) return;
-    setToast(`Dispatched trip with ${selectedVehicle.regNo} (${stops.length} stops).`);
+    setBusy(true);
+    try {
+      const trip = savedTrip || (await handleSaveTrip());
+      if (!trip?.id || !Array.isArray(trip.stops)) return;
+
+      await fetch(`/api/proxy/trips/${encodeURIComponent(trip.id)}/confirm-loading`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verifiedCratesCount: stops.reduce((s, st) => s + st.crates, 0) }),
+      });
+
+      const dispatchLines: Array<{ stopId: string; itemId: string; batchId: string; qty: number }> = [];
+      for (const st of trip.stops) {
+        for (const line of st.lines || []) {
+          const matchingBatch = stockBatches.find(
+            (b: any) => String(b.itemId || b.item_id) === String(line.item_id) && Number(b.qtyAvailable ?? b.qty_available ?? 0) > 0,
+          );
+          if (!matchingBatch) {
+            throw new Error(`No available inventory batch found for item ${line.item_id}. Receive GRN stock before dispatching.`);
+          }
+          dispatchLines.push({
+            stopId: String(st.id),
+            itemId: String(line.item_id),
+            batchId: String(matchingBatch.batchId || matchingBatch.id),
+            qty: Number(line.loaded_qty || 1),
+          });
+        }
+      }
+
+      const res = await fetch(`/api/proxy/trips/${encodeURIComponent(trip.id)}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lines: dispatchLines }),
+      });
+      const dPayload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(dPayload?.message || dPayload?.error?.message || `HTTP ${res.status}`);
+      }
+      setToast(`Dispatched trip ${trip.trip_no || ''} with ${selectedVehicle.regNo} (${stops.length} stops)!`);
+    } catch (err) {
+      setToast(`Dispatch blocked: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const capPct = Math.min(

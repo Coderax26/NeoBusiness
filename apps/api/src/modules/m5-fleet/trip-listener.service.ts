@@ -23,7 +23,7 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.worker = new Worker(
-      'domain-events',
+      'm5-fleet-events',
       async (job) => this.handle(job.data as DomainJob),
       { connection: getRedisConnection() },
     );
@@ -33,7 +33,7 @@ export class TripListenerService implements OnModuleInit, OnModuleDestroy {
       );
     });
     this.logger.log(
-      'TripListenerService started (listening on domain-events queue)',
+      'TripListenerService started (listening on m5-fleet-events queue)',
     );
   }
 

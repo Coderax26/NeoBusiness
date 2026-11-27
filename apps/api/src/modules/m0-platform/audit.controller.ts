@@ -12,11 +12,11 @@ import {
 import type { Knex } from 'knex';
 import { InjectKnex } from 'nestjs-knex';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
-import { RequirePermission } from './rbac.service.js';
+import { RbacGuard, RequirePermission } from './rbac.service.js';
 
 @ApiTags('audit')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('audit-logs')
 export class AuditController {
   constructor(@InjectKnex() private readonly knex: Knex) {}

@@ -6,7 +6,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { StockAlertsService } from './stock-alerts.service.js';
 import {
   StockAlertResponseDto,
@@ -15,7 +15,7 @@ import {
 
 @ApiTags('M7b Stock Alerts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('stock-alerts')
 export class StockAlertsController {
   constructor(private readonly stockAlerts: StockAlertsService) {}

@@ -17,7 +17,25 @@ export default function DeliveryIssuesDeskPage() {
       .then((res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setIssues(rows);
+        setIssues(
+          rows.map((i: any) => ({
+            id: String(i.id),
+            issueNo: String(i.issueNo ?? `ISS-${String(i.id).slice(0, 6).toUpperCase()}`),
+            tripId: String(i.trip_id ?? i.tripId ?? ''),
+            tripNo: String(i.trip_no ?? i.tripNo ?? ''),
+            stopOrderNo: String(i.stop_id ?? i.stopOrderNo ?? '-'),
+            customerName: String(i.site_name ?? i.customerName ?? 'Route Stop'),
+            type: String(i.category ?? i.type ?? 'OTHER') as any,
+            description: String(
+              i.resolution_note ??
+                i.description ??
+                `${i.category ?? 'Delivery Issue'} · Risk ₹${Number(i.value_at_risk ?? 0)}`,
+            ),
+            status: (i.status === 'OPEN' ? 'OPEN' : 'RESOLVED') as any,
+            resolutionOutcome: i.resolution_note ?? i.resolutionOutcome,
+            reportedAt: String(i.created_at ?? i.reportedAt ?? '').slice(0, 10),
+          })),
+        );
       })
       .catch(() => {});
     return () => {
@@ -32,11 +50,22 @@ export default function DeliveryIssuesDeskPage() {
 
   async function confirmResolve() {
     if (!resolvingIssue) return;
-    await fetch(`/api/proxy/trips/issues/${encodeURIComponent(resolvingIssue.id)}/resolve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resolutionOutcome: selectedOutcome }),
-    }).catch(() => {});
+    const res = await fetch(
+      `/api/proxy/trips/issues/${encodeURIComponent(resolvingIssue.id)}/resolve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resolutionNote: `Resolved via ${selectedOutcome}`,
+          escalate: false,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || err?.error?.message || `Failed to resolve issue (HTTP ${res.status})`);
+      return;
+    }
     setIssues((prev) =>
       prev.map((item) =>
         item.id === resolvingIssue.id

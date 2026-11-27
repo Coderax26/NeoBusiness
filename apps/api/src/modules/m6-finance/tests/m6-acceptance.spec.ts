@@ -368,7 +368,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
       // 4. Verify invoice balance updated
       const updatedInvoice = await invoiceSvc.getInvoice(invoiceId);
       expect(updatedInvoice.balanceDue).toBe('0.00'); // Full payment should zero balance
-      expect(updatedInvoice.status).toBe('PARTIAL'); // System computes PARTIAL after collection
+      expect(updatedInvoice.status).toBe('PAID');
 
       // 5. Now test PTP workflow on a NEW invoice
       const invoice2 = await invoiceSvc.generateAtDispatch(
@@ -447,8 +447,7 @@ describe('M6 Acceptance — Scenario E: Collection & PTP Workflow', () => {
 
       const finalInvoice = await invoiceSvc.getInvoice(invoiceId);
       expect(finalInvoice.balanceDue).toBe('0.00');
-      // System computes PARTIAL after single collection (PAID when multiple allocations cover full)
-      expect(finalInvoice.status).toBe('PARTIAL');
+      expect(finalInvoice.status).toBe('PAID');
 
       console.log('✅ Partial collection tracked correctly');
     });

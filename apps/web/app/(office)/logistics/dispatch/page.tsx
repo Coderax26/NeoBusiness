@@ -26,14 +26,24 @@ export default function LiveDispatchBoardPage() {
     lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16),
     status: (t.status ?? 'LOADING') as TripRecord['status'],
     stops: Array.isArray(t.stops)
-      ? t.stops.map((s: any) => ({
-          ...s,
-          id: String(s.id),
-          deliveryStatus: s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING',
-          expectedCodInr: Number(s.expectedCodInr ?? s.cash_to_collect ?? 0),
-          collectedCodInr: Number(s.collectedCodInr ?? s.actual_cash_collected ?? 0),
-          valueInr: Number(s.valueInr ?? s.order_value ?? s.total_amount ?? 0),
-        }))
+      ? t.stops.map((s: any) => {
+          const rawSt = String(s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING');
+          return {
+            ...s,
+            id: String(s.id),
+            deliveryStatus:
+              rawSt === 'DELIVERED_FULL' || rawSt === 'DELIVERED'
+                ? 'DELIVERED'
+                : rawSt === 'DELIVERED_PARTIAL' || rawSt === 'PARTIAL'
+                  ? 'PARTIAL'
+                  : rawSt === 'FAILED'
+                    ? 'FAILED'
+                    : 'PENDING',
+            expectedCodInr: Number(s.expectedCodInr ?? s.cod_amount ?? s.cash_to_collect ?? 0),
+            collectedCodInr: Number(s.collectedCodInr ?? s.cod_collected_amount ?? s.actual_cash_collected ?? 0),
+            valueInr: Number(s.valueInr ?? s.order_value ?? s.total_amount ?? 0),
+          };
+        })
       : [],
   });
 
@@ -50,7 +60,17 @@ export default function LiveDispatchBoardPage() {
         }
         if (issuesRes.status === 'fulfilled' && issuesRes.value) {
           const iss = Array.isArray(issuesRes.value) ? issuesRes.value : Array.isArray(issuesRes.value?.data) ? issuesRes.value.data : [];
-          setDeliveryIssues(iss);
+          setDeliveryIssues(
+            iss.map((i: any) => ({
+              ...i,
+              id: String(i.id),
+              issueNo: i.issueNo ?? `ISS-${String(i.id).slice(0, 6).toUpperCase()}`,
+              type: i.type ?? i.category ?? 'ISSUE',
+              tripNo: i.tripNo ?? i.trip_no ?? '',
+              customerName: i.customerName ?? i.site_name ?? 'Route Stop',
+              description: i.description ?? `${i.category ?? 'Issue'} (Value at risk: ₹${Number(i.value_at_risk ?? 0)})`,
+            })),
+          );
           setIssuesCount(iss.filter((i: any) => i.status === 'OPEN').length);
         }
         if (ordersRes.status === 'fulfilled' && ordersRes.value) {

@@ -21,21 +21,30 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OutboxRelay.name);
   private interval: NodeJS.Timeout | undefined;
   private isDispatching = false;
-  private domainQueue: Queue | undefined;
-  private dashboardQueue: Queue | undefined;
+  private queues:
+    | {
+        m3InventoryQueue: Queue;
+        m5FleetQueue: Queue;
+        m6CodQueue: Queue;
+        m6CreditNoteQueue: Queue;
+        dashboardQueue: Queue;
+      }
+    | undefined;
 
   constructor(@InjectKnex() private readonly knex: Knex) {}
 
-  private getQueues(): { domainQueue: Queue; dashboardQueue: Queue } {
-    if (!this.domainQueue || !this.dashboardQueue) {
+  private getQueues() {
+    if (!this.queues) {
       const connection = getRedisConnection();
-      this.domainQueue = new Queue('domain-events', { connection });
-      this.dashboardQueue = new Queue('dashboard-events', { connection });
+      this.queues = {
+        m3InventoryQueue: new Queue('m3-inventory-events', { connection }),
+        m5FleetQueue: new Queue('m5-fleet-events', { connection }),
+        m6CodQueue: new Queue('m6-cod-events', { connection }),
+        m6CreditNoteQueue: new Queue('m6-credit-note-events', { connection }),
+        dashboardQueue: new Queue('dashboard-events', { connection }),
+      };
     }
-    return {
-      domainQueue: this.domainQueue,
-      dashboardQueue: this.dashboardQueue,
-    };
+    return this.queues;
   }
 
   onModuleInit(): void {
@@ -50,9 +59,8 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Dispatch up to 50 unprocessed events to the domain-events queue.
-   * Each event is marked `processed_at` inside the same transaction
-   * that updates the DB, ensuring exactly-once delivery.
+   * Fan out unprocessed outbox events to dedicated per-module BullMQ queues
+   * (true pub/sub semantics so workers never compete for unrelated events).
    */
   async dispatch(): Promise<number> {
     if (this.isDispatching) return 0;
@@ -65,7 +73,19 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
 
       if (events.length === 0) return 0;
 
-      const { domainQueue, dashboardQueue } = this.getQueues();
+      const {
+        m3InventoryQueue,
+        m5FleetQueue,
+        m6CodQueue,
+        m6CreditNoteQueue,
+        dashboardQueue,
+      } = this.getQueues();
+      const jobOpts = {
+        attempts: 3,
+        backoff: { type: 'exponential' as const, delay: 2000 },
+        removeOnComplete: 500,
+        removeOnFail: 1000,
+      };
 
       let dispatched = 0;
       for (const event of events) {
@@ -91,8 +111,13 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
                   : row.payload,
               module_source: row.module_source,
             };
-            await domainQueue.add('domain-event', jobData);
-            await dashboardQueue.add('dashboard-event', jobData);
+            await Promise.all([
+              m3InventoryQueue.add('domain-event', jobData, jobOpts),
+              m5FleetQueue.add('domain-event', jobData, jobOpts),
+              m6CodQueue.add('domain-event', jobData, jobOpts),
+              m6CreditNoteQueue.add('domain-event', jobData, jobOpts),
+              dashboardQueue.add('dashboard-event', jobData, jobOpts),
+            ]);
             await trx('outbox_events')
               .where('id', row.id)
               .update({ processed_at: this.knex.fn.now() });
@@ -123,9 +148,14 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.interval);
       this.interval = undefined;
     }
-    await Promise.allSettled([
-      this.domainQueue?.close(),
-      this.dashboardQueue?.close(),
-    ]);
+    if (this.queues) {
+      await Promise.allSettled([
+        this.queues.m3InventoryQueue.close(),
+        this.queues.m5FleetQueue.close(),
+        this.queues.m6CodQueue.close(),
+        this.queues.m6CreditNoteQueue.close(),
+        this.queues.dashboardQueue.close(),
+      ]);
+    }
   }
 }

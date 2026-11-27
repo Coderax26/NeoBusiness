@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { Money } from '../../shared/utils/money.util.js';
 import { CreditNoteService } from './credit-note.service.js';
 import {
@@ -71,7 +72,7 @@ export class CreditNoteController {
 
     const result = await this.creditNoteService.createCreditNote({
       customerId: String(order.customer_id),
-      siteId: String(order.fulfillment_site_id || req.user.siteId),
+      siteId: String(order.fulfillment_site_id || resolveUserSiteId(req.user) || ''),
       orderId: dto.orderId,
       reasonType: reasonMap[dto.reason] || 'OTHER',
       lines: dto.lines.map((l) => ({
@@ -92,7 +93,8 @@ export class CreditNoteController {
   @ApiResponse({ status: 200, description: 'Credit notes list' })
   async list(@Query() query: ListCreditNotesQueryDto, @Req() req: any) {
     const siteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const creditNotes = await this.creditNoteService.listCreditNotes(
       query.customerId,
       siteId,

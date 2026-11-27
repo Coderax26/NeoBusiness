@@ -5,16 +5,20 @@
 export interface ReadyOrderItem {
   id: string;
   orderNo: string;
+  customerId?: string;
   customerName: string;
+  siteId?: string;
   area: string;
   deliveryWindow: '04-08' | '10-12' | '13-16' | '18-21';
   weightKg: number;
   crates: number;
   valueInr: number;
   status: 'READY' | 'PENDING_APPROVAL';
+  rawStatus?: string;
   creditHold: boolean;
   gpsX: number;
   gpsY: number;
+  lines?: Array<{ itemId: string; qty: number }>;
 }
 
 export interface FleetVehicleOption {

@@ -6,7 +6,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { DashboardService } from './dashboard.service.js';
 import {
   PulseResponseDto,
@@ -20,7 +21,7 @@ import {
 
 @ApiTags('M7b Dashboards — Owner Pulse & Operations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
@@ -106,7 +107,8 @@ export class DashboardController {
     @Req() req: any,
   ) {
     const siteId =
-      querySiteId || (req.user?.role === 'OWNER' ? undefined : req.user?.siteId);
+      querySiteId ||
+      (req.user?.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     return this.dashboard.getHomeSummary(req.user?.role, siteId);
   }
 }

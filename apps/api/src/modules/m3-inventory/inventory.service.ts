@@ -452,9 +452,16 @@ export class InventoryService implements InventoryPort {
     });
   }
 
-  async release(orderLineId: string): Promise<void> {
+  async release(orderOrLineId: string): Promise<void> {
+    const lineRows = await this.knex('sales_order_lines')
+      .where('order_id', orderOrLineId)
+      .select('id');
+    const targetIds = Array.from(
+      new Set([orderOrLineId, ...lineRows.map((l: any) => String(l.id))]),
+    );
     const reservations = await this.knex('stock_reservations')
-      .where({ order_id: orderLineId, status: 'ACTIVE' })
+      .whereIn('order_id', targetIds)
+      .andWhere('status', 'ACTIVE')
       .select('id');
     for (const reservation of reservations) {
       await this.releaseReservation(

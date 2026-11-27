@@ -42,15 +42,17 @@ interface RaiseOptions {
 export class ExceptionService implements ExceptionPort, OnModuleInit {
   private readonly logger = new Logger(ExceptionService.name);
 
-  /** Resolved handlers indexed by exception type (registered via onResolved). */
+  /** Resolved handlers indexed by exception type (supports multiple listeners per type). */
   private handlers = new Map<
     ExceptionType,
-    (
-      exceptionId: string,
-      action: string,
-      remarks: string,
-      counterJson?: object,
-    ) => Promise<void>
+    Array<
+      (
+        exceptionId: string,
+        action: string,
+        remarks: string,
+        counterJson?: object,
+      ) => Promise<void>
+    >
   >();
 
   constructor(
@@ -228,8 +230,12 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
       counterJson?: object,
     ) => Promise<void>,
   ): void {
-    this.handlers.set(type, handler);
-    this.logger.debug(`onResolved handler registered for ${type}`);
+    const existing = this.handlers.get(type) ?? [];
+    existing.push(handler);
+    this.handlers.set(type, existing);
+    this.logger.debug(
+      `onResolved handler registered for ${type} (listeners=${existing.length})`,
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -253,8 +259,9 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
     action: ResolutionAction,
     remarks: string,
     counterJson?: object,
+    resolvedByUserId?: string,
   ): Promise<string> {
-    const userId = await this.currentUserId();
+    const userId = resolvedByUserId ?? (await this.currentUserId());
 
     const result = await this.knex.transaction(async (trx) => {
       // Lock the row
@@ -334,9 +341,9 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
       'm7',
     );
 
-    // Fire onResolved handlers (async, fire-and-forget from the DB perspective)
-    const handler = this.handlers.get(result.type as ExceptionType);
-    if (handler) {
+    // Fire all registered onResolved handlers (async, isolated per listener)
+    const listeners = this.handlers.get(result.type as ExceptionType) ?? [];
+    for (const handler of listeners) {
       void handler(exceptionId, result.status, remarks, counterJson).catch(
         (err) =>
           this.logger.error(

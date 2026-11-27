@@ -28,21 +28,21 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         if (qData && qData.id) {
           setQuote({
             id: String(qData.id),
-            quoteNumber: String(qData.quoteNumber || qData.quote_number || qData.id),
+            quoteNumber: String(qData.quote_no || qData.quoteNumber || qData.quote_number || qData.id),
             customerId: String(qData.customerId || qData.customer_id || ''),
             customerName: String(qData.customerName || qData.customer_name || 'Customer'),
-            status: (qData.status || 'OPEN') as QuoteRecord['status'],
+            status: (qData.status || 'DRAFT') as QuoteRecord['status'],
             validUntil: String(qData.validUntil || qData.valid_until || today).slice(0, 10),
             createdAt: String(qData.createdAt || qData.created_at || today).slice(0, 10),
             totalAmount: Number(qData.totalAmount ?? qData.total_amount ?? 0),
             lines: Array.isArray(qData.lines)
               ? qData.lines.map((l: any) => ({
                   itemId: String(l.itemId || l.item_id || ''),
-                  sku: String(l.sku || l.skuCode || ''),
+                  sku: String(l.sku_code || l.sku || l.skuCode || ''),
                   itemName: String(l.itemName || l.item_name || 'Item'),
-                  uom: String(l.uom || 'kg'),
+                  uom: String(l.primary_uom || l.uom || 'kg'),
                   qty: Number(l.qty || 0),
-                  quotedPrice: Number(l.quotedPrice ?? l.quoted_price ?? l.unitPrice ?? 0),
+                  quotedPrice: Number(l.quoted_unit_price ?? l.quotedPrice ?? l.quoted_price ?? l.unitPrice ?? 0),
                 }))
               : [],
           });
@@ -87,9 +87,42 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const handleMarkLost = () => {
-    setQuote((prev) => (prev ? { ...prev, status: 'LOST', lostReason } : prev));
-    setLostOpen(false);
+  const handleMarkLost = async () => {
+    if (!quote) return;
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/proxy/quotes/${encodeURIComponent(quote.id)}/mark-lost`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: lostReason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setQuote((prev) => (prev ? { ...prev, status: 'LOST', lostReason } : prev));
+      setLostOpen(false);
+    } catch (err) {
+      setActionError(`Failed to mark quote lost: ${(err as Error).message}`);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!quote) return;
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/proxy/quotes/${encodeURIComponent(quote.id)}/send`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setReminderSent(true);
+      setQuote((prev) => (prev && prev.status === 'DRAFT' ? { ...prev, status: 'SENT' } : prev));
+    } catch (err) {
+      setActionError(`Failed to send quote: ${(err as Error).message}`);
+    }
   };
 
   if (loading) {
@@ -148,7 +181,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           </Button>
           {quote.status !== 'CONVERTED' && quote.status !== 'LOST' && (
             <>
-              <Button variant="secondary" size="sm" onClick={() => setReminderSent(true)}>
+              <Button variant="secondary" size="sm" onClick={handleSendReminder}>
                 💬 Send Reminder
               </Button>
               <Button variant="danger" size="sm" onClick={() => setLostOpen(true)}>
