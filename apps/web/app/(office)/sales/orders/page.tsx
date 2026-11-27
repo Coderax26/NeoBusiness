@@ -356,7 +356,7 @@ export default function OrdersTrackerPage() {
             <button
               key={sv.key}
               onClick={() => applySavedView(sv.key)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                 savedView === sv.key
                   ? 'bg-action/20 text-action border-action/30'
                   : 'bg-paper text-ink-3 border-rule hover:text-ink'
@@ -372,7 +372,7 @@ export default function OrdersTrackerPage() {
             <button
               key={m}
               onClick={() => setViewMode(m)}
-              className={`px-3 py-1 rounded-lg font-medium capitalize${
+              className={`px-3 py-1 rounded-lg font-medium capitalize ${
                 viewMode === m ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
               }`}
             >
@@ -388,7 +388,7 @@ export default function OrdersTrackerPage() {
           <button
             key={t.key}
             onClick={() => setStatusTab(t.key)}
-            className={`px-3 py-1.5 rounded-[3px] font-semibold whitespace-nowrap border transition-colors${
+            className={`px-3 py-1.5 rounded-[3px] font-semibold whitespace-nowrap border transition-colors ${
               statusTab === t.key
                 ? 'bg-action text-white border-action/30'
                 : 'bg-sheet text-ink-3 border-rule hover:text-ink'

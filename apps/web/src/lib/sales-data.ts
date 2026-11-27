@@ -15,6 +15,8 @@ export interface DailyPriceRow {
   minMarginPct: number;
   floorPrice: number | null;
   targetPrice: number | null;
+  priceSource?: string;
+  isPublished?: boolean;
   atpStock: number;
   lastPricesForCustomer?: { date: string; price: number }[];
 }

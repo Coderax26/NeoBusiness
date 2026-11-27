@@ -109,7 +109,7 @@ export default function SalesBoardPage() {
           return (
             <div
               key={col.status}
-              className={`bg-sheet border-t-2${col.color}border-x border-b border-rule rounded-[4px] p-3 space-y-3 min-h-[380px]`}
+              className={`bg-sheet border-t-2 ${col.color}border-x border-b border-rule rounded-[4px] p-3 space-y-3 min-h-[380px]`}
             >
               <div className="flex items-center justify-between text-xs font-bold text-ink pb-2 border-b border-rule">
                 <span>{col.label}</span>

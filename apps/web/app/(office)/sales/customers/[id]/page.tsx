@@ -184,7 +184,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* 5 KPIs (§8) */}
-      <div className={`grid grid-cols-2${isOwner ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}gap-4`}>
+      <div className={`grid grid-cols-2 ${isOwner ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}gap-4`}>
         <KpiCard title="Outstanding" value={formatINR(customer.outstanding)} subtitle="Current AR balance" tone="default" />
         <KpiCard title="Overdue" value={customer.overdueDays > 0 ? `${customer.overdueDays} days` : '₹0'} subtitle="Past credit terms" tone={customer.overdueDays > 0 ? 'danger' : 'success'} />
         <KpiCard title="Credit Used" value={`${creditUsedPct}%`} subtitle={`of ${formatINR(customer.creditLimit)}`} tone={creditUsedPct > 85 ? 'warning' : 'default'} />
@@ -228,7 +228,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
-            className={`pb-2.5 border-b-2 whitespace-nowrap transition-colors${
+            className={`pb-2.5 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === t.key ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
             }`}
           >

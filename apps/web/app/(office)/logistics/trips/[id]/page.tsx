@@ -127,7 +127,7 @@ export default function TripDetailPage() {
           </div>
           <div className="mt-1 flex items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{trip.tripNo}</h1>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STATUS_BADGES[trip.status]}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGES[trip.status]}`}>
               {trip.status}
             </span>
           </div>
@@ -211,7 +211,7 @@ export default function TripDetailPage() {
             key={tabKey}
             type="button"
             onClick={() => setActiveTab(tabKey)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition${
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
               activeTab === tabKey ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
           >
@@ -248,7 +248,7 @@ export default function TripDetailPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STOP_STATUS_STYLES[stop.deliveryStatus]}`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STOP_STATUS_STYLES[stop.deliveryStatus]}`}
                     >
                       {stop.deliveryStatus}
                     </span>

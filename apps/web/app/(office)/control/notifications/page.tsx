@@ -54,7 +54,7 @@ export default function NotificationsLogPage() {
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 statusFilter === st ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
               }`}
             >
@@ -94,7 +94,7 @@ export default function NotificationsLogPage() {
                 <td className="px-4 py-3 text-xs text-ink-3">{n.timestamp}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       n.status === 'SENT'
                         ? 'bg-leaf-soft text-leaf'
                         : n.status === 'FAILED'

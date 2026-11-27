@@ -112,7 +112,7 @@ export default function CloseTripChecklistPage() {
           <div key={item.key} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
             <div className="flex items-center gap-3">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold${
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
                   item.passed ? 'bg-leaf-soft text-leaf' : 'bg-madder-soft text-madder'
                 }`}
               >
@@ -120,7 +120,7 @@ export default function CloseTripChecklistPage() {
               </span>
               <div>
                 <div className="font-semibold text-ink">{item.label}</div>
-                <div className={`text-xs${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <div className={`text-xs ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {item.passed ? 'Passed — ready for trip closure' : item.detail}
                 </div>
               </div>
@@ -156,7 +156,7 @@ export default function CloseTripChecklistPage() {
           type="button"
           disabled={!checklist.canClose || tripClosed}
           onClick={handleCloseTrip}
-          className={`rounded-[3px] px-5 py-2.5 text-sm font-semibold transition${
+          className={`rounded-[3px] px-5 py-2.5 text-sm font-semibold transition ${
             checklist.canClose && !tripClosed
               ? 'bg-leaf text-white hover:bg-emerald-700'
               : 'cursor-not-allowed bg-sunken text-ink-3'

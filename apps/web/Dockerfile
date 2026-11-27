@@ -24,6 +24,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
+ENV NODE_OPTIONS="--max-old-space-size=512"
 ENV API_ORIGIN=http://api:3000
 
 RUN addgroup -g 1001 -S neobus && adduser -S neobus -u 1001 -G neobus

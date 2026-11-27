@@ -120,7 +120,7 @@ export default function TripExpensesPage() {
             key={cat}
             type="button"
             onClick={() => setCategoryFilter(cat)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
               categoryFilter === cat
                 ? 'bg-blue-600 text-white'
                 : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'

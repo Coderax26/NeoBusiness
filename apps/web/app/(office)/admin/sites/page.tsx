@@ -69,7 +69,7 @@ export default function AdminSitesPage() {
               <button
                 type="button"
                 onClick={() => toggleSite(s.id)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold${
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   s.active ? 'bg-leaf-soft text-leaf' : 'bg-sunken text-ink-3'
                 }`}
               >

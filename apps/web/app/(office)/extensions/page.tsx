@@ -76,7 +76,7 @@ export default function ErpExtensionsPage() {
               key={p}
               type="button"
               onClick={() => setPriorityFilter(p)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 priorityFilter === p ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
               }`}
             >
@@ -137,7 +137,7 @@ export default function ErpExtensionsPage() {
             <button
               type="button"
               onClick={() => toggleFlag(ext.id)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold${
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
                 ext.enabledFlag ? 'bg-leaf text-white' : 'bg-sunken text-ink-2'
               }`}
             >

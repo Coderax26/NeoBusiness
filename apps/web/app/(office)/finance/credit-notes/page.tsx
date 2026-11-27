@@ -148,7 +148,7 @@ export default function CreditNotesPage() {
  <td className="px-4 py-3 text-right font-mono font-semibold text-ink">{formatINR(n.amount)}</td>
  <td className="px-4 py-3">
  <span
- className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+ className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
  (n.status as string) ==='APPLIED'
                             ? 'bg-leaf-soft text-leaf'
                             : n.status === 'APPROVED'

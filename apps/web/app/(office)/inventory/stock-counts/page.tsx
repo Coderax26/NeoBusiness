@@ -121,7 +121,7 @@ export default function StockCountsPage() {
                       />
                     </td>
                     <td
-                      className={`py-3 text-right font-mono font-bold${
+                      className={`py-3 text-right font-mono font-bold ${
                         variance === 0
                           ? 'text-emerald-400'
                           : variance < 0

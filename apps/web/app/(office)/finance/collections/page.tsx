@@ -167,7 +167,7 @@ export default function CollectionsPage() {
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  className={`rounded-lg py-1.5 text-xs font-semibold${
+                  className={`rounded-lg py-1.5 text-xs font-semibold ${
                     mode === m
                       ? 'bg-leaf text-white'
                       : 'border border-rule bg-paper text-ink-2'

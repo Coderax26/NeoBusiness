@@ -113,7 +113,7 @@ export default function InventoryTransfersPage() {
           <button
             key={st}
             onClick={() => setStatusFilter(st)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               statusFilter === st
                 ? 'bg-haldi text-white'
                 : 'bg-sunken text-ink-3 hover:text-ink'

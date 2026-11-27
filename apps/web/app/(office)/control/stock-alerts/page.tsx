@@ -65,7 +65,7 @@ export default function StockAlertsControlPage() {
           <button
             key={c.key}
             onClick={() => setFilterType(filterType === c.key ? 'ALL' : c.key)}
-            className={`text-left p-4 rounded-[3px] border transition-colors${
+            className={`text-left p-4 rounded-[3px] border transition-colors ${
               filterType === c.key
                 ? 'bg-haldi-soft border-haldi/30'
                 : 'bg-sheet border-rule hover:border-rule-strong'

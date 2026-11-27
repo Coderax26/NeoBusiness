@@ -60,7 +60,7 @@ export default function StockLedgerExplorerPage() {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
                 typeFilter === t
                   ? 'bg-haldi text-white'
                   : 'bg-sunken text-ink-3 hover:text-ink'
@@ -106,7 +106,7 @@ export default function StockLedgerExplorerPage() {
                   <div className="text-[11px] font-mono text-ink-3 mt-1">{row.refNo}</div>
                 </td>
                 <td
-                  className={`p-3 text-right font-mono font-bold${
+                  className={`p-3 text-right font-mono font-bold ${
                     row.qtyDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'
                   }`}
                 >

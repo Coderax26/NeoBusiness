@@ -337,7 +337,7 @@ export default function SupplierMasterPage() {
       cell: (info) => {
         const rate = info.getValue() as number;
         return (
-          <span className={`text-xs font-mono font-bold${rate >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
+          <span className={`text-xs font-mono font-bold ${rate >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
             {rate.toFixed(1)}%
           </span>
         );
@@ -466,7 +466,7 @@ export default function SupplierMasterPage() {
 
         <button
           onClick={() => setMissingRateOnly(!missingRateOnly)}
-          className={`px-3 py-1.5 rounded-[3px] text-xs font-semibold border transition-all${
+          className={`px-3 py-1.5 rounded-[3px] text-xs font-semibold border transition-all ${
             missingRateOnly
               ? 'bg-madder-soft text-madder border-madder/30'
               : 'bg-paper text-ink-3 border-rule hover:text-ink'
@@ -491,7 +491,7 @@ export default function SupplierMasterPage() {
           <div className="flex border-b border-rule text-xs font-semibold gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('general')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'general' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -501,7 +501,7 @@ export default function SupplierMasterPage() {
               <>
                 <button
                   onClick={() => setActiveTab('items')}
-                  className={`pb-2 border-b-2 transition-colors${
+                  className={`pb-2 border-b-2 transition-colors ${
                     activeTab === 'items' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >
@@ -509,7 +509,7 @@ export default function SupplierMasterPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab('rates')}
-                  className={`pb-2 border-b-2 transition-colors${
+                  className={`pb-2 border-b-2 transition-colors ${
                     activeTab === 'rates' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >
@@ -517,7 +517,7 @@ export default function SupplierMasterPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab('performance')}
-                  className={`pb-2 border-b-2 transition-colors${
+                  className={`pb-2 border-b-2 transition-colors ${
                     activeTab === 'performance' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                   }`}
                 >

@@ -159,7 +159,7 @@ export default function ReportsLibraryPage() {
               key={a}
               type="button"
               onClick={() => setAreaFilter(a)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 areaFilter === a
                   ? 'bg-leaf text-white'
                   : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'

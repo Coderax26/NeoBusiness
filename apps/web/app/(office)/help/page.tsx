@@ -27,7 +27,7 @@ export default function HelpCentrePage() {
         <button
           type="button"
           onClick={() => setPracticeMode((p) => !p)}
-          className={`rounded-lg px-4 py-2 text-xs font-semibold${
+          className={`rounded-lg px-4 py-2 text-xs font-semibold ${
             practiceMode
               ? 'bg-amber-500 text-white'
               : 'border border-rule bg-sheet text-ink hover:bg-sunken'

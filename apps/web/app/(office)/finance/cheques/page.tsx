@@ -123,7 +123,7 @@ export default function ChequesBoardPage() {
                     {formatINR(c.amount)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STATUS_STYLE[c.status]}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[c.status]}`}>
                       {c.status}
                     </span>
                   </td>

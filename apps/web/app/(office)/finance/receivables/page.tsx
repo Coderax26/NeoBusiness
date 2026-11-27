@@ -155,7 +155,7 @@ export default function ReceivablesPage() {
                     <button
                       type="button"
                       onClick={() => toggleCreditHold(c.customerId)}
-                      className={`rounded px-2.5 py-1 text-xs font-semibold${
+                      className={`rounded px-2.5 py-1 text-xs font-semibold ${
                         c.creditHold
                           ? 'border border-leaf/30 bg-leaf-soft text-leaf'
                           : 'border border-madder/30 bg-madder-soft text-madder'

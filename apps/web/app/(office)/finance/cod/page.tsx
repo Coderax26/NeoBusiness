@@ -82,7 +82,7 @@ export default function CodSettlementPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         s.status === 'SETTLED' ? 'bg-leaf-soft text-leaf' : 'bg-haldi-soft text-haldi'
                       }`}
                     >

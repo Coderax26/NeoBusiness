@@ -209,7 +209,7 @@ export default function ControlAnalyticsPage() {
  key={t.key}
  type="button"
  onClick={() => setActiveTab(t.key)}
- className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+ className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
  activeTab === t.key ?'bg-teal-600 text-white' : 'bg-sheet text-ink-3 hover:bg-sunken hover:text-ink'
             }`}
           >

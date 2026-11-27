@@ -304,7 +304,7 @@ export default function PlanNewTripPage() {
             </div>
             <div className="w-full h-2.5 bg-sunken rounded-full overflow-hidden">
               <div
-                className={`h-full${
+                className={`h-full ${
                   readiness.isOverCapacity
                     ? 'bg-rose-500'
                     : capPct > 85

@@ -87,7 +87,7 @@ export default function GoodsReceivedPage() {
         <div className="flex items-center gap-2 bg-sheet border border-rule rounded-[3px] p-1">
           <button
             onClick={() => setViewRoleMode('OFFICE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               viewRoleMode === 'OFFICE'
                 ? 'bg-indigo-600 text-white'
                 : 'text-ink-3 hover:text-ink'
@@ -97,7 +97,7 @@ export default function GoodsReceivedPage() {
           </button>
           <button
             onClick={() => setViewRoleMode('BLIND_STOREKEEPER')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               viewRoleMode === 'BLIND_STOREKEEPER'
                 ? 'bg-haldi text-white'
                 : 'text-ink-3 hover:text-ink'
@@ -127,7 +127,7 @@ export default function GoodsReceivedPage() {
             {grns.map((g) => (
               <tr
                 key={g.id}
-                className={`hover:bg-sunken cursor-pointer${
+                className={`hover:bg-sunken cursor-pointer ${
                   selectedGrn?.id === g.id ? 'bg-indigo-500/10' : ''
                 }`}
                 onClick={() => setSelectedGrn(g)}

@@ -51,7 +51,7 @@ export class PricingService implements OnModuleInit {
     targetPrice: string;
     minMarginPct: number;
   } | null> {
-    const row = await this.knex('daily_price_lists')
+    let row = await this.knex('daily_price_lists')
       .where('item_id', itemId)
       .where('effective_date', date)
       .first(
@@ -62,6 +62,22 @@ export class PricingService implements OnModuleInit {
         'target_price',
         'min_margin_pct_used',
       );
+
+    // Carry forward most recent price band on or before `date` if today's prices are not yet published
+    if (!row) {
+      row = await this.knex('daily_price_lists')
+        .where('item_id', itemId)
+        .where('effective_date', '<=', date)
+        .orderBy('effective_date', 'desc')
+        .first(
+          'item_id',
+          'effective_date',
+          'latest_landed_cost',
+          'floor_price',
+          'target_price',
+          'min_margin_pct_used',
+        );
+    }
 
     if (!row) {
       return null;

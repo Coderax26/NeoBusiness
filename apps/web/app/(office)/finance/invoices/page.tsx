@@ -79,7 +79,7 @@ export default function InvoicesPage() {
             key={st}
             type="button"
             onClick={() => setStatusFilter(st)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
               statusFilter === st
                 ? 'bg-leaf text-white'
                 : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
@@ -123,7 +123,7 @@ export default function InvoicesPage() {
                     {formatINR(inv.balanceAmount)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${STATUS_COLORS[inv.status]}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[inv.status]}`}>
                       {inv.status}
                     </span>
                   </td>

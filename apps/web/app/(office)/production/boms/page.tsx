@@ -183,7 +183,7 @@ export default function BomsPage() {
             <div
               key={bom.id}
               onClick={() => setSelectedBomId(bom.id)}
-              className={`p-4 rounded-[3px] border cursor-pointer transition-colors${
+              className={`p-4 rounded-[3px] border cursor-pointer transition-colors ${
                 selectedBom.id === bom.id
                   ? 'bg-orange-500/10 border-orange-500'
                   : 'bg-sheet border-rule hover:border-rule-strong'

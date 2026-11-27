@@ -180,24 +180,24 @@ export class OrderService implements OnModuleInit {
             throw new NotFoundException(`Item ${line.itemId} not found`);
           }
 
-          // Verify band exists for today
+          // Verify band exists for today (falls back to most recent carried-forward band)
           const band = await this.pricing.getBand(
             line.itemId,
             new Date().toISOString().split('T')[0],
           );
           if (!band) {
             throw new BadRequestException(
-              `Price band not set for item ${line.itemId} today`,
+              `Price band not set for item "${item.name}" (${item.skuCode || line.itemId}). Please publish prices in Sales → Today's Prices first.`,
             );
           }
 
-          // Compute margin
+          // Compute margin (allow 0% break-even or negative-margin override requests; only reject <= ₹0 requested price)
           const requested = Money.of(line.requestedPrice);
           const cost = Money.of(band.latestLandedCost);
           const margin = Money.marginPct(requested, cost);
-          if (margin === null || margin.isZero()) {
+          if (requested.isZero() || requested.isNegative() || margin === null) {
             throw new BadRequestException(
-              `Requested price (${line.requestedPrice}) is zero or cost is zero`,
+              `Requested price for "${item.name}" must be greater than ₹0.`,
             );
           }
 
@@ -279,7 +279,7 @@ export class OrderService implements OnModuleInit {
         const band = await this.pricing.getBand(line.item_id, today);
         if (!band)
           throw new BadRequestException(
-            `Price band not set for item ${line.item_id} today`,
+            `Price band not set for item ${line.item_id}. Please publish prices in Sales → Today's Prices first.`,
           );
 
         const requested = Money.of(line.quoted_unit_price);

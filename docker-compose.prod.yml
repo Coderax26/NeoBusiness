@@ -61,6 +61,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      NODE_OPTIONS: "--max-old-space-size=768"
       LOG_FORMAT: ${LOG_FORMAT:-json}
       LOG_LEVEL: ${LOG_LEVEL:-log}
       APP_TZ: ${APP_TZ:-Asia/Kolkata}
@@ -116,6 +117,7 @@ services:
       NODE_ENV: production
       PORT: 4000
       HOSTNAME: 0.0.0.0
+      NODE_OPTIONS: "--max-old-space-size=512"
       API_ORIGIN: http://api:3000
       COOKIE_SECURE: ${COOKIE_SECURE:-auto}
       NEXT_PUBLIC_SHOW_DEMO_PERSONAS: ${NEXT_PUBLIC_SHOW_DEMO_PERSONAS:-false}
@@ -131,7 +133,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 512M
+          memory: 768M
     security_opt:
       - no-new-privileges:true
 

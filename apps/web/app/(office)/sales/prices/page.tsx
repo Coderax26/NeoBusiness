@@ -366,7 +366,7 @@ export default function TodaysPricesPage() {
                       value={row.floorPrice ?? ''}
                       onChange={(e) => handlePriceChange(row.itemId, 'floorPrice', e.target.value)}
                       placeholder="Set floor"
-                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none${
+                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none ${
                         isFloorBelowSuggested
                           ? 'border-amber-500'
                           : row.floorPrice === null
@@ -386,7 +386,7 @@ export default function TodaysPricesPage() {
                       value={row.targetPrice ?? ''}
                       onChange={(e) => handlePriceChange(row.itemId, 'targetPrice', e.target.value)}
                       placeholder="Set target"
-                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none${
+                      className={`w-24 bg-paper border rounded-lg px-2.5 py-1.5 font-mono text-xs text-ink focus:outline-none ${
                         isTargetBelowFloor
                           ? 'border-rose-500'
                           : row.targetPrice === null
@@ -403,7 +403,7 @@ export default function TodaysPricesPage() {
                       <Badge tone="danger">Missing</Badge>
                     ) : (
                       <span
-                        className={`font-bold${
+                        className={`font-bold ${
                           isBigChange
                             ? 'text-amber-400'
                             : changePct > 0

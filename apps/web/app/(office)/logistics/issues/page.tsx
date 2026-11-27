@@ -62,7 +62,7 @@ export default function DeliveryIssuesDeskPage() {
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 filterStatus === status
                   ? 'bg-blue-600 text-white'
                   : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
@@ -88,7 +88,7 @@ export default function DeliveryIssuesDeskPage() {
                     <span className="font-mono text-sm font-bold text-ink">{issue.issueNo}</span>
                     <span className="rounded bg-madder-soft px-2 py-0.5 text-xs font-semibold text-madder">{issue.type}</span>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         issue.status === 'OPEN' ? 'bg-haldi-soft text-haldi' : 'bg-leaf-soft text-leaf'
                       }`}
                     >
@@ -138,7 +138,7 @@ export default function DeliveryIssuesDeskPage() {
               {(['REDELIVER', 'CREDIT_NOTE', 'WRITE_OFF'] as const).map((outcome) => (
                 <label
                   key={outcome}
-                  className={`flex cursor-pointer items-center justify-between rounded-[3px] border p-3 text-sm${
+                  className={`flex cursor-pointer items-center justify-between rounded-[3px] border p-3 text-sm ${
                     selectedOutcome === outcome
                       ? 'border-blue-500 bg-blue-500/15 font-semibold text-blue-300'
                       : 'border-rule bg-paper text-ink-2'

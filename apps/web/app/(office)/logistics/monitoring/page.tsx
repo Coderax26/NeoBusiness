@@ -105,17 +105,17 @@ export default function FleetMonitoringPage() {
                   <td className="px-4 py-3 font-semibold text-ink">{v.tripsThisMonth ?? 0}</td>
                   <td className="px-4 py-3 font-mono text-ink-2">{Number(v.kmThisMonth ?? 0).toLocaleString('en-IN')} km</td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${getExpiryBadge(v.insuranceExpiry || v.insurance_expiry || '')}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${getExpiryBadge(v.insuranceExpiry || v.insurance_expiry || '')}`}>
                       {v.insuranceExpiry || v.insurance_expiry || '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${getExpiryBadge(v.fitnessExpiry || v.fitness_expiry || '')}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${getExpiryBadge(v.fitnessExpiry || v.fitness_expiry || '')}`}>
                       {v.fitnessExpiry || v.fitness_expiry || '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${getExpiryBadge(v.pucExpiry || v.puc_expiry || '')}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${getExpiryBadge(v.pucExpiry || v.puc_expiry || '')}`}>
                       {v.pucExpiry || v.puc_expiry || '—'}
                     </span>
                   </td>
@@ -167,7 +167,7 @@ export default function FleetMonitoringPage() {
                     </div>
                   </div>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       col.handoverStatus === 'SETTLED' ? 'bg-leaf-soft text-leaf' : 'bg-haldi-soft text-haldi'
                     }`}
                   >

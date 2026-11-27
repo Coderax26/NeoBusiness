@@ -185,7 +185,7 @@ export default function ProcurementPipelineHomePage() {
               <Link
                 href={stage.href}
                 onMouseEnter={() => setSelectedStage(stage.id)}
-                className={`flex-1 rounded-[3px] border bg-gradient-to-br p-4 transition-all hover:scale-[1.02] hover:border-indigo-400${stage.accent}${
+                className={`flex-1 rounded-[3px] border bg-gradient-to-br p-4 transition-all hover:scale-[1.02] hover:border-indigo-400 ${stage.accent}${
                   selectedStage === stage.id ? 'ring-1 ring-indigo-500/60' : ''
                 }`}
               >

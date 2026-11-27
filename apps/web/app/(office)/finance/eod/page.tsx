@@ -205,7 +205,7 @@ export default function EodClosingPage() {
           <div key={item.key} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
             <div className="flex items-center gap-3">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold${
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
                   item.passed ? 'bg-leaf-soft text-leaf' : 'bg-madder-soft text-madder'
                 }`}
               >
@@ -213,7 +213,7 @@ export default function EodClosingPage() {
               </span>
               <div>
                 <div className="font-semibold text-ink">{item.label}</div>
-                <div className={`text-xs${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <div className={`text-xs ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {item.passed ? 'Passed' : item.detail}
                 </div>
               </div>

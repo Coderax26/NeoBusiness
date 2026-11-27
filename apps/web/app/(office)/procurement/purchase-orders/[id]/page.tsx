@@ -202,7 +202,7 @@ export default function PurchaseOrderDetailPage({
           {LIFECYCLE_STEPS.map((step, idx) => (
             <div
               key={step.key}
-              className={`p-3 rounded-lg border text-xs font-medium${
+              className={`p-3 rounded-lg border text-xs font-medium ${
                 idx < currentStepIdx
                   ? 'bg-leaf-soft border-leaf/30 text-leaf'
                   : idx === currentStepIdx

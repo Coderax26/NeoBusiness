@@ -459,7 +459,7 @@ export default function CustomerMasterPage() {
         const isOver = cust.outstandingRupees > cust.creditLimitRupees;
         return (
           <div className="text-xs">
-            <span className={`font-mono font-bold${isOver ? 'text-rose-400' : 'text-ink'}`}>
+            <span className={`font-mono font-bold ${isOver ? 'text-rose-400' : 'text-ink'}`}>
               {formatINR(cust.outstandingRupees)}
             </span>
             {cust.overdueDays > 0 && (
@@ -497,7 +497,7 @@ export default function CustomerMasterPage() {
  <span className="text-zinc-700">|</span>
  <button
  onClick={() => toggleCustomerActive(cust.id)}
- className={`text-xs font-medium${
+ className={`text-xs font-medium ${
  cust.active ?'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'
               }`}
             >
@@ -619,7 +619,7 @@ export default function CustomerMasterPage() {
         <div className="flex items-center gap-1 bg-paper p-1 rounded-[3px] border border-rule">
           <button
             onClick={() => setViewMode('table')}
-            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors${
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
               viewMode === 'table' ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
             }`}
           >
@@ -627,7 +627,7 @@ export default function CustomerMasterPage() {
           </button>
           <button
             onClick={() => setViewMode('cards')}
-            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors${
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
               viewMode === 'cards' ? 'bg-sunken text-ink font-bold' : 'text-ink-3 hover:text-ink'
             }`}
           >
@@ -668,7 +668,7 @@ export default function CustomerMasterPage() {
                 </div>
                 <div>
                   <span className="text-ink-3 block text-[11px]">Outstanding</span>
-                  <span className={`font-mono font-bold${cust.outstandingRupees > cust.creditLimitRupees ? 'text-rose-400' : 'text-ink'}`}>
+                  <span className={`font-mono font-bold ${cust.outstandingRupees > cust.creditLimitRupees ? 'text-rose-400' : 'text-ink'}`}>
                     ₹{cust.outstandingRupees.toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -705,7 +705,7 @@ export default function CustomerMasterPage() {
           <div className="flex border-b border-rule text-xs font-semibold gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('business')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'business' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -713,7 +713,7 @@ export default function CustomerMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('contact')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'contact' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -721,7 +721,7 @@ export default function CustomerMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('credit')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'credit' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -729,7 +729,7 @@ export default function CustomerMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('contacts')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'contacts' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >

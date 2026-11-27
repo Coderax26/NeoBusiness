@@ -215,7 +215,7 @@ export default function StockOverviewPage() {
             <button
               key={tab.key}
               onClick={() => setViewMode(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
                 viewMode === tab.key
                   ? 'bg-haldi text-white'
                   : 'bg-sunken text-ink-3 hover:text-ink'
@@ -278,7 +278,7 @@ export default function StockOverviewPage() {
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-sunken rounded-full overflow-hidden">
                             <div
-                              className={`h-full${isLow ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                              className={`h-full ${isLow ? 'bg-rose-500' : 'bg-emerald-500'}`}
                               style={{ width: `${ratio}%` }}
                             />
                           </div>
@@ -420,7 +420,7 @@ export default function StockOverviewPage() {
                       <span className="text-ink-2">{m.refNo}</span>
                     </div>
                     <span
-                      className={`font-mono font-bold${
+                      className={`font-mono font-bold ${
                         m.qtyDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >

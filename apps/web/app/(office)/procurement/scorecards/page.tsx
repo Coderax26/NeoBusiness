@@ -98,7 +98,7 @@ export default function SupplierScorecardsPage() {
                 <tr
                   key={row.supplierId}
                   onClick={() => setSelectedSupplier(row)}
-                  className={`hover:bg-sunken cursor-pointer${
+                  className={`hover:bg-sunken cursor-pointer ${
                     selectedSupplier?.supplierId === row.supplierId ? 'bg-indigo-500/10' : ''}`}
  >
  <td className="p-3 font-mono text-xs text-ink-3">#{idx + 1}</td>

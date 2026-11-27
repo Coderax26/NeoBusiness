@@ -172,7 +172,7 @@ export default function ControlApprovalsPage() {
           <button
             type="button"
             onClick={() => setTab('PENDING')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
               tab === 'PENDING' ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
@@ -181,7 +181,7 @@ export default function ControlApprovalsPage() {
           <button
             type="button"
             onClick={() => setTab('HISTORY')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold${
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
               tab === 'HISTORY' ? 'bg-zinc-100 text-zinc-950' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
@@ -215,7 +215,7 @@ export default function ControlApprovalsPage() {
               setTypeFilter(t);
               setFocusedIdx(0);
             }}
-            className={`rounded-lg px-3 py-1 text-xs font-semibold${
+            className={`rounded-lg px-3 py-1 text-xs font-semibold ${
               typeFilter === t ? 'bg-action text-white' : 'border border-rule-strong bg-sheet text-ink-2'
             }`}
           >
@@ -238,7 +238,7 @@ export default function ControlApprovalsPage() {
             <div
               key={exc.id}
               onClick={() => setFocusedIdx(idx)}
-              className={`rounded-[4px] border bg-sheet p-5 transition${
+              className={`rounded-[4px] border bg-sheet p-5 transition ${
                 isFocused ? 'border-action/30 ring-1 ring-teal-500/40' : 'border-rule'
               }`}
             >

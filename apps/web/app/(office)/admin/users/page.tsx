@@ -176,7 +176,7 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       u.status === 'ACTIVE' ? 'bg-leaf-soft text-leaf' : 'bg-madder-soft text-madder'
                     }`}
                   >

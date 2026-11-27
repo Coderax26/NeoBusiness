@@ -356,7 +356,7 @@ export default function ItemMasterPage() {
         const isLow = item.currentStock <= item.minStockQty;
         return (
           <div className="text-xs">
-            <span className={`font-mono font-bold${isLow ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span className={`font-mono font-bold ${isLow ? 'text-rose-400' : 'text-emerald-400'}`}>
               {item.currentStock} {item.primaryUom}
             </span>
             {isLow && (
@@ -403,7 +403,7 @@ export default function ItemMasterPage() {
  <span className="text-zinc-700">|</span>
  <button
  onClick={() => toggleItemActive(item.id)}
- className={`text-xs font-medium${item.active ?'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'}`}
+ className={`text-xs font-medium ${item.active ?'text-zinc-400 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'}`}
             >
               {item.active ? 'Deactivate' : 'Activate'}
             </button>
@@ -522,7 +522,7 @@ export default function ItemMasterPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setLowStockFilter(!lowStockFilter)}
-            className={`px-3 py-1.5 rounded-[3px] text-xs font-semibold border transition-all${
+            className={`px-3 py-1.5 rounded-[3px] text-xs font-semibold border transition-all ${
               lowStockFilter
                 ? 'bg-madder-soft text-madder border-madder/30'
                 : 'bg-paper text-ink-3 border-rule hover:text-ink'
@@ -552,7 +552,7 @@ export default function ItemMasterPage() {
           <div className="flex border-b border-rule text-xs font-semibold gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('basics')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'basics' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -560,7 +560,7 @@ export default function ItemMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('units')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'units' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -568,7 +568,7 @@ export default function ItemMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('tax')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'tax' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -576,7 +576,7 @@ export default function ItemMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('pricing')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'pricing' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -584,7 +584,7 @@ export default function ItemMasterPage() {
             </button>
             <button
               onClick={() => setActiveTab('stock')}
-              className={`pb-2 border-b-2 transition-colors${
+              className={`pb-2 border-b-2 transition-colors ${
                 activeTab === 'stock' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
@@ -593,7 +593,7 @@ export default function ItemMasterPage() {
             {category === 'PROCESSED_FG' && (
               <button
                 onClick={() => setActiveTab('recipe')}
-                className={`pb-2 border-b-2 transition-colors${
+                className={`pb-2 border-b-2 transition-colors ${
                   activeTab === 'recipe' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
                 }`}
               >

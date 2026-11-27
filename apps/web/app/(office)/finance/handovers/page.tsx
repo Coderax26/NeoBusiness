@@ -155,7 +155,7 @@ export default function CashHandoversPage() {
                 key={h.id}
                 type="button"
                 onClick={() => setSelectedId(h.id)}
-                className={`w-full rounded-[3px] border p-4 text-left transition${
+                className={`w-full rounded-[3px] border p-4 text-left transition ${
                   selected?.id === h.id
                     ? 'border-leaf/30 bg-leaf-soft'
                     : 'border-rule bg-sheet hover:border-rule-strong'
@@ -163,7 +163,7 @@ export default function CashHandoversPage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-ink">{h.staffName}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold${STATUS_BADGE[h.status]}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[h.status]}`}>
                     {h.status}
                   </span>
                 </div>
@@ -235,7 +235,7 @@ export default function CashHandoversPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
                 <div className="text-xs text-ink-3">
                   Variance:{' '}
-                  <span className={`font-mono font-bold${evaluation.isDisputed ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  <span className={`font-mono font-bold ${evaluation.isDisputed ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {formatINR(evaluation.cashVariance)}
                   </span>
                 </div>

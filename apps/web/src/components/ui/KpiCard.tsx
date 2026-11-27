@@ -32,7 +32,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 
   return (
     <div
-      className={`px-4 py-3.5 rounded-[4px] border flex flex-col justify-between${toneClasses[tone]}`}
+      className={`px-4 py-3.5 rounded-[4px] border flex flex-col justify-between ${toneClasses[tone]}`}
     >
       <div className="flex items-start justify-between">
         <span className="text-[13px] font-medium text-ink-2">
@@ -40,7 +40,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         </span>
         {trend && (
           <span
-            className={`text-[12.5px] font-medium${
+            className={`text-[12.5px] font-medium ${
               trend.direction === 'up'
                 ? 'text-leaf'
                 : trend.direction === 'down'

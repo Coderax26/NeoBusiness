@@ -51,7 +51,7 @@ export default function RolloutReadinessPage() {
               key={r}
               type="button"
               onClick={() => setReleaseStage(r)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                 releaseStage === r
                   ? 'bg-leaf text-white'
                   : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'

@@ -145,28 +145,37 @@ export default function QuickOrderEntryPage() {
         if (priceRes.ok) {
           const priceRows = await priceRes.json();
           if (active && Array.isArray(priceRows) && priceRows.length > 0) {
-            const mappedPrices: DailyPriceRow[] = priceRows.map((r: any) => ({
-              itemId: String(r.itemId),
-              sku: String(r.skuCode || ''),
-              itemName: String(r.itemName || ''),
-              category:
-                r.itemCategory === 'RAW_MATERIAL' ||
-                r.itemCategory === 'PROCESSED_FG' ||
-                r.itemCategory === 'TRADED_GOOD'
-                  ? r.itemCategory
-                  : 'PROCESSED_FG',
-              uom: String(r.primaryUom || 'KG').toLowerCase(),
-              yesterdayFloor: Number(r.floorPrice ?? 0),
-              yesterdayTarget: Number(r.targetPrice ?? 0),
-              landedCost: Number(r.latestLandedCost ?? 0),
-              minMarginPct: Number(r.minMarginPctUsed ?? 0.15) * 100,
-              floorPrice: r.floorPrice != null ? Number(r.floorPrice) : null,
-              targetPrice: r.targetPrice != null ? Number(r.targetPrice) : null,
-              atpStock: 500,
-            }));
+            const mappedPrices: DailyPriceRow[] = priceRows.map((r: any) => {
+              const isUnset = r.source === 'UNSET';
+              const floor = isUnset || r.floorPrice == null ? null : Number(r.floorPrice);
+              const target = isUnset || r.targetPrice == null ? null : Number(r.targetPrice);
+              return {
+                itemId: String(r.itemId),
+                sku: String(r.skuCode || ''),
+                itemName: String(r.itemName || ''),
+                category:
+                  r.itemCategory === 'RAW_MATERIAL' ||
+                  r.itemCategory === 'PROCESSED_FG' ||
+                  r.itemCategory === 'TRADED_GOOD'
+                    ? r.itemCategory
+                    : 'PROCESSED_FG',
+                uom: String(r.primaryUom || 'KG').toLowerCase(),
+                yesterdayFloor: floor ?? 0,
+                yesterdayTarget: target ?? 0,
+                landedCost: Number(r.latestLandedCost ?? 0),
+                minMarginPct: Number(r.minMarginPctUsed ?? 0.15) * 100,
+                floorPrice: floor,
+                targetPrice: target,
+                priceSource: String(r.source || ''),
+                isPublished: Boolean(r.isPublished),
+                atpStock: 500,
+              };
+            });
             setDailyPrices(mappedPrices);
             const firstItem = mappedPrices[0];
             setFocusedItemId(firstItem.itemId);
+            const defaultTarget = firstItem.targetPrice ?? (firstItem.yesterdayTarget || 0);
+            const defaultFloor = firstItem.floorPrice ?? (firstItem.yesterdayFloor || 0);
             setLines((prev) =>
               prev.length === 0
                 ? [
@@ -178,9 +187,9 @@ export default function QuickOrderEntryPage() {
                       category: firstItem.category,
                       qty: 50,
                       uom: firstItem.uom,
-                      unitPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
-                      floorPrice: firstItem.floorPrice ?? firstItem.yesterdayFloor ?? 90,
-                      targetPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                      unitPrice: defaultTarget,
+                      floorPrice: defaultFloor,
+                      targetPrice: defaultTarget,
                       atpStock: firstItem.atpStock,
                       gstPct: 5,
                       reservedQty: 0,
@@ -196,9 +205,9 @@ export default function QuickOrderEntryPage() {
                           category: firstItem.category,
                           qty: 50,
                           uom: firstItem.uom,
-                          unitPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
-                          floorPrice: firstItem.floorPrice ?? firstItem.yesterdayFloor ?? 90,
-                          targetPrice: firstItem.targetPrice ?? firstItem.yesterdayTarget ?? 95,
+                          unitPrice: defaultTarget,
+                          floorPrice: defaultFloor,
+                          targetPrice: defaultTarget,
                           atpStock: firstItem.atpStock,
                         }
                       : l,
@@ -262,7 +271,7 @@ export default function QuickOrderEntryPage() {
     return () => {
       active = false;
     };
-  }, [customer, deliveryDate]);
+  }, [customer.id, customer.name, deliveryDate]);
 
   // Totals calculation
   const subtotal = lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
@@ -299,9 +308,9 @@ export default function QuickOrderEntryPage() {
       category: nextItem.category,
       qty: 50,
       uom: nextItem.uom,
-      unitPrice: nextItem.targetPrice ?? nextItem.yesterdayTarget,
-      floorPrice: nextItem.floorPrice ?? nextItem.yesterdayFloor,
-      targetPrice: nextItem.targetPrice ?? nextItem.yesterdayTarget,
+      unitPrice: nextItem.targetPrice ?? (nextItem.yesterdayTarget || 0),
+      floorPrice: nextItem.floorPrice ?? (nextItem.yesterdayFloor || 0),
+      targetPrice: nextItem.targetPrice ?? (nextItem.yesterdayTarget || 0),
       atpStock: nextItem.atpStock,
       gstPct: 5,
       reservedQty: 0,
@@ -325,9 +334,9 @@ export default function QuickOrderEntryPage() {
               itemName: itemMeta.itemName,
               category: itemMeta.category,
               uom: itemMeta.uom,
-              unitPrice: itemMeta.targetPrice ?? itemMeta.yesterdayTarget,
-              floorPrice: itemMeta.floorPrice ?? itemMeta.yesterdayFloor,
-              targetPrice: itemMeta.targetPrice ?? itemMeta.yesterdayTarget,
+              unitPrice: itemMeta.targetPrice ?? (itemMeta.yesterdayTarget || 0),
+              floorPrice: itemMeta.floorPrice ?? (itemMeta.yesterdayFloor || 0),
+              targetPrice: itemMeta.targetPrice ?? (itemMeta.yesterdayTarget || 0),
               atpStock: itemMeta.atpStock,
             };
           }
@@ -360,8 +369,26 @@ export default function QuickOrderEntryPage() {
       setSubmitError('Live customer and site data from the backend are still loading. Please retry in a moment.');
       return;
     }
+    if (lines.length === 0) {
+      setSubmitError('Add at least one item line before submitting.');
+      return;
+    }
     if (lines.some((l) => !UUID_RE.test(l.itemId))) {
       setSubmitError('Live item prices from the backend are still loading. Please select a valid item.');
+      return;
+    }
+    const unsetLine = lines.find((l) => {
+      const meta = dailyPrices.find((p) => p.itemId === l.itemId);
+      return meta?.priceSource === 'UNSET';
+    });
+    if (unsetLine) {
+      setSubmitError(
+        `Price band is not set for ${unsetLine.itemName || 'selected item'}. Please set and publish its price in Sales → Today's Prices before creating an order.`,
+      );
+      return;
+    }
+    if (lines.some((l) => !(Number(l.qty) > 0) || !(Number(l.unitPrice) > 0))) {
+      setSubmitError('Each order line must have quantity and unit price greater than 0.');
       return;
     }
 
@@ -385,6 +412,12 @@ export default function QuickOrderEntryPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 502 || res.status === 503) {
+          setSubmitError(
+            `Server is temporarily unavailable (HTTP ${res.status}). It may be restarting or redeploying — please retry in a few seconds.`,
+          );
+          return;
+        }
         const msg =
           payload?.error?.message ||
           (Array.isArray(payload?.message) ? payload.message.join(', ') : payload?.message) ||
@@ -443,6 +476,9 @@ export default function QuickOrderEntryPage() {
 
   const focusedItemMeta =
     dailyPrices.find((p) => p.itemId === focusedItemId) || dailyPrices[0] || null;
+  const hasUnsetPriceLine = lines.some(
+    (l) => dailyPrices.find((p) => p.itemId === l.itemId)?.priceSource === 'UNSET',
+  );
 
   // After submit success screen (§4.2)
   if (submittedOrder) {
@@ -520,7 +556,7 @@ export default function QuickOrderEntryPage() {
           <div className="flex items-center gap-1 bg-sheet p-1 rounded-[3px] border border-rule text-xs">
             <button
               onClick={() => setMode('GUIDED')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
                 mode === 'GUIDED' ? 'bg-action text-white' : 'text-ink-3 hover:text-ink'
               }`}
             >
@@ -528,7 +564,7 @@ export default function QuickOrderEntryPage() {
             </button>
             <button
               onClick={() => setMode('EXPRESS')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
                 mode === 'EXPRESS' ? 'bg-action text-white' : 'text-ink-3 hover:text-ink'
               }`}
             >
@@ -549,7 +585,7 @@ export default function QuickOrderEntryPage() {
             <button
               key={s.num}
               onClick={() => setGuidedStep(s.num)}
-              className={`flex-1 py-2 px-3 rounded-[3px] font-bold transition-all text-center${
+              className={`flex-1 py-2 px-3 rounded-[3px] font-bold transition-all text-center ${
                 guidedStep === s.num
                   ? 'bg-action/20 text-action border border-action/30'
                   : guidedStep > s.num
@@ -656,7 +692,7 @@ export default function QuickOrderEntryPage() {
               </span>
               <div className="flex-1 max-w-xs h-2 bg-sunken rounded-full overflow-hidden">
                 <div
-                  className={`h-full transition-all${
+                  className={`h-full transition-all ${
                     creditEval.status === 'BREACH' || creditEval.status === 'HOLD'
                       ? 'bg-rose-500'
                       : creditEval.status === 'NEAR_LIMIT'
@@ -765,7 +801,7 @@ export default function QuickOrderEntryPage() {
                                 unitPrice: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className={`w-24 bg-paper border rounded-lg px-2 py-1.5 font-mono text-ink focus:outline-none${
+                            className={`w-24 bg-paper border rounded-lg px-2 py-1.5 font-mono text-ink focus:outline-none ${
                               band.status === 'BELOW_FLOOR'
                                 ? 'border-amber-500'
                                 : 'border-rule focus:border-action/30'
@@ -779,7 +815,7 @@ export default function QuickOrderEntryPage() {
                         </td>
                         <td className="py-2.5 px-2">
                           <span
-                            className={`text-[11px] font-medium${
+                            className={`text-[11px] font-medium ${
                               stock.status === 'AVAILABLE' ? 'text-emerald-400' : 'text-amber-400'
                             }`}
                           >
@@ -816,6 +852,17 @@ export default function QuickOrderEntryPage() {
               </span>
             </div>
 
+            {hasUnsetPriceLine && (
+              <div className="p-3 rounded-[3px] bg-haldi-soft border border-haldi/30 text-xs text-haldi flex items-center justify-between gap-2 flex-wrap">
+                <span>
+                  ⚠ One or more selected items do not have a published price band yet. Set floor &amp; target prices before creating orders.
+                </span>
+                <Link href="/sales/prices" className="font-semibold underline hover:opacity-80">
+                  Set Today&apos;s Prices →
+                </Link>
+              </div>
+            )}
+
             {mode === 'GUIDED' && guidedStep === 2 && (
               <div className="flex justify-between pt-3 border-t border-rule">
                 <Button variant="ghost" size="sm" onClick={() => setGuidedStep(1)}>
@@ -834,32 +881,45 @@ export default function QuickOrderEntryPage() {
               <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
                 Last Prices ({customer.code})
               </h3>
-              <p className="text-[11px] text-ink-3 mt-0.5 truncate">{focusedItemMeta.itemName}</p>
+              <p className="text-[11px] text-ink-3 mt-0.5 truncate">
+                {focusedItemMeta ? focusedItemMeta.itemName : 'Select an item to view price guidance.'}
+              </p>
             </div>
 
-            <div className="space-y-2">
-              {(focusedItemMeta.lastPricesForCustomer || []).map((lp, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between text-xs p-2 rounded-[3px] bg-paper border border-rule"
-                >
-                  <span className="text-ink-3">{lp.date}</span>
-                  <span className="font-mono font-bold text-ink">₹{lp.price}</span>
+            {focusedItemMeta ? (
+              <>
+                <div className="space-y-2">
+                  {(focusedItemMeta.lastPricesForCustomer || []).map((lp, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-xs p-2 rounded-[3px] bg-paper border border-rule"
+                    >
+                      <span className="text-ink-3">{lp.date}</span>
+                      <span className="font-mono font-bold text-ink">₹{lp.price}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="pt-3 border-t border-rule text-xs space-y-1">
-              <div className="text-ink-3">Today&apos;s Suggested Target:</div>
-              <div className="text-lg font-mono font-semibold text-action">
-                ₹{focusedItemMeta.targetPrice ?? focusedItemMeta.yesterdayTarget} / {focusedItemMeta.uom}
-              </div>
-              {isOwner && (
-                <div className="text-[11px] text-ink-3">
-                  Today&apos;s Floor: ₹{focusedItemMeta.floorPrice ?? focusedItemMeta.yesterdayFloor}
+                <div className="pt-3 border-t border-rule text-xs space-y-1">
+                  <div className="text-ink-3">Today&apos;s Suggested Target:</div>
+                  <div className="text-lg font-mono font-semibold text-action">
+                    {focusedItemMeta.priceSource === 'UNSET'
+                      ? 'Not set'
+                      : `₹${focusedItemMeta.targetPrice ?? focusedItemMeta.yesterdayTarget} / ${focusedItemMeta.uom}`}
+                  </div>
+                  {isOwner && (
+                    <div className="text-[11px] text-ink-3">
+                      Today&apos;s Floor:{' '}
+                      {focusedItemMeta.priceSource === 'UNSET'
+                        ? 'Not set'
+                        : `₹${focusedItemMeta.floorPrice ?? focusedItemMeta.yesterdayFloor}`}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <p className="text-xs text-ink-3">Select an item to view price guidance.</p>
+            )}
           </div>
         </div>
       )}
@@ -887,7 +947,7 @@ export default function QuickOrderEntryPage() {
                 <div>
                   <span className="text-xs text-ink-3 block">Margin (Owner Only)</span>
                   <span
-                    className={`font-mono font-bold${
+                    className={`font-mono font-bold ${
                       marginPct >= 12 ? 'text-emerald-400' : 'text-amber-400'
                     }`}
                   >

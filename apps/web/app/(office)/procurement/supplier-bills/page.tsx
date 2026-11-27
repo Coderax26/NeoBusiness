@@ -343,7 +343,7 @@ export default function SupplierBillsPage() {
           <button
             key={t.key}
             onClick={() => setStatusTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               statusTab === t.key
                 ? 'bg-indigo-600 text-white'
                 : 'bg-sunken text-ink-3 hover:text-ink'
@@ -374,7 +374,7 @@ export default function SupplierBillsPage() {
                 <tr
                   key={b.id}
                   onClick={() => setSelectedBill(b)}
-                  className={`hover:bg-sunken cursor-pointer${
+                  className={`hover:bg-sunken cursor-pointer ${
                     selectedBill?.id === b.id ? 'bg-indigo-500/10' : ''
                   }`}
                 >

@@ -326,7 +326,7 @@ export default function ShortfallWorkbenchPage() {
                                 cand.quotedRate,
                               )
                             }
-                            className={`font-medium${
+                            className={`font-medium ${
                               sf.status === 'OPEN'
                                 ? 'text-indigo-400 hover:text-indigo-300'
                                 : 'text-ink-3 cursor-not-allowed'

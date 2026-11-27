@@ -133,7 +133,7 @@ export default function SetupWizardPage() {
               <button
                 key={s.id}
                 onClick={() => setCurrentStepIdx(idx)}
-                className={`w-full text-left p-3.5 rounded-[4px] border transition-all flex items-start gap-3${isActive
+                className={`w-full text-left p-3.5 rounded-[4px] border transition-all flex items-start gap-3 ${isActive
                   ? 'bg-sunken border-action/30 shadow-md ring-1 ring-teal-500/40'
                   : 'bg-sheet border-rule hover:bg-sunken'
                   }`}
@@ -148,7 +148,7 @@ export default function SetupWizardPage() {
                       ⏭
                     </span>
                   ) : (
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border${isActive ? 'bg-action/20 text-action border-action/30' : 'bg-sunken text-ink-3 border-rule-strong'
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${isActive ? 'bg-action/20 text-action border-action/30' : 'bg-sunken text-ink-3 border-rule-strong'
                       }`}>
                       {s.id}
                     </span>
@@ -156,7 +156,7 @@ export default function SetupWizardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold truncate${isActive ? 'text-white' : 'text-ink-2'}`}>
+                    <span className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-ink-2'}`}>
                       {s.title}
                     </span>
                   </div>

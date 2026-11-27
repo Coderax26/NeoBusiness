@@ -276,7 +276,7 @@ export default function PurchaseOrdersPage() {
               <button
                 key={tab.key}
                 onClick={() => setStatusTab(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   statusTab === tab.key
                     ? 'bg-indigo-600 text-white'
                     : 'bg-sunken text-ink-3 hover:text-ink'
@@ -406,7 +406,7 @@ export default function PurchaseOrdersPage() {
                                 : 'Issue PO to supplier'
                             }
                             onClick={() => handleIssuePo(po)}
-                            className={`text-xs font-medium${
+                            className={`text-xs font-medium ${
                               po.priceSpikeException
                                 ? 'text-ink-3 cursor-not-allowed'
                                 : 'text-emerald-400 hover:text-emerald-300'
@@ -450,7 +450,7 @@ export default function PurchaseOrdersPage() {
               (label, i) => (
                 <div
                   key={label}
-                  className={`p-1.5 rounded text-center${
+                  className={`p-1.5 rounded text-center ${
                     wizardStep === i + 1
                       ? 'bg-indigo-600 text-white'
                       : wizardStep > i + 1
@@ -546,7 +546,7 @@ export default function PurchaseOrdersPage() {
 
               {/* BR-03 Live Price Spike Feedback */}
               <div
-                className={`p-3 rounded-lg border text-xs${
+                className={`p-3 rounded-lg border text-xs ${
                   spikeEval.requiresOwnerApproval
                     ? 'bg-haldi-soft border-haldi/30 text-haldi'
                     : 'bg-leaf-soft border-leaf/30 text-leaf'

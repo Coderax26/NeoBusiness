@@ -131,7 +131,7 @@ export default function QuotesListPage() {
           <button
             key={st}
             onClick={() => setStatusFilter(st)}
-            className={`px-3 py-1.5 rounded-[3px] font-semibold border${
+            className={`px-3 py-1.5 rounded-[3px] font-semibold border ${
               statusFilter === st ? 'bg-action text-white border-action/30' : 'bg-sheet text-ink-3 border-rule'
             }`}
           >

@@ -245,7 +245,7 @@ export default function RequisitionsPage() {
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === st
                   ? 'bg-indigo-600 text-white'
                   : 'bg-sunken text-ink-3 hover:text-ink'

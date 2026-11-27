@@ -89,7 +89,7 @@ export default function PromisesToPayPage() {
             key={b}
             type="button"
             onClick={() => setBucketFilter(b)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold${
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
               bucketFilter === b
                 ? 'bg-leaf text-white'
                 : 'border border-rule bg-sheet text-ink-2 hover:bg-sunken'
@@ -167,7 +167,7 @@ export default function PromisesToPayPage() {
                     <td className="px-4 py-3 text-right font-mono font-semibold text-ink">{formatINR(p.promisedAmount)}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold${
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           p.bucket === 'KEPT'
                             ? 'bg-leaf-soft text-leaf'
                             : p.bucket === 'BROKEN' || p.bucket === 'OVERDUE'

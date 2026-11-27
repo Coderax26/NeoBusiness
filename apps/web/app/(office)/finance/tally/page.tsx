@@ -132,7 +132,7 @@ export default function TallyExportPage() {
                 key={t}
                 type="button"
                 onClick={() => toggleType(t)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold${
+                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
                   selectedTypes.includes(t)
                     ? 'bg-leaf text-white'
                     : 'border border-rule bg-paper text-ink-2'

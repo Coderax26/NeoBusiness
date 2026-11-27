@@ -117,8 +117,8 @@ function transformClassString(cls) {
   s = s.replace(/\bfont-black\b/g, 'font-semibold');
   s = s.replace(/\btext-\[1[01]px\]\b/g, 'text-[13px]');
 
-  // Clean extra spaces
-  s = s.replace(/ {2,}/g, ' ').trim();
+  // Clean extra horizontal spaces while preserving leading/trailing whitespace on template segments
+  s = s.replace(/ {2,}/g, ' ');
   return s;
 }
 
