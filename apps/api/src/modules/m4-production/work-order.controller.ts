@@ -103,11 +103,10 @@ export class WorkOrderController {
     @Body() dto: { startedBy?: string; siteId?: string },
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    const resolvedSiteId = resolveUserSiteId(req.user, dto?.siteId);
     return this.woService.startWorkOrder(
       id,
       req.user.sub,
-      resolvedSiteId,
+      dto?.siteId,
     );
   }
 
@@ -130,12 +129,10 @@ export class WorkOrderController {
     @Body() dto: RecordConsumptionDto,
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    const resolvedSiteId = resolveUserSiteId(req.user);
     return this.woService.recordConsumption(
       id,
       dto,
       req.user.sub,
-      resolvedSiteId,
     );
   }
 
@@ -158,12 +155,10 @@ export class WorkOrderController {
     @Body() dto: RecordOutputDto,
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    const resolvedSiteId = resolveUserSiteId(req.user);
     return this.woService.recordOutput(
       id,
       dto,
       req.user.sub,
-      resolvedSiteId,
     );
   }
 
@@ -188,11 +183,10 @@ export class WorkOrderController {
     @Body() dto: { completedBy?: string; siteId?: string },
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    const resolvedSiteId = resolveUserSiteId(req.user, dto?.siteId);
     return this.woService.completeWorkOrder(
       id,
       req.user.sub,
-      resolvedSiteId,
+      dto?.siteId,
     );
   }
 

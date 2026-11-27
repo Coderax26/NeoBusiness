@@ -17,7 +17,7 @@ export default function FloorRmRequestPage() {
   const [selectedId, setSelectedId] = useState('');
   const [qty, setQty] = useState('250');
   const [neededBy, setNeededBy] = useState(() => new Date().toISOString().slice(0, 10));
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -27,13 +27,19 @@ export default function FloorRmRequestPage() {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
         const rmRows: RmItem[] = rows
-          .filter((i: any) => !i.category || i.category === 'RAW_MATERIAL' || i.category === 'PACKAGING')
-          .map((i: any) => ({
-            id: String(i.id),
-            icon: i.category === 'PACKAGING' ? '📦' : '🌾',
-            name: String(i.name || i.sku_code || 'Material'),
-            uom: String(i.primary_uom || i.uom || 'kg'),
-          }));
+          .filter((i: any) => {
+            const cat = String(i.item_category ?? i.itemCategory ?? i.category ?? '');
+            return !cat || cat === 'RAW_MATERIAL' || cat === 'PACKAGING';
+          })
+          .map((i: any) => {
+            const cat = String(i.item_category ?? i.itemCategory ?? i.category ?? '');
+            return {
+              id: String(i.id),
+              icon: cat === 'PACKAGING' ? '📦' : '🌾',
+              name: String(i.name || i.sku_code || i.skuCode || 'Material'),
+              uom: String(i.primary_uom || i.primaryUom || i.uom || 'KG'),
+            };
+          });
         setItems(rmRows);
         if (rmRows.length > 0) setSelectedId(rmRows[0].id);
       })
@@ -43,7 +49,7 @@ export default function FloorRmRequestPage() {
     };
   }, []);
 
-  const selected = items.find((i) => i.id === selectedId) || items[0] || { id: '', icon: '🌾', name: 'Select Material', uom: 'kg' };
+  const selected = items.find((i) => i.id === selectedId) || items[0] || { id: '', icon: '🌾', name: 'Select Material', uom: 'KG' };
 
   const handleSubmit = async () => {
     if (!selected.id) return;
@@ -62,7 +68,12 @@ export default function FloorRmRequestPage() {
         ],
       },
     });
-    setBanner(`Requested ${qty} ${selected.uom} of ${selected.name}. ${res.message}`);
+    setBanner({
+      text: res.ok
+        ? `Requested ${qty} ${selected.uom} of ${selected.name}. ${res.message}`
+        : `Request failed: ${res.message}`,
+      isError: !res.ok,
+    });
   };
 
   return (
@@ -75,8 +86,14 @@ export default function FloorRmRequestPage() {
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold ${
+            banner.isError
+              ? 'bg-red-500/20 border-red-500/40 text-red-300'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

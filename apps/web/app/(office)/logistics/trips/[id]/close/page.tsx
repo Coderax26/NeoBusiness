@@ -17,41 +17,44 @@ export default function CloseTripChecklistPage() {
   const [expensesEntered, setExpensesEntered] = useState<boolean>(true);
   const [openIssuesCount, setOpenIssuesCount] = useState<number>(0);
   const [tripClosed, setTripClosed] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const loadChecklist = React.useCallback(async () => {
+    if (!tripId) return;
+    try {
+      const r = await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`);
+      if (!r.ok) return;
+      const res = await r.json().catch(() => null);
+      if (!res) return;
+      const t = res.data || res;
+      setTripNo(String(t.tripNo || t.trip_no || tripId));
+      const stops = Array.isArray(t.stops) ? t.stops : [];
+      setPendingStopsCount(
+        stops.filter((s: any) => (s.deliveryStatus ?? s.status ?? 'PENDING') === 'PENDING').length,
+      );
+      setUnloggedReturnsCount(Number(t.unloggedReturnsCount ?? 0));
+      setUncollectedCodOrdersCount(
+        stops.filter(
+          (s: any) =>
+            Boolean(s.is_cod ?? (s.expectedCodInr ?? 0) > 0) &&
+            Number(s.expectedCodInr ?? s.cod_amount ?? 0) >
+              Number(s.collectedCodInr ?? s.cod_collected_amount ?? 0),
+        ).length,
+      );
+      setCodHandedOver(Boolean(t.codHandedOver ?? true));
+      setExpensesEntered(
+        t.expensesEntered !== undefined ? Boolean(t.expensesEntered) : true,
+      );
+      setOpenIssuesCount(Number(t.openIssuesCount ?? t.open_issues_count ?? 0));
+      setTripClosed(t.status === 'CLOSED' || t.status === 'COMPLETED');
+    } catch {
+      /* ignore */
+    }
+  }, [tripId]);
 
   useEffect(() => {
-    if (!tripId) return;
-    let active = true;
-    fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
-        if (!active || !res) return;
-        const t = res.data || res;
-        setTripNo(String(t.tripNo || t.trip_no || tripId));
-        const stops = Array.isArray(t.stops) ? t.stops : [];
-        setPendingStopsCount(
-          stops.filter((s: any) => (s.deliveryStatus ?? s.status ?? 'PENDING') === 'PENDING').length,
-        );
-        setUnloggedReturnsCount(Number(t.unloggedReturnsCount ?? 0));
-        setUncollectedCodOrdersCount(
-          stops.filter(
-            (s: any) =>
-              Boolean(s.is_cod ?? (s.expectedCodInr ?? 0) > 0) &&
-              Number(s.expectedCodInr ?? s.cod_amount ?? 0) >
-                Number(s.collectedCodInr ?? s.cod_collected_amount ?? 0),
-          ).length,
-        );
-        setCodHandedOver(Boolean(t.codHandedOver ?? true));
-        setExpensesEntered(
-          t.expensesEntered !== undefined ? Boolean(t.expensesEntered) : true,
-        );
-        setOpenIssuesCount(Number(t.openIssuesCount ?? t.open_issues_count ?? 0));
-        setTripClosed(t.status === 'CLOSED' || t.status === 'COMPLETED');
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [tripId]);
+    loadChecklist();
+  }, [loadChecklist]);
 
   const checklist = useMemo(
     () =>
@@ -77,12 +80,13 @@ export default function CloseTripChecklistPage() {
 
   async function handleCloseTrip() {
     if (!checklist.canClose || tripClosed) return;
+    setErrorMsg(null);
     const res = await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}/close`, { method: 'POST' });
     if (res.ok) {
       setTripClosed(true);
     } else {
       const err = await res.json().catch(() => null);
-      alert(err?.message || err?.error?.message || `Failed to close trip (HTTP ${res.status})`);
+      setErrorMsg(err?.message || err?.error?.message || `Failed to close trip (HTTP ${res.status})`);
     }
   }
 
@@ -107,6 +111,13 @@ export default function CloseTripChecklistPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={loadChecklist}
+            className="rounded-lg border border-rule bg-sheet px-3.5 py-2 text-sm font-semibold text-ink hover:bg-sunken"
+          >
+            ↻ Refresh Checks
+          </button>
           <Link
             href={`/logistics/trips/${tripId}`}
             className="rounded-lg border border-rule bg-sheet px-3.5 py-2 text-sm font-semibold text-ink hover:bg-sunken"
@@ -115,6 +126,12 @@ export default function CloseTripChecklistPage() {
           </Link>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="rounded-[3px] border border-madder/30 bg-madder-soft p-4 text-sm font-semibold text-madder">
+          {errorMsg}
+        </div>
+      )}
 
       {tripClosed && (
         <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft p-4 text-sm font-semibold text-leaf">

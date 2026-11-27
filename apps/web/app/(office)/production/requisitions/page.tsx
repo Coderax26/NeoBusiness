@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, StatusPill } from '@neo/ui';
+import { Button, Dialog, StatusPill } from '@neo/ui';
 import { type RmRequisitionRecord } from '../../../../src/lib/production-data';
 
 function normalizeRequisitions(rawList: any[]): RmRequisitionRecord[] {
@@ -29,9 +29,14 @@ function normalizeRequisitions(rawList: any[]): RmRequisitionRecord[] {
 
 export default function ProductionRequisitionsPage() {
   const [reqs, setReqs] = useState<RmRequisitionRecord[]>([]);
+  const [rmItems, setRmItems] = useState<Array<{ id: string; name: string; skuCode: string; uom: string }>>([]);
   const [activeSiteId, setActiveSiteId] = useState('');
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualItemId, setManualItemId] = useState('');
+  const [manualQty, setManualQty] = useState('50');
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const loadReqs = useCallback(async (siteIdFilter: string) => {
     const siteQuery = siteIdFilter ? `?siteId=${encodeURIComponent(siteIdFilter)}` : '';
@@ -58,6 +63,26 @@ export default function ProductionRequisitionsPage() {
         .catch(() => {});
     }
 
+    fetch('/api/proxy/items')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((res) => {
+        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const filtered = rows
+          .filter((i: any) => {
+            const cat = String(i.item_category ?? i.itemCategory ?? i.category ?? '');
+            return cat === 'RAW_MATERIAL' || cat === 'PACKAGING';
+          })
+          .map((i: any) => ({
+            id: String(i.id),
+            name: String(i.name ?? 'Material'),
+            skuCode: String(i.sku_code ?? i.skuCode ?? ''),
+            uom: String(i.primary_uom ?? i.primaryUom ?? 'KG'),
+          }));
+        setRmItems(filtered);
+        if (filtered.length > 0) setManualItemId(filtered[0].id);
+      })
+      .catch(() => {});
+
     loadReqs(effectiveSite).catch(() => {});
   }, [loadReqs]);
 
@@ -77,9 +102,47 @@ export default function ProductionRequisitionsPage() {
         throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
       await loadReqs(activeSiteId);
-      setToast('Generated RM requisitions from planned Work Orders minus available & inbound stock.');
+      setToast({ msg: 'Generated RM requisitions from planned Work Orders minus available & inbound stock.' });
     } catch (err) {
-      setToast(`Unable to generate requisitions: ${(err as Error).message}`);
+      setToast({ msg: `Unable to generate requisitions: ${(err as Error).message}`, isError: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateManual = async () => {
+    const selectedItem = rmItems.find((i) => i.id === manualItemId);
+    if (!selectedItem || Number(manualQty) <= 0) {
+      setToast({ msg: 'Select a raw material and enter a positive quantity.', isError: true });
+      return;
+    }
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/production/requisitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: activeSiteId || undefined,
+          requiredByDate: manualDate,
+          status: 'PENDING',
+          lines: [
+            {
+              itemId: selectedItem.id,
+              requiredQty: String(Number(manualQty)),
+              uom: selectedItem.uom,
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReqs(activeSiteId);
+      setManualOpen(false);
+      setToast({ msg: `Created manual RM requisition for ${manualQty} ${selectedItem.uom} of ${selectedItem.name}.` });
+    } catch (err) {
+      setToast({ msg: `Failed to create requisition: ${(err as Error).message}`, isError: true });
     } finally {
       setBusy(false);
     }
@@ -96,9 +159,9 @@ export default function ProductionRequisitionsPage() {
         throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
       await loadReqs(activeSiteId);
-      setToast(label);
+      setToast({ msg: label });
     } catch (err) {
-      setToast(`Failed: ${(err as Error).message}`);
+      setToast({ msg: `Failed: ${(err as Error).message}`, isError: true });
     } finally {
       setBusy(false);
     }
@@ -115,9 +178,9 @@ export default function ProductionRequisitionsPage() {
         throw new Error(err?.message || `HTTP ${res.status}`);
       }
       await loadReqs(activeSiteId);
-      setToast('Deleted requisition.');
+      setToast({ msg: 'Deleted requisition.' });
     } catch (err) {
-      setToast(`Failed to delete requisition: ${(err as Error).message}`);
+      setToast({ msg: `Failed to delete requisition: ${(err as Error).message}`, isError: true });
     } finally {
       setBusy(false);
     }
@@ -137,14 +200,25 @@ export default function ProductionRequisitionsPage() {
             Auto-calculate RM shortfalls from planned Work Orders &amp; BOMs, approve, and convert to PO.
           </p>
         </div>
-        <Button variant="primary" disabled={busy} onClick={handleGenerateFromPlan}>
-          ⚡ Generate from Production Plan
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" disabled={busy} onClick={() => setManualOpen(true)}>
+            + Request Raw Material
+          </Button>
+          <Button variant="primary" disabled={busy} onClick={handleGenerateFromPlan}>
+            ⚡ Generate from Production Plan
+          </Button>
+        </div>
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
-          {toast}
+        <div
+          className={`p-3 rounded-lg border text-sm ${
+            toast.isError
+              ? 'bg-madder-soft border-madder/30 text-madder'
+              : 'bg-leaf-soft border-leaf/30 text-leaf'
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
 
@@ -226,6 +300,50 @@ export default function ProductionRequisitionsPage() {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={manualOpen} onClose={() => setManualOpen(false)} title="Create Manual RM Requisition">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-ink-3 mb-1">Raw Material / Packaging</label>
+            <select
+              value={manualItemId}
+              onChange={(e) => setManualItemId(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            >
+              {rmItems.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} ({i.skuCode} · {i.uom})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Quantity Needed</label>
+              <input
+                type="number"
+                step="0.001"
+                value={manualQty}
+                onChange={(e) => setManualQty(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm font-mono text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Needed By Date</label>
+              <input
+                type="date"
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setManualOpen(false)}>Cancel</Button>
+            <Button variant="primary" disabled={busy} onClick={handleCreateManual}>Submit Requisition</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

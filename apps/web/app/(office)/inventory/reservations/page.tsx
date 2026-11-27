@@ -21,7 +21,7 @@ export default function InventoryReservationsPage() {
         rows.map((row: any) => ({
           id: String(row.id),
           orderNo: String(row.orderNo || row.order_no || row.order_id || row.id),
-          customerName: String(row.customerName || row.order_type || 'SALES_ORDER'),
+          customerName: String(row.customerName || row.customer_name || row.order_type || 'SALES_ORDER'),
           itemId: String(row.itemId || row.item_id || ''),
           itemName: String(row.itemName || row.item_name || 'Item'),
           batchNo: String(row.batchNo || row.batch_number || row.batch_id || ''),

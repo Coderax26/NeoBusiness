@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -33,10 +34,12 @@ import {
   CreateReservationDto,
   CreateTransferDto,
   LedgerQueryDto,
+  OpeningStockDto,
   PostGrnDto,
   ReceiveTransferDto,
   RejectAdjustmentDto,
   ReleaseReservationDto,
+  UpdateStockCountLinesDto,
 } from './dto/inventory.dto.js';
 
 @ApiTags('M3 Inventory & Warehouse')
@@ -252,6 +255,24 @@ export class InventoryController {
   }
 
   /**
+   * POST /inventory/opening-stock
+   */
+  @Post('opening-stock')
+  @RequirePermission('inventory.adjust')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Load opening stock balances directly into inventory batches' })
+  async postOpeningStock(@Body() body: OpeningStockDto, @Req() req: any) {
+    const siteId = resolveUserSiteId(req?.user, body.siteId) || body.siteId;
+    return this.inventoryService.postOpeningStock(
+      siteId,
+      body.lines,
+      req.user?.sub || req.user?.id,
+      body.locationId,
+      body.notes,
+    );
+  }
+
+  /**
    * POST /inventory/adjustments
    */
   @Post('adjustments')
@@ -260,14 +281,21 @@ export class InventoryController {
   @ApiOperation({ summary: 'Create stock adjustment' })
   async createAdjustment(@Body() body: CreateAdjustmentDto, @Req() req: any) {
     const siteId = resolveUserSiteId(req?.user, body.siteId) || body.siteId;
-    return this.inventoryService.createAdjustment(
+    const result = await this.inventoryService.createAdjustment(
       siteId,
       body.itemId,
       body.adjustmentType,
       body.qty,
       body.remarks,
       req.user?.sub || req.user?.id,
+      body.batchId,
     );
+    if (!result.success) {
+      throw new BadRequestException(
+        'Insufficient available stock at this site for a stock deduction adjustment',
+      );
+    }
+    return result;
   }
 
   @Post('adjustments/:id/approve')
@@ -350,6 +378,16 @@ export class InventoryController {
   @ApiOperation({ summary: 'Get stock count sheet detail with counted lines (G-INV-3)' })
   async getStockCount(@Param('id') id: string) {
     return this.inventoryService.getStockCountById(id);
+  }
+
+  @Patch('stock-counts/:id/lines')
+  @RequirePermission('inventory.adjust')
+  @ApiOperation({ summary: 'Save edited physical counted quantities before posting variances' })
+  async updateStockCountLines(
+    @Param('id') id: string,
+    @Body() body: UpdateStockCountLinesDto,
+  ) {
+    return this.inventoryService.updateStockCountLines(id, body.items);
   }
 
   /**

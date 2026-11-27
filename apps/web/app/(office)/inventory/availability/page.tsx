@@ -5,58 +5,51 @@ import Link from 'next/link';
 import { Card, Badge } from '@neo/ui';
 import { computeAtp } from '@neo/shared';
 
-type AtpRow = {
+type CatalogItem = {
   itemId: string;
-  siteId?: string;
-  siteName?: string;
   sku: string;
   itemName: string;
   uom: string;
-  onHand: number;
-  reserved: number;
-  incomingPoQty: number;
-  plannedProductionQty: number;
 };
 
 export default function CheckAvailabilityPage() {
-  const [projections, setProjections] = useState<AtpRow[]>([]);
+  const [items, setItems] = useState<CatalogItem[]>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedItemId, setSelectedItemId] = useState('');
+  const [selectedSiteId, setSelectedSiteId] = useState('');
   const [targetDate, setTargetDate] = useState(new Date().toISOString().slice(0, 10));
+  const [projData, setProjData] = useState({
+    onHand: 0,
+    reserved: 0,
+    incomingPoQty: 0,
+    plannedProductionQty: 0,
+  });
 
   useEffect(() => {
     let active = true;
-    fetch('/api/proxy/inventory/stock/current')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
+    Promise.all([
+      fetch('/api/proxy/items').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/sites').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([itmRes, siteRes, meRes]) => {
         if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        const byItem = new Map<string, AtpRow>();
-        for (const r of rows) {
-          const itemId = String(r.itemId || r.item_id || r.id);
-          const onHand = Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0);
-          const reserved = Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? r.qty_reserved ?? 0);
-          const existing = byItem.get(itemId);
-          if (existing) {
-            existing.onHand += onHand;
-            existing.reserved += reserved;
-          } else {
-            byItem.set(itemId, {
-              itemId,
-              siteId: String(r.siteId || r.site_id || ''),
-              siteName: String(r.siteName || r.site_name || 'Main Site'),
-              sku: String(r.sku || r.skuCode || r.sku_code || ''),
-              itemName: String(r.itemName || r.item_name || 'Item'),
-              uom: String(r.uom || 'kg'),
-              onHand,
-              reserved,
-              incomingPoQty: Number(r.incomingPoQty ?? 0),
-              plannedProductionQty: Number(r.plannedProductionQty ?? 0),
-            });
-          }
-        }
-        const mapped = Array.from(byItem.values());
-        setProjections(mapped);
-        if (mapped.length > 0) setSelectedItemId(mapped[0].itemId);
+        const iRows = Array.isArray(itmRes) ? itmRes : Array.isArray(itmRes?.data) ? itmRes.data : [];
+        const sRows = Array.isArray(siteRes) ? siteRes : Array.isArray(siteRes?.data) ? siteRes.data : [];
+
+        const mappedItems: CatalogItem[] = iRows.map((i: any) => ({
+          itemId: String(i.id),
+          sku: String(i.sku_code ?? i.skuCode ?? ''),
+          itemName: String(i.name ?? 'Item'),
+          uom: String(i.primary_uom ?? i.primaryUom ?? 'KG'),
+        }));
+        setItems(mappedItems);
+        if (mappedItems.length > 0) setSelectedItemId(mappedItems[0].itemId);
+
+        const mappedSites = sRows.map((s: any) => ({ id: String(s.id), name: String(s.name ?? 'Site') }));
+        setSites(mappedSites);
+        const preferred = meRes?.user?.activeSiteId || mappedSites[0]?.id || '';
+        if (preferred) setSelectedSiteId(String(preferred));
       })
       .catch(() => {});
     return () => {
@@ -67,51 +60,39 @@ export default function CheckAvailabilityPage() {
   useEffect(() => {
     if (!selectedItemId) return;
     let active = true;
-    const item = projections.find((p) => p.itemId === selectedItemId);
     const params = new URLSearchParams({ itemId: selectedItemId });
-    if (item?.siteId) params.set('siteId', item.siteId);
+    if (selectedSiteId) params.set('siteId', selectedSiteId);
     fetch(`/api/proxy/inventory/stock/projection?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((proj) => {
         if (!active || !proj) return;
-        setProjections((prev) =>
-          prev.map((p) =>
-            p.itemId === selectedItemId
-              ? {
-                  ...p,
-                  onHand: proj.onHandQty !== undefined ? Number(proj.onHandQty) : p.onHand,
-                  reserved: proj.reservedQty !== undefined ? Number(proj.reservedQty) : p.reserved,
-                  incomingPoQty: Number(proj.incomingPoQty ?? 0),
-                  plannedProductionQty: Number(proj.plannedWoQty ?? 0),
-                }
-              : p,
-          ),
-        );
+        const d = proj?.data ?? proj;
+        setProjData({
+          onHand: Number(d.onHandQty ?? 0),
+          reserved: Number(d.reservedQty ?? 0),
+          incomingPoQty: Number(d.incomingPoQty ?? 0),
+          plannedProductionQty: Number(d.plannedWoQty ?? 0),
+        });
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [selectedItemId]);
+  }, [selectedItemId, selectedSiteId]);
 
-  const proj = useMemo(
+  const currentItem = useMemo(
     () =>
-      projections.find((p) => p.itemId === selectedItemId) ||
-      projections[0] || {
+      items.find((i) => i.itemId === selectedItemId) || {
         itemId: '',
         sku: '—',
         itemName: 'No items loaded',
-        uom: 'kg',
-        onHand: 0,
-        reserved: 0,
-        incomingPoQty: 0,
-        plannedProductionQty: 0,
+        uom: 'KG',
       },
-    [projections, selectedItemId],
+    [items, selectedItemId],
   );
 
-  const currentAtp = computeAtp(proj.onHand, proj.reserved);
-  const projectedAtp = currentAtp + proj.incomingPoQty + proj.plannedProductionQty;
+  const currentAtp = computeAtp(projData.onHand, projData.reserved);
+  const projectedAtp = currentAtp + projData.incomingPoQty + projData.plannedProductionQty;
 
   return (
     <div className="space-y-6">
@@ -123,7 +104,7 @@ export default function CheckAvailabilityPage() {
         </div>
         <h1 className="text-2xl font-bold text-ink">Available-to-Promise (ATP) Checker</h1>
         <p className="text-sm text-ink-3">
-          Pick an item, site, and delivery date to see ATP (On Hand − Reserved) plus incoming POs &amp; planned production.
+          Pick any item and site to see live On Hand − Reserved (ATP) plus incoming POs &amp; planned production.
         </p>
       </div>
 
@@ -135,7 +116,7 @@ export default function CheckAvailabilityPage() {
             onChange={(e) => setSelectedItemId(e.target.value)}
             className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
           >
-            {projections.map((p) => (
+            {items.map((p) => (
               <option key={p.itemId} value={p.itemId}>
                 {p.itemName} ({p.sku})
               </option>
@@ -144,12 +125,18 @@ export default function CheckAvailabilityPage() {
         </div>
         <div>
           <label className="block text-xs text-ink-3 mb-1">Site</label>
-          <input
-            type="text"
-            readOnly
-            value={(proj as any).siteName ?? 'Main Site'}
-            className="w-full bg-paper border border-rule rounded-lg p-2.5 text-sm text-ink-2"
-          />
+          <select
+            value={selectedSiteId}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+          >
+            <option value="">All Sites</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-xs text-ink-3 mb-1">Promise Date</label>
@@ -166,34 +153,32 @@ export default function CheckAvailabilityPage() {
         <Card className="p-4 bg-sheet border-rule">
           <div className="text-xs text-ink-3">On Hand</div>
           <div className="text-2xl font-bold text-ink font-mono mt-1">
-            {proj.onHand} {proj.uom}
+            {projData.onHand} {currentItem.uom}
           </div>
         </Card>
         <Card className="p-4 bg-sheet border-rule">
           <div className="text-xs text-ink-3">Reserved (Sales Orders)</div>
           <div className="text-2xl font-bold text-haldi font-mono mt-1">
-            −{proj.reserved} {proj.uom}
+            −{projData.reserved} {currentItem.uom}
           </div>
         </Card>
         <Card className="p-4 bg-leaf-soft border-leaf/30">
           <div className="text-xs text-leaf font-semibold">Current ATP</div>
           <div className="text-2xl font-bold text-leaf font-mono mt-1">
-            {currentAtp} {proj.uom}
+            {currentAtp} {currentItem.uom}
           </div>
         </Card>
         <Card className="p-4 bg-sheet border-rule">
           <div className="text-xs text-ink-3">Incoming POs</div>
           <div className="text-2xl font-bold text-action font-mono mt-1">
-            +{proj.incomingPoQty} {proj.uom}
+            +{projData.incomingPoQty} {currentItem.uom}
           </div>
-          <div className="text-[11px] text-ink-3 mt-1">{(proj as any).incomingPoRef ?? ''}</div>
         </Card>
         <Card className="p-4 bg-sheet border-rule">
           <div className="text-xs text-ink-3">Planned Production</div>
           <div className="text-2xl font-bold text-action font-mono mt-1">
-            +{proj.plannedProductionQty} {proj.uom}
+            +{projData.plannedProductionQty} {currentItem.uom}
           </div>
-          <div className="text-[11px] text-ink-3 mt-1">{(proj as any).plannedProductionRef ?? ''}</div>
         </Card>
       </div>
 
@@ -201,12 +186,13 @@ export default function CheckAvailabilityPage() {
         <div>
           <div className="text-xs text-ink-3">Net Projected Available by {targetDate}</div>
           <div className="text-2xl font-bold text-ink font-mono mt-0.5">
-            {projectedAtp} {proj.uom}
+            {projectedAtp} {currentItem.uom}
           </div>
         </div>
-        <Badge variant="success">Ready to Promise</Badge>
+        <Badge variant={projectedAtp > 0 ? 'success' : 'warning'}>
+          {projectedAtp > 0 ? 'Ready to Promise' : 'Zero Stock / Need Supply'}
+        </Badge>
       </Card>
     </div>
   );
 }
-

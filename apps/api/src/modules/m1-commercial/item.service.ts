@@ -203,6 +203,7 @@ export class ItemService {
       id: String(item.id),
       skuCode: item.sku_code,
       name: item.name,
+      category: item.item_category,
       itemCategory: item.item_category,
       primaryUom: item.primary_uom,
       secondaryUom: item.secondary_uom,

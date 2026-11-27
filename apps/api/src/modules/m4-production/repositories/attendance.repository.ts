@@ -73,7 +73,8 @@ export class AttendanceRepository {
       .leftJoin('production_work_orders as wo', 'la.work_order_id', 'wo.id')
       .where('la.work_order_id', workOrderId)
       .select('la.*', 'u.full_name as worker_name', 'wo.wo_no as work_order_no')
-      .orderBy('la.date', 'desc');
+      .orderBy('la.date', 'desc')
+      .orderBy('la.created_at', 'desc');
   }
 
   async list(
@@ -84,7 +85,8 @@ export class AttendanceRepository {
       .join('users as u', 'la.worker_id', 'u.id')
       .leftJoin('production_work_orders as wo', 'la.work_order_id', 'wo.id')
       .select('la.*', 'u.full_name as worker_name', 'wo.wo_no as work_order_no')
-      .orderBy('la.date', 'desc');
+      .orderBy('la.date', 'desc')
+      .orderBy('la.created_at', 'desc');
 
     if (
       siteId &&

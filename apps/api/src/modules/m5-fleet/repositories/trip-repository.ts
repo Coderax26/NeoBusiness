@@ -80,17 +80,24 @@ export class TripRepository {
    */
   private async buildManifest(tripId: string): Promise<DriverManifest> {
     const trip = await this.knex('delivery_trips')
-      .where('id', tripId)
-      .join('vehicles', 'delivery_trips.vehicle_id', 'vehicles.id')
-      .join('users', 'delivery_trips.driver_id', 'users.id')
+      .where('delivery_trips.id', tripId)
+      .leftJoin('vehicles', 'delivery_trips.vehicle_id', 'vehicles.id')
+      .leftJoin('users', 'delivery_trips.driver_id', 'users.id')
       .select(
         'delivery_trips.id as tripId',
         'delivery_trips.trip_no as tripNo',
         'delivery_trips.trip_date as tripDate',
+        'delivery_trips.dispatch_mode as dispatchMode',
+        'delivery_trips.transporter_name as transporterName',
+        'delivery_trips.lr_tracking_no as lrTrackingNo',
         'vehicles.id as vehicleId',
-        'vehicles.registration_no as vehicleRegNo',
+        this.knex.raw(
+          "COALESCE(vehicles.registration_no, delivery_trips.external_vehicle_no, '3PL') as \"vehicleRegNo\"",
+        ),
         'users.id as driverId',
-        'users.full_name as driverName',
+        this.knex.raw(
+          "COALESCE(users.full_name, delivery_trips.external_driver_name, delivery_trips.transporter_name, 'External Driver') as \"driverName\"",
+        ),
       )
       .first();
 
@@ -122,7 +129,7 @@ export class TripRepository {
               'delivery_stop_lines.delivered_qty',
               'delivery_stop_lines.returned_qty',
               'delivery_stop_lines.batch_id',
-              'inventory_batches.batch_no',
+              'inventory_batches.batch_number as batch_no',
               'items.primary_uom as uom',
               'items.hsn_code',
               'items.tax_rate_pct',

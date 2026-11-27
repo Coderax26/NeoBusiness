@@ -6,9 +6,11 @@ import { type DeliveryIssueRecord } from '../../../../src/lib/logistics-data';
 
 export default function DeliveryIssuesDeskPage() {
   const [issues, setIssues] = useState<DeliveryIssueRecord[]>([]);
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'OPEN' | 'RESOLVED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED'>('ALL');
   const [resolvingIssue, setResolvingIssue] = useState<DeliveryIssueRecord | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<'REDELIVER' | 'CREDIT_NOTE' | 'WRITE_OFF'>('CREDIT_NOTE');
+  const [escalateIssue, setEscalateIssue] = useState(false);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -23,15 +25,19 @@ export default function DeliveryIssuesDeskPage() {
             issueNo: String(i.issueNo ?? `ISS-${String(i.id).slice(0, 6).toUpperCase()}`),
             tripId: String(i.trip_id ?? i.tripId ?? ''),
             tripNo: String(i.trip_no ?? i.tripNo ?? ''),
-            stopOrderNo: String(i.stop_id ?? i.stopOrderNo ?? '-'),
-            customerName: String(i.site_name ?? i.customerName ?? 'Route Stop'),
+            stopOrderNo: String(i.stop_order_no ?? i.stop_id ?? i.stopOrderNo ?? '-'),
+            customerName: String(i.customer_name ?? i.site_name ?? i.customerName ?? 'Route Stop'),
             type: String(i.category ?? i.type ?? 'OTHER') as any,
             description: String(
               i.resolution_note ??
                 i.description ??
                 `${i.category ?? 'Delivery Issue'} · Risk ₹${Number(i.value_at_risk ?? 0)}`,
             ),
-            status: (i.status === 'OPEN' ? 'OPEN' : 'RESOLVED') as any,
+            status: (i.status === 'OPEN'
+              ? 'OPEN'
+              : i.status === 'ESCALATED'
+                ? 'ESCALATED'
+                : 'RESOLVED') as any,
             resolutionOutcome: i.resolution_note ?? i.resolutionOutcome,
             reportedAt: String(i.created_at ?? i.reportedAt ?? '').slice(0, 10),
           })),
@@ -57,27 +63,50 @@ export default function DeliveryIssuesDeskPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           resolutionNote: `Resolved via ${selectedOutcome}`,
-          escalate: false,
+          escalate: escalateIssue,
         }),
       },
     );
+    const err = await res.json().catch(() => null);
     if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      alert(err?.message || err?.error?.message || `Failed to resolve issue (HTTP ${res.status})`);
+      setBanner({
+        text: err?.message || err?.error?.message || `Failed to resolve issue (HTTP ${res.status})`,
+        isError: true,
+      });
       return;
     }
+    const nextStatus = escalateIssue ? 'ESCALATED' : 'RESOLVED';
     setIssues((prev) =>
       prev.map((item) =>
         item.id === resolvingIssue.id
-          ? { ...item, status: 'RESOLVED', resolutionOutcome: selectedOutcome }
+          ? {
+              ...item,
+              status: nextStatus as any,
+              resolutionOutcome: selectedOutcome,
+            }
           : item,
       ),
     );
+    setBanner({
+      text: `${resolvingIssue.issueNo} ${escalateIssue ? 'escalated to owner' : 'resolved'} (${selectedOutcome}).`,
+    });
+    setEscalateIssue(false);
     setResolvingIssue(null);
   }
 
   return (
     <div className="space-y-6">
+      {banner && (
+        <div
+          className={`rounded-lg border p-3 text-sm font-medium ${
+            banner.isError
+              ? 'border-madder/30 bg-madder-soft text-madder'
+              : 'border-leaf/30 bg-leaf-soft text-leaf'
+          }`}
+        >
+          {banner.text}
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">Delivery Issues Desk</h1>
@@ -86,7 +115,7 @@ export default function DeliveryIssuesDeskPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(['ALL', 'OPEN', 'RESOLVED'] as const).map((status) => (
+          {(['ALL', 'OPEN', 'ESCALATED', 'RESOLVED'] as const).map((status) => (
             <button
               key={status}
               type="button"
@@ -140,7 +169,7 @@ export default function DeliveryIssuesDeskPage() {
                   </div>
                 </div>
 
-                {issue.status === 'OPEN' && (
+                {(issue.status === 'OPEN' || (issue.status as string) === 'ESCALATED') && (
                   <button
                     type="button"
                     onClick={() => setResolvingIssue(issue)}
@@ -183,6 +212,14 @@ export default function DeliveryIssuesDeskPage() {
                 </label>
               ))}
             </div>
+            <label className="mt-3 flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={escalateIssue}
+                onChange={(e) => setEscalateIssue(e.target.checked)}
+              />
+              Escalate to Owner instead of final close
+            </label>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"

@@ -28,12 +28,13 @@ export default function BomsPage() {
   const [selectedBomId, setSelectedBomId] = useState<string>('');
   const [scaleTargetQty, setScaleTargetQty] = useState<number>(100);
   const [liveRollup, setLiveRollup] = useState<{ totalBatchCost: number; costPerUnit: number } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newBomNo, setNewBomNo] = useState(`BOM-${Date.now().toString().slice(-4)}`);
   const [newFgItemId, setNewFgItemId] = useState('');
-  const [newRmItemId, setNewRmItemId] = useState('');
-  const [newRmQtyPerUnit, setNewRmQtyPerUnit] = useState('1.05');
+  const [newLines, setNewLines] = useState<Array<{ itemId: string; qtyPerUnit: string }>>([
+    { itemId: '', qtyPerUnit: '1.05' },
+  ]);
   const [newYieldPct, setNewYieldPct] = useState('97.00');
   const [busy, setBusy] = useState(false);
 
@@ -108,7 +109,11 @@ export default function BomsPage() {
         const fgs = mapped.filter((i) => i.category === 'PROCESSED_FG');
         const rms = mapped.filter((i) => i.category === 'RAW_MATERIAL' || i.category === 'PACKAGING');
         if (fgs.length > 0) setNewFgItemId(fgs[0].id);
-        if (rms.length > 0) setNewRmItemId(rms[0].id);
+        if (rms.length > 0) {
+          setNewLines((prev) =>
+            prev.length === 1 && !prev[0].itemId ? [{ itemId: rms[0].id, qtyPerUnit: '1.05' }] : prev,
+          );
+        }
       })
       .catch(() => {});
 
@@ -143,7 +148,9 @@ export default function BomsPage() {
       .then((res) => {
         if (!active || !res) return;
         const d = res?.data ?? res;
-        const costPerUnit = Number(d?.totalCostPerUnit ?? d?.costPerUnit ?? 0);
+        const costPerUnit = Number(
+          d?.totalCostPerUnit ?? d?.estimatedCostPerUnitInr ?? d?.costPerUnit ?? 0,
+        );
         if (Number.isFinite(costPerUnit)) {
           setLiveRollup({
             totalBatchCost: Number((costPerUnit * selectedBom.outputQty).toFixed(2)),
@@ -168,9 +175,9 @@ export default function BomsPage() {
   );
   const costRollup = liveRollup && liveRollup.costPerUnit > 0 ? liveRollup : clientRollup;
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+  const showToast = (msg: string, isError = false) => {
+    setToast({ msg, isError });
+    setTimeout(() => setToast(null), 5000);
   };
 
   const handleActivate = async (bom: BomRecord) => {
@@ -186,7 +193,7 @@ export default function BomsPage() {
       await loadBoms(activeSiteId);
       showToast(`Activated ${bom.code} (v${bom.version}).`);
     } catch (err) {
-      showToast(`Failed to activate BOM: ${(err as Error).message}`);
+      showToast(`Failed to activate BOM: ${(err as Error).message}`, true);
     } finally {
       setBusy(false);
     }
@@ -206,18 +213,18 @@ export default function BomsPage() {
       await loadBoms(activeSiteId);
       showToast(`Deleted draft ${bom.code}.`);
     } catch (err) {
-      showToast(`Failed to delete draft: ${(err as Error).message}`);
+      showToast(`Failed to delete draft: ${(err as Error).message}`, true);
     } finally {
       setBusy(false);
     }
   };
 
   const handleCreateDraft = async () => {
-    if (!newFgItemId || !newRmItemId || !newBomNo.trim()) {
-      showToast('Select Finished Good, Raw Material, and enter BOM Code.');
+    const validLines = newLines.filter((l) => l.itemId && Number(l.qtyPerUnit) > 0);
+    if (!newFgItemId || validLines.length === 0 || !newBomNo.trim()) {
+      showToast('Select a Finished Good, add at least one Raw Material / Packaging ingredient, and enter a BOM Code.', true);
       return;
     }
-    const rmItem = items.find((i) => i.id === newRmItemId);
     try {
       setBusy(true);
       const res = await fetch('/api/proxy/production/boms', {
@@ -229,15 +236,16 @@ export default function BomsPage() {
           siteId: activeSiteId || undefined,
           status: 'DRAFT',
           yieldPct: newYieldPct || '95.00',
-          lines: [
-            {
-              itemId: newRmItemId,
-              qtyPerUnit: newRmQtyPerUnit || '1.00',
+          lines: validLines.map((l, idx) => {
+            const rmItem = items.find((i) => i.id === l.itemId);
+            return {
+              itemId: l.itemId,
+              qtyPerUnit: l.qtyPerUnit || '1.00',
               uom: rmItem?.primaryUom || 'KG',
-              sequenceNo: 1,
-              isCritical: true,
-            },
-          ],
+              sequenceNo: idx + 1,
+              isCritical: idx === 0,
+            };
+          }),
         }),
       });
       if (!res.ok) {
@@ -249,7 +257,7 @@ export default function BomsPage() {
       setNewBomNo(`BOM-${Date.now().toString().slice(-4)}`);
       showToast(`Created draft recipe ${newBomNo}.`);
     } catch (err) {
-      showToast(`Failed to create draft BOM: ${(err as Error).message}`);
+      showToast(`Failed to create draft BOM: ${(err as Error).message}`, true);
     } finally {
       setBusy(false);
     }
@@ -278,8 +286,14 @@ export default function BomsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
-          {toast}
+        <div
+          className={`p-3 rounded-lg border text-sm ${
+            toast.isError
+              ? 'bg-madder-soft border-madder/30 text-madder'
+              : 'bg-leaf-soft border-leaf/30 text-leaf'
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
 
@@ -433,39 +447,72 @@ export default function BomsPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-xs text-ink-3 mb-1">Primary Raw Material</label>
-            <select
-              value={newRmItemId}
-              onChange={(e) => setNewRmItemId(e.target.value)}
-              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-            >
-              {rmItems.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({i.skuCode})
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs text-ink-3">Ingredients (Raw Materials &amp; Packaging)</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setNewLines((prev) => [
+                    ...prev,
+                    { itemId: rmItems[0]?.id ?? '', qtyPerUnit: '1.00' },
+                  ])
+                }
+                className="text-xs font-semibold text-action hover:underline"
+              >
+                + Add Ingredient
+              </button>
+            </div>
+            {newLines.map((line, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                <select
+                  value={line.itemId}
+                  onChange={(e) =>
+                    setNewLines((prev) =>
+                      prev.map((x, i) => (i === idx ? { ...x, itemId: e.target.value } : x)),
+                    )
+                  }
+                  className="col-span-7 bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
+                >
+                  <option value="">Select ingredient...</option>
+                  {rmItems.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.skuCode} · {i.primaryUom})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  step="0.001"
+                  value={line.qtyPerUnit}
+                  onChange={(e) =>
+                    setNewLines((prev) =>
+                      prev.map((x, i) => (i === idx ? { ...x, qtyPerUnit: e.target.value } : x)),
+                    )
+                  }
+                  placeholder="Qty / unit"
+                  className="col-span-3 bg-paper border border-rule-strong rounded-lg p-2 text-xs font-mono text-ink"
+                />
+                {newLines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setNewLines((prev) => prev.filter((_, i) => i !== idx))}
+                    className="col-span-2 text-xs text-madder hover:underline"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-ink-3 mb-1">Qty Per Unit FG</label>
-              <input
-                type="text"
-                value={newRmQtyPerUnit}
-                onChange={(e) => setNewRmQtyPerUnit(e.target.value)}
-                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-ink-3 mb-1">Target Yield %</label>
-              <input
-                type="text"
-                value={newYieldPct}
-                onChange={(e) => setNewYieldPct(e.target.value)}
-                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-ink-3 mb-1">Target Yield %</label>
+            <input
+              type="text"
+              value={newYieldPct}
+              onChange={(e) => setNewYieldPct(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>

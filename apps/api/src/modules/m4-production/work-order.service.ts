@@ -106,7 +106,7 @@ export class WorkOrderService {
 
     const woPlannedQty = Qty.of(dto.plannedQty, dto.uom);
 
-    return await this.knex.transaction(async (trx) => {
+    const createdHeaderId = await this.knex.transaction(async (trx) => {
       const headerId = uuidv7();
       await trx('production_work_orders')
         .insert({
@@ -156,8 +156,10 @@ export class WorkOrderService {
         'm4',
       );
 
-      return this.toResponseDto(headerId, bom);
+      return headerId;
     });
+
+    return this.toResponseDto(createdHeaderId, bom);
   }
 
   /**
@@ -252,12 +254,15 @@ export class WorkOrderService {
       );
     }
 
-    return await this.knex.transaction(async (trx) => {
-      await this.woRepo.updateHeader(woId, {
-        status: WorkOrderStatus.IN_PROGRESS,
-        started_at: Clock.nowUtc().toISOString(),
-        started_by: startedBy,
-      });
+    await this.knex.transaction(async (trx) => {
+      await trx('production_work_orders')
+        .where('id', woId)
+        .update({
+          status: WorkOrderStatus.IN_PROGRESS,
+          started_at: Clock.nowUtc().toISOString(),
+          started_by: startedBy,
+          updated_at: Clock.nowUtc().toISOString(),
+        });
 
       await this.outbox.raise(
         trx,
@@ -271,9 +276,9 @@ export class WorkOrderService {
         },
         'm4',
       );
-
-      return this.toResponseDto(woId, bom);
     });
+
+    return this.toResponseDto(woId, bom);
   }
 
   /**
@@ -519,14 +524,13 @@ export class WorkOrderService {
       totalWastageQty = 0;
     }
 
-    const rawTol = this.configService?.get?.('yield_variance_tolerance_pct');
+    const rawTol = await this.configService?.get?.('yield_variance_tolerance_pct');
     const tolerancePct =
       rawTol !== undefined && Number.isFinite(Number(rawTol)) && Number(rawTol) > 0
         ? Number(rawTol)
         : 3;
-    const basis = String(
-      this.configService?.get?.('yield_variance_basis') ?? 'ISSUED_RAW_MATERIAL',
-    );
+    const rawBasis = await this.configService?.get?.('yield_variance_basis');
+    const basis = String(rawBasis ?? 'ISSUED_RAW_MATERIAL');
 
     let actualYieldPct = 100;
     let yieldVariancePct = 0;

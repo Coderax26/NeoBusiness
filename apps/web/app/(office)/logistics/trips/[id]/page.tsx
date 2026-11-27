@@ -44,13 +44,29 @@ export default function TripDetailPage() {
     id: String(t.id),
     tripNo: String(t.tripNo ?? t.trip_no ?? t.id),
     tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
+    siteId: String(t.site_id ?? t.siteId ?? ''),
+    dispatchMode: t.dispatch_mode ?? 'OWN_FLEET',
+    transporterName: t.transporter_name ?? null,
+    lrTrackingNo: t.lr_tracking_no ?? null,
+    freightCost: t.freight_cost != null ? Number(t.freight_cost) : null,
+    createdAt: t.created_at ? String(t.created_at).slice(0, 16).replace('T', ' ') : undefined,
+    startedAt: t.started_at ? String(t.started_at).slice(0, 16).replace('T', ' ') : undefined,
+    closedAt: t.closed_at ? String(t.closed_at).slice(0, 16).replace('T', ' ') : undefined,
     vehicleId: String(t.vehicleId ?? t.vehicle_id ?? ''),
-    vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? 'Vehicle'),
+    vehicleRegNo: String(
+      t.vehicleRegNo ?? t.registration_no ?? t.external_vehicle_no ?? 'Vehicle',
+    ),
     driverId: String(t.driverId ?? t.driver_id ?? ''),
-    driverName: String(t.driverName ?? t.driver_name ?? 'Driver'),
+    driverName: String(
+      t.driverName ??
+        t.driver_name ??
+        t.external_driver_name ??
+        t.transporter_name ??
+        'Driver',
+    ),
     status: (t.status ?? 'LOADING') as TripRecord['status'],
     loadingConfirmed: t.status !== 'LOADING',
-    lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16),
+    lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16).replace('T', ' '),
     unloggedReturnsCount: Number(t.unloggedReturnsCount ?? 0),
     codHandedOver: Boolean(t.codHandedOver ?? false),
     expensesEntered: Number(t.expenses_count ?? 0) > 0,
@@ -77,6 +93,7 @@ export default function TripDetailPage() {
             deliveryStatus,
             expectedCodInr: Number(s.expectedCodInr ?? s.cod_amount ?? s.cash_to_collect ?? 0),
             collectedCodInr: Number(s.collectedCodInr ?? s.cod_collected_amount ?? s.actual_cash_collected ?? 0),
+            deliveredAt: s.delivered_at ? String(s.delivered_at).slice(0, 16).replace('T', ' ') : undefined,
             challanNo: s.challanNo ?? s.challan_no,
             ewayBillRef: s.ewayBillRef ?? s.eway_bill_no,
             epodSignedBy: s.epodSignedBy ?? s.epod_signature_url,
@@ -87,7 +104,7 @@ export default function TripDetailPage() {
           } as TripStopDetail & { lines?: any[] };
         })
       : [],
-  });
+  } as TripRecord & Record<string, any>);
 
   useEffect(() => {
     if (!tripId) return;
@@ -205,10 +222,55 @@ export default function TripDetailPage() {
     }
   }
 
-  function toggleCodHandover() {
-    if (!trip) return;
-    setTrip((prev) => (prev ? { ...prev, codHandedOver: !prev.codHandedOver } : prev));
-    setStatusMessage(!trip.codHandedOver ? 'Marked COD handed over for F9 settlement.' : 'Reverted COD handover flag.');
+  async function handleSettleCodHandover() {
+    if (!trip || trip.codHandedOver) return;
+    const codStops = trip.stops.filter((s) => s.collectedCodInr > 0 || s.expectedCodInr > 0);
+    if (codStops.length === 0) {
+      setStatusMessage('No COD stops on this trip require handover.');
+      return;
+    }
+    try {
+      for (const st of codStops) {
+        const res = await fetch(`/api/proxy/cod-settlements/${encodeURIComponent(st.stopId)}/settle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            (trip as any).siteId ? { siteId: (trip as any).siteId } : {},
+          ),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+        }
+      }
+      const fresh = await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`).then((r) =>
+        r.ok ? r.json() : null,
+      );
+      if (fresh) setTrip(normalizeTrip(fresh?.data || fresh));
+      setStatusMessage('Settled COD handover into Collection Receipts (F9).');
+    } catch (err) {
+      setStatusMessage(`COD handover failed: ${(err as Error).message}`);
+    }
+  }
+
+  async function handleIssueStopChallan(stopId: string) {
+    try {
+      const res = await fetch(
+        `/api/proxy/trips/${encodeURIComponent(tripId)}/stops/${encodeURIComponent(stopId)}/challan`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      const fresh = await fetch(`/api/proxy/trips/${encodeURIComponent(tripId)}`).then((r) =>
+        r.ok ? r.json() : null,
+      );
+      if (fresh) setTrip(normalizeTrip(fresh?.data || fresh));
+      setStatusMessage('Generated delivery challan.');
+    } catch (err) {
+      setStatusMessage(`Challan error: ${(err as Error).message}`);
+    }
   }
 
   return (
@@ -231,9 +293,23 @@ export default function TripDetailPage() {
           <p className="mt-1 text-sm text-slate-500">
             Vehicle <span className="font-semibold text-slate-700">{trip.vehicleRegNo}</span> · Driver{' '}
             <span className="font-semibold text-slate-700">{trip.driverName}</span> · Date {trip.tripDate}
+            {(trip as any).dispatchMode === 'THIRD_PARTY' && (
+              <>
+                {' '}· <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">3PL: {(trip as any).transporterName}</span>
+                {(trip as any).lrTrackingNo && ` · LR: ${(trip as any).lrTrackingNo}`}
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/proxy/trips/${encodeURIComponent(trip.id)}/manifest-pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Manifest PDF ↗
+          </a>
           <Link
             href="/logistics/dispatch"
             className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -284,10 +360,11 @@ export default function TripDetailPage() {
           </div>
           <button
             type="button"
-            onClick={toggleCodHandover}
-            className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            disabled={trip.codHandedOver}
+            onClick={handleSettleCodHandover}
+            className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
           >
-            {trip.codHandedOver ? 'Mark Pending' : 'Confirm COD Handover'}
+            {trip.codHandedOver ? 'Settled in Accounts' : 'Confirm COD Handover'}
           </button>
         </div>
       </div>
@@ -412,6 +489,25 @@ export default function TripDetailPage() {
                     {stop.ewayBillRef ?? (needEway ? 'Missing!' : 'N/A')}
                   </span>
                 </div>
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  {!stop.challanNo && (
+                    <button
+                      type="button"
+                      onClick={() => handleIssueStopChallan(stop.stopId)}
+                      className="rounded border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      Generate Challan
+                    </button>
+                  )}
+                  <a
+                    href={`/api/proxy/trips/${encodeURIComponent(trip.id)}/stops/${encodeURIComponent(stop.stopId)}/challan/pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Challan PDF ↗
+                  </a>
+                </div>
               </div>
             );
           })}
@@ -517,15 +613,33 @@ export default function TripDetailPage() {
           <ol className="mt-4 space-y-3 border-l-2 border-blue-200 pl-4 text-sm">
             <li>
               <div className="font-semibold text-slate-900">Trip Created & Stops Assigned</div>
-              <div className="text-xs text-slate-500">{trip.tripDate} 07:30 · {trip.stops.length} stops loaded</div>
+              <div className="text-xs text-slate-500">
+                {(trip as any).createdAt || trip.tripDate} · {trip.stops.length} stops
+              </div>
             </li>
+            {(trip as any).startedAt && (
+              <li>
+                <div className="font-semibold text-slate-900">Loading Confirmed & Dispatched</div>
+                <div className="text-xs text-slate-500">
+                  {(trip as any).startedAt} · {trip.vehicleRegNo} ({trip.driverName})
+                </div>
+              </li>
+            )}
+            {trip.stops
+              .filter((s: any) => s.deliveredAt)
+              .map((s: any) => (
+                <li key={s.stopId}>
+                  <div className="font-semibold text-slate-900">
+                    Stop #{s.seq} {s.customerName} — {s.deliveryStatus}
+                  </div>
+                  <div className="text-xs text-slate-500">{s.deliveredAt}</div>
+                </li>
+              ))}
             <li>
-              <div className="font-semibold text-slate-900">Loading Confirmed & Challans Generated</div>
-              <div className="text-xs text-slate-500">{trip.tripDate} 08:45 · Gate pass issued</div>
-            </li>
-            <li>
-              <div className="font-semibold text-slate-900">Last Live Ping ({trip.status})</div>
-              <div className="text-xs text-slate-500">Updated {trip.lastUpdated} · Driver {trip.driverName}</div>
+              <div className="font-semibold text-slate-900">Current State ({trip.status})</div>
+              <div className="text-xs text-slate-500">
+                {(trip as any).closedAt ? `Closed ${(trip as any).closedAt}` : `Last updated ${trip.lastUpdated}`}
+              </div>
             </li>
           </ol>
         </div>

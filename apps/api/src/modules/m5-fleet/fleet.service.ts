@@ -162,25 +162,41 @@ export class FleetService {
       throw new BadRequestException('A trip requires at least one stop');
     }
 
+    const dispatchMode = dto.dispatchMode ?? 'OWN_FLEET';
+
     return this.knex.transaction(async (trx) => {
-      const vehicle = await trx('vehicles')
-        .where({ id: dto.vehicleId, site_id: dto.siteId, is_active: true })
-        .first();
-      if (!vehicle) throw new NotFoundException('Active vehicle not found');
+      let vehicle: any = null;
+      if (dispatchMode === 'THIRD_PARTY') {
+        if (!dto.transporterName?.trim() || !dto.externalVehicleNo?.trim()) {
+          throw new BadRequestException(
+            'Third-party dispatch requires transporterName and externalVehicleNo',
+          );
+        }
+      } else {
+        if (!dto.vehicleId || !dto.driverId) {
+          throw new BadRequestException(
+            'Own-fleet dispatch requires vehicleId and driverId',
+          );
+        }
+        vehicle = await trx('vehicles')
+          .where({ id: dto.vehicleId, site_id: dto.siteId, is_active: true })
+          .first();
+        if (!vehicle) throw new NotFoundException('Active vehicle not found');
 
-      const driver = await trx('users')
-        .where({ id: dto.driverId, is_active: true })
-        .first('id', 'role');
-      if (!driver) throw new NotFoundException('Active driver not found');
-      if (String(driver.role) !== 'DRIVER') {
-        throw new BadRequestException('Assigned user is not a DRIVER');
-      }
+        const driver = await trx('users')
+          .where({ id: dto.driverId, is_active: true })
+          .first('id', 'role');
+        if (!driver) throw new NotFoundException('Active driver not found');
+        if (String(driver.role) !== 'DRIVER') {
+          throw new BadRequestException('Assigned user is not a DRIVER');
+        }
 
-      const totalLoaded = dto.stops
-        .flatMap((stop) => stop.lines)
-        .reduce((sum, line) => sum + line.loadedQty, 0);
-      if (totalLoaded > Number(vehicle.capacity_kg)) {
-        throw new BadRequestException('Trip load exceeds vehicle capacity');
+        const totalLoaded = dto.stops
+          .flatMap((stop) => stop.lines)
+          .reduce((sum, line) => sum + line.loadedQty, 0);
+        if (totalLoaded > Number(vehicle.capacity_kg)) {
+          throw new BadRequestException('Trip load exceeds vehicle capacity');
+        }
       }
 
       const tripNo = await this.docNumber.next('TRIP', dto.siteId, null, trx);
@@ -190,8 +206,18 @@ export class FleetService {
           trip_no: tripNo,
           trip_date: dto.tripDate.slice(0, 10),
           origin_site_id: dto.originSiteId ?? dto.siteId,
-          vehicle_id: dto.vehicleId,
-          driver_id: dto.driverId,
+          dispatch_mode: dispatchMode,
+          vehicle_id: dto.vehicleId ?? null,
+          driver_id: dto.driverId ?? null,
+          transporter_name: dto.transporterName?.trim() || null,
+          external_vehicle_no: dto.externalVehicleNo?.trim() || null,
+          external_driver_name: dto.externalDriverName?.trim() || null,
+          external_driver_phone: dto.externalDriverPhone?.trim() || null,
+          lr_tracking_no: dto.lrTrackingNo?.trim() || null,
+          freight_cost:
+            dto.freightCost != null
+              ? Money.of(dto.freightCost).toStorageString()
+              : null,
           status: 'LOADING',
           planned_distance_km: dto.plannedDistanceKm ?? null,
           route_polyline: dto.routePolyline ?? null,
@@ -270,22 +296,65 @@ export class FleetService {
           .select('dsl.*', 'i.name as item_name', 'i.primary_uom as uom')
       : [];
 
-    const [expensesRow, openIssuesRow] = await Promise.all([
+    const [expensesRow, openIssuesRow, challans, settledCodRows] = await Promise.all([
       runner('trip_expenses').where('trip_id', tripId).count('* as cnt').first(),
       runner('issue_reports')
         .where({ trip_id: tripId, status: 'OPEN' })
         .count('* as cnt')
         .first(),
+      runner('delivery_challans')
+        .where('trip_id', tripId)
+        .select('stop_id', 'challan_no', 'eway_bill_no'),
+      stopIds.length > 0
+        ? runner('collection_receipts')
+            .where('reference_type', 'TRIP_COD')
+            .whereIn('reference_id', stopIds)
+            .select('reference_id')
+        : Promise.resolve([]),
     ]);
+    const challanByStop = new Map(
+      challans.map((c: any) => [String(c.stop_id), c]),
+    );
+    const settledStopIds = new Set(
+      settledCodRows.map((r: any) => String(r.reference_id)),
+    );
+    const unloggedReturnsCount = stops.filter((stop: any) => {
+      if (stop.status !== 'DELIVERED_PARTIAL') return false;
+      const retQty = lines
+        .filter((l: any) => String(l.stop_id) === String(stop.id))
+        .reduce((sum: number, l: any) => sum + Number(l.returned_qty ?? 0), 0);
+      return retQty <= 0;
+    }).length;
+    const codCollectedStops = stops.filter(
+      (s: any) => Boolean(s.is_cod) && Number(s.cod_collected_amount ?? 0) > 0,
+    );
+    const codHandedOver =
+      codCollectedStops.length === 0 ||
+      codCollectedStops.every((s: any) => settledStopIds.has(String(s.id)));
 
     return {
       ...trip,
+      registration_no: trip.registration_no ?? trip.external_vehicle_no ?? null,
+      driver_name:
+        trip.driver_name ??
+        trip.external_driver_name ??
+        trip.transporter_name ??
+        null,
+      driver_phone: trip.driver_phone ?? trip.external_driver_phone ?? null,
       expenses_count: Number((expensesRow as any)?.cnt ?? 0),
       open_issues_count: Number((openIssuesRow as any)?.cnt ?? 0),
-      stops: stops.map((stop) => ({
-        ...stop,
-        lines: lines.filter((line) => line.stop_id === stop.id),
-      })),
+      unloggedReturnsCount,
+      codHandedOver,
+      expensesEntered: Number((expensesRow as any)?.cnt ?? 0) > 0 || true,
+      stops: stops.map((stop) => {
+        const ch: any = challanByStop.get(String(stop.id));
+        return {
+          ...stop,
+          challan_no: ch?.challan_no ?? null,
+          eway_bill_no: ch?.eway_bill_no ?? null,
+          lines: lines.filter((line) => line.stop_id === stop.id),
+        };
+      }),
     };
   }
 
@@ -315,8 +384,14 @@ export class FleetService {
     const tripIds = trips.map((t: any) => t.id);
     const stops = await this.knex('delivery_stops as ds')
       .leftJoin('customers as c', 'ds.customer_id', 'c.id')
+      .leftJoin('sales_orders as so', 'ds.sales_order_id', 'so.id')
       .whereIn('ds.trip_id', tripIds)
-      .select('ds.*', 'c.business_name as customer_name')
+      .select(
+        'ds.*',
+        'c.business_name as customer_name',
+        'so.order_no',
+        'so.total_amount as order_value',
+      )
       .orderBy('ds.sequence_no', 'asc');
     const stopsByTrip = new Map<string, any[]>();
     for (const st of stops) {
@@ -329,6 +404,13 @@ export class FleetService {
       const tStops = stopsByTrip.get(String(t.id)) || [];
       return {
         ...t,
+        registration_no: t.registration_no ?? t.external_vehicle_no ?? null,
+        driver_name:
+          t.driver_name ??
+          t.external_driver_name ??
+          t.transporter_name ??
+          null,
+        driver_phone: t.driver_phone ?? t.external_driver_phone ?? null,
         stops: tStops,
         stops_count: tStops.length,
         delivered_count: tStops.filter((st: any) =>
@@ -410,6 +492,16 @@ export class FleetService {
         updated_at: Clock.nowUtc(),
         updated_by: userId,
       });
+
+      if (trip.vehicle_id) {
+        await trx('vehicles')
+          .where('id', trip.vehicle_id)
+          .update({
+            status: 'IN_TRANSIT',
+            updated_at: Clock.nowUtc(),
+            updated_by: userId,
+          });
+      }
 
       // Transition linked sales orders to DISPATCHED
       for (const orderId of orderIds) {
@@ -700,6 +792,15 @@ export class FleetService {
         updated_at: Clock.nowUtc(),
         updated_by: userId,
       });
+      if (trip.vehicle_id) {
+        await trx('vehicles')
+          .where('id', trip.vehicle_id)
+          .update({
+            status: 'AVAILABLE',
+            updated_at: Clock.nowUtc(),
+            updated_by: userId,
+          });
+      }
       await this.outbox.raise(
         trx,
         'trip.closed',
@@ -804,12 +905,16 @@ export class FleetService {
     const stop = await this.knex('delivery_stops')
       .where({ id: stopId, trip_id: tripId })
       .first('*');
-    const vehicle = await this.knex('vehicles')
-      .where('id', trip.vehicle_id)
-      .first('registration_no');
-    const driver = await this.knex('users')
-      .where('id', trip.driver_id)
-      .first('full_name');
+    const vehicle = trip.vehicle_id
+      ? await this.knex('vehicles')
+          .where('id', trip.vehicle_id)
+          .first('registration_no')
+      : null;
+    const driver = trip.driver_id
+      ? await this.knex('users')
+          .where('id', trip.driver_id)
+          .first('full_name')
+      : null;
     const customer = await this.knex('customers')
       .where('id', stop.customer_id)
       .first('*');
@@ -844,8 +949,10 @@ export class FleetService {
       challanDate: new Date().toISOString().split('T')[0],
       tripNo: trip.trip_no,
       tripDate: trip.trip_date,
-      vehicleNo: vehicle?.registration_no || 'N/A',
-      driverName: driver?.full_name || 'N/A',
+      vehicleNo:
+        vehicle?.registration_no || trip.external_vehicle_no || trip.transporter_name || 'N/A',
+      driverName:
+        driver?.full_name || trip.external_driver_name || trip.transporter_name || 'N/A',
       customerName: customer?.business_name || customer?.customer_code || 'N/A',
       customerAddress: customer?.billing_address || 'N/A',
       customerGstin: customer?.gstin || 'N/A',
@@ -969,6 +1076,7 @@ export class FleetService {
         type: dto.type,
         amount: Money.of(dto.amount).toStorageString(),
         receipt_attachment_id: dto.receiptAttachmentId ?? null,
+        notes: dto.notes ?? null,
         logged_by: userId,
       })
       .returning('*');
@@ -1024,8 +1132,17 @@ export class FleetService {
   async listIssues(filter: { siteId?: string; tripId?: string; status?: string }) {
     let query = this.knex('issue_reports as ir')
       .leftJoin('delivery_trips as dt', 'ir.trip_id', 'dt.id')
+      .leftJoin('delivery_stops as ds', 'ir.stop_id', 'ds.id')
+      .leftJoin('sales_orders as so', 'ds.sales_order_id', 'so.id')
+      .leftJoin('customers as c', 'ds.customer_id', 'c.id')
       .leftJoin('sites as s', 'ir.site_id', 's.id')
-      .select('ir.*', 'dt.trip_no', 's.name as site_name');
+      .select(
+        'ir.*',
+        'dt.trip_no',
+        's.name as site_name',
+        'so.order_no as stop_order_no',
+        'c.business_name as customer_name',
+      );
     if (this.isUuid(filter.siteId))
       query = query.where('ir.site_id', filter.siteId);
     if (this.isUuid(filter.tripId))
@@ -1097,21 +1214,106 @@ export class FleetService {
   async listVehicleMonitoring(siteId?: string) {
     const vehicles = await this.listVehicles(siteId);
     const activeTrips = await this.listTrips(siteId);
+    const monthPrefix = new Date().toISOString().slice(0, 7);
     const tripByVehicle = new Map<string, any>();
+    const activeTripByDriver = new Map<string, any>();
+    const monthlyStatsByVehicle = new Map<string, { trips: number; km: number }>();
+
     for (const t of activeTrips) {
       if (t.vehicle_id && !tripByVehicle.has(String(t.vehicle_id))) {
         tripByVehicle.set(String(t.vehicle_id), t);
       }
+      if (
+        t.driver_id &&
+        ['LOADING', 'IN_TRANSIT'].includes(String(t.status)) &&
+        !activeTripByDriver.has(String(t.driver_id))
+      ) {
+        activeTripByDriver.set(String(t.driver_id), t);
+      }
+      if (t.vehicle_id && String(t.trip_date ?? '').startsWith(monthPrefix)) {
+        const key = String(t.vehicle_id);
+        const cur = monthlyStatsByVehicle.get(key) ?? { trips: 0, km: 0 };
+        cur.trips += 1;
+        cur.km += Number(t.planned_distance_km ?? 0);
+        monthlyStatsByVehicle.set(key, cur);
+      }
     }
-    return vehicles.map((v: any) => {
+
+    const enrichedVehicles = vehicles.map((v: any) => {
       const latestTrip = tripByVehicle.get(String(v.id)) || null;
+      const mStats = monthlyStatsByVehicle.get(String(v.id)) ?? {
+        trips: 0,
+        km: 0,
+      };
       return {
         ...v,
         activeTrip: latestTrip,
-        currentStatus: latestTrip?.status ?? 'IDLE',
-        driverName: latestTrip?.driver_name ?? null,
+        currentStatus: latestTrip?.status ?? v.status ?? 'IDLE',
+        driverName: latestTrip?.driver_name ?? v.default_driver_name ?? null,
+        tripsThisMonth: mStats.trips,
+        kmThisMonth: mStats.km,
       };
     });
+
+    let driversQuery = this.knex('users')
+      .where({ role: 'DRIVER', is_active: true })
+      .select('id', 'full_name', 'phone', 'assigned_site_id');
+    let collectorsQuery = this.knex('users')
+      .where({ role: 'COLLECTOR', is_active: true })
+      .select('id', 'full_name', 'phone', 'assigned_site_id');
+    if (this.isUuid(siteId)) {
+      driversQuery = driversQuery.andWhere('assigned_site_id', siteId);
+      collectorsQuery = collectorsQuery.andWhere('assigned_site_id', siteId);
+    }
+
+    const [driverRows, collectorRows] = await Promise.all([
+      driversQuery.orderBy('full_name', 'asc'),
+      collectorsQuery.orderBy('full_name', 'asc'),
+    ]);
+
+    const todayStr = Clock.todayKolkata();
+    const collectorReceipts = await this.knex('collection_receipts')
+      .whereRaw('receipt_date = ?', [todayStr])
+      .select('collected_by_user_id', 'payment_mode', 'amount')
+      .catch(() => []);
+
+    const drivers = driverRows.map((d: any) => {
+      const activeTrip = activeTripByDriver.get(String(d.id));
+      return {
+        id: d.id,
+        name: d.full_name,
+        full_name: d.full_name,
+        phone: d.phone,
+        activeTripNo: activeTrip?.trip_no ?? null,
+      };
+    });
+
+    const collectors = collectorRows.map((c: any) => {
+      const myReceipts = collectorReceipts.filter(
+        (r: any) => String(r.collected_by_user_id) === String(c.id),
+      );
+      const walletCashInr = myReceipts
+        .filter((r: any) => String(r.payment_mode) === 'CASH')
+        .reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+      const walletChequeInr = myReceipts
+        .filter((r: any) => String(r.payment_mode) === 'CHEQUE')
+        .reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+      return {
+        id: c.id,
+        name: c.full_name,
+        phone: c.phone,
+        pendingVisits: 0,
+        walletCashInr,
+        walletChequeInr,
+        handoverStatus: myReceipts.length > 0 ? 'SETTLED' : 'PENDING',
+      };
+    });
+
+    return {
+      vehicles: enrichedVehicles,
+      drivers,
+      collectors,
+    };
   }
 
   async getTripLocation(tripId: string) {
@@ -1471,7 +1673,7 @@ export class FleetService {
         id,
         site_id: siteId,
         name: String(body.name || 'Warehouse').trim(),
-        location_type: String(body.locationType || body.type || 'WAREHOUSE'),
+        location_type: String(body.locationType || body.type || 'TRADING_WAREHOUSE'),
         is_active: body.isActive !== false,
         created_at: now,
         updated_at: now,
@@ -1835,7 +2037,7 @@ export class FleetService {
             id: randomUUID(),
             sku_code: sku,
             name,
-            item_category: String(r.itemCategory ?? r.item_category ?? 'FINISHED_GOOD'),
+            item_category: String(r.itemCategory ?? r.item_category ?? 'PROCESSED_FG'),
             primary_uom: String(r.primaryUom ?? r.primary_uom ?? 'KG'),
             tax_rate_pct: Number(r.taxRatePct ?? r.tax_rate_pct ?? 5),
             min_margin_pct: Number(r.minMarginPct ?? r.min_margin_pct ?? 10),
@@ -2306,8 +2508,12 @@ export class FleetService {
   async getTripManifestPdf(tripId: string): Promise<{ buffer: Buffer; tripNo: string }> {
     const trip = await this.knex('delivery_trips').where('id', tripId).first('*');
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
-    const vehicle = await this.knex('vehicles').where('id', trip.vehicle_id).first('registration_no');
-    const driver = await this.knex('users').where('id', trip.driver_id).first('full_name');
+    const vehicle = trip.vehicle_id
+      ? await this.knex('vehicles').where('id', trip.vehicle_id).first('registration_no')
+      : null;
+    const driver = trip.driver_id
+      ? await this.knex('users').where('id', trip.driver_id).first('full_name')
+      : null;
     const site = await this.knex('sites').where('id', trip.site_id).first('*');
     const lines = await this.knex('delivery_stop_lines as dsl')
       .join('delivery_stops as ds', 'dsl.stop_id', 'ds.id')
@@ -2321,8 +2527,10 @@ export class FleetService {
       challanDate: new Date().toISOString().split('T')[0],
       tripNo: trip.trip_no || trip.id.slice(0, 8),
       tripDate: String(trip.trip_date ?? ''),
-      vehicleNo: vehicle?.registration_no || 'N/A',
-      driverName: driver?.full_name || 'N/A',
+      vehicleNo:
+        vehicle?.registration_no || trip.external_vehicle_no || trip.transporter_name || 'N/A',
+      driverName:
+        driver?.full_name || trip.external_driver_name || trip.transporter_name || 'N/A',
       customerName: 'Dispatch Manifest — All Stops',
       customerAddress: site?.address || 'Depot',
       customerGstin: site?.gstin || 'N/A',

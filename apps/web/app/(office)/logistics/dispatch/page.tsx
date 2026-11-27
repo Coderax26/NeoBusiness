@@ -21,16 +21,30 @@ export default function LiveDispatchBoardPage() {
     id: String(t.id),
     tripNo: String(t.tripNo ?? t.trip_no ?? ''),
     tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
-    vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? ''),
-    driverName: String(t.driverName ?? t.driver_name ?? ''),
+    vehicleRegNo: String(
+      t.vehicleRegNo ?? t.registration_no ?? t.external_vehicle_no ?? 'Carrier',
+    ),
+    driverName: String(
+      t.driverName ??
+        t.driver_name ??
+        t.external_driver_name ??
+        t.transporter_name ??
+        'Driver',
+    ),
+    dispatchMode: String(t.dispatch_mode ?? 'OWN_FLEET'),
+    transporterName: t.transporter_name ?? null,
     lastUpdated: String(t.lastUpdated ?? t.updated_at ?? t.created_at ?? '').slice(0, 16),
     status: (t.status ?? 'LOADING') as TripRecord['status'],
     stops: Array.isArray(t.stops)
-      ? t.stops.map((s: any) => {
+      ? t.stops.map((s: any, idx: number) => {
           const rawSt = String(s.deliveryStatus ?? s.delivery_status ?? s.status ?? 'PENDING');
           return {
             ...s,
             id: String(s.id),
+            stopId: String(s.stopId ?? s.id),
+            seq: Number(s.seq ?? s.sequence_no ?? idx + 1),
+            gpsX: Number(s.gpsX ?? 100 + (idx % 4) * 65),
+            gpsY: Number(s.gpsY ?? 50 + Math.floor(idx / 4) * 60),
             deliveryStatus:
               rawSt === 'DELIVERED_FULL' || rawSt === 'DELIVERED'
                 ? 'DELIVERED'

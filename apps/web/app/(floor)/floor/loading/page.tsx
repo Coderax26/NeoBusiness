@@ -7,39 +7,83 @@ import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 export default function FloorVehicleLoadingPage() {
   const { enqueueOrSend } = useFloorOutbox();
   const [trips, setTrips] = useState<FloorLoadingTrip[]>([]);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<string>('');
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
-    fetch('/api/proxy/trips')
+    let active = true;
+    fetch('/api/proxy/trips?status=LOADING')
       .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
+      .then(async (res) => {
+        if (!active) return;
         const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        setTrips(
-          list.map((t: any) => ({
-            tripId: t.id,
-            tripNo: t.trip_no ?? t.tripNo ?? t.id.slice(0, 8),
-            vehicleNo: t.vehicle_reg_no ?? t.vehicleNo ?? 'Vehicle',
-            driverName: t.driver_name ?? t.driverName ?? 'Driver',
-            status: t.status ?? 'LOADING',
-            stops: Array.isArray(t.stops)
-              ? t.stops.map((s: any) => ({
-                  stopId: s.id,
-                  customerName: s.customer_name ?? s.customerName ?? 'Customer',
-                  itemName: s.item_name ?? 'Order Items',
-                  requiredQty: Number(s.required_qty ?? 1),
+        const hydrated = await Promise.all(
+          list.slice(0, 10).map(async (t: any) => {
+            let detail = t;
+            try {
+              const dr = await fetch(`/api/proxy/trips/${encodeURIComponent(String(t.id))}`);
+              if (dr.ok) {
+                const dj = await dr.json();
+                detail = dj?.data ?? dj ?? t;
+              }
+            } catch {
+              /* fallback to summary row */
+            }
+            const rawStops = Array.isArray(detail.stops) ? detail.stops : [];
+            return {
+              tripId: String(detail.id),
+              tripNo: String(detail.trip_no ?? detail.tripNo ?? String(detail.id).slice(0, 8)),
+              vehicleNo: String(
+                detail.registration_no ??
+                  detail.external_vehicle_no ??
+                  detail.vehicle_reg_no ??
+                  detail.vehicleNo ??
+                  'Vehicle',
+              ),
+              driverName: String(
+                detail.driver_name ??
+                  detail.external_driver_name ??
+                  detail.transporter_name ??
+                  detail.driverName ??
+                  'Driver',
+              ),
+              status: (detail.status === 'READY_TO_DISPATCH' ? 'READY_TO_DISPATCH' : 'LOADING') as FloorLoadingTrip['status'],
+              stops: rawStops.map((s: any) => {
+                const lines = Array.isArray(s.lines) ? s.lines : [];
+                const totalQty =
+                  lines.reduce((acc: number, l: any) => acc + Number(l.loaded_qty ?? 0), 0) ||
+                  Number(s.required_qty ?? 1);
+                const firstItem = lines[0]?.item_name ?? s.order_no ?? 'Order Items';
+                return {
+                  stopId: String(s.id),
+                  customerName: String(s.customer_name ?? s.customerName ?? 'Customer'),
+                  itemName:
+                    lines.length > 1
+                      ? `${firstItem} (+${lines.length - 1} more)`
+                      : String(firstItem),
+                  requiredQty: totalQty,
                   loadedQty: 0,
-                  uom: 'CRATE',
-                  suggestedBatch: s.batch_number ?? 'FEFO',
+                  uom: String(lines[0]?.uom ?? 'CRATE'),
+                  suggestedBatch: String(lines[0]?.batch_number ?? s.batch_number ?? 'FEFO'),
                   checked: false,
-                }))
-              : [],
-          })),
+                };
+              }),
+            };
+          }),
         );
+        if (!active) return;
+        setTrips(hydrated);
+        if (hydrated.length > 0) setSelectedTripId(hydrated[0].tripId);
       })
-      .catch(() => setTrips([]));
+      .catch(() => {
+        if (active) setTrips([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const trip = trips[0];
+  const trip = trips.find((t) => t.tripId === selectedTripId) || trips[0];
 
   if (!trip) {
     return (
@@ -71,20 +115,29 @@ export default function FloorVehicleLoadingPage() {
   };
 
   const handleCompleteLoading = async () => {
+    const verifiedCratesCount = Math.max(
+      1,
+      Math.round(
+        trip.stops.reduce((sum, s) => sum + Number(s.loadedQty || s.requiredQty || 1), 0),
+      ),
+    );
     const res = await enqueueOrSend({
       type: 'LOADING_CONFIRM',
-      endpoint: `/api/bff/trips/${trip.tripId}/confirm-loading`,
+      endpoint: `/api/bff/trips/${encodeURIComponent(trip.tripId)}/confirm-loading`,
       payload: {
-        tripId: trip.tripId,
-        stops: trip.stops,
+        verifiedCratesCount,
       },
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Could not confirm loading: ${res.message}`, isError: true });
+      return;
+    }
     setTrips((prev) =>
       prev.map((t) =>
         t.tripId === trip.tripId ? { ...t, status: 'READY_TO_DISPATCH' } : t,
       ),
     );
-    setBanner(`Loading complete for ${trip.tripNo}! ${res.message}`);
+    setBanner({ text: `Loading confirmed for ${trip.tripNo}! ${res.message}`, isError: false });
   };
 
   return (
@@ -97,14 +150,35 @@ export default function FloorVehicleLoadingPage() {
             {trip.vehicleNo} · Driver: {trip.driverName}
           </p>
         </div>
-        <span className="px-4 py-2 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-sm">
-          {trip.status}
-        </span>
+        <div className="flex items-center gap-3">
+          {trips.length > 1 && (
+            <select
+              value={trip.tripId}
+              onChange={(e) => setSelectedTripId(e.target.value)}
+              className="min-h-[44px] bg-zinc-950 border border-zinc-700 rounded-xl px-3 text-sm text-white"
+            >
+              {trips.map((t) => (
+                <option key={t.tripId} value={t.tripId}>
+                  {t.tripNo} ({t.vehicleNo})
+                </option>
+              ))}
+            </select>
+          )}
+          <span className="px-4 py-2 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-sm">
+            {trip.status}
+          </span>
+        </div>
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold ${
+            banner.isError
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

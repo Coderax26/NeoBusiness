@@ -35,7 +35,7 @@ export default function FloorAdjustmentsPage() {
   const [qty, setQty] = useState(5);
   const [reason, setReason] = useState<string>('DAMAGE');
   const [photoName, setPhotoName] = useState('');
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/proxy/inventory/stock/current')
@@ -84,12 +84,25 @@ export default function FloorAdjustmentsPage() {
       payload: {
         siteId: selected.siteId,
         itemId: selected.itemId,
-        adjustmentType: reason === 'SPILLAGE' ? 'SHRINKAGE' : 'WRITEOFF',
+        ...(selected.id ? { batchId: selected.id } : {}),
+        adjustmentType:
+          reason === 'SPILLAGE'
+            ? 'SHRINKAGE'
+            : reason === 'EXPIRY'
+              ? 'EXPIRY_REMOVAL'
+              : 'WRITEOFF',
         qty: String(Math.abs(qty)),
         remarks: `Floor report (${reason}) batch ${selected.batchNo}${photoName ? ` photo:${photoName}` : ''}`,
       },
     });
-    setBanner(`Adjustment request for ${selected.itemName} submitted! ${res.message}`);
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Adjustment rejected: ${res.message}`, isError: true });
+      return;
+    }
+    setBanner({
+      text: `Adjustment request for ${selected.itemName} submitted! ${res.message}`,
+      isError: false,
+    });
   };
 
   return (
@@ -102,8 +115,14 @@ export default function FloorAdjustmentsPage() {
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold ${
+            banner.isError
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

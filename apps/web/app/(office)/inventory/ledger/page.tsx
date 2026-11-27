@@ -17,41 +17,66 @@ export default function StockLedgerExplorerPage() {
       .then((res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setEntries(
-          rows.map((row: any) => {
-            const txn = String(row.txnType || row.txn_type || row.type || 'ADJUSTMENT').toUpperCase();
-            const mappedType: LedgerEntry['type'] =
-              txn === 'RECEIPT'
-                ? 'GRN'
-                : txn === 'SALE_DISPATCH'
-                  ? 'SALE'
-                  : txn === 'TRANSFER_IN' || txn === 'TRANSFER_OUT'
-                    ? 'TRANSFER'
-                    : txn === 'PROD_OUTPUT'
-                      ? 'PRODUCTION_IN'
-                      : txn === 'PROD_CONSUME'
-                        ? 'PRODUCTION_OUT'
-                        : txn === 'REVERSAL'
-                          ? 'REVERSAL'
-                          : 'ADJUSTMENT';
-            const rawQty = Number(row.qtyDelta ?? row.qty ?? 0);
-            const isOutflow = ['SALE_DISPATCH', 'TRANSFER_OUT', 'WRITEOFF', 'EXPIRY_REMOVAL', 'SHRINKAGE', 'PROD_CONSUME'].includes(txn);
-            return {
-              id: String(row.id),
-              timestamp: String(row.timestamp || row.postedAt || row.posted_at || '').slice(0, 19).replace('T', ' '),
-              itemId: String(row.itemId || row.item_id || ''),
-              itemName: String(row.itemName || row.item_name || 'Item'),
-              batchNo: String(row.batchNo || row.batchNumber || row.batch_id || ''),
-              siteName: String(row.siteName || row.site_name || 'Main Site'),
-              type: mappedType,
-              qtyDelta: row.qtyDelta !== undefined ? rawQty : (isOutflow ? -Math.abs(rawQty) : rawQty),
-              runningBalance: Number(row.runningBalance ?? 0),
-              uom: String(row.uom || 'KG'),
-              refNo: String(row.refNo || row.referenceNo || row.reference_no || ''),
-              reversesId: row.reversesId || row.reversesTxnId || row.reverses_txn_id || undefined,
-            };
-          }),
-        );
+        // Compute chronological running balance per item from oldest to newest, then preserve newest-first order
+        const parsedRows = rows.map((row: any) => {
+          const txn = String(row.txnType || row.txn_type || row.type || 'ADJUSTMENT').toUpperCase();
+          const mappedType: LedgerEntry['type'] =
+            txn === 'RECEIPT'
+              ? 'GRN'
+              : txn === 'SALE_DISPATCH'
+                ? 'SALE'
+                : txn === 'TRANSFER_IN' || txn === 'TRANSFER_OUT'
+                  ? 'TRANSFER'
+                  : txn === 'PROD_OUTPUT'
+                    ? 'PRODUCTION_IN'
+                    : txn === 'PROD_CONSUME'
+                      ? 'PRODUCTION_OUT'
+                      : txn === 'REVERSAL'
+                        ? 'REVERSAL'
+                        : 'ADJUSTMENT';
+          const rawQty = Number(row.qtyDelta ?? row.qty ?? 0);
+          const isOutflow = [
+            'SALE_DISPATCH',
+            'TRANSFER_OUT',
+            'ADJUSTMENT',
+            'WRITEOFF',
+            'EXPIRY_REMOVAL',
+            'SHRINKAGE',
+            'PROD_CONSUME',
+            'COUNT_DEFICIT',
+          ].includes(txn);
+          const isNonStockHold = txn === 'RESERVATION' || txn === 'RELEASE';
+          const qtyDelta =
+            row.qtyDelta !== undefined
+              ? rawQty
+              : isNonStockHold
+                ? 0
+                : isOutflow
+                  ? -Math.abs(rawQty)
+                  : Math.abs(rawQty);
+          return {
+            id: String(row.id),
+            timestamp: String(row.timestamp || row.postedAt || row.posted_at || '').slice(0, 19).replace('T', ' '),
+            itemId: String(row.itemId || row.item_id || ''),
+            itemName: String(row.itemName || row.item_name || 'Item'),
+            batchNo: String(row.batchNo || row.batchNumber || row.batch_id || ''),
+            siteName: String(row.siteName || row.site_name || 'Main Site'),
+            type: mappedType,
+            qtyDelta,
+            runningBalance: Number(row.runningBalance ?? 0),
+            uom: String(row.uom || 'KG'),
+            refNo: String(row.refNo || row.referenceNo || row.reference_no || ''),
+            reversesId: row.reversesId || row.reversesTxnId || row.reverses_txn_id || undefined,
+          };
+        });
+        const balByItem = new Map<string, number>();
+        for (let idx = parsedRows.length - 1; idx >= 0; idx--) {
+          const item = parsedRows[idx];
+          const next = (balByItem.get(item.itemId) ?? 0) + item.qtyDelta;
+          balByItem.set(item.itemId, next);
+          item.runningBalance = Number(next.toFixed(3));
+        }
+        setEntries(parsedRows);
       })
       .catch(() => {});
     return () => {

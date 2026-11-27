@@ -98,7 +98,17 @@ export class InventoryDriftJob implements OnModuleInit, OnModuleDestroy {
   }
 
   private onHandDelta(type: string, qty: Qty): Qty {
-    if (['RECEIPT', 'RETURN', 'TRANSFER_IN', 'PROD_OUTPUT'].includes(type)) {
+    if (
+      [
+        'RECEIPT',
+        'RETURN',
+        'TRANSFER_IN',
+        'PROD_OUTPUT',
+        'OPENING_STOCK',
+        'COUNT_SURPLUS',
+        'FOUND',
+      ].includes(type)
+    ) {
       return qty;
     }
     if (
@@ -110,6 +120,7 @@ export class InventoryDriftJob implements OnModuleInit, OnModuleDestroy {
         'EXPIRY_REMOVAL',
         'SHRINKAGE',
         'PROD_CONSUME',
+        'COUNT_DEFICIT',
       ].includes(type)
     ) {
       return qty.mul(-1);

@@ -15,27 +15,39 @@ import {
 interface DraftStop extends ReadyOrderItem {
   ewayBillRef: string;
   challanGenerated: boolean;
+  isCod?: boolean;
 }
 
 export default function PlanNewTripPage() {
   const [siteId, setSiteId] = useState('');
   const [readyPool, setReadyPool] = useState<ReadyOrderItem[]>([]);
-  const [vehicles, setVehicles] = useState<Array<{ id: string; regNo: string; model: string; capacityKg: number; capacityCrates: number }>>([]);
+  const [vehicles, setVehicles] = useState<Array<{ id: string; siteId?: string; regNo: string; model: string; capacityKg: number; capacityCrates: number }>>([]);
   const [drivers, setDrivers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   const [stockBatches, setStockBatches] = useState<any[]>([]);
   const [areaFilter, setAreaFilter] = useState('ALL');
   const [windowFilter, setWindowFilter] = useState('ALL');
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [stops, setStops] = useState<DraftStop[]>([]);
+  const [dispatchMode, setDispatchMode] = useState<'OWN_FLEET' | 'THIRD_PARTY'>('OWN_FLEET');
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
+  const [transporterName, setTransporterName] = useState('');
+  const [externalVehicleNo, setExternalVehicleNo] = useState('');
+  const [externalDriverName, setExternalDriverName] = useState('');
+  const [externalDriverPhone, setExternalDriverPhone] = useState('');
+  const [lrTrackingNo, setLrTrackingNo] = useState('');
+  const [freightCost, setFreightCost] = useState('');
   const [loadingConfirmed, setLoadingConfirmed] = useState(false);
   const [savedTrip, setSavedTrip] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     let active = true;
+    const preselectedOrderId =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('orderId')
+        : null;
     Promise.all([
       fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/proxy/orders?status=READY').then((r) => (r.ok ? r.json() : [])),
@@ -43,8 +55,13 @@ export default function PlanNewTripPage() {
       fetch('/api/proxy/vehicles').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/drivers').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+      preselectedOrderId
+        ? fetch(`/api/proxy/orders/${encodeURIComponent(preselectedOrderId)}`).then((r) =>
+            r.ok ? r.json() : null,
+          )
+        : Promise.resolve(null),
     ])
-      .then(([meRes, readyRes, confRes, vehRes, drvRes, stkRes]) => {
+      .then(([meRes, readyRes, confRes, vehRes, drvRes, stkRes, preOrderRes]) => {
         if (!active) return;
         const storedSite =
           typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
@@ -57,8 +74,14 @@ export default function PlanNewTripPage() {
 
         const rRows = Array.isArray(readyRes) ? readyRes : Array.isArray(readyRes?.data) ? readyRes.data : [];
         const cRows = Array.isArray(confRes) ? confRes : Array.isArray(confRes?.data) ? confRes.data : [];
-        const combined = [...rRows, ...cRows];
-        const mappedOrders: ReadyOrderItem[] = combined.map((o: any, idx: number) => ({
+        const combinedMap = new Map<string, any>();
+        for (const row of [...rRows, ...cRows]) {
+          if (row?.id) combinedMap.set(String(row.id), row);
+        }
+        const preOrder = preOrderRes?.data ?? preOrderRes;
+        if (preOrder?.id) combinedMap.set(String(preOrder.id), preOrder);
+
+        const toReadyItem = (o: any, idx: number): ReadyOrderItem => ({
           id: String(o.id),
           orderNo: String(o.order_no || o.orderNumber || o.id),
           customerId: String(o.customer_id || o.customerId || ''),
@@ -86,12 +109,23 @@ export default function PlanNewTripPage() {
                 qty: Number(l.ordered_qty ?? l.qty ?? 1),
               }))
             : [],
-        }));
+        });
+
+        const mappedOrders: ReadyOrderItem[] = Array.from(combinedMap.values()).map(toReadyItem);
         setReadyPool(mappedOrders);
+
+        if (preselectedOrderId) {
+          const match = mappedOrders.find((o) => o.id === preselectedOrderId);
+          if (match) {
+            setStops([{ ...match, ewayBillRef: '', challanGenerated: false, isCod: match.creditHold }]);
+            if (match.siteId) setSiteId(match.siteId);
+          }
+        }
 
         const vRows = Array.isArray(vehRes) ? vehRes : Array.isArray(vehRes?.data) ? vehRes.data : [];
         const mappedVehicles = vRows.map((v: any) => ({
           id: String(v.id),
+          siteId: String(v.site_id || v.siteId || ''),
           regNo: String(v.registration_no || v.regNo || v.id),
           model: String(v.vehicle_type || v.model || 'Truck'),
           capacityKg: Number(v.capacity_kg ?? v.capacityKg ?? 1000),
@@ -134,7 +168,7 @@ export default function PlanNewTripPage() {
   const readiness = useMemo(
     () =>
       evaluateTripBuilderReadiness({
-        capacityKg: selectedVehicle.capacityKg,
+        capacityKg: dispatchMode === 'THIRD_PARTY' ? 1000000 : selectedVehicle.capacityKg,
         loadingConfirmed,
         stops: stops.map((s) => ({
           orderNo: s.orderNo,
@@ -145,13 +179,17 @@ export default function PlanNewTripPage() {
           ewayBillRef: s.ewayBillRef,
         })),
       }),
-    [selectedVehicle.capacityKg, loadingConfirmed, stops],
+    [dispatchMode, selectedVehicle.capacityKg, loadingConfirmed, stops],
   );
+
+  const carrierMissing =
+    dispatchMode === 'THIRD_PARTY' &&
+    (!transporterName.trim() || !externalVehicleNo.trim());
 
   const addOrderToTrip = (order: ReadyOrderItem) => {
     setStops((prev) => [
       ...prev,
-      { ...order, ewayBillRef: '', challanGenerated: false },
+      { ...order, ewayBillRef: '', challanGenerated: false, isCod: Boolean(order.creditHold) },
     ]);
   };
 
@@ -159,7 +197,7 @@ export default function PlanNewTripPage() {
     const toAdd = availableOrders.filter((o) => checkedIds.includes(o.id));
     setStops((prev) => [
       ...prev,
-      ...toAdd.map((o) => ({ ...o, ewayBillRef: '', challanGenerated: false })),
+      ...toAdd.map((o) => ({ ...o, ewayBillRef: '', challanGenerated: false, isCod: Boolean(o.creditHold) })),
     ]);
     setCheckedIds([]);
   };
@@ -177,28 +215,49 @@ export default function PlanNewTripPage() {
       setBusy(true);
       try {
         for (const st of savedTrip.stops) {
-          await fetch(
+          const matchingDraft = stops.find((s) => s.id === String(st.sales_order_id));
+          const chRes = await fetch(
             `/api/proxy/trips/${encodeURIComponent(savedTrip.id)}/stops/${encodeURIComponent(st.id)}/challan`,
-            { method: 'POST' },
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(
+                matchingDraft?.ewayBillRef?.trim()
+                  ? { ewayBillNo: matchingDraft.ewayBillRef.trim() }
+                  : {},
+              ),
+            },
           );
+          if (!chRes.ok) {
+            const err = await chRes.json().catch(() => null);
+            throw new Error(err?.message || `HTTP ${chRes.status}`);
+          }
         }
         setStops((prev) => prev.map((s) => ({ ...s, challanGenerated: true })));
-        setToast(`Generated ${savedTrip.stops.length} delivery challan(s) on trip ${savedTrip.trip_no || ''}.`);
+        setToast({ text: `Generated ${savedTrip.stops.length} delivery challan(s) on trip ${savedTrip.trip_no || ''}.` });
       } catch (err) {
-        setToast(`Failed to generate challans: ${(err as Error).message}`);
+        setToast({ text: `Failed to generate challans: ${(err as Error).message}`, isError: true });
       } finally {
         setBusy(false);
       }
       return;
     }
     setStops((prev) => prev.map((s) => ({ ...s, challanGenerated: true })));
-    setToast(`Prepared ${stops.length} delivery challan(s). Save trip to issue PDFs.`);
+    setToast({ text: `Prepared ${stops.length} delivery challan(s). Save trip to issue PDFs.` });
   };
 
   const handleSaveTrip = async () => {
-    const resolvedSiteId = siteId || stops[0]?.siteId || '';
-    if (!resolvedSiteId || !vehicleId || !driverId || stops.length === 0) {
-      setToast('Site, vehicle, driver, and at least one stop are required to save a trip.');
+    const resolvedSiteId = stops[0]?.siteId || siteId || '';
+    if (!resolvedSiteId || stops.length === 0) {
+      setToast({ text: 'Site and at least one stop are required to save a trip.', isError: true });
+      return null;
+    }
+    if (dispatchMode === 'OWN_FLEET' && (!vehicleId || !driverId)) {
+      setToast({ text: 'Select a company vehicle and driver, or switch to Third-Party / 3PL Carrier.', isError: true });
+      return null;
+    }
+    if (dispatchMode === 'THIRD_PARTY' && (!transporterName.trim() || !externalVehicleNo.trim())) {
+      setToast({ text: 'Transporter / Carrier Name and External Vehicle No. are required for 3PL dispatch.', isError: true });
       return null;
     }
     setBusy(true);
@@ -206,14 +265,23 @@ export default function PlanNewTripPage() {
       const payload = {
         siteId: resolvedSiteId,
         tripDate: new Date().toISOString().split('T')[0],
-        vehicleId,
-        driverId,
+        dispatchMode,
+        ...(dispatchMode === 'OWN_FLEET'
+          ? { vehicleId, driverId }
+          : {
+              transporterName: transporterName.trim(),
+              externalVehicleNo: externalVehicleNo.trim(),
+              ...(externalDriverName.trim() ? { externalDriverName: externalDriverName.trim() } : {}),
+              ...(externalDriverPhone.trim() ? { externalDriverPhone: externalDriverPhone.trim() } : {}),
+              ...(lrTrackingNo.trim() ? { lrTrackingNo: lrTrackingNo.trim() } : {}),
+              ...(freightCost ? { freightCost: Number(freightCost) || 0 } : {}),
+            }),
         stops: stops.map((s, idx) => ({
           customerId: s.customerId || '',
           salesOrderId: s.id,
           sequenceNo: idx + 1,
-          isCod: Boolean(s.creditHold),
-          codAmount: s.creditHold ? s.valueInr : 0,
+          isCod: Boolean(s.isCod || s.creditHold),
+          codAmount: s.isCod || s.creditHold ? s.valueInr : 0,
           lines: (s.lines || []).map((l) => ({
             itemId: l.itemId,
             loadedQty: Number(l.qty || 1),
@@ -231,10 +299,10 @@ export default function PlanNewTripPage() {
       }
       const created = data?.data ?? data;
       setSavedTrip(created);
-      setToast(`Trip ${created?.trip_no || ''} saved in LOADING state!`);
+      setToast({ text: `Trip ${created?.trip_no || ''} saved in LOADING state!` });
       return created;
     } catch (err) {
-      setToast(`Failed to save trip: ${(err as Error).message}`);
+      setToast({ text: `Failed to save trip: ${(err as Error).message}`, isError: true });
       return null;
     } finally {
       setBusy(false);
@@ -242,32 +310,49 @@ export default function PlanNewTripPage() {
   };
 
   const handleDispatch = async () => {
-    if (!readiness.canDispatch) return;
+    if (!readiness.canDispatch || carrierMissing) return;
     setBusy(true);
     try {
       const trip = savedTrip || (await handleSaveTrip());
       if (!trip?.id || !Array.isArray(trip.stops)) return;
 
-      await fetch(`/api/proxy/trips/${encodeURIComponent(trip.id)}/confirm-loading`, {
+      const resolvedSiteId = String(trip.site_id || stops[0]?.siteId || siteId || '');
+      const confirmRes = await fetch(`/api/proxy/trips/${encodeURIComponent(trip.id)}/confirm-loading`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ verifiedCratesCount: stops.reduce((s, st) => s + st.crates, 0) }),
       });
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json().catch(() => null);
+        throw new Error(err?.message || `Loading confirmation failed (HTTP ${confirmRes.status})`);
+      }
 
       const dispatchLines: Array<{ stopId: string; itemId: string; batchId: string; qty: number }> = [];
       for (const st of trip.stops) {
         for (const line of st.lines || []) {
-          const matchingBatch = stockBatches.find(
-            (b: any) => String(b.itemId || b.item_id) === String(line.item_id) && Number(b.qtyAvailable ?? b.qty_available ?? 0) > 0,
+          const neededQty = Number(line.loaded_qty || 1);
+          const matchingBatches = stockBatches.filter(
+            (b: any) =>
+              String(b.itemId || b.item_id) === String(line.item_id) &&
+              Number(b.qtyAvailable ?? b.qty_available ?? 0) > 0,
           );
+          const sameSiteBatch = matchingBatches.find(
+            (b: any) =>
+              String(b.siteId || b.site_id) === resolvedSiteId &&
+              Number(b.qtyAvailable ?? b.qty_available ?? 0) >= neededQty,
+          );
+          const matchingBatch =
+            sameSiteBatch ||
+            matchingBatches.find((b: any) => Number(b.qtyAvailable ?? b.qty_available ?? 0) >= neededQty) ||
+            matchingBatches[0];
           if (!matchingBatch) {
-            throw new Error(`No available inventory batch found for item ${line.item_id}. Receive GRN stock before dispatching.`);
+            throw new Error(`No available inventory batch found for item ${line.item_name || line.item_id}. Receive GRN or add Opening Stock before dispatching.`);
           }
           dispatchLines.push({
             stopId: String(st.id),
             itemId: String(line.item_id),
             batchId: String(matchingBatch.batchId || matchingBatch.id),
-            qty: Number(line.loaded_qty || 1),
+            qty: neededQty,
           });
         }
       }
@@ -281,9 +366,13 @@ export default function PlanNewTripPage() {
       if (!res.ok) {
         throw new Error(dPayload?.message || dPayload?.error?.message || `HTTP ${res.status}`);
       }
-      setToast(`Dispatched trip ${trip.trip_no || ''} with ${selectedVehicle.regNo} (${stops.length} stops)!`);
+      const carrierLabel =
+        dispatchMode === 'THIRD_PARTY'
+          ? `${transporterName.trim()} (${externalVehicleNo.trim()})`
+          : selectedVehicle.regNo;
+      setToast({ text: `Dispatched trip ${trip.trip_no || ''} with ${carrierLabel} (${stops.length} stops)!` });
     } catch (err) {
-      setToast(`Dispatch blocked: ${(err as Error).message}`);
+      setToast({ text: `Dispatch blocked: ${(err as Error).message}`, isError: true });
     } finally {
       setBusy(false);
     }
@@ -311,8 +400,35 @@ export default function PlanNewTripPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
-          {toast}
+        <div
+          className={`p-3 rounded-lg border text-sm font-medium ${
+            toast.isError
+              ? 'bg-madder-soft border-madder/30 text-madder'
+              : 'bg-leaf-soft border-leaf/30 text-leaf'
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
+
+      {savedTrip?.id && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-sheet border border-rule text-xs">
+          <span className="font-mono font-semibold text-ink">
+            Active Draft Trip: {savedTrip.trip_no} ({savedTrip.dispatch_mode === 'THIRD_PARTY' ? `3PL · ${savedTrip.transporter_name}` : 'Company Fleet'})
+          </span>
+          <div className="flex items-center gap-3">
+            <Link href={`/logistics/trips/${savedTrip.id}`} className="text-action font-semibold hover:underline">
+              Open Trip Details →
+            </Link>
+            <a
+              href={`/api/proxy/trips/${encodeURIComponent(savedTrip.id)}/manifest-pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-ink-2 font-semibold hover:underline"
+            >
+              Download Manifest PDF ↗
+            </a>
+          </div>
         </div>
       )}
 
@@ -402,34 +518,128 @@ export default function PlanNewTripPage() {
             if (found) addOrderToTrip(found);
           }}
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] text-ink-3 mb-1">Vehicle</label>
-              <select
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
-              >
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.regNo} ({v.capacityKg} kg)
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] text-ink-3 mb-1">Driver</label>
-              <select
-                value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
-              >
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
+          {/* Dispatch Mode Switch */}
+          <div className="flex items-center gap-2 p-1 rounded-lg bg-paper border border-rule">
+            <button
+              type="button"
+              onClick={() => setDispatchMode('OWN_FLEET')}
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                dispatchMode === 'OWN_FLEET'
+                  ? 'bg-action text-white'
+                  : 'text-ink-2 hover:bg-sunken'
+              }`}
+            >
+              Company Vehicle (Own Fleet)
+            </button>
+            <button
+              type="button"
+              onClick={() => setDispatchMode('THIRD_PARTY')}
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                dispatchMode === 'THIRD_PARTY'
+                  ? 'bg-action text-white'
+                  : 'text-ink-2 hover:bg-sunken'
+              }`}
+            >
+              Third-Party / 3PL Carrier
+            </button>
           </div>
+
+          {dispatchMode === 'OWN_FLEET' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Vehicle</label>
+                <select
+                  value={vehicleId}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                  className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
+                >
+                  {vehicles.length === 0 && <option value="">No company vehicles found</option>}
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.regNo} ({v.capacityKg} kg)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Driver</label>
+                <select
+                  value={driverId}
+                  onChange={(e) => setDriverId(e.target.value)}
+                  className="w-full bg-paper border border-rule-strong rounded-lg p-2 text-xs text-ink"
+                >
+                  {drivers.length === 0 && <option value="">No drivers found</option>}
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 p-3 rounded-lg bg-paper border border-rule">
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Transporter / Carrier *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. VRL Logistics, Porter"
+                  value={transporterName}
+                  onChange={(e) => setTransporterName(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Vehicle Number *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. MH-42-T-9821"
+                  value={externalVehicleNo}
+                  onChange={(e) => setExternalVehicleNo(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">External Driver Name</label>
+                <input
+                  type="text"
+                  placeholder="Driver name"
+                  value={externalDriverName}
+                  onChange={(e) => setExternalDriverName(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Driver Phone</label>
+                <input
+                  type="tel"
+                  placeholder="98XXXXXXXX"
+                  value={externalDriverPhone}
+                  onChange={(e) => setExternalDriverPhone(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">LR / Docket / Tracking #</label>
+                <input
+                  type="text"
+                  placeholder="Optional docket ref"
+                  value={lrTrackingNo}
+                  onChange={(e) => setLrTrackingNo(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink-3 mb-1">Agreed Freight (₹)</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="e.g. 2500"
+                  value={freightCost}
+                  onChange={(e) => setFreightCost(e.target.value)}
+                  className="w-full bg-sheet border border-rule-strong rounded px-2.5 py-1.5 text-xs text-ink"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Capacity Meter */}
           <div className="p-3 rounded-lg bg-paper border border-rule space-y-1.5">
@@ -492,6 +702,20 @@ export default function PlanNewTripPage() {
                     <span>{stop.weightKg} kg · {stop.area}</span>
                     <span>{formatINR(stop.valueInr)}</span>
                   </div>
+                  <label className="flex items-center gap-2 text-[11px] text-ink-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(stop.isCod)}
+                      onChange={(e) =>
+                        setStops((prev) =>
+                          prev.map((s) =>
+                            s.id === stop.id ? { ...s, isCod: e.target.checked } : s,
+                          ),
+                        )
+                      }
+                    />
+                    <span>Collect Cash on Delivery (COD: {formatINR(stop.valueInr)})</span>
+                  </label>
                   {needsEway && (
                     <div className="pt-1">
                       <input
@@ -528,14 +752,26 @@ export default function PlanNewTripPage() {
           </label>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled={!readiness.canSaveTrip} onClick={handleSaveTrip}>
-              Save Trip
+            <Button
+              variant="secondary"
+              disabled={busy || !readiness.canSaveTrip || carrierMissing}
+              onClick={handleSaveTrip}
+            >
+              {busy ? 'Saving...' : 'Save Trip'}
             </Button>
-            <Button variant="secondary" disabled={stops.length === 0} onClick={handleGenerateChallans}>
+            <Button
+              variant="secondary"
+              disabled={busy || stops.length === 0}
+              onClick={handleGenerateChallans}
+            >
               Generate Challans
             </Button>
-            <Button variant="primary" disabled={!readiness.canDispatch} onClick={handleDispatch}>
-              Dispatch ▶
+            <Button
+              variant="primary"
+              disabled={busy || !readiness.canDispatch || carrierMissing}
+              onClick={handleDispatch}
+            >
+              {busy ? 'Dispatching...' : 'Dispatch ▶'}
             </Button>
           </div>
         </Card>

@@ -91,8 +91,8 @@ export class BomService {
       }
     }
 
-    // Use transaction for atomic BOM creation
-    return await this.knex.transaction(async (trx) => {
+    // Use transaction for atomic BOM creation, then read response after commit
+    const createdHeaderId = await this.knex.transaction(async (trx) => {
       // Create BOM header with proper required fields
       const headerId = uuidv7();
       const [header] = await trx('bom_headers')
@@ -140,11 +140,16 @@ export class BomService {
           header.item_id,
           header.site_id,
           createdBy,
+          header.bom_no,
+          header.version,
+          header.yield_pct,
         );
       }
 
-      return this.getBomResponse(headerId);
+      return headerId;
     });
+
+    return this.getBomResponse(createdHeaderId);
   }
 
   async activateBom(
@@ -180,6 +185,9 @@ export class BomService {
     itemId: string,
     siteId: string,
     requestedBy: string,
+    bomNo?: string,
+    version?: number,
+    yieldPct?: string,
   ): Promise<void> {
     // Deactivate any other ACTIVE BOM for this item/site
     await trx('bom_headers')
@@ -208,11 +216,11 @@ export class BomService {
       bomId,
       {
         bomId,
-        bomNo: (await this.bomRepo.getHeaderById(bomId))?.bom_no ?? '',
+        bomNo: bomNo ?? (await trx('bom_headers').where('id', bomId).first('bom_no'))?.bom_no ?? '',
         itemId,
         siteId,
-        version: 1,
-        yieldPct: '95.00',
+        version: version ?? 1,
+        yieldPct: yieldPct ?? '95.00',
       },
       'm4',
     );
@@ -343,6 +351,7 @@ export class BomService {
     bomId: string;
     bomNo: string;
     estimatedCostPerUnitInr: string;
+    totalCostPerUnit: string;
     currency: string;
     breakdown: Array<{
       itemId: string;
@@ -362,10 +371,10 @@ export class BomService {
     for (const line of lines) {
       const rateRow = await this.knex('supplier_rate_quotes')
         .where('item_id', line.item_id)
-        .orderBy('effective_from', 'desc')
+        .orderBy('quoted_at', 'desc')
         .orderBy('created_at', 'desc')
-        .first('unit_price');
-      let unitCost = Number(rateRow?.unit_price ?? 0);
+        .first('quoted_price');
+      let unitCost = Number(rateRow?.quoted_price ?? 0);
       if (unitCost === 0) {
         const poRow = await this.knex('purchase_order_lines')
           .where('item_id', line.item_id)
@@ -390,6 +399,7 @@ export class BomService {
       bomId: header.id,
       bomNo: header.bom_no,
       estimatedCostPerUnitInr: totalCost.toFixed(2),
+      totalCostPerUnit: totalCost.toFixed(2),
       currency: 'INR',
       breakdown,
     };

@@ -115,7 +115,7 @@ export default function FloorBlindGrnPage() {
   const [notes, setNotes] = useState('');
   const [keypadLineId, setKeypadLineId] = useState<string | null>(null);
   const [keypadValue, setKeypadValue] = useState('0');
-  const [savedBanner, setSavedBanner] = useState<string | null>(null);
+  const [savedBanner, setSavedBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const handleSaveReceipt = async () => {
     if (!selectedPo) return;
@@ -144,17 +144,21 @@ export default function FloorBlindGrnPage() {
       endpoint: '/api/proxy/procurement/grns',
       payload,
     });
-    setSavedBanner(res.message);
+    if (!res.ok && !res.queued) {
+      setSavedBanner({ text: res.message, isError: true });
+      return;
+    }
+    setSavedBanner({ text: res.message, isError: false });
   };
 
-  if (savedBanner) {
+  if (savedBanner && !savedBanner.isError) {
     return (
       <div className="bg-zinc-900 border border-emerald-500/40 rounded-2xl p-8 text-center space-y-5">
         <div className="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-400 text-4xl font-black flex items-center justify-center mx-auto">
           ✓
         </div>
         <h2 className="text-2xl font-bold text-white">Receipt Saved</h2>
-        <p className="text-base text-emerald-300">{savedBanner}</p>
+        <p className="text-base text-emerald-300">{savedBanner.text}</p>
         <div className="flex flex-wrap justify-center gap-4 pt-2">
           <button
             onClick={() => {
@@ -201,6 +205,11 @@ export default function FloorBlindGrnPage() {
       </div>
 
       {/* Item Lines — strictly NO ordered qty or unit price */}
+      {savedBanner?.isError && (
+        <div className="p-4 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-semibold">
+          GRN failed: {savedBanner.text}
+        </div>
+      )}
       <div className="space-y-4">
         {blindLines.map((line) => (
           <div

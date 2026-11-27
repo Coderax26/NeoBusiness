@@ -175,7 +175,9 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
       'ds.id as stopId',
       'ds.trip_id as tripId',
       'dt.trip_no as tripNumber',
-      'd.full_name as driverName',
+      this.knex.raw(
+        "COALESCE(d.full_name, dt.external_driver_name, dt.transporter_name, 'External Carrier') as \"driverName\"",
+      ),
       'ds.customer_id as customerId',
       'c.business_name as customerName',
       'ds.sales_order_id as salesOrderId',
@@ -278,14 +280,14 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
     const result = await this.knex.transaction(async (trx) => {
       const receiptNo = await this.docNumber.next('RECEIPT', siteId, null, trx);
 
-      // Get the driver who delivered this stop
+      // Get the driver who delivered this stop (fallback to trip creator for 3PL trips)
       const stop = await trx('delivery_stops')
         .where('id', stopId)
         .first('trip_id');
       const trip = await trx('delivery_trips')
         .where('id', stop.trip_id)
-        .first('driver_id');
-      const driverId = String(trip?.driver_id ?? '');
+        .first('driver_id', 'created_by');
+      const driverId = String(trip?.driver_id || trip?.created_by || '');
 
       // 1. Insert collection_receipts
       const [receipt] = await trx('collection_receipts')

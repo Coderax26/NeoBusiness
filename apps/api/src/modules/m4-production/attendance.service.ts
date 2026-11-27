@@ -33,14 +33,11 @@ export class AttendanceService {
     if (!dto.siteId) {
       throw new BadRequestException('siteId is required to log attendance');
     }
-    // Validate date is not in the future
-    const requestDate = new Date(dto.date);
-    const now = new Date();
-    if (requestDate > now) {
+    // Validate date is not in the future (compare YYYY-MM-DD in IST)
+    const attendanceDate = dto.date.slice(0, 10);
+    if (attendanceDate > Clock.todayKolkata()) {
       throw new BadRequestException('Attendance date cannot be in the future');
     }
-
-    const attendanceDate = dto.date;
 
     const nowIso = Clock.nowUtc().toISOString();
     const [insertedRow] = await this.knex('labour_attendance_logs')
@@ -96,7 +93,7 @@ export class AttendanceService {
     }
 
     const users = await usersQuery
-      .distinct('u.id', 'u.full_name', 'u.role_code', 'u.phone')
+      .distinct('u.id', 'u.full_name', 'u.role', 'u.phone')
       .orderBy('u.full_name', 'asc');
 
     const logs = await this.attendanceRepo.list(siteId, today);
@@ -139,7 +136,7 @@ export class AttendanceService {
       );
       const punchedIn =
         latest !== undefined && parseFloat(latest.hours_worked) === 0;
-      const roleStr = String(u.role_code || 'FLOOR_SUPERVISOR');
+      const roleStr = String(u.role || 'PROD_MGR');
       return {
         id: String(u.id),
         code: `WRK-${String(idx + 1).padStart(2, '0')}`,

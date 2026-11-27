@@ -117,7 +117,7 @@ export class RequisitionService {
       }
     }
 
-    return await this.knex.transaction(async (trx) => {
+    const createdHeaderId = await this.knex.transaction(async (trx) => {
       const headerId = uuidv7();
       await trx('production_requisitions')
         .insert({
@@ -149,8 +149,10 @@ export class RequisitionService {
         await trx('production_requisition_lines').insert(lines);
       }
 
-      return this.getRequisitionResponse(headerId);
+      return headerId;
     });
+
+    return this.getRequisitionResponse(createdHeaderId);
   }
 
   /**
@@ -303,8 +305,28 @@ export class RequisitionService {
       }));
     }
     if (effectiveDemands.length === 0) {
+      // Fallback: inspect confirmed / sourcing sales orders at this site that have an active BOM
+      const soDemandRows = await this.knex('sales_order_lines as sol')
+        .join('sales_orders as so', 'sol.order_id', 'so.id')
+        .join('bom_headers as bh', function () {
+          this.on('bh.item_id', '=', 'sol.item_id')
+            .andOn('bh.site_id', '=', 'so.fulfillment_site_id')
+            .andOnVal('bh.status', '=', 'ACTIVE');
+        })
+        .where('so.fulfillment_site_id', siteId)
+        .whereIn('so.order_status', ['CONFIRMED', 'IN_PRODUCTION_SOURCING'])
+        .select('sol.item_id', 'sol.ordered_qty as planned_qty', 'so.delivery_date');
+      effectiveDemands = soDemandRows.map((r: any) => ({
+        itemId: String(r.item_id),
+        qty: String(r.planned_qty),
+        requiredBy: r.delivery_date
+          ? new Date(r.delivery_date).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
+      }));
+    }
+    if (effectiveDemands.length === 0) {
       throw new BadRequestException(
-        'No planned work orders or demand lines found to generate requisitions',
+        'No planned Work Orders or active Sales Orders with an ACTIVE BOM found at this site. Create a Work Order or create a manual Raw Material Requisition.',
       );
     }
 
@@ -586,12 +608,91 @@ export class RequisitionService {
 
     const lines = await this.reqRepo.getLinesWithItems(reqId);
     const poIds: string[] = [];
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const now = new Date();
 
-    // For each line, create a back-to-batch PO via ProcurementPort
+    // Group lines by primary approved supplier when available; otherwise queue purchase_requisitions
     for (const line of lines) {
-      // In real implementation, this would create a PO draft
-      const poId = await this.procurementPort.createBackToBatchPO(line.id);
-      poIds.push(poId);
+      const supplierRow = await this.knex('supplier_items as si')
+        .join('suppliers as s', 'si.supplier_id', 's.id')
+        .where({ 'si.item_id': line.item_id, 's.is_active': true })
+        .orderByRaw('si.is_primary DESC, s.is_approved DESC')
+        .first('s.id as supplier_id', 's.lead_time_days_avg');
+
+      if (supplierRow?.supplier_id) {
+        const rateRow = await this.knex('supplier_rate_quotes')
+          .where({ supplier_id: supplierRow.supplier_id, item_id: line.item_id })
+          .orderBy('quoted_at', 'desc')
+          .first('quoted_price');
+        const poLineFallback = !rateRow
+          ? await this.knex('purchase_order_lines')
+              .where({ item_id: line.item_id })
+              .orderBy('created_at', 'desc')
+              .first('unit_price')
+          : null;
+        const unitPrice = Number(
+          rateRow?.quoted_price ?? poLineFallback?.unit_price ?? 0,
+        );
+        const qtyNum = Number(line.required_qty || 0);
+        const lineTotal = Number((qtyNum * unitPrice).toFixed(2));
+        const poSeq = await this.getNextSequence(header.site_id, 'PO');
+        const poId = uuidv7();
+        const poNo = `PO-${dateStr}-${String(poSeq).padStart(4, '0')}`;
+        const leadDays = Number(supplierRow.lead_time_days_avg ?? 2);
+        const expectedDate = new Date(Date.now() + leadDays * 86400000);
+
+        await this.knex.transaction(async (trx) => {
+          await trx('purchase_orders').insert({
+            id: poId,
+            po_no: poNo,
+            supplier_id: supplierRow.supplier_id,
+            receiving_site_id: header.site_id,
+            po_status: 'DRAFT',
+            total_amount: lineTotal.toFixed(2),
+            expected_delivery: expectedDate.toISOString().slice(0, 10),
+            created_at: now,
+            created_by: convertedBy,
+            updated_at: now,
+            updated_by: convertedBy,
+          });
+          await trx('purchase_order_lines').insert({
+            id: uuidv7(),
+            po_id: poId,
+            item_id: line.item_id,
+            ordered_qty: line.required_qty,
+            confirmed_qty: line.required_qty,
+            received_qty: '0.000',
+            unit_price: unitPrice.toFixed(2),
+            last_purchase_price_snapshot: unitPrice.toFixed(2),
+            price_variance_pct: '0.0000',
+            created_at: now,
+            created_by: convertedBy,
+            updated_at: now,
+            updated_by: convertedBy,
+          });
+        });
+        poIds.push(poId);
+      } else {
+        // Queue in M2 Purchase Requisitions for buyer supplier assignment
+        const prId = uuidv7();
+        const prSeq = await this.getNextSequence(header.site_id, 'PR');
+        await this.knex('purchase_requisitions').insert({
+          id: prId,
+          req_no: `PR-${dateStr}-${String(prSeq).padStart(4, '0')}`,
+          item_id: line.item_id,
+          qty: line.required_qty,
+          needed_by: header.required_by_date,
+          source: 'PRODUCTION',
+          source_ref_id: header.id,
+          status: 'OPEN',
+          requested_by: convertedBy,
+          created_at: now,
+          created_by: convertedBy,
+          updated_at: now,
+          updated_by: convertedBy,
+        });
+        poIds.push(prId);
+      }
     }
 
     // Mark requisition as CONVERTED

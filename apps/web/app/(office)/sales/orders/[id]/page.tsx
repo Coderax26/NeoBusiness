@@ -402,20 +402,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </Button>
           )}
           {(order.status === 'CONFIRMED' || order.status === 'IN_PRODUCTION_SOURCING') && (
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={busyAction !== null}
-              onClick={() => handleTransition('mark-ready', 'Order marked READY for dispatch.')}
-            >
-              Mark Ready for Dispatch →
-            </Button>
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={busyAction !== null}
+                onClick={() => handleTransition('mark-ready', 'Order marked READY for dispatch.')}
+              >
+                Mark Ready for Dispatch →
+              </Button>
+              <Link href={`/logistics/trips/new?orderId=${encodeURIComponent(order.id)}`}>
+                <Button variant="secondary" size="sm">
+                  Dispatch (Own Fleet / 3PL)
+                </Button>
+              </Link>
+            </>
           )}
           {order.status === 'READY' && (
             <>
-              <Link href="/logistics/trips/new">
+              <Link href={`/logistics/trips/new?orderId=${encodeURIComponent(order.id)}`}>
                 <Button variant="primary" size="sm">
-                  Plan Dispatch Trip →
+                  Dispatch (Own Fleet / 3PL) →
                 </Button>
               </Link>
               <Button

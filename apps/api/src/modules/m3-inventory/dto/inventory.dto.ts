@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsEnum,
   IsISO8601,
   IsNotEmpty,
+  IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
@@ -95,6 +97,10 @@ export class ReleaseReservationDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class CreateTransferDto {
@@ -163,6 +169,10 @@ export class PostGrnDto {
 export enum AdjustmentType {
   WRITEOFF = 'WRITEOFF',
   SHRINKAGE = 'SHRINKAGE',
+  COUNT_SURPLUS = 'COUNT_SURPLUS',
+  FOUND = 'FOUND',
+  OPENING_STOCK = 'OPENING_STOCK',
+  EXPIRY_REMOVAL = 'EXPIRY_REMOVAL',
 }
 
 export class CreateAdjustmentDto {
@@ -171,6 +181,10 @@ export class CreateAdjustmentDto {
 
   @IsUUID()
   itemId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  batchId?: string;
 
   @IsEnum(AdjustmentType)
   adjustmentType!: AdjustmentType;
@@ -183,6 +197,77 @@ export class CreateAdjustmentDto {
   @IsString()
   @IsNotEmpty()
   remarks!: string;
+}
+
+export class OpeningStockLineDto {
+  @IsUUID()
+  itemId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(POSITIVE_QTY)
+  qty!: string;
+
+  @IsOptional()
+  @IsNumberString()
+  unitCost?: string;
+
+  @IsOptional()
+  @IsString()
+  batchNumber?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  mfgDate?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  expiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  uom?: string;
+}
+
+export class OpeningStockDto {
+  @IsUUID()
+  siteId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => OpeningStockLineDto)
+  lines!: OpeningStockLineDto[];
+}
+
+export class UpdateStockCountLineDto {
+  @IsUUID()
+  itemId!: string;
+
+  @IsOptional()
+  @IsString()
+  batchNo?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(NON_NEGATIVE_QTY)
+  countedQty!: string;
+}
+
+export class UpdateStockCountLinesDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateStockCountLineDto)
+  items!: UpdateStockCountLineDto[];
 }
 
 export class RejectAdjustmentDto {

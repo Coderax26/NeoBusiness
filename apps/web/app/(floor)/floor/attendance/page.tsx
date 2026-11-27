@@ -7,26 +7,44 @@ import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 export default function FloorAttendancePage() {
   const { enqueueOrSend } = useFloorOutbox();
   const [workers, setWorkers] = useState<WorkerMasterRecord[]>([]);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
-    fetch('/api/proxy/production/workers')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      fetch('/api/proxy/production/workers').then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/production/attendance?date=${today}`).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([res, attRes]) => {
         const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const attRows = Array.isArray(attRes?.data)
+          ? attRes.data
+          : Array.isArray(attRes)
+            ? attRes
+            : [];
+        const attByWorker = new Map<string, any>();
+        for (const a of attRows) {
+          const wId = String(a.worker_id ?? a.workerId ?? '');
+          if (wId && !attByWorker.has(wId)) attByWorker.set(wId, a);
+        }
         setWorkers(
-          list.map((w: any) => ({
-            id: w.id,
-            code: w.code ?? 'WRK',
-            name: w.fullName ?? w.full_name ?? w.name ?? 'Worker',
-            station: w.station ?? w.role ?? 'Floor',
-            shift: w.shift ?? 'SHIFT_1',
-            status: (w.status === 'IN' ? 'IN' : 'OUT') as 'IN' | 'OUT',
-            lastPunch: w.lastPunch ?? '--:--',
-            hoursToday: Number(w.hoursToday ?? 0),
-            monthlyHours: Number(w.monthlyHours ?? 0),
-            assignedWoNo: w.assignedWoNo,
-          })),
+          list.map((w: any) => {
+            const log = attByWorker.get(String(w.id));
+            const derivedStatus =
+              log != null ? (Number(log.hours_worked ?? log.hoursWorked ?? 0) > 0 ? 'OUT' : 'IN') : w.status === 'IN' ? 'IN' : 'OUT';
+            return {
+              id: w.id,
+              code: w.code ?? 'WRK',
+              name: w.fullName ?? w.full_name ?? w.name ?? 'Worker',
+              station: w.station ?? w.role ?? 'Floor',
+              shift: w.shift ?? 'SHIFT_1',
+              status: derivedStatus as 'IN' | 'OUT',
+              lastPunch: w.lastPunch ?? '--:--',
+              hoursToday: Number(log?.hours_worked ?? w.hoursToday ?? 0),
+              monthlyHours: Number(w.monthlyHours ?? 0),
+              assignedWoNo: w.assignedWoNo,
+            };
+          }),
         );
       })
       .catch(() => setWorkers([]));
@@ -45,6 +63,10 @@ export default function FloorAttendancePage() {
         overtimeHours: 0,
       },
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Attendance failed for ${worker.name}: ${res.message}`, isError: true });
+      return;
+    }
     setWorkers((prev) =>
       prev.map((w) =>
         w.id === worker.id
@@ -56,7 +78,7 @@ export default function FloorAttendancePage() {
           : w,
       ),
     );
-    setBanner(`${worker.name} clocked ${nextStatus}. ${res.message}`);
+    setBanner({ text: `${worker.name} clocked ${nextStatus}. ${res.message}` });
   };
 
   return (
@@ -69,8 +91,14 @@ export default function FloorAttendancePage() {
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold ${
+            banner.isError
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

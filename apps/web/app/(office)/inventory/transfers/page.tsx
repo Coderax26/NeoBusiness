@@ -24,7 +24,10 @@ export default function InventoryTransfersPage() {
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [toSite, setToSite] = useState('');
   const [qty, setQty] = useState(200);
-  const [toast, setToast] = useState<string | null>(null);
+  const [receiveTarget, setReceiveTarget] = useState<(TransferRecord & { rawLines?: any[] }) | null>(null);
+  const [receiveQtyMap, setReceiveQtyMap] = useState<Record<string, string>>({});
+  const [receiveVarianceReason, setReceiveVarianceReason] = useState('');
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
 
   const loadData = async () => {
     try {
@@ -88,9 +91,9 @@ export default function InventoryTransfersPage() {
     loadData();
   }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+  const showToast = (msg: string, isError = false) => {
+    setToast({ msg, isError });
+    setTimeout(() => setToast(null), 5000);
   };
 
   const filtered = transfers.filter((t) =>
@@ -101,6 +104,10 @@ export default function InventoryTransfersPage() {
     const src = stockRows.find((r) => r.id === selectedBatchId) || stockRows[0];
     if (!src) return;
     const toSiteId = sites.find((s) => s.id === toSite || s.name === toSite)?.id || toSite;
+    if (toSiteId === src.siteId) {
+      showToast('Destination site must be different from source site.', true);
+      return;
+    }
     try {
       const res = await fetch('/api/proxy/inventory/transfers', {
         method: 'POST',
@@ -121,7 +128,45 @@ export default function InventoryTransfersPage() {
       setCreateOpen(false);
       showToast(`Created transfer for ${src.itemName} (${qty} ${src.uom}).`);
     } catch (err) {
-      showToast(`Failed to create transfer: ${(err as Error).message}`);
+      showToast(`Failed to create transfer: ${(err as Error).message}`, true);
+    }
+  };
+
+  const openReceiveModal = (trf: TransferRecord & { rawLines?: any[] }) => {
+    const map: Record<string, string> = {};
+    for (const l of trf.rawLines || []) {
+      map[String(l.id)] = String(l.dispatched_qty || l.requested_qty || trf.qty);
+    }
+    setReceiveQtyMap(map);
+    setReceiveVarianceReason('');
+    setReceiveTarget(trf);
+  };
+
+  const handleConfirmReceive = async () => {
+    if (!receiveTarget) return;
+    try {
+      const lines = (receiveTarget.rawLines || []).map((l: any) => ({
+        lineId: String(l.id),
+        receivedQty: String(receiveQtyMap[String(l.id)] ?? l.dispatched_qty ?? l.requested_qty ?? receiveTarget.qty),
+        varianceReason: receiveVarianceReason.trim() || undefined,
+      }));
+      const res = await fetch(
+        `/api/proxy/inventory/transfers/${encodeURIComponent(receiveTarget.id)}/receive`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lines }),
+        },
+      );
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadData();
+      setReceiveTarget(null);
+      showToast(`Transfer ${receiveTarget.transferNo} received cleanly.`);
+    } catch (err) {
+      showToast(`Failed to receive transfer: ${(err as Error).message}`, true);
     }
   };
 
@@ -130,19 +175,13 @@ export default function InventoryTransfersPage() {
     nextStatus: TransferRecord['status'],
     endpoint: string,
   ) => {
+    if (endpoint === 'receive') {
+      openReceiveModal(trf);
+      return;
+    }
     try {
-      const body =
-        endpoint === 'receive'
-          ? JSON.stringify({
-              lines: (trf.rawLines || []).map((l: any) => ({
-                lineId: String(l.id),
-                receivedQty: String(l.dispatched_qty || l.requested_qty || trf.qty),
-              })),
-            })
-          : undefined;
       const res = await fetch(`/api/proxy/inventory/transfers/${encodeURIComponent(trf.id)}/${endpoint}`, {
         method: 'POST',
-        ...(body ? { headers: { 'Content-Type': 'application/json' }, body } : {}),
       });
       const payload = await res.json().catch(() => null);
       if (!res.ok) {
@@ -151,7 +190,7 @@ export default function InventoryTransfersPage() {
       await loadData();
       showToast(`Transfer updated to ${nextStatus}.`);
     } catch (err) {
-      showToast(`Failed to ${endpoint} transfer: ${(err as Error).message}`);
+      showToast(`Failed to ${endpoint} transfer: ${(err as Error).message}`, true);
     }
   };
 
@@ -175,8 +214,14 @@ export default function InventoryTransfersPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
-          {toast}
+        <div
+          className={`p-3 rounded-lg border text-sm ${
+            toast.isError
+              ? 'bg-madder-soft border-madder/30 text-madder'
+              : 'bg-leaf-soft border-leaf/30 text-leaf'
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
 
@@ -322,6 +367,46 @@ export default function InventoryTransfersPage() {
             <Button variant="primary" onClick={handleCreate}>Create Draft Transfer</Button>
           </div>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={!!receiveTarget}
+        onClose={() => setReceiveTarget(null)}
+        title={`Receive Transfer — ${receiveTarget?.transferNo ?? ''}`}
+      >
+        {receiveTarget && (
+          <div className="space-y-4">
+            <p className="text-xs text-ink-3">
+              Confirm physical received quantity. Any short-receipt automatically raises a STOCK_VARIANCE check.
+            </p>
+            {(receiveTarget.rawLines || []).map((l: any) => (
+              <div key={l.id} className="flex items-center justify-between gap-3 p-2.5 bg-paper border border-rule rounded-lg text-xs">
+                <div>
+                  <div className="font-medium text-ink">{l.item_name || receiveTarget.itemName}</div>
+                  <div className="text-ink-3 font-mono">Dispatched: {l.dispatched_qty || receiveTarget.qty} {receiveTarget.uom}</div>
+                </div>
+                <input
+                  type="number"
+                  step="0.001"
+                  value={receiveQtyMap[String(l.id)] ?? ''}
+                  onChange={(e) => setReceiveQtyMap((p) => ({ ...p, [String(l.id)]: e.target.value }))}
+                  className="w-28 text-right bg-sheet border border-rule-strong rounded px-2 py-1 font-mono"
+                />
+              </div>
+            ))}
+            <input
+              type="text"
+              placeholder="Variance / damage note (if short-received)..."
+              value={receiveVarianceReason}
+              onChange={(e) => setReceiveVarianceReason(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setReceiveTarget(null)}>Cancel</Button>
+              <Button variant="primary" onClick={handleConfirmReceive}>Confirm Receipt</Button>
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   );

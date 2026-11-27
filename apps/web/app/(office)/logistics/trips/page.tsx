@@ -22,8 +22,18 @@ export default function TripsListPage() {
             id: String(t.id),
             tripNo: String(t.tripNo ?? t.trip_no ?? ''),
             tripDate: String(t.tripDate ?? t.trip_date ?? '').slice(0, 10),
-            vehicleRegNo: String(t.vehicleRegNo ?? t.registration_no ?? ''),
-            driverName: String(t.driverName ?? t.driver_name ?? ''),
+            vehicleRegNo: String(
+              t.vehicleRegNo ?? t.registration_no ?? t.external_vehicle_no ?? 'Carrier',
+            ),
+            driverName: String(
+              t.driverName ??
+                t.driver_name ??
+                t.external_driver_name ??
+                t.transporter_name ??
+                'Driver',
+            ),
+            dispatchMode: t.dispatch_mode ?? 'OWN_FLEET',
+            transporterName: t.transporter_name ?? null,
             status: (t.status ?? 'LOADING') as TripRecord['status'],
             stops: Array.isArray(t.stops)
               ? t.stops.map((s: any) => ({
@@ -91,8 +101,19 @@ export default function TripsListPage() {
                     <div className="text-[11px] text-ink-3 font-mono">{trip.tripDate}</div>
                   </td>
                   <td className="p-3">
-                    <div className="text-ink font-medium">{trip.vehicleRegNo}</div>
-                    <div className="text-xs text-ink-3">{trip.driverName}</div>
+                    <div className="text-ink font-medium flex items-center gap-1.5">
+                      <span>{trip.vehicleRegNo}</span>
+                      {(trip as any).dispatchMode === 'THIRD_PARTY' && (
+                        <span className="px-1.5 py-0.5 rounded bg-haldi-soft text-haldi text-[10px] font-mono">
+                          3PL
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-ink-3">
+                      {(trip as any).transporterName
+                        ? `${(trip as any).transporterName} · ${trip.driverName}`
+                        : trip.driverName}
+                    </div>
                   </td>
                   <td className="p-3 text-right font-mono text-ink">{trip.stops.length}</td>
                   <td className="p-3 text-right font-mono text-ink">{formatINR(totalValue)}</td>

@@ -61,20 +61,29 @@ export function FloorOutboxProvider({ children }: { children: React.ReactNode })
         headers: {
           'Content-Type': 'application/json',
           'X-Idempotency-Key': item.idempotencyKey,
+          'X-Captured-At': item.captured_at,
         },
-        body: JSON.stringify({
-          ...item.payload,
-          captured_at: item.captured_at,
-          idempotencyKey: item.idempotencyKey,
-        }),
+        body: JSON.stringify(item.payload ?? {}),
       });
+      if (res.ok) {
+        return { ok: true as const, status: res.status };
+      }
+      const errJson = await res.json().catch(() => null);
+      const rawMsg = errJson?.message ?? errJson?.error?.message;
+      const errMsg = Array.isArray(rawMsg)
+        ? rawMsg.join(', ')
+        : typeof rawMsg === 'string' && rawMsg
+          ? rawMsg
+          : `HTTP ${res.status}`;
       return {
-        ok: res.ok,
-        errorReason: res.ok ? undefined : `HTTP ${res.status}`,
+        ok: false as const,
+        status: res.status,
+        errorReason: errMsg,
       };
     } catch (err: any) {
       return {
-        ok: false,
+        ok: false as const,
+        status: 0,
         errorReason: err?.message || 'Network request failed',
       };
     }
@@ -161,8 +170,23 @@ export function FloorOutboxProvider({ children }: { children: React.ReactNode })
       return { ok: true, queued: false, message: 'Synced with server.' };
     }
 
-    setOutbox((prev) => [{ ...item, status: 'FAILED', errorReason: 'Sync failed' }, ...prev]);
-    return { ok: false, queued: true, message: 'Queued for retry.' };
+    if (res.status >= 400 && res.status < 500) {
+      return {
+        ok: false,
+        queued: false,
+        message: res.errorReason || `Request rejected (HTTP ${res.status}).`,
+      };
+    }
+
+    setOutbox((prev) => [
+      { ...item, status: 'FAILED', errorReason: res.errorReason || 'Sync failed' },
+      ...prev,
+    ]);
+    return {
+      ok: false,
+      queued: true,
+      message: res.errorReason ? `${res.errorReason} — queued for retry.` : 'Queued for retry.',
+    };
   };
 
   const retryItem = async (id: string) => {

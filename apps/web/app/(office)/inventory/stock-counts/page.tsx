@@ -8,20 +8,38 @@ import { type StockCountRecord } from '../../../../src/lib/inventory-data';
 export default function StockCountsPage() {
   const [counts, setCounts] = useState<StockCountRecord[]>([]);
   const [stockBatches, setStockBatches] = useState<any[]>([]);
+  const [catalogItems, setCatalogItems] = useState<Array<{ id: string; name: string; sku: string; uom: string }>>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [newNotes, setNewNotes] = useState('');
   const [countedMap, setCountedMap] = useState<Record<string, number>>({});
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
 
   const loadCounts = async () => {
     try {
-      const [cntRes, stkRes] = await Promise.all([
+      const [cntRes, stkRes, itmRes, siteRes] = await Promise.all([
         fetch('/api/proxy/inventory/stock-counts').then((r) => (r.ok ? r.json() : [])),
         fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/items').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/sites').then((r) => (r.ok ? r.json() : [])),
       ]);
       const rows = Array.isArray(cntRes) ? cntRes : Array.isArray(cntRes?.data) ? cntRes.data : [];
       const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+      const iRows = Array.isArray(itmRes) ? itmRes : Array.isArray(itmRes?.data) ? itmRes.data : [];
+      const stRows = Array.isArray(siteRes) ? siteRes : Array.isArray(siteRes?.data) ? siteRes.data : [];
       setStockBatches(sRows);
+      setCatalogItems(
+        iRows.map((i: any) => ({
+          id: String(i.id),
+          name: String(i.name ?? 'Item'),
+          sku: String(i.sku_code ?? i.skuCode ?? ''),
+          uom: String(i.primary_uom ?? i.primaryUom ?? 'KG'),
+        })),
+      );
+      const mappedSites = stRows.map((s: any) => ({ id: String(s.id), name: String(s.name ?? 'Site') }));
+      setSites(mappedSites);
+      if (mappedSites.length > 0) setSelectedSiteId((p) => p || mappedSites[0].id);
 
       setCounts(
         rows.map((s: any) => {
@@ -67,20 +85,37 @@ export default function StockCountsPage() {
     );
   };
 
+  const countSourceRows =
+    stockBatches.length > 0
+      ? stockBatches.slice(0, 15).map((b: any) => ({
+          idKey: String(b.batchId || b.id),
+          itemId: String(b.itemId || b.item_id),
+          itemName: String(b.itemName || b.item_name || 'Item'),
+          batchNo: String(b.batchNumber || b.batch_number || ''),
+          sysQty: Number(b.qtyOnHand ?? b.qty_on_hand ?? b.onHand ?? 0),
+        }))
+      : catalogItems.slice(0, 15).map((i) => ({
+          idKey: i.id,
+          itemId: i.id,
+          itemName: i.name,
+          batchNo: '',
+          sysQty: 0,
+        }));
+
   const handleCreateCount = async () => {
-    if (stockBatches.length === 0) return;
-    const first = stockBatches[0];
-    const siteId = String(first.siteId || first.site_id || '');
-    const items = stockBatches.slice(0, 10).map((b: any) => {
-      const idKey = String(b.batchId || b.id);
-      const sysQty = Number(b.qtyOnHand ?? b.qty_on_hand ?? b.onHand ?? 0);
-      return {
-        itemId: String(b.itemId || b.item_id),
-        batchNo: String(b.batchNumber || b.batch_number || ''),
-        systemQty: String(sysQty),
-        countedQty: String(countedMap[idKey] ?? sysQty),
-      };
-    });
+    const siteId =
+      selectedSiteId ||
+      String(stockBatches[0]?.siteId || stockBatches[0]?.site_id || '');
+    if (!siteId || countSourceRows.length === 0) {
+      setToast({ msg: 'Select a site and ensure at least one item exists.', isError: true });
+      return;
+    }
+    const items = countSourceRows.map((b) => ({
+      itemId: b.itemId,
+      ...(b.batchNo ? { batchNo: b.batchNo } : {}),
+      systemQty: String(b.sysQty),
+      countedQty: String(countedMap[b.idKey] ?? b.sysQty),
+    }));
     try {
       const res = await fetch('/api/proxy/inventory/stock-counts', {
         method: 'POST',
@@ -94,14 +129,33 @@ export default function StockCountsPage() {
       await loadCounts();
       setCreateOpen(false);
       setNewNotes('');
-      setToast('Created physical stock count sheet.');
+      setToast({ msg: 'Created physical stock count sheet.' });
     } catch (err) {
-      setToast(`Failed to create stock count: ${(err as Error).message}`);
+      setToast({ msg: `Failed to create stock count: ${(err as Error).message}`, isError: true });
     }
   };
 
   const postSheet = async (sheet: StockCountRecord) => {
     try {
+      // Persist edited countedQty values before posting variances
+      const patchRes = await fetch(
+        `/api/proxy/inventory/stock-counts/${encodeURIComponent(sheet.id)}/lines`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: sheet.lines.map((l) => ({
+              itemId: l.itemId,
+              countedQty: String(Math.max(0, Number(l.countedQty) || 0)),
+            })),
+          }),
+        },
+      );
+      if (!patchRes.ok) {
+        const err = await patchRes.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${patchRes.status}`);
+      }
+
       const res = await fetch(`/api/proxy/inventory/stock-counts/${encodeURIComponent(sheet.id)}/approve`, {
         method: 'POST',
       });
@@ -110,9 +164,9 @@ export default function StockCountsPage() {
         throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
       await loadCounts();
-      setToast(`Posted variance adjustments to ledger for count sheet ${sheet.sheetNo}.`);
+      setToast({ msg: `Posted variance adjustments to ledger for count sheet ${sheet.sheetNo}.` });
     } catch (err) {
-      setToast(`Failed to approve stock count: ${(err as Error).message}`);
+      setToast({ msg: `Failed to approve stock count: ${(err as Error).message}`, isError: true });
     }
   };
 
@@ -141,8 +195,14 @@ export default function StockCountsPage() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
-          {toast}
+        <div
+          className={`p-3 rounded-lg border text-sm ${
+            toast.isError
+              ? 'bg-madder-soft border-madder/30 text-madder'
+              : 'bg-leaf-soft border-leaf/30 text-leaf'
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
 
@@ -214,32 +274,41 @@ export default function StockCountsPage() {
       ))}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Physical Stock Count">
         <div className="space-y-4">
-          <input
-            type="text"
-            placeholder="Count notes (e.g. Monthly cycle count)"
-            value={newNotes}
-            onChange={(e) => setNewNotes(e.target.value)}
-            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select
+              value={selectedSiteId}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            >
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Count notes (e.g. Monthly cycle count)"
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            />
+          </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {stockBatches.slice(0, 10).map((b: any) => {
-              const idKey = String(b.batchId || b.id);
-              const sysQty = Number(b.qtyOnHand ?? b.qty_on_hand ?? 0);
-              return (
-                <div key={idKey} className="flex items-center justify-between gap-2 text-xs p-2 bg-paper border border-rule rounded">
-                  <div>
-                    <div className="font-medium text-ink">{b.itemName}</div>
-                    <div className="font-mono text-ink-3">{b.batchNumber} (Sys: {sysQty})</div>
+            {countSourceRows.map((b) => (
+              <div key={b.idKey} className="flex items-center justify-between gap-2 text-xs p-2 bg-paper border border-rule rounded">
+                <div>
+                  <div className="font-medium text-ink">{b.itemName}</div>
+                  <div className="font-mono text-ink-3">
+                    {b.batchNo || 'Zero stock'} (Sys: {b.sysQty})
                   </div>
-                  <input
-                    type="number"
-                    value={countedMap[idKey] ?? sysQty}
-                    onChange={(e) => setCountedMap((prev) => ({ ...prev, [idKey]: Number(e.target.value) }))}
-                    className="w-24 text-right bg-sheet border border-rule-strong rounded px-2 py-1 font-mono"
-                  />
                 </div>
-              );
-            })}
+                <input
+                  type="number"
+                  value={countedMap[b.idKey] ?? b.sysQty}
+                  onChange={(e) => setCountedMap((prev) => ({ ...prev, [b.idKey]: Number(e.target.value) }))}
+                  className="w-24 text-right bg-sheet border border-rule-strong rounded px-2 py-1 font-mono"
+                />
+              </div>
+            ))}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>

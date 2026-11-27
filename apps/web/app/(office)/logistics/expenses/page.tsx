@@ -19,6 +19,7 @@ export default function TripExpensesPage() {
   const [newCategory, setNewCategory] = useState<TripExpenseRecord['category']>('FUEL');
   const [newAmount, setNewAmount] = useState('1200');
   const [newNotes, setNewNotes] = useState('');
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -83,11 +84,15 @@ export default function TripExpensesPage() {
       body: JSON.stringify({
         type: expenseType,
         amount: parsedAmount,
+        ...(newNotes.trim() ? { notes: newNotes.trim() } : {}),
       }),
     });
     const created = await res.json().catch(() => null);
     if (!res.ok) {
-      alert(created?.message || created?.error?.message || `Failed to log expense (HTTP ${res.status})`);
+      setBanner({
+        text: created?.message || created?.error?.message || `Failed to log expense (HTTP ${res.status})`,
+        isError: true,
+      });
       return;
     }
 
@@ -99,15 +104,27 @@ export default function TripExpensesPage() {
       category: expenseType as any,
       amount: parsedAmount,
       date: new Date().toISOString().slice(0, 10),
-      notes: newNotes || `${expenseType} expense`,
+      notes: newNotes.trim() || `${expenseType} expense`,
     };
     setExpenses((prev) => [record, ...prev]);
     setShowAddModal(false);
     setNewNotes('');
+    setBanner({ text: `Logged ${expenseType} expense on ${trip.tripNo}.` });
   }
 
   return (
     <div className="space-y-6">
+      {banner && (
+        <div
+          className={`rounded-lg border p-3 text-sm font-medium ${
+            banner.isError
+              ? 'border-madder/30 bg-madder-soft text-madder'
+              : 'border-leaf/30 bg-leaf-soft text-leaf'
+          }`}
+        >
+          {banner.text}
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">Trip Expenses</h1>

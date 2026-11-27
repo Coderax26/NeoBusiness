@@ -609,70 +609,119 @@ export class InventoryService implements InventoryPort {
   ): Promise<string> {
     return this.knex.transaction(async (trx) => {
       const consumedQty = Qty.of(qty, opts?.uom ?? 'KG');
-      let batch: any = null;
 
       if (batchId) {
-        batch = await trx('inventory_batches')
+        const batch = await trx('inventory_batches')
           .where({ id: batchId, item_id: itemId })
           .forUpdate()
           .first('id', 'site_id', 'qty_on_hand', 'qty_committed');
-      } else if (opts?.siteId) {
-        batch = await trx('inventory_batches')
-          .where({ site_id: opts.siteId, item_id: itemId, status: 'AVAILABLE' })
-          .andWhere('qty_on_hand', '>=', consumedQty.toNumber())
-          .orderByRaw('expiry_date ASC NULLS LAST, created_at ASC')
-          .forUpdate()
-          .first('id', 'site_id', 'qty_on_hand', 'qty_committed');
-
-        if (!batch) {
-          batch = await trx('inventory_batches')
-            .where({ site_id: opts.siteId, item_id: itemId })
-            .andWhere('qty_on_hand', '>=', consumedQty.toNumber())
-            .orderByRaw('expiry_date ASC NULLS LAST, created_at ASC')
-            .forUpdate()
-            .first('id', 'site_id', 'qty_on_hand', 'qty_committed');
+        if (!batch) throw new BadRequestException('Inventory batch not found');
+        if (Qty.of(String(batch.qty_on_hand), opts?.uom ?? 'KG').isLessThan(consumedQty)) {
+          throw new BadRequestException('Insufficient physical stock');
         }
-      }
+        const resolvedBatchId = String(batch.id);
+        const currentCommitted = Number(batch.qty_committed ?? 0);
+        const committedDelta =
+          currentCommitted > 0
+            ? -Math.min(currentCommitted, consumedQty.toNumber())
+            : 0;
 
-      if (!batch) throw new BadRequestException('Inventory batch not found');
-      if (Qty.of(String(batch.qty_on_hand), opts?.uom ?? 'KG').isLessThan(consumedQty)) {
-        throw new BadRequestException('Insufficient physical stock');
-      }
-
-      const resolvedBatchId = String(batch.id);
-      const currentCommitted = Number(batch.qty_committed ?? 0);
-      const committedDelta =
-        currentCommitted > 0
-          ? -Math.min(currentCommitted, consumedQty.toNumber())
-          : 0;
-
-      await this.insertLedger(trx, {
-        siteId: String(batch.site_id),
-        itemId,
-        batchId: resolvedBatchId,
-        txnType: 'PROD_CONSUME',
-        qty: consumedQty.toStorageString(),
-        referenceTable: 'work_order_materials',
-        referenceId: workOrderId,
-        referenceNo: materialLineId,
-        committedDelta: committedDelta !== 0 ? committedDelta : undefined,
-      });
-
-      await trx('stock_reservations')
-        .where({ status: 'ACTIVE' })
-        .andWhere(function () {
-          this.where({ order_id: materialLineId }).orWhere({
-            item_id: itemId,
-            batch_id: resolvedBatchId,
-          });
-        })
-        .update({
-          status: 'CONSUMED',
-          consumed_at: Clock.nowUtc(),
-          updated_at: Clock.nowUtc(),
+        await this.insertLedger(trx, {
+          siteId: String(batch.site_id),
+          itemId,
+          batchId: resolvedBatchId,
+          txnType: 'PROD_CONSUME',
+          qty: consumedQty.toStorageString(),
+          referenceTable: 'work_order_materials',
+          referenceId: workOrderId,
+          referenceNo: materialLineId,
+          committedDelta: committedDelta !== 0 ? committedDelta : undefined,
         });
 
-      return resolvedBatchId;
+        await trx('stock_reservations')
+          .where({ status: 'ACTIVE' })
+          .andWhere(function () {
+            this.where({ order_id: materialLineId }).orWhere({
+              item_id: itemId,
+              batch_id: resolvedBatchId,
+            });
+          })
+          .update({
+            status: 'CONSUMED',
+            consumed_at: Clock.nowUtc(),
+            updated_at: Clock.nowUtc(),
+          });
+
+        return resolvedBatchId;
+      }
+
+      if (!opts?.siteId) {
+        throw new BadRequestException('Inventory batch not found');
+      }
+
+      const candidateBatches = await trx('inventory_batches')
+        .where({ site_id: opts.siteId, item_id: itemId })
+        .where('qty_on_hand', '>', 0)
+        .orderByRaw("CASE WHEN status = 'AVAILABLE' THEN 0 ELSE 1 END, expiry_date ASC NULLS LAST, created_at ASC")
+        .forUpdate()
+        .select('id', 'site_id', 'qty_on_hand', 'qty_committed');
+
+      const totalOnHand = candidateBatches.reduce(
+        (sum, b: any) => sum + Number(b.qty_on_hand ?? 0),
+        0,
+      );
+      if (candidateBatches.length === 0 || totalOnHand + 1e-6 < consumedQty.toNumber()) {
+        throw new BadRequestException(
+          candidateBatches.length === 0
+            ? 'Inventory batch not found'
+            : 'Insufficient physical stock',
+        );
+      }
+
+      let remaining = consumedQty;
+      let firstBatchId = '';
+      for (const batch of candidateBatches) {
+        if (remaining.isZero()) break;
+        const batchOnHand = Qty.of(String(batch.qty_on_hand), opts?.uom ?? 'KG');
+        const take = batchOnHand.isLessThan(remaining) ? batchOnHand : remaining;
+        if (take.isZero()) continue;
+
+        const bId = String(batch.id);
+        if (!firstBatchId) firstBatchId = bId;
+        const currentCommitted = Number(batch.qty_committed ?? 0);
+        const committedDelta =
+          currentCommitted > 0 ? -Math.min(currentCommitted, take.toNumber()) : 0;
+
+        await this.insertLedger(trx, {
+          siteId: String(batch.site_id),
+          itemId,
+          batchId: bId,
+          txnType: 'PROD_CONSUME',
+          qty: take.toStorageString(),
+          referenceTable: 'work_order_materials',
+          referenceId: workOrderId,
+          referenceNo: materialLineId,
+          committedDelta: committedDelta !== 0 ? committedDelta : undefined,
+        });
+
+        await trx('stock_reservations')
+          .where({ status: 'ACTIVE' })
+          .andWhere(function () {
+            this.where({ order_id: materialLineId }).orWhere({
+              item_id: itemId,
+              batch_id: bId,
+            });
+          })
+          .update({
+            status: 'CONSUMED',
+            consumed_at: Clock.nowUtc(),
+            updated_at: Clock.nowUtc(),
+          });
+
+        remaining = remaining.sub(take);
+      }
+
+      return firstBatchId;
     });
   }
 
@@ -709,11 +758,19 @@ export class InventoryService implements InventoryPort {
         const defaultLocation = await trx('locations')
           .where({ site_id: resolvedSiteId })
           .first('id');
+        let candidateBatchNo =
+          opts?.batchNumber?.trim() ||
+          `FG-${workOrderId.slice(0, 8).toUpperCase()}-${Clock.nowUtc().getTime().toString().slice(-6)}`;
+        // Prevent duplicate batch_number 500 when recording multiple partial outputs for the same WO
+        const dup = await trx('inventory_batches')
+          .where({ site_id: resolvedSiteId, item_id: itemId, batch_number: candidateBatchNo })
+          .first('id');
+        if (dup) {
+          candidateBatchNo = `${candidateBatchNo}-${Clock.nowUtc().getTime().toString().slice(-4)}`;
+        }
         const createdBatch = await this.createBatch(trx, resolvedSiteId, itemId, {
           locationId: defaultLocation?.id ? String(defaultLocation.id) : undefined,
-          batchLotNo:
-            opts?.batchNumber?.trim() ||
-            `FG-${workOrderId.slice(0, 8).toUpperCase()}-${Clock.nowUtc().getTime().toString().slice(-6)}`,
+          batchLotNo: candidateBatchNo,
           mfgDate: Clock.nowUtc(),
           receivedBy: opts?.createdBy,
         });
@@ -846,6 +903,11 @@ export class InventoryService implements InventoryPort {
     qty: string,
     idempotencyKey: string,
   ): Promise<{ success: boolean; transferId?: string; shortfall?: string }> {
+    if (fromSite === toSite) {
+      throw new BadRequestException(
+        'Source and destination sites must be different for a transfer',
+      );
+    }
     return this.knex.transaction(async (trx) => {
       const existing = await trx('stock_transfers')
         .where({ idempotency_key: idempotencyKey })
@@ -989,8 +1051,11 @@ export class InventoryService implements InventoryPort {
 
       const lines = await trx('stock_transfer_lines')
         .where({ transfer_id: transferId, status: 'DISPATCHED' })
-        .select('id', 'item_id', 'dispatched_qty');
+        .select('id', 'item_id', 'from_batch_id', 'dispatched_qty');
       let totalVariance = Qty.zero('KG');
+      const destLoc = await trx('locations')
+        .where({ site_id: transfer.to_site_id })
+        .first('id');
       for (const line of lines) {
         const receivedLine = receivedLines?.find(
           (candidate) => candidate.lineId === String(line.id),
@@ -1005,10 +1070,24 @@ export class InventoryService implements InventoryPort {
           );
         }
         totalVariance = totalVariance.add(dispatchedQty.sub(qty));
+        const srcBatch = line.from_batch_id
+          ? await trx('inventory_batches')
+              .where({ id: line.from_batch_id })
+              .first('mfg_date', 'expiry_date', 'landed_cost_per_unit')
+          : null;
         const batch = await this.createBatch(
           trx,
           String(transfer.to_site_id),
           String(line.item_id),
+          {
+            locationId: destLoc?.id ? String(destLoc.id) : undefined,
+            mfgDate: srcBatch?.mfg_date ?? undefined,
+            expiryDate: srcBatch?.expiry_date ?? undefined,
+            landedCostPerUnit: srcBatch?.landed_cost_per_unit
+              ? String(srcBatch.landed_cost_per_unit)
+              : undefined,
+            receivedBy: receivedByUserId,
+          },
         );
         await this.insertLedger(trx, {
           siteId: String(transfer.to_site_id),
@@ -1197,14 +1276,106 @@ export class InventoryService implements InventoryPort {
     });
   }
 
+  async postOpeningStock(
+    siteId: string,
+    lines: Array<{
+      itemId: string;
+      qty: string;
+      unitCost?: string;
+      batchNumber?: string;
+      mfgDate?: string;
+      expiryDate?: string;
+      uom?: string;
+    }>,
+    postedBy: string,
+    locationId?: string,
+    notes?: string,
+  ): Promise<{ postedCount: number; batches: Array<{ itemId: string; batchId: string; batchNumber: string; qty: string }> }> {
+    if (!this.isUuid(siteId)) {
+      throw new BadRequestException('Valid siteId UUID is required');
+    }
+    return this.knex.transaction(async (trx) => {
+      const targetLoc =
+        locationId && this.isUuid(locationId)
+          ? locationId
+          : (await trx('locations').where({ site_id: siteId }).first('id'))?.id;
+
+      const createdBatches: Array<{ itemId: string; batchId: string; batchNumber: string; qty: string }> = [];
+      for (const line of lines) {
+        const qtyObj = Qty.of(line.qty, line.uom ?? 'KG');
+        const item = await trx('items')
+          .where({ id: line.itemId })
+          .first('id', 'primary_uom', 'shelf_life_days');
+        if (!item) {
+          throw new BadRequestException(`Item ${line.itemId} not found`);
+        }
+        const batchNo =
+          line.batchNumber?.trim() ||
+          `OPN-${Clock.todayKolkata().replace(/-/g, '')}-${uuidv4().slice(0, 6).toUpperCase()}`;
+
+        let batch = await trx('inventory_batches')
+          .where({ site_id: siteId, item_id: line.itemId, batch_number: batchNo })
+          .first('id', 'site_id', 'batch_number');
+        if (!batch) {
+          const defaultExp =
+            !line.expiryDate && item.shelf_life_days
+              ? new Date(Date.now() + Number(item.shelf_life_days) * 86400000)
+                  .toISOString()
+                  .slice(0, 10)
+              : line.expiryDate;
+          const b = await this.createBatch(trx, siteId, line.itemId, {
+            locationId: targetLoc ? String(targetLoc) : undefined,
+            batchLotNo: batchNo,
+            mfgDate: line.mfgDate ?? Clock.todayKolkata(),
+            expiryDate: defaultExp,
+            landedCostPerUnit: line.unitCost ?? '0.00',
+            receivedBy: postedBy,
+          });
+          batch = { id: b.id, site_id: siteId, batch_number: batchNo };
+        }
+
+        await this.insertLedger(trx, {
+          siteId,
+          itemId: line.itemId,
+          batchId: String(batch.id),
+          txnType: 'OPENING_STOCK',
+          qty: qtyObj.toStorageString(),
+          referenceTable: 'inventory_batches',
+          referenceId: String(batch.id),
+          referenceNo: batchNo,
+          postedBy: this.isUuid(postedBy) ? postedBy : undefined,
+          note: notes || 'Opening Stock Load',
+        });
+
+        createdBatches.push({
+          itemId: line.itemId,
+          batchId: String(batch.id),
+          batchNumber: String(batch.batch_number),
+          qty: qtyObj.toStorageString(),
+        });
+      }
+      return { postedCount: createdBatches.length, batches: createdBatches };
+    });
+  }
+
   async createAdjustment(
     siteId: string,
     itemId: string,
-    adjustmentType: 'WRITEOFF' | 'SHRINKAGE',
+    adjustmentType:
+      | 'WRITEOFF'
+      | 'SHRINKAGE'
+      | 'COUNT_SURPLUS'
+      | 'FOUND'
+      | 'OPENING_STOCK'
+      | 'EXPIRY_REMOVAL',
     qty: string,
     remarks: string,
     requestedBy: string,
+    batchId?: string,
   ): Promise<{ success: boolean; approvedBy: string }> {
+    const isPositive = ['COUNT_SURPLUS', 'FOUND', 'OPENING_STOCK'].includes(
+      adjustmentType,
+    );
     return this.knex.transaction(async (trx) => {
       const availableRow = await trx('inventory_batches')
         .where({ site_id: siteId, item_id: itemId, status: 'AVAILABLE' })
@@ -1212,27 +1383,30 @@ export class InventoryService implements InventoryPort {
         .first();
       const available = Qty.of(String(availableRow?.total ?? '0'), 'KG');
       const adjustment = Qty.of(qty, 'KG');
-      if (available.isLessThan(adjustment)) {
+      if (!isPositive && available.isLessThan(adjustment)) {
         return { success: false, approvedBy: '' };
       }
       const threshold =
         (await this.config?.getNumber('adjustment_variance_threshold_pct')) ??
         5;
       const variancePct = available.isZero()
-        ? 100
+        ? isPositive
+          ? 0
+          : 100
         : (adjustment.toNumber() / available.toNumber()) * 100;
-      const autoApprove = variancePct <= threshold;
+      const autoApprove = isPositive || variancePct <= threshold;
       const adjustmentId = uuidv4();
       const adjustmentNo = `ADJ-${Clock.nowUtc().getTime()}-${adjustmentId.slice(0, 8)}`;
       await trx('stock_adjustments').insert({
         id: adjustmentId,
         site_id: siteId,
         item_id: itemId,
+        batch_id: batchId && this.isUuid(batchId) ? batchId : null,
         adjustment_no: adjustmentNo,
         adjustment_type: adjustmentType,
         qty: adjustment.toStorageString(),
         uom: 'KG',
-        variance_pct: variancePct.toFixed(2),
+        variance_pct: Math.min(9999999, variancePct).toFixed(2),
         reason: remarks,
         status: autoApprove ? 'APPROVED' : 'PENDING',
         requested_by: requestedBy,
@@ -1253,6 +1427,7 @@ export class InventoryService implements InventoryPort {
           adjustmentNo,
           requestedBy,
           remarks,
+          batchId,
         );
       }
       return { success: true, approvedBy: autoApprove ? requestedBy : '' };
@@ -1286,6 +1461,7 @@ export class InventoryService implements InventoryPort {
         String(adjustment.adjustment_no),
         approvedBy,
         String(adjustment.reason),
+        adjustment.batch_id ? String(adjustment.batch_id) : undefined,
       );
     });
   }
@@ -1371,6 +1547,7 @@ export class InventoryService implements InventoryPort {
       batchLotNo?: string;
       mfgDate?: string | Date;
       expiryDate?: string | Date;
+      landedCostPerUnit?: string;
       receivedBy?: string;
     },
   ) {
@@ -1390,6 +1567,7 @@ export class InventoryService implements InventoryPort {
       mfg_date: opts?.mfgDate ?? null,
       expiry_date: opts?.expiryDate ?? null,
       received_date: Clock.todayKolkata(),
+      landed_cost_per_unit: opts?.landedCostPerUnit ?? '0.00',
       created_by:
         opts?.receivedBy && UUID_RE.test(opts.receivedBy)
           ? opts.receivedBy
@@ -1414,14 +1592,61 @@ export class InventoryService implements InventoryPort {
     adjustmentNo: string,
     postedBy: string,
     reason: string,
+    batchId?: string,
   ): Promise<void> {
+    const isPositive = ['COUNT_SURPLUS', 'FOUND', 'OPENING_STOCK'].includes(
+      adjustmentType,
+    );
+    if (isPositive) {
+      let targetBatchId =
+        batchId && this.isUuid(batchId) ? batchId : undefined;
+      if (!targetBatchId) {
+        const existingBatch = await trx('inventory_batches')
+          .where({ site_id: siteId, item_id: itemId, status: 'AVAILABLE' })
+          .orderBy('expiry_date', 'asc')
+          .first('id');
+        if (existingBatch) {
+          targetBatchId = String(existingBatch.id);
+        } else {
+          const defaultLoc = await trx('locations')
+            .where({ site_id: siteId })
+            .first('id');
+          const created = await this.createBatch(trx, siteId, itemId, {
+            locationId: defaultLoc?.id ? String(defaultLoc.id) : undefined,
+            batchLotNo: `ADJ-${Clock.todayKolkata().replace(/-/g, '')}-${adjustmentId.slice(0, 6).toUpperCase()}`,
+            receivedBy: postedBy,
+          });
+          targetBatchId = created.id;
+        }
+      }
+      await this.insertLedger(trx, {
+        siteId,
+        itemId,
+        batchId: targetBatchId,
+        txnType: adjustmentType,
+        qty: qty.toStorageString(),
+        referenceTable: 'stock_adjustments',
+        referenceId: adjustmentId,
+        referenceNo: adjustmentNo,
+        postedBy,
+        note: reason,
+      });
+      await trx('stock_adjustments')
+        .where({ id: adjustmentId })
+        .update({ status: 'APPROVED', batch_id: targetBatchId, updated_at: Clock.nowUtc() });
+      return;
+    }
+
     let remaining = qty;
-    const batches = await trx('inventory_batches')
+    const batchQuery = trx('inventory_batches')
       .where({ site_id: siteId, item_id: itemId, status: 'AVAILABLE' })
-      .where('qty_available', '>', 0)
-      .orderBy('expiry_date', 'asc')
-      .forUpdate()
-      .select('id', 'qty_available');
+      .where('qty_available', '>', 0);
+    if (batchId && this.isUuid(batchId)) {
+      batchQuery.orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END, expiry_date ASC', [batchId]);
+    } else {
+      batchQuery.orderBy('expiry_date', 'asc');
+    }
+    const batches = await batchQuery.forUpdate().select('id', 'qty_available');
     for (const batch of batches) {
       if (remaining.isZero()) break;
       const available = Qty.of(String(batch.qty_available), 'KG');
@@ -1522,11 +1747,16 @@ export class InventoryService implements InventoryPort {
     let query = this.knex('stock_adjustments as sa')
       .leftJoin('sites as s', 'sa.site_id', 's.id')
       .leftJoin('items as i', 'sa.item_id', 'i.id')
+      .leftJoin('inventory_batches as ib', 'sa.batch_id', 'ib.id')
+      .leftJoin('users as u', 'sa.requested_by', 'u.id')
       .select(
         'sa.*',
         's.name as site_name',
         'i.name as item_name',
         'i.sku_code',
+        'ib.batch_number as batch_no',
+        'ib.landed_cost_per_unit as unit_cost',
+        'u.full_name as requested_by_name',
       );
     if (this.isUuid(siteId)) query = query.where('sa.site_id', siteId);
     if (status) query = query.where('sa.status', status);
@@ -1538,7 +1768,11 @@ export class InventoryService implements InventoryPort {
       .leftJoin('sites as s', 'sr.site_id', 's.id')
       .leftJoin('items as i', 'sr.item_id', 'i.id')
       .leftJoin('inventory_batches as ib', 'sr.batch_id', 'ib.id')
-      .leftJoin('sales_orders as so', 'sr.order_id', 'so.id')
+      .leftJoin('sales_order_lines as sol', 'sr.order_id', 'sol.id')
+      .leftJoin('sales_orders as so', function () {
+        this.on('so.id', '=', 'sol.order_id').orOn('so.id', '=', 'sr.order_id');
+      })
+      .leftJoin('customers as c', 'so.customer_id', 'c.id')
       .select(
         'sr.*',
         's.name as site_name',
@@ -1546,6 +1780,7 @@ export class InventoryService implements InventoryPort {
         'i.sku_code',
         'ib.batch_number',
         'so.order_no',
+        'c.business_name as customer_name',
       );
     if (this.isUuid(siteId)) query = query.where('sr.site_id', siteId);
     if (this.isUuid(itemId)) query = query.where('sr.item_id', itemId);
@@ -1702,6 +1937,55 @@ export class InventoryService implements InventoryPort {
     return { ...sheet, items };
   }
 
+  async updateStockCountLines(
+    id: string,
+    items: Array<{ itemId: string; batchNo?: string; countedQty: string }>,
+  ) {
+    return this.knex.transaction(async (trx) => {
+      const sheet = await trx('stock_count_sheets')
+        .where({ id })
+        .forUpdate()
+        .first();
+      if (!sheet) {
+        throw new BadRequestException(`Stock count sheet ${id} not found`);
+      }
+      if (sheet.status !== 'DRAFT') {
+        throw new BadRequestException(`Stock count sheet is already ${sheet.status}`);
+      }
+      const existingLines = await trx('stock_count_items')
+        .where({ count_sheet_id: id })
+        .select('*');
+
+      for (const it of items) {
+        const match = existingLines.find(
+          (l: any) =>
+            String(l.item_id) === it.itemId &&
+            (!it.batchNo || String(l.batch_no ?? '') === it.batchNo),
+        );
+        const counted = Number(it.countedQty ?? 0);
+        if (match) {
+          const sys = Number(match.system_qty ?? 0);
+          await trx('stock_count_items')
+            .where({ id: match.id })
+            .update({
+              counted_qty: counted,
+              variance_qty: counted - sys,
+            });
+        } else {
+          await trx('stock_count_items').insert({
+            count_sheet_id: id,
+            item_id: it.itemId,
+            batch_no: it.batchNo || null,
+            system_qty: 0,
+            counted_qty: counted,
+            variance_qty: counted,
+          });
+        }
+      }
+      return this.getStockCountById(id);
+    });
+  }
+
   async approveStockCount(id: string, userId: string) {
     return this.knex.transaction(async (trx) => {
       const sheet = await trx('stock_count_sheets as scs')
@@ -1783,14 +2067,13 @@ export class InventoryService implements InventoryPort {
             siteId: String(sheet.site_id),
             itemId: String(item.item_id),
             batchId: String(batch.id),
-            txnType: 'ADJUSTMENT',
+            txnType: 'COUNT_SURPLUS',
             qty: absQty.toStorageString(),
             referenceTable: 'stock_adjustments',
             referenceId: adjId,
             referenceNo: adjustmentNo,
             postedBy: userId,
             note: reason,
-            onHandDelta: absQty.toNumber(),
           });
         } else {
           let remaining = absQty;

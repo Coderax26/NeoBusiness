@@ -199,7 +199,7 @@ export class FleetController {
   }
 
   @Post('trips/:id/confirm-loading')
-  @RequirePermission('fleet.manage')
+  @RequirePermission('fleet.dispatch')
   @ApiOperation({ summary: 'Storekeeper confirms loading before dispatch (G-FLT-2)' })
   confirmLoading(
     @Param('id') id: string,

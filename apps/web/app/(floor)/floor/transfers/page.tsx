@@ -7,7 +7,7 @@ import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 export default function FloorTransfersPage() {
   const { enqueueOrSend } = useFloorOutbox();
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/proxy/inventory/transfers')
@@ -45,12 +45,16 @@ export default function FloorTransfersPage() {
               receivedQty: String(l.dispatched_qty || l.requested_qty || trf.qty),
             })),
           }
-        : { transferId: trf.id, qty: trf.qty };
+        : {};
     const res = await enqueueOrSend({
       type: 'TRANSFER_RECEIVE',
       endpoint: `/api/proxy/inventory/transfers/${trf.id}/${action}`,
       payload,
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `${trf.transferNo} ${action} failed: ${res.message}`, isError: true });
+      return;
+    }
     setTransfers((prev) =>
       prev.map((t) =>
         t.id === trf.id
@@ -58,7 +62,7 @@ export default function FloorTransfersPage() {
           : t,
       ),
     );
-    setBanner(`${trf.transferNo} ${action}ed. ${res.message}`);
+    setBanner({ text: `${trf.transferNo} ${action}ed. ${res.message}`, isError: false });
   };
 
   return (
@@ -71,8 +75,14 @@ export default function FloorTransfersPage() {
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold ${
+            banner.isError
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

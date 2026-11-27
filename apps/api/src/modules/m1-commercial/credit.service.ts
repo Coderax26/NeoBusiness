@@ -148,10 +148,10 @@ export class CreditService implements OnModuleInit, CreditPort {
       throw new Error(`Order ${orderId} not found`);
     }
 
-    if (orderRow.order_status !== 'CONFIRMED') {
+    if (!['CONFIRMED', 'READY'].includes(orderRow.order_status)) {
       return {
         allowed: false,
-        reason: 'Order must be CONFIRMED before dispatch',
+        reason: 'Order must be CONFIRMED or READY before dispatch',
       };
     }
 

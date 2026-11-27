@@ -110,6 +110,7 @@ const MODULES: ModuleConfig[] = [
       { label: 'Stock Ledger', href: '/inventory/ledger', permission: 'inventory.read' },
       { label: 'Reservations', href: '/inventory/reservations', permission: 'inventory.read' },
       { label: 'Physical Counts', href: '/inventory/stock-counts', permission: 'inventory.read' },
+      { label: 'Warehouses & Bins', href: '/inventory/warehouses', permission: 'inventory.read' },
       { label: 'Stock Alerts', href: '/control/stock-alerts', permission: 'inventory.read' },
     ],
   },

@@ -113,7 +113,17 @@ export class LedgerPostingService {
   }
 
   private onHandDelta(txnType: string, qty: number): number {
-    if (['RECEIPT', 'RETURN', 'TRANSFER_IN', 'PROD_OUTPUT'].includes(txnType)) {
+    if (
+      [
+        'RECEIPT',
+        'RETURN',
+        'TRANSFER_IN',
+        'PROD_OUTPUT',
+        'OPENING_STOCK',
+        'COUNT_SURPLUS',
+        'FOUND',
+      ].includes(txnType)
+    ) {
       return qty;
     }
     if (
@@ -125,6 +135,7 @@ export class LedgerPostingService {
         'EXPIRY_REMOVAL',
         'SHRINKAGE',
         'PROD_CONSUME',
+        'COUNT_DEFICIT',
       ].includes(txnType)
     ) {
       return -qty;

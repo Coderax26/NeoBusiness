@@ -9,14 +9,13 @@ import { type StockRow } from '../../../../src/lib/inventory-data';
 export default function ExpiryWatchlistPage() {
   const [stockRows, setStockRows] = useState<StockRow[]>([]);
   const [daysThreshold, setDaysThreshold] = useState(30);
-  const [actionedIds, setActionedIds] = useState<Record<string, string>>({});
+  const [actionedIds, setActionedIds] = useState<Record<string, { label: string; isError?: boolean }>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/inventory/stock/current')
+  const loadBatches = () => {
+    return fetch('/api/proxy/inventory/stock/current')
       .then((r) => (r.ok ? r.json() : []))
       .then((res) => {
-        if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
         setStockRows(
           rows.map((r: any) => {
@@ -48,9 +47,10 @@ export default function ExpiryWatchlistPage() {
         );
       })
       .catch(() => {});
-    return () => {
-      active = false;
-    };
+  };
+
+  useEffect(() => {
+    loadBatches();
   }, []);
 
   const filteredBatches = useMemo(() => {
@@ -67,30 +67,50 @@ export default function ExpiryWatchlistPage() {
     return { expired, le3, le7, le30 };
   }, [filteredBatches]);
 
-  const handleAction = async (batch: StockRow, action: string) => {
-    if (action === 'Write off' && batch.onHand > 0 && batch.siteId && batch.itemId) {
-      try {
-        const res = await fetch('/api/proxy/inventory/adjustments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            siteId: batch.siteId,
-            itemId: batch.itemId,
-            adjustmentType: 'WRITEOFF',
-            qty: String(batch.onHand),
-            remarks: `Expiry write-off for batch ${batch.batchNo}`,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => null);
-          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
-        }
-      } catch (err) {
-        setActionedIds((prev) => ({ ...prev, [batch.id]: `Error: ${(err as Error).message}` }));
-        return;
-      }
+  const handleAdjustmentAction = async (
+    batch: StockRow,
+    adjustmentType: 'EXPIRY_REMOVAL' | 'SHRINKAGE',
+    label: string,
+  ) => {
+    const qtyToAdjust = Math.max(0, batch.onHand - batch.reserved);
+    if (qtyToAdjust <= 0 || !batch.siteId || !batch.itemId) {
+      setActionedIds((prev) => ({
+        ...prev,
+        [batch.id]: { label: 'No unreserved stock left to adjust', isError: true },
+      }));
+      return;
     }
-    setActionedIds((prev) => ({ ...prev, [batch.id]: action }));
+    try {
+      setBusyId(batch.id);
+      const res = await fetch('/api/proxy/inventory/adjustments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: batch.siteId,
+          itemId: batch.itemId,
+          batchId: batch.id,
+          adjustmentType,
+          qty: String(qtyToAdjust),
+          remarks: `${label} for batch ${batch.batchNo}`,
+        }),
+      });
+      const err = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBatches();
+      setActionedIds((prev) => ({
+        ...prev,
+        [batch.id]: { label: `${label} submitted (${qtyToAdjust} ${batch.uom})` },
+      }));
+    } catch (err) {
+      setActionedIds((prev) => ({
+        ...prev,
+        [batch.id]: { label: `Error: ${(err as Error).message}`, isError: true },
+      }));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -174,16 +194,26 @@ export default function ExpiryWatchlistPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {doneAction ? (
-                  <Badge variant="info">Action queued: {doneAction}</Badge>
+                  <Badge variant={doneAction.isError ? 'danger' : 'info'}>
+                    {doneAction.label}
+                  </Badge>
                 ) : (
                   <>
-                    <Button variant="secondary" onClick={() => handleAction(batch, 'Sell first')}>
-                      Sell First
+                    <Link href={`/sales/prices?itemId=${encodeURIComponent(batch.itemId)}`}>
+                      <Button variant="secondary">Clearance Price</Button>
+                    </Link>
+                    <Button
+                      variant="secondary"
+                      disabled={busyId === batch.id}
+                      onClick={() => handleAdjustmentAction(batch, 'SHRINKAGE', 'Shrinkage / Quarantine')}
+                    >
+                      Shrinkage
                     </Button>
-                    <Button variant="secondary" onClick={() => handleAction(batch, 'Discount')}>
-                      Discount
-                    </Button>
-                    <Button variant="primary" onClick={() => handleAction(batch, 'Write off')}>
+                    <Button
+                      variant="primary"
+                      disabled={busyId === batch.id}
+                      onClick={() => handleAdjustmentAction(batch, 'EXPIRY_REMOVAL', 'Expiry Write-off')}
+                    >
                       Write Off
                     </Button>
                   </>

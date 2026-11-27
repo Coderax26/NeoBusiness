@@ -28,7 +28,7 @@ function mapFloorReasonToDto(reason: string): 'NORMAL' | 'ABNORMAL' | 'EXPIRY' |
 export default function FloorProductionKanbanPage() {
   const { enqueueOrSend } = useFloorOutbox();
   const [workOrders, setWorkOrders] = useState<FloorWorkOrder[]>([]);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const loadWorkOrders = useCallback(async () => {
     const r = await fetch('/api/proxy/production/work-orders');
@@ -97,6 +97,10 @@ export default function FloorProductionKanbanPage() {
       endpoint: `/api/proxy/production/work-orders/${wo.id}/start`,
       payload: {},
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Could not start ${wo.woNumber}: ${res.message}`, isError: true });
+      return;
+    }
     if (res.ok && !res.queued) {
       await loadWorkOrders().catch(() => {});
     } else {
@@ -112,7 +116,7 @@ export default function FloorProductionKanbanPage() {
         ),
       );
     }
-    setBanner(`Started ${wo.woNumber}. ${res.message}`);
+    setBanner({ text: `Started ${wo.woNumber}. ${res.message}` });
   };
 
   const handleRecordConsumption = async () => {
@@ -133,10 +137,10 @@ export default function FloorProductionKanbanPage() {
     });
     if (r.ok) {
       await loadWorkOrders().catch(() => {});
-      setBanner(`Issued RM batch materials for ${consumeTarget.woNumber}.`);
+      setBanner({ text: `Issued RM batch materials for ${consumeTarget.woNumber}.` });
     } else {
       const err = await r.json().catch(() => null);
-      setBanner(`Failed to issue RM: ${err?.message || `HTTP ${r.status}`}`);
+      setBanner({ text: `Failed to issue RM: ${err?.message || `HTTP ${r.status}`}`, isError: true });
     }
     setConsumeTarget(null);
   };
@@ -158,6 +162,11 @@ export default function FloorProductionKanbanPage() {
         ],
       },
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Output failed: ${res.message}`, isError: true });
+      setOutputTarget(null);
+      return;
+    }
     if (res.ok && !res.queued) {
       await loadWorkOrders().catch(() => {});
     } else {
@@ -169,7 +178,7 @@ export default function FloorProductionKanbanPage() {
         ),
       );
     }
-    setBanner(`Recorded ${qty} ${outputTarget.uom} output on ${outputTarget.woNumber}. ${res.message}`);
+    setBanner({ text: `Recorded ${qty} ${outputTarget.uom} output on ${outputTarget.woNumber}. ${res.message}` });
     setOutputTarget(null);
   };
 
@@ -186,12 +195,17 @@ export default function FloorProductionKanbanPage() {
         reasonType: mapFloorReasonToDto(wastageReason),
       },
     });
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Wastage failed: ${res.message}`, isError: true });
+      setWastageTarget(null);
+      return;
+    }
     setWorkOrders((prev) =>
       prev.map((w) =>
         w.id === wastageTarget.id ? { ...w, scrapQty: w.scrapQty + wastageQty } : w,
       ),
     );
-    setBanner(`Logged ${wastageQty} ${wastageTarget.uom} wastage (${wastageReason}). ${res.message}`);
+    setBanner({ text: `Logged ${wastageQty} ${wastageTarget.uom} wastage (${wastageReason}). ${res.message}` });
     setWastageTarget(null);
   };
 
@@ -210,6 +224,12 @@ export default function FloorProductionKanbanPage() {
       payload: {},
     });
 
+    if (!res.ok && !res.queued) {
+      setBanner({ text: `Could not complete ${completeTarget.woNumber}: ${res.message}`, isError: true });
+      setCompleteTarget(null);
+      return;
+    }
+
     if (res.ok && !res.queued) {
       await loadWorkOrders().catch(() => {});
     } else {
@@ -225,11 +245,11 @@ export default function FloorProductionKanbanPage() {
         ),
       );
     }
-    setBanner(
-      evalRes.warningBanner
+    setBanner({
+      text: evalRes.warningBanner
         ? `Completed ${completeTarget.woNumber}! ${evalRes.warningBanner}`
         : `Completed ${completeTarget.woNumber} (${evalRes.yieldPct}% yield). ${res.message}`,
-    );
+    });
     setCompleteTarget(null);
   };
 
@@ -249,8 +269,14 @@ export default function FloorProductionKanbanPage() {
       </div>
 
       {banner && (
-        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold text-base">
-          {banner}
+        <div
+          className={`p-4 rounded-xl border font-semibold text-base ${
+            banner.isError
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-200'
+              : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200'
+          }`}
+        >
+          {banner.text}
         </div>
       )}
 

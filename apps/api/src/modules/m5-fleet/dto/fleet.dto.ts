@@ -117,11 +117,43 @@ export class CreateTripDto {
   @IsISO8601()
   tripDate!: string;
 
-  @IsUUID()
-  vehicleId!: string;
+  @IsEnum(['OWN_FLEET', 'THIRD_PARTY'])
+  @IsOptional()
+  dispatchMode?: 'OWN_FLEET' | 'THIRD_PARTY';
 
   @IsUUID()
-  driverId!: string;
+  @IsOptional()
+  vehicleId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  driverId?: string;
+
+  @IsString()
+  @IsOptional()
+  transporterName?: string;
+
+  @IsString()
+  @IsOptional()
+  externalVehicleNo?: string;
+
+  @IsString()
+  @IsOptional()
+  externalDriverName?: string;
+
+  @IsString()
+  @IsOptional()
+  externalDriverPhone?: string;
+
+  @IsString()
+  @IsOptional()
+  lrTrackingNo?: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  freightCost?: number;
 
   @IsUUID()
   @IsOptional()
@@ -297,4 +329,8 @@ export class CreateExpenseDto {
   @IsUUID()
   @IsOptional()
   receiptAttachmentId?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }
