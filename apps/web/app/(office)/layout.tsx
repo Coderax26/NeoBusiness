@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { can, type SessionUser } from '@neo/shared';
@@ -12,11 +12,13 @@ import { LockScreenOverlay } from '../../src/components/shell/LockScreenOverlay'
 import { TourEngine, Avatar, Kbd, useTheme } from '@neo/ui';
 import { NAV_ICONS, ACTION_ICONS } from '../../src/lib/icons';
 import { useLocale } from '../../src/lib/locale';
+import { getRoleLabel, SITE_TYPE_LABELS } from '../../src/lib/settings-copy';
 
 interface SubTabItem {
   label: string;
   href: string;
   permission?: string;
+  description?: string;
 }
 
 interface ModuleConfig {
@@ -183,19 +185,19 @@ const MODULES: ModuleConfig[] = [
 ];
 
 const SETTINGS_TABS: SubTabItem[] = [
-  { label: 'Company', href: '/admin/company', permission: 'admin.manage' },
-  { label: 'Users', href: '/admin/users', permission: 'admin.manage' },
-  { label: 'Roles', href: '/admin/roles', permission: 'admin.manage' },
-  { label: 'Sites', href: '/admin/sites', permission: 'admin.manage' },
-  { label: 'Opening Balances', href: '/admin/opening-balances', permission: 'admin.manage' },
-  { label: 'Business Rules', href: '/admin/business-rules', permission: 'config.edit' },
-  { label: 'Approval Rules', href: '/admin/approval-rules', permission: 'config.edit' },
-  { label: 'Templates & Series', href: '/admin/templates', permission: 'config.edit' },
-  { label: 'Audit Trail', href: '/control/audit', permission: 'audit.view' },
-  { label: 'System Health', href: '/admin/system', permission: 'admin.manage' },
-  { label: 'Go-Live Checklist', href: '/admin/rollout', permission: 'admin.manage' },
-  { label: 'Extensions', href: '/extensions' },
-  { label: 'Help & Training', href: '/help' },
+  { label: 'Company', href: '/admin/company', permission: 'admin.manage', description: 'Business name, GST/PAN, bank details & invoice footer' },
+  { label: 'Users', href: '/admin/users', permission: 'admin.manage', description: 'Staff accounts, login PINs & assigned locations' },
+  { label: 'Roles', href: '/admin/roles', permission: 'admin.manage', description: 'What each staff role can view and do' },
+  { label: 'Sites', href: '/admin/sites', permission: 'admin.manage', description: 'Factories, warehouses, fulfillment sites & storage areas' },
+  { label: 'Opening Balances', href: '/admin/opening-balances', permission: 'admin.manage', description: 'Starting customer & supplier balances before go-live' },
+  { label: 'Business Rules', href: '/admin/business-rules', permission: 'config.edit', description: 'Profit limits, credit days, alerts & daily rules' },
+  { label: 'Approval Rules', href: '/admin/approval-rules', permission: 'config.edit', description: 'Who approves price overrides, credit & cash mismatches' },
+  { label: 'Templates & Series', href: '/admin/templates', permission: 'config.edit', description: 'WhatsApp/SMS alerts & invoice/order number format' },
+  { label: 'Audit Trail', href: '/control/audit', permission: 'audit.view', description: 'Permanent history of who changed what and when' },
+  { label: 'System Health', href: '/admin/system', permission: 'admin.manage', description: 'App status, database connection & alert queue' },
+  { label: 'Go-Live Checklist', href: '/admin/rollout', permission: 'admin.manage', description: 'Launch readiness checklist for your business' },
+  { label: 'Extensions', href: '/extensions', description: 'Optional add-on tools like scanners and reports' },
+  { label: 'Help & Training', href: '/help', description: 'Quick step-by-step guides & simple word glossary' },
 ];
 
 const CREATE_MENU_ITEMS = [
@@ -250,12 +252,13 @@ export default function OfficeLayout({
   const [helpOpen, setHelpOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [tourActive, setTourActive] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Badge counts
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
-  useEffect(() => {
+  const loadSessionUser = useCallback(() => {
     fetch('/api/auth/me')
       .then((res) => {
         if (!res.ok) {
@@ -282,6 +285,28 @@ export default function OfficeLayout({
       })
       .catch(() => router.push('/login'));
   }, [router]);
+
+  useEffect(() => {
+    loadSessionUser();
+  }, [loadSessionUser]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onSitesUpdated = () => loadSessionUser();
+    window.addEventListener('neobus-sites-updated', onSitesUpdated);
+    return () => window.removeEventListener('neobus-sites-updated', onSitesUpdated);
+  }, [loadSessionUser]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [userMenuOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -335,8 +360,18 @@ export default function OfficeLayout({
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    setUserMenuOpen(false);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Proceed to login even if backend logout request fails
+    } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('neobus_active_site_id');
+      }
+      router.push('/login');
+      router.refresh();
+    }
   };
 
   const visibleModules = useMemo(
@@ -552,6 +587,7 @@ export default function OfficeLayout({
                     key={tab.href}
                     href={tab.href}
                     onClick={onNavigate}
+                    title={tab.description}
                     className={`block px-2.5 py-1.5 text-[13.5px] rounded-[3px] transition-colors truncate ${
                       active
                         ? 'bg-sheet text-action font-semibold border border-rule'
@@ -571,15 +607,14 @@ export default function OfficeLayout({
 
   return (
     <div className="flex min-h-screen bg-paper text-ink font-sans">
-      {/* Click-outside backdrop for desktop popovers */}
-      {(createMenuOpen || collapsedFlyout || userMenuOpen) && (
+      {/* Click-outside backdrop for desktop sidebar popovers */}
+      {(createMenuOpen || collapsedFlyout) && (
         <div
-          className="fixed inset-0 z-30"
+          className="fixed inset-0 z-[25]"
           aria-hidden="true"
           onClick={() => {
             setCreateMenuOpen(false);
             setCollapsedFlyout(null);
-            setUserMenuOpen(false);
           }}
         />
       )}
@@ -759,7 +794,12 @@ export default function OfficeLayout({
                         : 'text-ink-2 hover:text-ink hover:bg-paper'
                     }`}
                   >
-                    {tab.label}
+                    <div>{tab.label}</div>
+                    {tab.description && (
+                      <div className="text-[11.5px] text-ink-3 font-normal leading-snug mt-0.5">
+                        {tab.description}
+                      </div>
+                    )}
                   </Link>
                 );
               })}
@@ -789,7 +829,7 @@ export default function OfficeLayout({
                   <div className="text-[13.5px] font-semibold text-ink truncate group-hover:text-action">
                     {user?.name || 'Loading...'}
                   </div>
-                  <div className="text-[12px] text-ink-3 truncate">{user?.role || ''}</div>
+                  <div className="text-[12px] text-ink-3 truncate">{getRoleLabel(user?.role)}</div>
                 </div>
               </Link>
               <div className="flex items-center gap-1 shrink-0">
@@ -819,7 +859,7 @@ export default function OfficeLayout({
       {/* 2. Main Sheet Workspace */}
       <div className="flex-1 flex flex-col min-w-0 bg-sheet pb-16 lg:pb-0">
         {/* Clean Single-Row Topbar (Zero scrollbars, zero tabs) */}
-        <header className="h-[56px] border-b border-rule px-4 sm:px-8 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20 bg-sheet no-print">
+        <header className="h-[56px] border-b border-rule px-4 sm:px-8 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-30 bg-sheet no-print">
           {/* Left: Desktop Breadcrumb OR Mobile Menu + 1-Tap Section Switcher */}
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Mobile Hamburger + Contextual Pill */}
@@ -881,7 +921,7 @@ export default function OfficeLayout({
                 {user?.role === 'OWNER' && <option value="all">All Sites (Aggregated)</option>}
                 {(user?.sites || []).map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.siteType})
+                    {s.name} ({SITE_TYPE_LABELS[s.siteType || ''] || s.siteType})
                   </option>
                 ))}
               </select>
@@ -937,21 +977,22 @@ export default function OfficeLayout({
               )}
             </button>
 
-            <div className="relative z-40">
+            <div ref={userMenuRef} className="relative z-40">
               <button
                 type="button"
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => setUserMenuOpen((prev) => !prev)}
                 className="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-action"
                 aria-label="Account menu"
+                aria-expanded={userMenuOpen}
               >
                 <Avatar name={user?.name || 'U'} size="sm" />
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50 text-[13.5px]">
+                <div className="absolute right-0 mt-2 w-56 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50 text-[13.5px]">
                   <div className="px-3.5 py-2 border-b border-rule">
                     <div className="font-semibold text-ink truncate">{user?.name}</div>
-                    <div className="text-[12.5px] text-ink-3">{user?.role}</div>
+                    <div className="text-[12.5px] text-ink-3">{getRoleLabel(user?.role)}</div>
                   </div>
                   <Link
                     href="/me"
@@ -1227,7 +1268,7 @@ export default function OfficeLayout({
                     <div className="text-[13.5px] font-semibold text-ink truncate">
                       {user?.name || 'Loading...'}
                     </div>
-                    <div className="text-[12px] text-ink-3 truncate">{user?.role || ''}</div>
+                    <div className="text-[12px] text-ink-3 truncate">{getRoleLabel(user?.role)}</div>
                   </div>
                 </Link>
                 <button

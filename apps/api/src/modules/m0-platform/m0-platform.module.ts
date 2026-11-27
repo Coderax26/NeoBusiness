@@ -14,6 +14,7 @@ import { NotificationsController } from './notifications.controller.js';
 import { SearchController } from './search.controller.js';
 import { AttachmentsController } from './attachments.controller.js';
 import { EventsController } from './events.controller.js';
+import { SitesController } from './sites.controller.js';
 import { PermissionService, RbacGuard } from './rbac.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { DocNumberService } from './doc-number.service.js';
@@ -57,6 +58,7 @@ import { PilotReconciliationService } from '../../shared/observability/pilot-rec
     SearchController,
     AttachmentsController,
     EventsController,
+    SitesController,
   ],
   exports: [
     DatabaseModule,

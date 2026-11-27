@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { Search } from 'lucide-react';
 
 export interface SearchResultItem {
@@ -40,11 +41,6 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
       if (e.key === 'Escape' && isOpen) {
         e.preventDefault();
         onClose();
@@ -100,7 +96,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
             formatted.push({
               id: c.id,
               category: 'Customer',
-              title: c.legal_name || c.trade_name,
+              title: c.business_name || c.legal_name || c.trade_name || 'Customer',
               subtitle: c.phone,
               href: `/sales/customers/${c.id}`,
             }),
@@ -127,7 +123,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
             formatted.push({
               id: s.id,
               category: 'Supplier',
-              title: s.legal_name,
+              title: s.company_name || s.name || s.legal_name || 'Supplier',
               subtitle: s.phone,
               href: `/procurement/suppliers`,
             }),
@@ -167,12 +163,16 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/45">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/45"
+      onClick={onClose}
+    >
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Global search palette"
+        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xl bg-sheet border border-rule-strong rounded-[4px] shadow-2xl overflow-hidden"
       >
         <div className="p-3.5 border-b border-rule flex items-center gap-3">
@@ -197,7 +197,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
             </div>
           ) : (
             results.map((item) => (
-              <a
+              <Link
                 key={`${item.category}-${item.id}`}
                 href={item.href}
                 onClick={onClose}
@@ -210,7 +210,7 @@ export const SearchPalette: React.FC<SearchPaletteProps> = ({
                 <span className="text-[13px] px-2 py-0.5 rounded-[3px] bg-paper text-ink-2 border border-rule">
                   {item.category}
                 </span>
-              </a>
+              </Link>
             ))
           )}
         </div>

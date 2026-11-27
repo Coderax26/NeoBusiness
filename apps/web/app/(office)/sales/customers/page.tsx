@@ -36,6 +36,7 @@ export interface CustomerRecord {
   phone: string;
   whatsappPhone: string;
   whatsappOptIn: boolean;
+  defaultSiteId?: string;
   defaultSite: string;
   deliveryWindow: 'MORNING' | 'AFTERNOON' | 'EVENING';
   creditLimitRupees: number;
@@ -54,6 +55,23 @@ export interface CustomerRecord {
 
 export default function CustomerMasterPage() {
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [fulfillmentSites, setFulfillmentSites] = useState<Array<{ id: string; name: string }>>([]);
+
+  const loadSites = useCallback(async () => {
+    try {
+      let res = await fetch('/api/proxy/sites?fulfillmentOnly=true');
+      let list = res.ok ? await res.json() : [];
+      if (!Array.isArray(list) || list.length === 0) {
+        res = await fetch('/api/proxy/sites');
+        list = res.ok ? await res.json() : [];
+      }
+      if (Array.isArray(list)) {
+        setFulfillmentSites(list.map((s: any) => ({ id: String(s.id), name: String(s.name) })));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -86,7 +104,8 @@ export default function CustomerMasterPage() {
           phone: String(c.phone || ''),
           whatsappPhone: String(c.whatsapp_no || c.phone || ''),
           whatsappOptIn: Boolean(c.whatsapp_no || c.phone),
-          defaultSite: String(c.default_site_name || 'NeoCore Factory — Mumbai'),
+          defaultSiteId: c.default_site_id ? String(c.default_site_id) : undefined,
+          defaultSite: String(c.default_site_name || 'Not assigned'),
           deliveryWindow: win,
           creditLimitRupees: limit,
           creditDays: Number(c.credit_days ?? 7),
@@ -121,8 +140,9 @@ export default function CustomerMasterPage() {
   }, []);
 
   useEffect(() => {
+    loadSites();
     loadCustomers();
-  }, [loadCustomers]);
+  }, [loadSites, loadCustomers]);
   const [search, setSearch] = useState('');
   const [creditStatusFilter, setCreditStatusFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -152,7 +172,7 @@ export default function CustomerMasterPage() {
   const [phone, setPhone] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(true);
-  const [defaultSite, setDefaultSite] = useState('Pune Central Depot');
+  const [defaultSite, setDefaultSite] = useState('');
   const [deliveryWindow, setDeliveryWindow] = useState<CustomerRecord['deliveryWindow']>('MORNING');
   const [creditLimitRupees, setCreditLimitRupees] = useState('50000');
   const [creditDays, setCreditDays] = useState('7');
@@ -177,7 +197,7 @@ export default function CustomerMasterPage() {
     setPhone('');
     setWhatsappPhone('');
     setWhatsappOptIn(true);
-    setDefaultSite('Pune Central Depot');
+    setDefaultSite(fulfillmentSites[0]?.id || '');
     setDeliveryWindow('MORNING');
     setCreditLimitRupees('50000');
     setOriginalCreditLimit(50000);
@@ -203,7 +223,7 @@ export default function CustomerMasterPage() {
     setPhone(cust.phone);
     setWhatsappPhone(cust.whatsappPhone);
     setWhatsappOptIn(cust.whatsappOptIn);
-    setDefaultSite(cust.defaultSite);
+    setDefaultSite(cust.defaultSiteId || fulfillmentSites[0]?.id || '');
     setDeliveryWindow(cust.deliveryWindow);
     setCreditLimitRupees(String(cust.creditLimitRupees));
     setOriginalCreditLimit(cust.creditLimitRupees);
@@ -317,6 +337,7 @@ export default function CustomerMasterPage() {
             phone: phone.trim(),
             whatsappNo: whatsappPhone.trim() || phone.trim(),
             billingAddress: billingAddress.trim() || 'Mumbai',
+            defaultSiteId: uuidRe.test(defaultSite) ? defaultSite : undefined,
             gstin: gstin.trim().toUpperCase() || undefined,
             stateCode: (stateCode || '27').slice(0, 2),
             preferredDeliveryWindow,
@@ -329,6 +350,7 @@ export default function CustomerMasterPage() {
             phone: phone.trim(),
             whatsappNo: whatsappPhone.trim() || phone.trim(),
             billingAddress: billingAddress.trim() || 'Mumbai',
+            defaultSiteId: uuidRe.test(defaultSite) ? defaultSite : undefined,
             gstin: gstin.trim().toUpperCase() || undefined,
             stateCode: (stateCode || '27').slice(0, 2),
             creditLimit: Math.round(newLimit),
@@ -850,15 +872,18 @@ export default function CustomerMasterPage() {
 
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block text-xs font-semibold text-ink-2 mb-1">Default Fulfilment Site</label>
+ <label className="block text-xs font-semibold text-ink-2 mb-1">Default Fulfillment Site</label>
  <select
  value={defaultSite}
  onChange={(e) => setDefaultSite(e.target.value)}
  className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
  >
- <option value="Pune Central Depot">Pune Central Depot</option>
- <option value="Baner Transit Depot">Baner Transit Depot</option>
- <option value="Hadapsar Warehouse">Hadapsar Warehouse</option>
+ <option value="">Select fulfillment site...</option>
+ {fulfillmentSites.map((s) => (
+ <option key={s.id} value={s.id}>
+ {s.name}
+ </option>
+ ))}
  </select>
  </div>
  <div>

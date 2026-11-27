@@ -35,10 +35,14 @@ export const Drawer: React.FC<DrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end">
+    <div
+      className="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end"
+      onClick={onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
         className={`w-full ${widthClasses[width]} h-full bg-sheet border-l border-rule-strong flex flex-col shadow-2xl text-ink`}
       >
         <div className="px-6 py-4 border-b border-rule flex items-center justify-between">

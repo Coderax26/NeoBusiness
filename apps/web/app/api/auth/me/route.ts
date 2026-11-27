@@ -11,6 +11,9 @@ function buildSessionUserPayload(raw: any) {
         name: s.name,
         type: s.type || s.siteType || 'OFFICE',
         siteType: s.siteType || s.type || 'OFFICE',
+        code: s.code || s.site_code || '',
+        isFulfillmentSite:
+          s.isFulfillmentSite ?? s.is_fulfillment_site ?? (s.type !== 'OFFICE' && s.siteType !== 'OFFICE'),
       }))
     : [];
   const siteIds =

@@ -37,6 +37,7 @@ export const ApprovalsDrawer: React.FC<{
       }
 
       try {
+        setDecisionError(null);
         const res = await fetch('/api/proxy/exceptions?status=PENDING');
         if (res.ok) {
           const data = await res.json();
@@ -81,9 +82,13 @@ export const ApprovalsDrawer: React.FC<{
             setExceptions(normalized.filter((e) => !resolvedIds.includes(e.id)));
             return;
           }
+        } else if (active && res.status !== 403) {
+          setDecisionError('Could not load pending approvals right now.');
         }
       } catch {
-        setDecisionError('Failed to load pending exceptions.');
+        if (active) {
+          setDecisionError('Failed to load pending approvals.');
+        }
       }
 
       if (active) {

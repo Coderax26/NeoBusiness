@@ -69,17 +69,33 @@ export default function QuickOrderEntryPage() {
       let loadedSites: Array<{ id: string; name: string }> = [];
       let fallbackSiteId = '';
       try {
-        const meRes = await fetch('/api/auth/me');
+        const [meRes, sitesRes] = await Promise.all([
+          fetch('/api/auth/me'),
+          fetch('/api/proxy/sites?fulfillmentOnly=true'),
+        ]);
+        if (sitesRes.ok) {
+          const siteRows = await sitesRes.json();
+          if (Array.isArray(siteRows) && siteRows.length > 0) {
+            loadedSites = siteRows.map((s: any) => ({
+              id: String(s.id),
+              name: String(s.name || s.id),
+            }));
+          }
+        }
         if (meRes.ok) {
           const meData = await meRes.json();
           if (active && meData?.user) {
             setUser(meData.user);
-            loadedSites = Array.isArray(meData.user.sites)
-              ? meData.user.sites.map((s: any) => ({
-                  id: String(s.id),
-                  name: String(s.name || s.id),
-                }))
-              : [];
+            if (loadedSites.length === 0 && Array.isArray(meData.user.sites)) {
+              const userFulfill = meData.user.sites.filter(
+                (s: any) => s.isFulfillmentSite !== false && s.siteType !== 'OFFICE',
+              );
+              const pool = userFulfill.length > 0 ? userFulfill : meData.user.sites;
+              loadedSites = pool.map((s: any) => ({
+                id: String(s.id),
+                name: String(s.name || s.id),
+              }));
+            }
             if (loadedSites.length > 0) {
               setSites(loadedSites);
               fallbackSiteId = loadedSites[0].id;
@@ -90,6 +106,11 @@ export default function QuickOrderEntryPage() {
               setSelectedSiteId((prev) => prev || fallbackSiteId);
             }
           }
+        } else if (active && loadedSites.length > 0) {
+          setSites(loadedSites);
+          fallbackSiteId = loadedSites[0].id;
+          setSelectedSiteId((prev) => prev || loadedSites[0].id);
+          setSiteName(loadedSites[0].name);
         }
       } catch {
         // ignore network error
@@ -636,7 +657,7 @@ export default function QuickOrderEntryPage() {
             </div>
 
             <div>
-              <label className="block text-ink-3 font-semibold mb-1">Dispatch Site</label>
+              <label className="block text-ink-3 font-semibold mb-1">Fulfillment / Dispatch Site</label>
               <select
                 value={selectedSiteId}
                 onChange={(e) => {

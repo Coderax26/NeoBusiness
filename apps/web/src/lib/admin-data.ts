@@ -21,11 +21,26 @@ export interface SiteRecord {
   id: string;
   code: string;
   name: string;
-  siteType: 'FACTORY' | 'DEPOT' | 'WAREHOUSE';
+  siteType: 'FACTORY' | 'DEPOT' | 'WAREHOUSE' | 'OFFICE';
   gstin: string;
   address: string;
   active: boolean;
-  locations: Array<{ name: string; type: 'DRY_STORE' | 'COLD_STORE' | 'DISPATCH_BAY' }>;
+  isFulfillmentSite?: boolean;
+  locations: Array<{
+    id?: string;
+    name: string;
+    type:
+      | 'DRY_STORE'
+      | 'COLD_STORE'
+      | 'DISPATCH_BAY'
+      | 'RAW_MATERIAL_STORE'
+      | 'FINISHED_GOODS_STORE'
+      | 'TRADING_WAREHOUSE'
+      | 'VEHICLE'
+      | 'QUARANTINE'
+      | 'OFFICE';
+    active?: boolean;
+  }>;
 }
 
 export interface BusinessRuleSetting {

@@ -103,3 +103,11 @@ export class CancelOrderDto {
   @IsString()
   reason: string;
 }
+
+/**
+ * DTO for updating an order's fulfillment site.
+ */
+export class UpdateOrderFulfillmentSiteDto {
+  @IsUUID()
+  fulfillmentSiteId: string;
+}

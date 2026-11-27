@@ -25,7 +25,7 @@ export class AuthService {
   constructor(
     @InjectKnex() private readonly knex: Knex,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   /**
    * Validate user credentials (phone + password/PIN).

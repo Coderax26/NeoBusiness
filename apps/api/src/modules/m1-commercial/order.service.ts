@@ -864,6 +864,71 @@ export class OrderService implements OnModuleInit {
   }
 
   /**
+   * Reassign fulfillment site for an editable sales order.
+   */
+  async updateFulfillmentSite(
+    orderId: string,
+    fulfillmentSiteId: string,
+    userId: string,
+  ): Promise<{ orderId: string; fulfillmentSiteId: string; siteName: string }> {
+    const editableStatuses = [
+      'DRAFT',
+      'PENDING_APPROVAL',
+      'CONFIRMED',
+      'IN_PRODUCTION_SOURCING',
+      'READY',
+      'READY_FOR_DISPATCH',
+    ];
+    return this.knex.transaction(async (trx) => {
+      const order = await trx('sales_orders')
+        .where('id', orderId)
+        .forUpdate()
+        .first('id', 'order_status', 'fulfillment_site_id');
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+      if (!editableStatuses.includes(order.order_status)) {
+        throw new ConflictException(
+          `Cannot change fulfillment site after order is ${order.order_status}`,
+        );
+      }
+
+      const site = await trx('sites')
+        .where('id', fulfillmentSiteId)
+        .first('id', 'name', 'is_active', 'is_fulfillment_site');
+      if (!site || !site.is_active) {
+        throw new BadRequestException('Selected site is inactive or does not exist.');
+      }
+      if (!site.is_fulfillment_site) {
+        throw new BadRequestException(
+          `${site.name} is not enabled as a fulfillment site. Enable it in Settings → Sites first.`,
+        );
+      }
+
+      await trx('sales_orders')
+        .where('id', orderId)
+        .update({
+          fulfillment_site_id: fulfillmentSiteId,
+          updated_at: new Date(),
+        });
+
+      await trx('order_status_log').insert({
+        order_id: orderId,
+        from_status: order.order_status,
+        to_status: order.order_status,
+        by_user: userId,
+        reason: `Fulfillment site changed to ${site.name}`,
+      });
+
+      return {
+        orderId,
+        fulfillmentSiteId,
+        siteName: site.name,
+      };
+    });
+  }
+
+  /**
    * Publish order.confirmed domain event.
    */
   private async emitOrderConfirmedEvent(

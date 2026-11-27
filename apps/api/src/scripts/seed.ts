@@ -23,18 +23,24 @@ dotenv.config();
 const SITES = [
   {
     name: 'NeoCore Factory — Mumbai',
+    site_code: 'MUM-FAC',
     site_type: 'FACTORY' as const,
     address: 'Plot 42, MIDC, Andheri East, Mumbai 400059',
+    is_fulfillment_site: true,
   },
   {
     name: 'Central Warehouse — Navi Mumbai',
+    site_code: 'NVM-WH',
     site_type: 'WAREHOUSE' as const,
     address: 'Sector 17, Navi Mumbai, Maharashtra 400703',
+    is_fulfillment_site: true,
   },
   {
     name: 'NeoCore Office — Corporate',
+    site_code: 'CORP-HQ',
     site_type: 'OFFICE' as const,
     address: 'Bandra Kurla Complex, Mumbai 400051',
+    is_fulfillment_site: false,
   },
 ];
 
@@ -110,8 +116,10 @@ async function upsertSite(
   const [row] = await knex('sites')
     .insert({
       name: site.name,
+      site_code: site.site_code,
       site_type: site.site_type,
       address: site.address,
+      is_fulfillment_site: site.is_fulfillment_site,
       is_active: true,
     })
     .returning('id');

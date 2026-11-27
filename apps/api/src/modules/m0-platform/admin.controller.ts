@@ -27,7 +27,8 @@ import {
   ResetPinDto,
   CreateSiteDto,
   UpdateSiteDto,
-  CreateLocationDto,
+  CreateSiteLocationBodyDto,
+  UpdateLocationDto,
   UpdateBusinessRuleDto,
   UpdateApprovalPolicyDto,
 } from './dto/admin.dto.js';
@@ -103,8 +104,14 @@ export class AdminController {
   @Get('sites')
   @RequirePermission('config.edit')
   @ApiOperation({ summary: 'List all sites' })
-  async listSites(@Query('includeInactive') includeInactive?: string) {
-    return this.adminService.listSites(includeInactive === 'true');
+  async listSites(
+    @Query('includeInactive') includeInactive?: string,
+    @Query('includeLocations') includeLocations?: string,
+  ) {
+    return this.adminService.listSites(
+      includeInactive === 'true',
+      includeLocations === 'true',
+    );
   }
 
   @Post('sites')
@@ -137,10 +144,22 @@ export class AdminController {
   @ApiOperation({ summary: 'Create a location under a site' })
   async createLocation(
     @Param('id') siteId: string,
-    @Body() dto: Omit<CreateLocationDto, 'siteId'>,
+    @Body() dto: CreateSiteLocationBodyDto,
     @Req() req: any,
   ) {
     return this.adminService.createLocation({ ...dto, siteId }, req.user?.id);
+  }
+
+  @Patch('sites/:id/locations/:locationId')
+  @RequirePermission('config.edit')
+  @ApiOperation({ summary: 'Update a storage location under a site' })
+  async updateLocation(
+    @Param('id') siteId: string,
+    @Param('locationId') locationId: string,
+    @Body() dto: UpdateLocationDto,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateLocation(siteId, locationId, dto, req.user?.id);
   }
 
   // ─── Roles ──────────────────────────────────────────────────────────────────

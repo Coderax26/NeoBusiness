@@ -85,30 +85,44 @@ export class CustomerService {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.siteId)
         ? filters.siteId
         : undefined;
-    const query = this.knex('customers').select('*');
+    const query = this.knex('customers')
+      .leftJoin('sites as s', 'customers.default_site_id', 's.id')
+      .select(
+        'customers.*',
+        's.name as default_site_name',
+        's.is_fulfillment_site as default_site_is_fulfillment',
+      );
 
     if (validSiteId) {
-      query.where('default_site_id', validSiteId);
+      query.where('customers.default_site_id', validSiteId);
     }
     if (filters.isActive !== undefined) {
-      query.where('is_active', filters.isActive);
+      query.where('customers.is_active', filters.isActive);
     }
     if (filters.search) {
       query.andWhere((qb) => {
-        qb.whereILike('business_name', `%${filters.search}%`)
-          .orWhereILike('customer_code', `%${filters.search}%`)
-          .orWhereILike('phone', `%${filters.search}%`);
+        qb.whereILike('customers.business_name', `%${filters.search}%`)
+          .orWhereILike('customers.customer_code', `%${filters.search}%`)
+          .orWhereILike('customers.phone', `%${filters.search}%`);
       });
     }
 
-    return query.orderBy('created_at', 'desc');
+    return query.orderBy('customers.created_at', 'desc');
   }
 
   /**
    * Get customer by ID.
    */
   async findById(id: string) {
-    const customer = await this.knex('customers').where('id', id).first();
+    const customer = await this.knex('customers')
+      .leftJoin('sites as s', 'customers.default_site_id', 's.id')
+      .where('customers.id', id)
+      .select(
+        'customers.*',
+        's.name as default_site_name',
+        's.is_fulfillment_site as default_site_is_fulfillment',
+      )
+      .first();
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
     return customer;
   }
@@ -144,7 +158,7 @@ export class CustomerService {
     if (data.phone) updateData.phone = data.phone;
     if (data.whatsappNo !== undefined) updateData.whatsapp_no = data.whatsappNo;
     if (data.billingAddress) updateData.billing_address = data.billingAddress;
-    if (data.defaultSiteId) updateData.default_site_id = data.defaultSiteId;
+    if (data.defaultSiteId !== undefined) updateData.default_site_id = data.defaultSiteId || null;
     if (data.gstin !== undefined) updateData.gstin = data.gstin;
     if (data.stateCode) updateData.state_code = data.stateCode;
     if (data.preferredDeliveryWindow !== undefined)

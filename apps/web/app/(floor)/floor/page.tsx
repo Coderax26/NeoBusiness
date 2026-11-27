@@ -65,7 +65,7 @@ export default function FloorTerminalPage() {
       Icon: Package,
       accent: 'border-l-4 border-l-leaf',
       badge: 'Yield Check',
-      href: '/floor/output',
+      href: '/floor/production',
     },
     {
       title: 'Raw Material Request',
@@ -74,7 +74,7 @@ export default function FloorTerminalPage() {
       Icon: ClipboardList,
       accent: 'border-l-4 border-l-action',
       badge: 'BOM Pull',
-      href: '/floor/material-request',
+      href: '/floor/rm-request',
     },
     {
       title: 'Shift Worker Attendance',
@@ -92,7 +92,7 @@ export default function FloorTerminalPage() {
       Icon: Trash2,
       accent: 'border-l-4 border-l-madder',
       badge: 'Spill Log',
-      href: '/floor/wastage',
+      href: '/floor/adjustments',
     },
     {
       title: 'Quick Scale Keypad',
@@ -143,7 +143,7 @@ export default function FloorTerminalPage() {
       Icon: Scale,
       accent: 'border-l-4 border-l-action',
       badge: 'Cycle Count',
-      href: '/floor/stock-counts',
+      href: '/floor/stock',
     },
     {
       title: 'Stock Damage & Adjustment',

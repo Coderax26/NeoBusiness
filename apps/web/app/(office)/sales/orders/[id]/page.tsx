@@ -16,6 +16,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const [order, setOrder] = useState<SalesOrderRecord | null>(null);
   const [siteId, setSiteId] = useState<string>('');
+  const [fulfillmentSites, setFulfillmentSites] = useState<Array<{ id: string; name: string }>>([]);
+  const [savingSite, setSavingSite] = useState(false);
   const [exceptions, setExceptions] = useState<any[]>([]);
   const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +125,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     refreshOrder();
+    fetch('/api/proxy/sites?fulfillmentOnly=true')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        if (Array.isArray(rows)) {
+          setFulfillmentSites(rows.map((s: any) => ({ id: String(s.id), name: String(s.name) })));
+        }
+      })
+      .catch(() => {});
   }, [id]);
+
+  const handleSaveFulfillmentSite = async (nextSiteId: string) => {
+    if (!order || !nextSiteId || nextSiteId === siteId) return;
+    setActionMsg(null);
+    setSavingSite(true);
+    try {
+      const res = await fetch(`/api/proxy/orders/${encodeURIComponent(order.id)}/fulfillment-site`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fulfillmentSiteId: nextSiteId }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await refreshOrder(true);
+      setActionMsg({
+        text: `Fulfillment site changed to ${payload?.siteName || 'selected site'}.`,
+        tone: 'success',
+      });
+    } catch (err) {
+      setActionMsg({ text: (err as Error).message, tone: 'error' });
+    } finally {
+      setSavingSite(false);
+    }
+  };
 
   // Poll every 30s for live approval/counter updates (§4.2, OD-021)
   useEffect(() => {
@@ -714,6 +750,35 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 );
               })}
             </ul>
+          </div>
+
+          <div className="pt-2">
+            <h3 className="text-[14px] font-semibold text-ink pb-2 bahi-section-rule mb-2.5">
+              Fulfillment Site
+            </h3>
+            {['DRAFT', 'PENDING_APPROVAL', 'CONFIRMED', 'IN_PRODUCTION_SOURCING', 'READY'].includes(
+              order.status,
+            ) && fulfillmentSites.length > 0 ? (
+              <div className="space-y-1.5">
+                <select
+                  value={siteId}
+                  disabled={savingSite}
+                  onChange={(e) => void handleSaveFulfillmentSite(e.target.value)}
+                  className="w-full rounded-[3px] border border-rule-strong bg-paper px-2.5 py-1.5 text-[13px] text-ink"
+                >
+                  {fulfillmentSites.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11.5px] text-ink-3">
+                  {savingSite ? 'Updating fulfillment site...' : 'Choose which site packs & ships this order.'}
+                </p>
+              </div>
+            ) : (
+              <div className="text-[13.5px] font-medium text-ink">{order.siteName}</div>
+            )}
           </div>
 
           <div className="pt-2">

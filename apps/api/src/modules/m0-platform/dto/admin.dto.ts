@@ -108,10 +108,25 @@ export class CreateSiteDto {
   @IsIn(['FACTORY', 'WAREHOUSE', 'OFFICE'])
   siteType!: string;
 
+  @ApiPropertyOptional({ example: 'PUN-01' })
+  @IsOptional()
+  @IsString()
+  siteCode?: string;
+
+  @ApiPropertyOptional({ example: '27AAACN1234F1Z5' })
+  @IsOptional()
+  @IsString()
+  gstin?: string;
+
   @ApiPropertyOptional({ example: 'Plot 42, Hadapsar Industrial Estate, Pune' })
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isFulfillmentSite?: boolean;
 }
 
 export class UpdateSiteDto {
@@ -125,6 +140,16 @@ export class UpdateSiteDto {
   @IsIn(['FACTORY', 'WAREHOUSE', 'OFFICE'])
   siteType?: string;
 
+  @ApiPropertyOptional({ example: 'PUN-01' })
+  @IsOptional()
+  @IsString()
+  siteCode?: string;
+
+  @ApiPropertyOptional({ example: '27AAACN1234F1Z5' })
+  @IsOptional()
+  @IsString()
+  gstin?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -134,6 +159,58 @@ export class UpdateSiteDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isFulfillmentSite?: boolean;
+}
+
+const LOCATION_TYPES = [
+  'RAW_MATERIAL_STORE',
+  'FINISHED_GOODS_STORE',
+  'TRADING_WAREHOUSE',
+  'VEHICLE',
+  'QUARANTINE',
+  'OFFICE',
+] as const;
+
+export class CreateSiteLocationBodyDto {
+  @ApiProperty({ example: 'Cold Room A' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ example: 'RAW_MATERIAL_STORE', enum: LOCATION_TYPES })
+  @IsIn(LOCATION_TYPES)
+  locationType!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vehicleId?: string;
+}
+
+export class UpdateLocationDto {
+  @ApiPropertyOptional({ example: 'Cold Room B' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ enum: LOCATION_TYPES })
+  @IsOptional()
+  @IsIn(LOCATION_TYPES)
+  locationType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vehicleId?: string;
 }
 
 export class CreateLocationDto {
@@ -149,23 +226,9 @@ export class CreateLocationDto {
 
   @ApiProperty({
     example: 'RAW_MATERIAL_STORE',
-    enum: [
-      'RAW_MATERIAL_STORE',
-      'FINISHED_GOODS_STORE',
-      'TRADING_WAREHOUSE',
-      'VEHICLE',
-      'QUARANTINE',
-      'OFFICE',
-    ],
+    enum: LOCATION_TYPES,
   })
-  @IsIn([
-    'RAW_MATERIAL_STORE',
-    'FINISHED_GOODS_STORE',
-    'TRADING_WAREHOUSE',
-    'VEHICLE',
-    'QUARANTINE',
-    'OFFICE',
-  ])
+  @IsIn(LOCATION_TYPES)
   locationType!: string;
 
   @ApiPropertyOptional()

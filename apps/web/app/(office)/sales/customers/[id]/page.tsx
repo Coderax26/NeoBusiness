@@ -76,7 +76,7 @@ export default function Customer360Page({ params }: { params: Promise<{ id: stri
             name: String(custData.business_name || custData.name || 'Customer'),
             phone: String(custData.phone || ''),
             gstin: String(custData.gstin || ''),
-            site: String(custData.default_site_name || 'Main Site'),
+            site: String(custData.default_site_name || 'Not assigned'),
             window: String(custData.preferred_delivery_window || '10-12'),
             creditLimit: Number(custData.credit_limit ?? 0),
             outstanding: Number(custData.current_ar_balance ?? 0),

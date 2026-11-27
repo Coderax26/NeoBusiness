@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { SettingsPageHeader } from '../../../../src/components/settings/SettingsPageHeader';
 
 interface SystemHealthMetrics {
   dbConnected: boolean;
@@ -10,8 +11,12 @@ interface SystemHealthMetrics {
 }
 
 export default function AdminSystemHealthPage() {
-  const [healthStatus, setHealthStatus] = useState('Checking...');
-  const [dbStatus, setDbStatus] = useState('Checking...');
+  const [appStatus, setAppStatus] = useState<'Checking...' | 'Running Smoothly' | 'Needs Attention'>(
+    'Checking...',
+  );
+  const [dbStatus, setDbStatus] = useState<'Checking...' | 'Connected' | 'Disconnected'>(
+    'Checking...',
+  );
   const [metrics, setMetrics] = useState<SystemHealthMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,15 +29,12 @@ export default function AdminSystemHealthPage() {
       ]);
 
       if (!basicRes && !sysRes) {
-        setHealthStatus('Unavailable');
-        setDbStatus('Unavailable');
+        setAppStatus('Needs Attention');
+        setDbStatus('Disconnected');
       } else {
-        setHealthStatus(
-          basicRes?.status === 'ok' || basicRes?.ok || sysRes?.dbConnected
-            ? '● Healthy'
-            : String(basicRes?.status || 'Unavailable'),
-        );
         const sysData = sysRes?.data ?? sysRes;
+        const ok = Boolean(basicRes?.status === 'ok' || basicRes?.ok || sysData?.dbConnected);
+        setAppStatus(ok ? 'Running Smoothly' : 'Needs Attention');
         if (sysData && typeof sysData === 'object') {
           setMetrics({
             dbConnected: Boolean(sysData.dbConnected),
@@ -44,12 +46,12 @@ export default function AdminSystemHealthPage() {
           });
           setDbStatus(sysData.dbConnected ? 'Connected' : 'Disconnected');
         } else {
-          setDbStatus(basicRes?.db ? String(basicRes.db) : 'Connected');
+          setDbStatus('Connected');
         }
       }
     } catch {
-      setHealthStatus('Unavailable');
-      setDbStatus('Unavailable');
+      setAppStatus('Needs Attention');
+      setDbStatus('Disconnected');
     } finally {
       setLoading(false);
     }
@@ -61,60 +63,88 @@ export default function AdminSystemHealthPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">System Health &amp; Data Management</h1>
-          <p className="text-sm text-ink-3">
-            API health, outbox queue depth, failed notification dispatches, and database status.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadHealth}
-          disabled={loading}
-          className="rounded-lg border border-rule-strong bg-sheet px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-sunken disabled:opacity-60"
-        >
-          {loading ? 'Checking…' : '↻ Refresh Status'}
-        </button>
-      </div>
+      <SettingsPageHeader
+        title="System Health & Backups"
+        subtitle="Check if NeoBus services, company data storage, and customer message delivery are working normally."
+        whatIsThis="Use this screen for quick peace of mind or if support asks you to check system status. If all four cards look healthy, your business data and alerts are working properly."
+        actions={
+          <button
+            type="button"
+            onClick={loadHealth}
+            disabled={loading}
+            className="rounded-[3px] border border-rule-strong bg-sheet px-3.5 py-2 text-xs font-semibold text-ink hover:bg-paper disabled:opacity-60"
+          >
+            {loading ? 'Checking…' : '↻ Check Again'}
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[3px] border border-rule bg-sheet p-4">
-          <div className="text-xs text-ink-3">API Health (/health)</div>
-          <div className="mt-1 text-lg font-bold text-leaf">{healthStatus}</div>
+        <div className="rounded-[4px] border border-rule bg-sheet p-4 space-y-1">
+          <div className="text-xs font-semibold text-ink-3">Application Service</div>
+          <div
+            className={`text-lg font-bold ${
+              appStatus === 'Running Smoothly' ? 'text-leaf' : 'text-madder'
+            }`}
+          >
+            {appStatus}
+          </div>
+          <p className="text-xs text-ink-3">
+            Shows whether the main business server is responding to staff devices.
+          </p>
         </div>
-        <div className="rounded-[3px] border border-rule bg-sheet p-4">
-          <div className="text-xs text-ink-3">PostgreSQL Database</div>
-          <div className="mt-1 text-lg font-bold text-ink">{dbStatus}</div>
+
+        <div className="rounded-[4px] border border-rule bg-sheet p-4 space-y-1">
+          <div className="text-xs font-semibold text-ink-3">Company Data Storage</div>
+          <div
+            className={`text-lg font-bold ${
+              dbStatus === 'Connected' ? 'text-leaf' : 'text-madder'
+            }`}
+          >
+            {dbStatus}
+          </div>
+          <p className="text-xs text-ink-3">
+            Confirms your orders, invoices, and stock records are being saved safely.
+          </p>
         </div>
-        <div className="rounded-[3px] border border-rule bg-sheet p-4">
-          <div className="text-xs text-ink-3">Outbox Queue Depth</div>
-          <div className="mt-1 font-mono text-lg font-bold text-ink">
+
+        <div className="rounded-[4px] border border-rule bg-sheet p-4 space-y-1">
+          <div className="text-xs font-semibold text-ink-3">Pending Background Updates</div>
+          <div className="font-mono text-lg font-bold text-ink">
             {metrics ? metrics.outboxQueueDepth : '—'}
           </div>
-          <div className="mt-0.5 text-[11px] text-ink-3">Pending domain events (processed_at IS NULL)</div>
+          <p className="text-xs text-ink-3">
+            Updates waiting to sync (normally 0 or a small number during busy hours).
+          </p>
         </div>
-        <div className="rounded-[3px] border border-rule bg-sheet p-4">
-          <div className="text-xs text-ink-3">Failed Notifications</div>
+
+        <div className="rounded-[4px] border border-rule bg-sheet p-4 space-y-1">
+          <div className="text-xs font-semibold text-ink-3">Unsent Customer Alerts</div>
           <div
-            className={`mt-1 font-mono text-lg font-bold ${
+            className={`font-mono text-lg font-bold ${
               metrics && metrics.failedNotificationsCount > 0 ? 'text-madder' : 'text-leaf'
             }`}
           >
             {metrics ? metrics.failedNotificationsCount : '—'}
           </div>
-          <div className="mt-0.5 text-[11px] text-ink-3">
-            {metrics ? `Checked ${metrics.lastCheckedAt}` : 'Asia/Kolkata (IST)'}
-          </div>
+          <p className="text-xs text-ink-3">
+            {metrics && metrics.failedNotificationsCount > 0
+              ? 'Some WhatsApp/SMS messages failed to send — check customer phone numbers.'
+              : 'All WhatsApp and SMS notifications delivered normally.'}
+          </p>
         </div>
       </div>
 
-      <div className="rounded-[3px] border border-rule bg-sheet p-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="text-sm font-bold text-ink">Data Retention &amp; Master Backup</div>
-          <div className="text-xs text-ink-3">Audit logs retained for 8 years (GST statutory requirement).</div>
+      <div className="rounded-[4px] border border-rule bg-sheet p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="text-sm font-bold text-ink">Record Retention &amp; GST Safety</div>
+          <div className="text-xs text-ink-2">
+            All invoices, receipts, and activity history are preserved for 8 years to meet GST audit requirements.
+          </div>
         </div>
-        <div className="font-mono text-xs text-ink-3">Timezone: Asia/Kolkata (IST) · v0.7.0 (R3)</div>
+        <div className="text-xs text-ink-3">
+          {metrics ? `Last checked: ${metrics.lastCheckedAt}` : 'India Standard Time (IST)'}
+        </div>
       </div>
     </div>
   );

@@ -85,7 +85,7 @@ export class QuoteController {
     @Req() req: any,
   ) {
     const userId = String(req.user?.sub || req.user?.id || '');
-    const siteId = dto?.fulfillmentSiteId || req.user?.siteId || '';
+    const siteId = dto?.fulfillmentSiteId || req.user?.siteId || req.user?.siteIds?.[0] || '';
     return this.quoteSvc.convertToOrder(id, siteId, userId);
   }
 

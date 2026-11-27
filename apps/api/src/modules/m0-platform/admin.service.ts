@@ -15,6 +15,7 @@ import {
   CreateSiteDto,
   UpdateSiteDto,
   CreateLocationDto,
+  UpdateLocationDto,
   UpdateBusinessRuleDto,
   UpdateApprovalPolicyDto,
 } from './dto/admin.dto.js';
@@ -69,7 +70,39 @@ export class AdminService {
       });
     }
 
-    return query.orderBy('u.created_at', 'desc');
+    const rows = await query.orderBy('u.created_at', 'desc');
+    if (rows.length === 0) return rows;
+
+    const userIds = rows.map((r: any) => r.id);
+    const accessRows = await this.knex('user_site_access as usa')
+      .join('sites as s', 'usa.site_id', 's.id')
+      .whereIn('usa.user_id', userIds)
+      .select('usa.user_id', 'usa.site_id', 's.name as site_name');
+
+    const siteMap = new Map<string, Set<string>>();
+    const siteNameMap = new Map<string, Map<string, string>>();
+    for (const a of accessRows) {
+      if (!siteMap.has(a.user_id)) siteMap.set(a.user_id, new Set());
+      if (!siteNameMap.has(a.user_id)) siteNameMap.set(a.user_id, new Map());
+      siteMap.get(a.user_id)!.add(a.site_id);
+      siteNameMap.get(a.user_id)!.set(a.site_id, a.site_name);
+    }
+
+    return rows.map((u: any) => {
+      const merged = new Set<string>(siteMap.get(u.id) ?? []);
+      if (u.assigned_site_id) merged.add(u.assigned_site_id);
+      const nameLookup = siteNameMap.get(u.id);
+      const siteNames = Array.from(merged).map((sid) =>
+        sid === u.assigned_site_id && u.assigned_site_name
+          ? u.assigned_site_name
+          : nameLookup?.get(sid) || sid,
+      );
+      return {
+        ...u,
+        site_ids: Array.from(merged),
+        site_names: siteNames,
+      };
+    });
   }
 
   async getUserById(id: string) {
@@ -269,27 +302,49 @@ export class AdminService {
 
   // ─── Sites & Locations ──────────────────────────────────────────────────────
 
-  async listSites(includeInactive = false) {
+  async listSites(includeInactive = false, includeLocations = false) {
     let query = this.knex('sites').select('*');
     if (!includeInactive) {
       query = query.where('is_active', true);
     }
-    return query.orderBy('name', 'asc');
+    const sites = await query.orderBy('name', 'asc');
+    if (!includeLocations || sites.length === 0) return sites;
+
+    const siteIds = sites.map((s: any) => s.id);
+    const locations = await this.knex('locations')
+      .whereIn('site_id', siteIds)
+      .orderBy('name', 'asc');
+
+    const locMap = new Map<string, any[]>();
+    for (const loc of locations) {
+      const key = String(loc.site_id);
+      if (!locMap.has(key)) locMap.set(key, []);
+      locMap.get(key)!.push(loc);
+    }
+
+    return sites.map((s: any) => ({
+      ...s,
+      locations: locMap.get(String(s.id)) ?? [],
+    }));
   }
 
   async createSite(dto: CreateSiteDto, creatorId?: string) {
+    const defaultFulfill = dto.siteType !== 'OFFICE';
     const [site] = await this.knex('sites')
       .insert({
         id: uuidv4(),
         name: dto.name,
         site_type: dto.siteType,
+        site_code: dto.siteCode?.trim() || null,
+        gstin: dto.gstin?.trim() || null,
         address: dto.address || null,
+        is_fulfillment_site: dto.isFulfillmentSite ?? defaultFulfill,
         is_active: true,
         created_by: creatorId || null,
         updated_by: creatorId || null,
       })
       .returning('*');
-    return site;
+    return { ...site, locations: [] };
   }
 
   async updateSite(id: string, dto: UpdateSiteDto, updaterId?: string) {
@@ -304,10 +359,45 @@ export class AdminService {
     };
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.siteType !== undefined) updateData.site_type = dto.siteType;
+    if (dto.siteCode !== undefined) updateData.site_code = dto.siteCode.trim() || null;
+    if (dto.gstin !== undefined) updateData.gstin = dto.gstin.trim() || null;
     if (dto.address !== undefined) updateData.address = dto.address;
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
+    if (dto.isFulfillmentSite !== undefined) {
+      updateData.is_fulfillment_site = dto.isFulfillmentSite;
+    }
 
     const [updated] = await this.knex('sites').where('id', id).update(updateData).returning('*');
+    const locations = await this.knex('locations').where('site_id', id).orderBy('name', 'asc');
+    return { ...updated, locations };
+  }
+
+  async updateLocation(
+    siteId: string,
+    locationId: string,
+    dto: UpdateLocationDto,
+    updaterId?: string,
+  ) {
+    const loc = await this.knex('locations')
+      .where({ id: locationId, site_id: siteId })
+      .first();
+    if (!loc) {
+      throw new NotFoundException(`Location ${locationId} not found for site ${siteId}`);
+    }
+
+    const updateData: any = {
+      updated_at: new Date(),
+      updated_by: updaterId || null,
+    };
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.locationType !== undefined) updateData.location_type = dto.locationType;
+    if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
+    if (dto.vehicleId !== undefined) updateData.vehicle_id = dto.vehicleId || null;
+
+    const [updated] = await this.knex('locations')
+      .where({ id: locationId, site_id: siteId })
+      .update(updateData)
+      .returning('*');
     return updated;
   }
 

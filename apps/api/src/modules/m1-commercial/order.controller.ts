@@ -23,6 +23,7 @@ import {
   RequestOverrideDto,
   AcceptCounterDto,
   CancelOrderDto,
+  UpdateOrderFulfillmentSiteDto,
 } from './dto/order.dto.js';
 
 @Controller('orders')
@@ -169,6 +170,19 @@ export class OrderController {
     @Req() req: any,
   ) {
     return this.orderSvc.cancel(id, dto.reason, req.user.id);
+  }
+
+  /**
+   * PATCH /orders/:id/fulfillment-site - Reassign order fulfillment site
+   */
+  @Patch(':id/fulfillment-site')
+  @RequirePermission('order.create')
+  async updateFulfillmentSite(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderFulfillmentSiteDto,
+    @Req() req: any,
+  ) {
+    return this.orderSvc.updateFulfillmentSite(id, dto.fulfillmentSiteId, req.user.id);
   }
 
   /**
