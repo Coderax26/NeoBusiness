@@ -70,6 +70,7 @@ export default function VehiclesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<VehicleRecord | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   // Form fields
   const [regNo, setRegNo] = useState('');
@@ -115,6 +116,22 @@ export default function VehiclesPage() {
     setFormOpen(true);
   };
 
+  const mapVehicleFromApi = (v: any): VehicleRecord => ({
+    id: String(v.id),
+    registrationNumber: String(v.registration_no || v.registrationNumber || v.regNo || ''),
+    vehicleType: (v.vehicle_type || v.vehicleType || 'MINI_TRUCK') as VehicleRecord['vehicleType'],
+    capacityKg: Number(v.capacity_kg ?? v.capacityKg ?? 1000),
+    capacityCrates: Number(v.capacity_crates ?? v.capacityCrates ?? 50),
+    ownershipType: (v.ownership_type || v.ownershipType || 'OWNED') as VehicleRecord['ownershipType'],
+    defaultDriverName: v.default_driver_name || v.defaultDriverName || '',
+    defaultDriverPhone: v.default_driver_phone || v.defaultDriverPhone || '',
+    fitnessExpiryDate: String(v.fitness_expiry || v.fitnessExpiryDate || '').slice(0, 10),
+    insuranceExpiryDate: String(v.insurance_expiry || v.insuranceExpiryDate || '').slice(0, 10),
+    pucExpiryDate: String(v.puc_expiry || v.pucExpiryDate || '').slice(0, 10),
+    status: (v.status || 'AVAILABLE') as VehicleRecord['status'],
+    active: v.is_active !== false,
+  });
+
   const handleSaveVehicle = async () => {
     const errors: Record<string, string> = {};
     const cleanReg = regNo.trim().toUpperCase();
@@ -127,41 +144,43 @@ export default function VehiclesPage() {
 
     const capKgNum = parseInt(capacityKg, 10) || 1000;
     const capCratesNum = parseInt(capacityCrates, 10) || 50;
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+    setSaving(true);
+    setFormErrors({});
     try {
+      const commonPayload = {
+        registrationNo: cleanReg,
+        vehicleType,
+        capacityKg: capKgNum,
+        capacityCrates: capCratesNum,
+        ownershipType,
+        defaultDriverName: driverName.trim() || undefined,
+        defaultDriverPhone: driverPhone.trim() || undefined,
+        fitnessExpiry: fitnessExpiry || undefined,
+        insuranceExpiry: insuranceExpiry || undefined,
+        pucExpiry: pucExpiry || undefined,
+      };
+
       if (editingVehicle) {
         const res = await fetch(`/api/proxy/vehicles/${encodeURIComponent(editingVehicle.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            registrationNo: cleanReg,
-            vehicleType,
-            capacityKg: capKgNum,
-          }),
+          body: JSON.stringify(commonPayload),
         });
+        const updated = await res.json().catch(() => null);
         if (!res.ok) {
-          const err = await res.json().catch(() => null);
-          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+          throw new Error(updated?.message || updated?.error?.message || `HTTP ${res.status}`);
         }
-        const updated = await res.json();
+        const mapped = mapVehicleFromApi({ ...updated, id: editingVehicle.id });
         setVehicles((prev) =>
-          prev.map((v) =>
-            v.id === editingVehicle.id
-              ? {
-                  ...v,
-                  registrationNumber: updated?.registration_no ?? cleanReg,
-                  vehicleType: updated?.vehicle_type ?? vehicleType,
-                  capacityKg: Number(updated?.capacity_kg ?? capKgNum),
-                  capacityCrates: capCratesNum,
-                }
-              : v,
-          ),
+          prev.map((v) => (v.id === editingVehicle.id ? mapped : v)),
         );
       } else {
         const storedSite =
           typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
         const meRes = await fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)).catch(() => null);
-        const siteId =
+        const candidateSiteId =
           (storedSite && storedSite !== 'all' ? storedSite : null) ||
           meRes?.user?.activeSiteId ||
           meRes?.user?.sites?.[0]?.id ||
@@ -170,37 +189,21 @@ export default function VehiclesPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            siteId,
-            registrationNo: cleanReg,
-            vehicleType,
-            capacityKg: capKgNum,
-            capacityCrates: capCratesNum,
+            ...(uuidRe.test(String(candidateSiteId)) ? { siteId: candidateSiteId } : {}),
+            ...commonPayload,
           }),
         });
         const created = await res.json().catch(() => null);
         if (!res.ok) {
           throw new Error(created?.message || created?.error?.message || `HTTP ${res.status}`);
         }
-        const newRec: VehicleRecord = {
-          id: String(created?.id ?? `veh-${Date.now()}`),
-          registrationNumber: String(created?.registration_no ?? cleanReg),
-          vehicleType: String(created?.vehicle_type ?? vehicleType) as VehicleRecord['vehicleType'],
-          capacityKg: Number(created?.capacity_kg ?? capKgNum),
-          capacityCrates: capCratesNum,
-          ownershipType,
-          defaultDriverName: driverName.trim(),
-          defaultDriverPhone: driverPhone.trim(),
-          fitnessExpiryDate: fitnessExpiry,
-          insuranceExpiryDate: insuranceExpiry,
-          pucExpiryDate: pucExpiry,
-          status: 'AVAILABLE',
-          active: true,
-        };
-        setVehicles((prev) => [newRec, ...prev]);
+        setVehicles((prev) => [mapVehicleFromApi(created), ...prev]);
       }
       setFormOpen(false);
     } catch (err) {
       setFormErrors({ regNo: (err as Error).message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -500,7 +503,7 @@ export default function VehiclesPage() {
               <select
                 value={ownershipType}
                 onChange={(e) => setOwnershipType(e.target.value as any)}
-                className="w-full bg-paper border border-rule rounded-[3px] px-3 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
+                className="w-full bg-paper border border-rule rounded-[3px] px-2.5 py-2 text-xs text-ink focus:outline-none focus:border-action/30"
               >
                 <option value="OWNED">Company Owned</option>
                 <option value="HIRED">Market Hired</option>
@@ -562,11 +565,11 @@ export default function VehiclesPage() {
           </div>
 
           <div className="pt-3 border-t border-rule flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setFormOpen(false)}>
+            <Button variant="ghost" size="sm" disabled={saving} onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSaveVehicle}>
-              {editingVehicle ? 'Save Vehicle' : 'Register Vehicle'}
+            <Button variant="primary" size="sm" disabled={saving} onClick={handleSaveVehicle}>
+              {saving ? 'Saving...' : editingVehicle ? 'Save Vehicle' : 'Register Vehicle'}
             </Button>
           </div>
         </div>

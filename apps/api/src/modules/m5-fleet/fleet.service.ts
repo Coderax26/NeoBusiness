@@ -84,15 +84,63 @@ export class FleetService {
     );
   }
 
-  async createVehicle(dto: CreateVehicleDto, userId: string) {
+  private normalizeDateInput(val?: unknown): string | null {
+    if (typeof val !== 'string') return null;
+    const trimmed = val.trim();
+    return trimmed ? trimmed.slice(0, 10) : null;
+  }
+
+  async createVehicle(
+    dto: CreateVehicleDto,
+    userId: string,
+    userSiteIds?: string[],
+  ) {
+    let resolvedSiteId = this.isUuid(dto.siteId) ? dto.siteId! : '';
+    if (!resolvedSiteId && Array.isArray(userSiteIds)) {
+      resolvedSiteId = userSiteIds.find((id) => this.isUuid(id)) || '';
+    }
+    if (!resolvedSiteId) {
+      const firstSite = await this.knex('sites')
+        .where('is_active', true)
+        .orderBy('created_at', 'asc')
+        .first('id');
+      resolvedSiteId = firstSite?.id ? String(firstSite.id) : '';
+    }
+    if (!resolvedSiteId) {
+      throw new BadRequestException(
+        'No active site found. Please create a site in Settings → Sites first.',
+      );
+    }
+
+    const cleanReg = dto.registrationNo.trim().toUpperCase();
+    const existing = await this.knex('vehicles')
+      .where({ site_id: resolvedSiteId, is_active: true })
+      .whereRaw('LOWER(registration_no) = LOWER(?)', [cleanReg])
+      .first('id');
+    if (existing) {
+      throw new ConflictException(
+        `A vehicle with registration number ${cleanReg} already exists.`,
+      );
+    }
+
+    const actorId = this.isUuid(userId) ? userId : null;
     const [vehicle] = await this.knex('vehicles')
       .insert({
-        site_id: dto.siteId,
-        registration_no: dto.registrationNo.trim(),
+        site_id: resolvedSiteId,
+        registration_no: cleanReg,
         vehicle_type: dto.vehicleType.trim(),
         capacity_kg: String(dto.capacityKg),
-        created_by: userId,
-        updated_by: userId,
+        capacity_crates:
+          dto.capacityCrates !== undefined ? Number(dto.capacityCrates) : null,
+        ownership_type: (dto.ownershipType || 'OWNED').trim().toUpperCase(),
+        default_driver_name: dto.defaultDriverName?.trim() || null,
+        default_driver_phone: dto.defaultDriverPhone?.trim() || null,
+        fitness_expiry: this.normalizeDateInput(dto.fitnessExpiry),
+        insurance_expiry: this.normalizeDateInput(dto.insuranceExpiry),
+        puc_expiry: this.normalizeDateInput(dto.pucExpiry),
+        status: (dto.status || 'AVAILABLE').trim().toUpperCase(),
+        created_by: actorId,
+        updated_by: actorId,
       })
       .returning('*');
     return vehicle;
@@ -1007,11 +1055,36 @@ export class FleetService {
     const patch: Record<string, any> = { updated_at: new Date() };
     if (userId && this.isUuid(userId)) patch.updated_by = userId;
     if (body.registrationNo !== undefined)
-      patch.registration_no = String(body.registrationNo).trim();
+      patch.registration_no = String(body.registrationNo).trim().toUpperCase();
     if (body.vehicleType !== undefined)
       patch.vehicle_type = String(body.vehicleType).trim();
     if (body.capacityKg !== undefined)
       patch.capacity_kg = String(body.capacityKg);
+    if (body.capacityCrates !== undefined)
+      patch.capacity_crates =
+        body.capacityCrates === null || body.capacityCrates === ''
+          ? null
+          : Number(body.capacityCrates);
+    if (body.ownershipType !== undefined)
+      patch.ownership_type = String(body.ownershipType).trim().toUpperCase();
+    if (body.defaultDriverName !== undefined)
+      patch.default_driver_name =
+        typeof body.defaultDriverName === 'string' && body.defaultDriverName.trim()
+          ? body.defaultDriverName.trim()
+          : null;
+    if (body.defaultDriverPhone !== undefined)
+      patch.default_driver_phone =
+        typeof body.defaultDriverPhone === 'string' && body.defaultDriverPhone.trim()
+          ? body.defaultDriverPhone.trim()
+          : null;
+    if (body.fitnessExpiry !== undefined)
+      patch.fitness_expiry = this.normalizeDateInput(body.fitnessExpiry);
+    if (body.insuranceExpiry !== undefined)
+      patch.insurance_expiry = this.normalizeDateInput(body.insuranceExpiry);
+    if (body.pucExpiry !== undefined)
+      patch.puc_expiry = this.normalizeDateInput(body.pucExpiry);
+    if (body.status !== undefined)
+      patch.status = String(body.status).trim().toUpperCase();
     if (body.isActive !== undefined) patch.is_active = Boolean(body.isActive);
     const [updated] = await this.knex('vehicles')
       .where('id', id)

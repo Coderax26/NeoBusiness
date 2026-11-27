@@ -15,8 +15,9 @@ import {
 } from 'class-validator';
 
 export class CreateVehicleDto {
+  @IsOptional()
   @IsUUID()
-  siteId!: string;
+  siteId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -36,6 +37,34 @@ export class CreateVehicleDto {
   @IsNumber()
   @Min(0)
   capacityCrates?: number;
+
+  @IsOptional()
+  @IsString()
+  ownershipType?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultDriverName?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultDriverPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  fitnessExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  insuranceExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  pucExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
 
 export class CreateTripStopLineDto {

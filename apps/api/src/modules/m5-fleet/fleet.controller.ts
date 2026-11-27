@@ -53,7 +53,11 @@ export class FleetController {
   @RequirePermission('fleet.manage')
   @ApiOperation({ summary: 'Register a vehicle' })
   createVehicle(@Body() dto: CreateVehicleDto, @Req() req: any) {
-    return this.fleet.createVehicle(dto, req.user.sub || req.user.id);
+    return this.fleet.createVehicle(
+      dto,
+      req.user.sub || req.user.id,
+      req.user?.siteIds,
+    );
   }
 
   @Get('trips')
