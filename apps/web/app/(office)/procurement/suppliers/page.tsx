@@ -13,6 +13,7 @@ import {
   exportToCsv,
 } from '@neo/ui';
 import { validateGSTIN, checkDuplicateRecord } from '@neo/shared';
+import { FileVault } from '../../../../src/components/FileVault';
 
 export interface SupplierItem {
   itemId: string;
@@ -108,8 +109,12 @@ export default function SupplierMasterPage() {
   // Form modal state
   const [formOpen, setFormOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierRecord | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'items' | 'rates' | 'performance'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'items' | 'rates' | 'performance' | 'ledger' | 'documents'>('general');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [catalogItems, setCatalogItems] = useState<Array<{ id: string; sku: string; name: string }>>([]);
+  const [linkItemId, setLinkItemId] = useState('');
+  const [supplierLedger, setSupplierLedger] = useState<any[]>([]);
+  const [supplierLinkedItems, setSupplierLinkedItems] = useState<SupplierItem[]>([]);
 
   // Rate card modal state
   const [rateModalOpen, setRateModalOpen] = useState(false);
@@ -159,8 +164,75 @@ export default function SupplierMasterPage() {
     setPaymentTermsDays(String(sup.paymentTermsDays));
     setLeadTimeDays(String(sup.leadTimeDays));
     setFormErrors({});
+    setSupplierLinkedItems(sup.items || []);
+    setSupplierLedger([]);
     setActiveTab('general');
     setFormOpen(true);
+
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRe.test(sup.id)) {
+      Promise.all([
+        fetch(`/api/proxy/procurement/suppliers/${encodeURIComponent(sup.id)}/items`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/proxy/procurement/suppliers/${encodeURIComponent(sup.id)}/ledger`).then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/items').then((r) => (r.ok ? r.json() : [])),
+      ])
+        .then(([itRes, ledRes, allItRes]) => {
+          const itRows = Array.isArray(itRes) ? itRes : Array.isArray(itRes?.data) ? itRes.data : [];
+          if (itRows.length > 0) {
+            setSupplierLinkedItems(
+              itRows.map((it: any) => ({
+                itemId: String(it.item_id ?? it.itemId ?? it.id),
+                itemSku: String(it.sku_code ?? it.itemSku ?? ''),
+                itemName: String(it.item_name ?? it.name ?? 'Item'),
+                supplierSku: String(it.supplier_sku ?? '-'),
+                packSize: String(it.pack_size ?? 'Standard'),
+                approved: it.is_approved !== false,
+                latestRate: it.latest_rate != null ? Number(it.latest_rate) : undefined,
+              })),
+            );
+          }
+          const lRows = Array.isArray(ledRes)
+            ? ledRes
+            : Array.isArray(ledRes?.entries)
+              ? ledRes.entries
+              : Array.isArray(ledRes?.data)
+                ? ledRes.data
+                : [];
+          setSupplierLedger(lRows);
+          const catRows = Array.isArray(allItRes) ? allItRes : [];
+          setCatalogItems(
+            catRows.map((x: any) => ({
+              id: String(x.id),
+              sku: String(x.sku_code || ''),
+              name: String(x.name || ''),
+            })),
+          );
+          if (catRows.length > 0) setLinkItemId((prev) => prev || String(catRows[0].id));
+        })
+        .catch(() => {});
+    }
+  };
+
+  const handleLinkItem = async () => {
+    if (!editingSupplier || !linkItemId) return;
+    try {
+      const res = await fetch(
+        `/api/proxy/procurement/suppliers/${encodeURIComponent(editingSupplier.id)}/items/${encodeURIComponent(linkItemId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isPrimary: true }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      setSaveToast('Linked catalog item to supplier.');
+      openEditForm(editingSupplier);
+    } catch (err) {
+      setSaveToast(`Failed to link item: ${(err as Error).message}`);
+    }
   };
 
   const handleSaveSupplier = async () => {
@@ -275,17 +347,15 @@ export default function SupplierMasterPage() {
         `/api/proxy/procurement/suppliers/${encodeURIComponent(editingSupplier.id)}/update-reliability`,
         { method: 'POST' },
       );
-      if (res.ok) {
-        await loadSuppliers();
-        setSaveToast(`Recalculated reliability score for ${editingSupplier.name}.`);
-        return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
       }
-    } catch { /* fallback below */ }
-    const weighted = (editingSupplier.fillRatePct * 0.6 + editingSupplier.onTimePct * 0.4) / 20;
-    const newScore = parseFloat(Math.min(5.0, Math.max(1.0, weighted)).toFixed(1));
-    const updatedSupplier: SupplierRecord = { ...editingSupplier, reliabilityScore: newScore };
-    setEditingSupplier(updatedSupplier);
-    setSuppliers((prev) => prev.map((s) => (s.id === updatedSupplier.id ? updatedSupplier : s)));
+      await loadSuppliers();
+      setSaveToast(`Recalculated reliability score for ${editingSupplier.name}.`);
+    } catch (err) {
+      setSaveToast(`Could not recalculate reliability: ${(err as Error).message}`);
+    }
   };
 
   // KPIs
@@ -559,6 +629,22 @@ export default function SupplierMasterPage() {
                 >
                   Performance &amp; Reliability
                 </button>
+                <button
+                  onClick={() => setActiveTab('ledger')}
+                  className={`pb-2 border-b-2 transition-colors ${
+                    activeTab === 'ledger' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  AP Ledger ({supplierLedger.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('documents')}
+                  className={`pb-2 border-b-2 transition-colors ${
+                    activeTab === 'documents' ? 'border-action/30 text-action' : 'border-transparent text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  Documents
+                </button>
               </>
             )}
           </div>
@@ -670,39 +756,63 @@ export default function SupplierMasterPage() {
           {/* Tab 2: Supplied Items */}
           {activeTab === 'items' && editingSupplier && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-ink-3">
-                  Catalog items linked to this supplier for purchase orders:
+                  Catalog items linked to this supplier ({supplierLinkedItems.length}):
                 </span>
+                {catalogItems.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={linkItemId}
+                      onChange={(e) => setLinkItemId(e.target.value)}
+                      className="bg-paper border border-rule rounded-[3px] px-2.5 py-1.5 text-xs text-ink"
+                    >
+                      {catalogItems.map((ci) => (
+                        <option key={ci.id} value={ci.id}>
+                          {ci.name} ({ci.sku})
+                        </option>
+                      ))}
+                    </select>
+                    <Button variant="secondary" size="sm" onClick={handleLinkItem}>
+                      + Link Item
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                {editingSupplier.items.map((it) => (
-                  <div
-                    key={it.itemId}
-                    className="p-3 bg-paper border border-rule rounded-[3px] flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <div className="font-bold text-ink">{it.itemName}</div>
-                      <div className="text-[11px] text-ink-3 mt-0.5">
-                        <span>SKU: {it.itemSku}</span>
-                        <span className="mx-1.5">•</span>
-                        <span>Vendor SKU: {it.supplierSku}</span>
-                        <span className="mx-1.5">•</span>
-                        <span>Pack: {it.packSize}</span>
+                {supplierLinkedItems.length === 0 ? (
+                  <div className="p-4 text-center bg-paper border border-rule rounded-[3px] text-xs text-ink-3">
+                    No catalog items linked to this supplier yet.
+                  </div>
+                ) : (
+                  supplierLinkedItems.map((it) => (
+                    <div
+                      key={it.itemId}
+                      className="p-3 bg-paper border border-rule rounded-[3px] flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-ink">{it.itemName}</div>
+                        <div className="text-[11px] text-ink-3 mt-0.5">
+                          <span>SKU: {it.itemSku}</span>
+                          <span className="mx-1.5">•</span>
+                          <span>Vendor SKU: {it.supplierSku}</span>
+                          <span className="mx-1.5">•</span>
+                          <span>Pack: {it.packSize}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {it.latestRate !== undefined ? (
+                          <span className="font-mono font-bold text-action">
+                            ₹{it.latestRate.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-madder font-semibold">⚠️ No rate set</span>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      {it.latestRate !== undefined ? (
-                        <span className="font-mono font-bold text-action">
-                          ₹{it.latestRate.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-madder font-semibold">⚠️ No rate set</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -795,6 +905,32 @@ export default function SupplierMasterPage() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {activeTab === 'ledger' && editingSupplier && (
+            <div className="space-y-2 text-xs">
+              {supplierLedger.length === 0 ? (
+                <div className="p-6 text-center bg-paper border border-rule rounded-[3px] text-ink-3">
+                  No supplier bills or payments recorded yet.
+                </div>
+              ) : (
+                supplierLedger.map((entry: any, idx: number) => (
+                  <div key={entry.id || idx} className="p-3 bg-paper border border-rule rounded-[3px] flex justify-between items-center">
+                    <div>
+                      <span className="font-mono font-bold text-action">{entry.reference_no || entry.entry_type || 'TXN'}</span>
+                      <span className="text-ink-3 ml-2">{String(entry.entry_date || entry.created_at || '').slice(0, 10)}</span>
+                    </div>
+                    <div className="font-mono font-bold text-ink">
+                      ₹{Number(entry.amount ?? entry.credit_amount ?? entry.debit_amount ?? 0).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'documents' && editingSupplier && (
+            <FileVault entityType="SUPPLIER" entityId={editingSupplier.id} title="Supplier KYC, GST & Contract Files" />
           )}
 
           {/* Footer */}
@@ -909,8 +1045,28 @@ export default function SupplierMasterPage() {
           };
         }}
         onImport={async (validRows) => {
-          setSuppliers((prev) => [...(validRows as SupplierRecord[]), ...prev]);
-          return { importedCount: validRows.length, skippedCount: 0 };
+          const payloadRows = validRows.map((r) => ({
+            supplierCode: r.code,
+            companyName: r.name,
+            phone: r.phone,
+            gstin: r.gstin || undefined,
+            paymentTermsDays: Number(r.paymentTermsDays || 15),
+          }));
+          const res = await fetch('/api/proxy/import/suppliers/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: payloadRows }),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(data?.message || `Import failed (HTTP ${res.status})`);
+          }
+          await loadSuppliers();
+          const importedCount = Number(data?.importedCount ?? payloadRows.length);
+          return {
+            importedCount,
+            skippedCount: Math.max(0, payloadRows.length - importedCount),
+          };
         }}
       />
     </div>

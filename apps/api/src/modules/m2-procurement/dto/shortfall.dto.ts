@@ -29,4 +29,8 @@ export class UpdateShortfallStatusDto {
   })
   @IsEnum(['OPEN', 'COVERED_BY_BACKUP', 'ALLOCATED', 'WRITTEN_OFF'])
   status: 'OPEN' | 'COVERED_BY_BACKUP' | 'ALLOCATED' | 'WRITTEN_OFF';
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

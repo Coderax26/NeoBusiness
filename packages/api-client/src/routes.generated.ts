@@ -64,6 +64,7 @@ export const API_ROUTES = [
   { method: 'POST', path: '/cod-settlements/:stopId/settle', module: 'modules/m6-finance' },
   { method: 'GET', path: '/cod-settlements/pending', module: 'modules/m6-finance' },
   { method: 'GET', path: '/collections/:id/pdf', module: 'modules/m6-finance' },
+  { method: 'POST', path: '/collections/:id/reverse', module: 'modules/m6-finance' },
   { method: 'GET', path: '/collections/:id', module: 'modules/m6-finance' },
   { method: 'POST', path: '/collections/allocate', module: 'modules/m6-finance' },
   { method: 'GET', path: '/collections', module: 'modules/m6-finance' },

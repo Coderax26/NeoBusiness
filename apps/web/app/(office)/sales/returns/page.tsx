@@ -16,124 +16,153 @@ const RETURN_REASONS = [
 
 export default function SalesReturnsPage() {
   const [returns, setReturns] = useState<SalesReturnRecord[]>([]);
-  const [orders, setOrders] = useState<SalesOrderRecord[]>([]);
+  const [orders, setOrders] = useState<Array<SalesOrderRecord & { siteId?: string }>>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const deliveredOrders = orders.filter((o) => o.status === 'DELIVERED');
+  const deliveredOrders = orders.filter((o) =>
+    ['DELIVERED', 'DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(o.status),
+  );
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState(RETURN_REASONS[0]);
   const [condition, setCondition] = useState<'RESALEABLE' | 'DAMAGED'>('RESALEABLE');
 
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch('/api/proxy/credit-notes').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/orders').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([cnData, ordData]) => {
-        if (!active) return;
-        if (Array.isArray(cnData)) {
-          setReturns(
-            cnData.map((r: any) => ({
-              id: String(r.id),
-              returnNumber: String(r.creditNoteNumber || r.credit_note_number || r.returnNumber || r.id),
-              orderId: String(r.orderId || r.order_id || ''),
-              orderNumber: String(r.orderNumber || r.order_number || r.invoiceNumber || '—'),
-              customerId: String(r.customerId || r.customer_id || ''),
-              customerName: String(r.customerName || r.customer_name || 'Customer'),
-              itemName: String(r.itemName || r.item_name || r.reason || 'Returned Goods'),
-              qty: Number(r.qty ?? r.returnedQty ?? 1),
-              uom: String(r.uom || 'kg'),
-              reason: String(r.reason || 'Customer return'),
-              condition: (r.condition === 'DAMAGED' ? 'DAMAGED' : 'RESALEABLE') as SalesReturnRecord['condition'],
-              creditAmount: Number(r.amount ?? r.creditAmount ?? r.totalAmount ?? 0),
-              status: (r.status === 'STOCK_RECEIVED' ? 'STOCK_RECEIVED' : 'PENDING_RECEIPT') as SalesReturnRecord['status'],
-              createdAt: String(r.createdAt || r.created_at || new Date().toISOString()).slice(0, 10),
-            })),
-          );
+  const loadReturnsAndOrders = React.useCallback(async () => {
+    try {
+      const [retRes, cnRes, ordRes] = await Promise.all([
+        fetch('/api/proxy/sales-returns').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/credit-notes').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/orders').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const retRaw = Array.isArray(retRes)
+        ? retRes
+        : Array.isArray(retRes?.data)
+          ? retRes.data
+          : [];
+      const cnRaw = Array.isArray(cnRes)
+        ? cnRes
+        : Array.isArray(cnRes?.data)
+          ? cnRes.data
+          : [];
+      const mergedMap = new Map<string, any>();
+      for (const item of [...retRaw, ...cnRaw]) {
+        if (item?.id && !mergedMap.has(String(item.id))) {
+          mergedMap.set(String(item.id), item);
         }
-        if (Array.isArray(ordData)) {
-          const mappedOrders: SalesOrderRecord[] = ordData.map((o: any) => ({
-            id: String(o.id),
-            orderNumber: String(o.orderNumber || o.order_no || o.order_number || o.id),
-            customerId: String(o.customerId || o.customer_id || ''),
-            customerName: String(o.customerName || o.customer_name || 'Customer'),
-            siteName: String(o.site_name || o.siteName || 'Main Site'),
-            deliveryDate: String(o.delivery_date || o.deliveryDate || '').slice(0, 10),
-            deliveryWindow: '10-12',
-            status: (o.order_status || o.status || 'DELIVERED') as SalesOrderRecord['status'],
-            createdAt: String(o.created_at_idx || o.createdAt || '').slice(0, 10),
-            createdBy: 'Sales',
-            subtotal: Number(o.total_amount ?? o.totalAmount ?? 0),
-            gstTotal: 0,
-            grandTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
-            marginPct: 15,
-            timeline: [],
-            lines: [
-              {
-                id: '1',
-                itemId: '',
-                sku: '',
-                itemName: 'Order Item',
-                category: 'PROCESSED_FG',
-                qty: 1,
-                uom: 'kg',
-                unitPrice: Number(o.total_amount ?? o.totalAmount ?? 0),
-                gstPct: 5,
-                floorPrice: 0,
-                targetPrice: 0,
-                landedCost: 0,
-                lineTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
-                atpStock: 0,
-                reservedQty: 0,
-              },
-            ],
-          }));
-          setOrders(mappedOrders);
-          const firstDel = mappedOrders.find((x) => x.status === 'DELIVERED') || mappedOrders[0];
-          if (firstDel) setSelectedOrderId(firstDel.id);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+      }
+      const retRows = Array.from(mergedMap.values());
+      setReturns(
+        retRows.map((r: any) => ({
+          id: String(r.id),
+          returnNumber: String(
+            r.credit_note_no || r.creditNoteNumber || r.credit_note_number || r.returnNumber || String(r.id).slice(0, 8),
+          ),
+          orderId: String(r.orderId || r.order_id || ''),
+          orderNumber: String(r.orderNumber || r.order_no || r.invoiceNumber || '—'),
+          customerId: String(r.customerId || r.customer_id || ''),
+          customerName: String(r.customerName || r.customer_name || 'Customer'),
+          itemName: String(r.itemName || r.item_name || r.reason || 'Returned Goods'),
+          qty: Number(r.qty ?? r.returnedQty ?? 1),
+          uom: String(r.uom || 'kg'),
+          reason: String(r.reason || 'Customer return'),
+          condition: (r.condition === 'DAMAGED' ? 'DAMAGED' : 'RESALEABLE') as SalesReturnRecord['condition'],
+          creditAmount: Number(r.total_amount ?? r.amount ?? r.creditAmount ?? 0),
+          status: (r.status === 'STOCK_RECEIVED' || r.status === 'APPLIED' ? 'STOCK_RECEIVED' : 'PENDING_RECEIPT') as SalesReturnRecord['status'],
+          createdAt: String(r.createdAt || r.created_at || new Date().toISOString()).slice(0, 10),
+        })),
+      );
+      const ordRows = Array.isArray(ordRes)
+        ? ordRes
+        : Array.isArray(ordRes?.data)
+          ? ordRes.data
+          : [];
+      const mappedOrders = ordRows.map((o: any) => ({
+        id: String(o.id),
+        orderNumber: String(o.orderNumber || o.order_no || o.order_number || o.id),
+        customerId: String(o.customerId || o.customer_id || ''),
+        customerName: String(o.customerName || o.customer_name || 'Customer'),
+        siteId: String(o.fulfillment_site_id || ''),
+        siteName: String(o.site_name || o.siteName || 'Main Site'),
+        deliveryDate: String(o.delivery_date || o.deliveryDate || '').slice(0, 10),
+        deliveryWindow: '10-12' as const,
+        status: (o.order_status || o.status || 'DELIVERED') as SalesOrderRecord['status'],
+        createdAt: String(o.created_at_idx || o.createdAt || '').slice(0, 10),
+        createdBy: 'Sales',
+        subtotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+        gstTotal: 0,
+        grandTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+        marginPct: 15,
+        timeline: [],
+        lines: [
+          {
+            id: '1',
+            itemId: '',
+            sku: '',
+            itemName: 'Order Item',
+            category: 'PROCESSED_FG' as const,
+            qty: 1,
+            uom: 'kg',
+            unitPrice: Number(o.total_amount ?? o.totalAmount ?? 0),
+            gstPct: 5,
+            floorPrice: 0,
+            targetPrice: 0,
+            landedCost: 0,
+            lineTotal: Number(o.total_amount ?? o.totalAmount ?? 0),
+            atpStock: 0,
+            reservedQty: 0,
+          },
+        ],
+      }));
+      setOrders(mappedOrders);
+      const firstDel =
+        mappedOrders.find((x: any) =>
+          ['DELIVERED', 'DELIVERED_FULL', 'DELIVERED_PARTIAL'].includes(x.status),
+        ) || mappedOrders[0];
+      if (firstDel) setSelectedOrderId((prev) => prev || firstDel.id);
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  useEffect(() => {
+    void loadReturnsAndOrders();
+  }, [loadReturnsAndOrders]);
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || deliveredOrders[0] || orders[0];
   const firstLine = selectedOrder?.lines?.[0] || { itemName: 'Item', uom: 'kg', unitPrice: 0, gstPct: 5 };
 
   const handleCreateReturn = async () => {
+    if (!selectedOrder) return;
+    setErrorMsg(null);
+    setSubmitting(true);
     const returnQty = parseFloat(qty) || 1;
     const creditAmount = Number((returnQty * firstLine.unitPrice * (1 + firstLine.gstPct / 100)).toFixed(2));
-
-    const newRec: SalesReturnRecord = {
-      id: `ret-${Date.now()}`,
-      returnNumber: `SR-2026-${Math.floor(100 + Math.random() * 899)}`,
-      orderId: selectedOrder.id,
-      orderNumber: selectedOrder.orderNumber,
-      customerId: selectedOrder.customerId,
-      customerName: selectedOrder.customerName,
-      itemName: firstLine.itemName,
-      qty: returnQty,
-      uom: firstLine.uom,
-      reason,
-      condition,
-      creditAmount,
-      status: condition === 'RESALEABLE' ? 'STOCK_RECEIVED' : 'CREDIT_NOTE_REQUESTED',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-
     try {
-      await fetch('/api/proxy/credit-notes', {
+      const res = await fetch('/api/proxy/sales-returns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRec),
-      }).catch(() => {});
-    } finally {
-      setReturns((prev) => [newRec, ...prev]);
+        body: JSON.stringify({
+          siteId: selectedOrder.siteId || undefined,
+          customerId: selectedOrder.customerId,
+          orderId: selectedOrder.id,
+          qty: returnQty,
+          amount: creditAmount,
+          reason,
+          condition,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReturnsAndOrders();
       setModalOpen(false);
+    } catch (err) {
+      setErrorMsg(`Failed to submit sales return: ${(err as Error).message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -278,9 +307,16 @@ export default function SalesReturnsPage() {
             Credit Note Request Amount: <strong className="text-action font-mono">{formatINR((parseFloat(qty) || 1) * firstLine.unitPrice * (1 + firstLine.gstPct / 100))}</strong>
           </div>
 
+          {errorMsg && (
+            <div className="p-2.5 rounded-[3px] border border-madder/30 bg-madder-soft text-madder font-medium">
+              {errorMsg}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={handleCreateReturn}>Submit Return &amp; Credit Request</Button>
+            <Button variant="primary" size="sm" disabled={submitting || !selectedOrder} onClick={handleCreateReturn}>
+              {submitting ? 'Submitting...' : 'Submit Return & Credit Request'}
+            </Button>
           </div>
         </div>
       </Dialog>

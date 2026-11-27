@@ -27,6 +27,7 @@ export default function SetupWizardPage() {
   const [companyName, setCompanyName] = useState('');
   const [gstin, setGstin] = useState('');
   const [gstinError, setGstinError] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -38,7 +39,7 @@ export default function SetupWizardPage() {
         if (!active) return;
         if (compRes.status === 'fulfilled' && compRes.value) {
           const c = compRes.value.data || compRes.value;
-          if (c.legalName) setCompanyName(String(c.legalName));
+          if (c.legalName || c.legal_name) setCompanyName(String(c.legalName || c.legal_name));
           if (c.gstin) setGstin(String(c.gstin));
         }
         if (rollRes.status === 'fulfilled' && rollRes.value) {
@@ -54,22 +55,34 @@ export default function SetupWizardPage() {
     };
   }, []);
 
-  const saveProgress = (updated: SetupStep[]) => {
+  const saveProgress = async (updated: SetupStep[]) => {
     setSteps(updated);
     try {
       localStorage.setItem('neobus_setup_wizard_progress', JSON.stringify(updated));
     } catch { }
-    fetch('/api/proxy/admin/rollout', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ setupSteps: updated }),
-    }).catch(() => { });
+    try {
+      const res = await fetch('/api/proxy/admin/rollout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setupSteps: updated }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setSaveFeedback({
+          text: err?.message || `Failed to save wizard progress (HTTP ${res.status})`,
+          isError: true,
+        });
+      }
+    } catch {
+      setSaveFeedback({ text: 'Failed to sync wizard progress to server.', isError: true });
+    }
   };
 
   const completedCount = steps.filter((s) => s.status === 'COMPLETED').length;
   const progressPercent = Math.round((completedCount / steps.length) * 100);
 
-  const markComplete = (idx: number) => {
+  const markComplete = async (idx: number) => {
+    setSaveFeedback(null);
     if (idx === 0) {
       const gstinVal = validateGSTIN(gstin);
       if (!gstinVal.valid) {
@@ -77,10 +90,26 @@ export default function SetupWizardPage() {
         return;
       }
       setGstinError(null);
+      if (companyName.trim()) {
+        const profRes = await fetch('/api/proxy/admin/company-profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ legalName: companyName.trim(), gstin: gstin.trim().toUpperCase() }),
+        }).catch(() => null);
+        if (!profRes || !profRes.ok) {
+          const err = profRes ? await profRes.json().catch(() => null) : null;
+          setSaveFeedback({
+            text: err?.message || 'Could not save Company Profile. Check permission or inputs.',
+            isError: true,
+          });
+          return;
+        }
+        setSaveFeedback({ text: 'Company Profile & Setup step saved cleanly.' });
+      }
     }
     const updated = [...steps];
     updated[idx].status = 'COMPLETED';
-    saveProgress(updated);
+    await saveProgress(updated);
     if (idx < steps.length - 1) {
       setCurrentStepIdx(idx + 1);
     }
@@ -100,6 +129,17 @@ export default function SetupWizardPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Top Banner / Progress */}
+      {saveFeedback && (
+        <div
+          className={`rounded-[3px] border p-3 text-xs font-medium ${
+            saveFeedback.isError
+              ? 'border-madder/30 bg-madder-soft text-madder'
+              : 'border-leaf/30 bg-leaf-soft text-leaf'
+          }`}
+        >
+          {saveFeedback.text}
+        </div>
+      )}
       <div className="bg-sheet border border-rule rounded-[4px] p-6 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-rule">
           <div>

@@ -11,6 +11,7 @@ import {
   formatINR,
 } from '@neo/shared';
 import { type SalesOrderRecord } from '../../../../../src/lib/sales-data';
+import { FileVault } from '../../../../../src/components/FileVault';
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -465,11 +466,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </Button>
             </Link>
           )}
+          <a
+            href={`/api/proxy/orders/${encodeURIComponent(order.id)}/pdf`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Button variant="secondary" size="sm" type="button">
+              Order PDF
+            </Button>
+          </a>
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
             <Printer className="w-4 h-4" />
             Print
           </Button>
-          <Link href="/sales/orders/new">
+          <Link href={`/sales/orders/new?duplicateFrom=${encodeURIComponent(order.id)}`}>
             <Button variant="secondary" size="sm">
               <Copy className="w-4 h-4" />
               Repeat order
@@ -693,19 +703,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {activeTab === 'docs' && (
-            <div className="bg-sheet border border-rule rounded-[4px] p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px]">
-              <div className="p-3 bg-paper border border-rule rounded-[3px]">
-                <span className="text-ink-3 block text-[12.5px]">Dispatch Trip / Challan</span>
-                <span className="font-mono font-semibold text-action">{order.linkedTripNo || 'Not assigned yet'}</span>
+            <div className="space-y-4">
+              <div className="bg-sheet border border-rule rounded-[4px] p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px]">
+                <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                  <span className="text-ink-3 block text-[12.5px]">Dispatch Trip / Challan</span>
+                  <span className="font-mono font-semibold text-action">{order.linkedTripNo || 'Not assigned yet'}</span>
+                </div>
+                <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                  <span className="text-ink-3 block text-[12.5px]">Tax Invoice</span>
+                  <span className="font-mono font-semibold text-ink">{order.linkedInvoiceNo || 'Pending delivery'}</span>
+                </div>
+                <div className="p-3 bg-paper border border-rule rounded-[3px]">
+                  <span className="text-ink-3 block text-[12.5px]">Linked Quote</span>
+                  <span className="font-mono font-semibold text-ink-2">
+                    {order.linkedQuoteId ? (
+                      <Link href={`/sales/quotes/${order.linkedQuoteId}`} className="text-action hover:underline">
+                        {order.linkedQuoteId}
+                      </Link>
+                    ) : (
+                      'Direct order'
+                    )}
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-paper border border-rule rounded-[3px]">
-                <span className="text-ink-3 block text-[12.5px]">Tax Invoice</span>
-                <span className="font-mono font-semibold text-ink">{order.linkedInvoiceNo || 'Pending delivery'}</span>
-              </div>
-              <div className="p-3 bg-paper border border-rule rounded-[3px]">
-                <span className="text-ink-3 block text-[12.5px]">Linked Quote</span>
-                <span className="font-mono font-semibold text-ink-2">{order.linkedQuoteId || 'Direct order'}</span>
-              </div>
+              <FileVault entityType="SALES_ORDER" entityId={order.id} title="Order & Dispatch Attachments" />
             </div>
           )}
 

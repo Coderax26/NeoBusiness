@@ -129,14 +129,7 @@ export default function OrdersTrackerPage() {
   };
 
   const handleDuplicateOrder = (order: SalesOrderRecord) => {
-    const cloned: SalesOrderRecord = {
-      ...order,
-      id: `ord-${Date.now()}`,
-      orderNumber: `SO-2026-${Math.floor(1050 + Math.random() * 900)}`,
-      status: 'DRAFT',
-      createdAt: new Date().toISOString(),
-    };
-    setOrders((prev) => [cloned, ...prev]);
+    window.location.href = `/sales/orders/new?duplicateFrom=${encodeURIComponent(order.id)}`;
   };
 
   const handleConfirmCancel = async () => {

@@ -13,6 +13,8 @@ export default function ReportsLibraryPage() {
   const [activeReport, setActiveReport] = useState<ReportDefinition | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [runningKey, setRunningKey] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
     const storedSite =
@@ -23,12 +25,22 @@ export default function ReportsLibraryPage() {
       fetch(`/api/proxy/analytics/ar/aging${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`/api/proxy/reports/management/pnl-snapshot${siteQuery}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/proxy/invoices${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/reports/catalog').then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/reports/sales-register${siteQuery}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/reports/purchase-register${siteQuery}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/proxy/reports/gst/summary${siteQuery}`).then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([arRes, pnlRes, invRes]) => {
+      .then(([arRes, pnlRes, invRes, catRes, salesRegRes, purchRegRes, gstRes]) => {
         if (!active) return;
-        const builtReports: ReportDefinition[] = [];
+        const builtReports: Array<ReportDefinition & { catalogKey?: string }> = [];
         if (arRes.status === 'fulfilled') {
-          const arRows = Array.isArray(arRes.value) ? arRes.value : Array.isArray(arRes.value?.data) ? arRes.value.data : [];
+          const arRows = Array.isArray(arRes.value)
+            ? arRes.value
+            : Array.isArray(arRes.value?.customers)
+              ? arRes.value.customers
+              : Array.isArray(arRes.value?.data)
+                ? arRes.value.data
+                : [];
           builtReports.push({
             id: 'rep-ar-aging',
             title: 'AR Aging Summary',
@@ -39,10 +51,10 @@ export default function ReportsLibraryPage() {
             columns: ['Customer', '0-7d', '8-15d', '16-30d', '30+d', 'Total'],
             rows: arRows.map((c: any) => [
               String(c.customerName || c.businessName || c.business_name || 'Customer'),
-              String(c.bucket0to7 ?? c.aging_0_7 ?? 0),
-              String(c.bucket8to15 ?? c.aging_8_15 ?? 0),
-              String(c.bucket16to30 ?? c.aging_16_30 ?? 0),
-              String(c.bucket30Plus ?? c.aging_30_plus ?? 0),
+              String(c.bucket0to7 ?? c.aging_0_7 ?? c.bucket_0_7 ?? 0),
+              String(c.bucket8to15 ?? c.aging_8_15 ?? c.bucket_8_15 ?? 0),
+              String(c.bucket16to30 ?? c.aging_16_30 ?? c.bucket_16_30 ?? 0),
+              String(c.bucket30Plus ?? c.aging_30_plus ?? c.bucket_30_plus ?? 0),
               String(c.totalOutstanding ?? c.total_outstanding ?? 0),
             ]),
           });
@@ -61,13 +73,103 @@ export default function ReportsLibraryPage() {
             lastRun: new Date().toISOString().slice(0, 10),
             columns: ['Metric', 'Amount (INR)'],
             rows: [
-              ['Revenue', String(p.salesInr ?? p.revenue ?? p.totalRevenue ?? 0)],
-              ['COGS', String(p.cogsInr ?? p.cogs ?? p.totalCost ?? 0)],
+              ['Revenue', String(salesVal)],
+              ['COGS', String(cogsVal)],
               ['Gross Profit', String(grossProfitVal)],
               ['Expenses', String(p.expensesInr ?? p.expenses ?? p.totalExpenses ?? 0)],
               ['Net Profit', String(p.netProfitInr ?? p.netProfit ?? 0)],
             ],
           });
+        }
+        if (salesRegRes.status === 'fulfilled' && salesRegRes.value) {
+          const sr = Array.isArray(salesRegRes.value)
+            ? salesRegRes.value
+            : Array.isArray(salesRegRes.value?.rows)
+              ? salesRegRes.value.rows
+              : Array.isArray(salesRegRes.value?.data)
+                ? salesRegRes.value.data
+                : [];
+          builtReports.push({
+            id: 'rep-sales-reg',
+            title: 'Sales & Tax Register',
+            area: 'Sales',
+            description: 'Invoice-by-invoice taxable value, CGST/SGST/IGST, and grand total register.',
+            favourite: true,
+            lastRun: new Date().toISOString().slice(0, 10),
+            columns: ['Invoice #', 'Date', 'Customer', 'Taxable', 'Tax', 'Total'],
+            rows: sr.map((x: any) => [
+              String(x.invoice_no ?? x.invoiceNo ?? '-'),
+              String(x.invoice_date ?? x.invoiceDate ?? '').slice(0, 10),
+              String(x.customer_name ?? x.customerName ?? '-'),
+              String(x.subtotal ?? x.taxable_value ?? 0),
+              String(x.tax_total ?? x.taxAmount ?? 0),
+              String(x.total_amount ?? x.totalAmount ?? 0),
+            ]),
+          });
+        }
+        if (purchRegRes.status === 'fulfilled' && purchRegRes.value) {
+          const pr = Array.isArray(purchRegRes.value)
+            ? purchRegRes.value
+            : Array.isArray(purchRegRes.value?.rows)
+              ? purchRegRes.value.rows
+              : Array.isArray(purchRegRes.value?.data)
+                ? purchRegRes.value.data
+                : [];
+          builtReports.push({
+            id: 'rep-purch-reg',
+            title: 'Purchase Register',
+            area: 'Purchases',
+            description: 'Supplier bill register for ITC reconciliation.',
+            favourite: false,
+            lastRun: new Date().toISOString().slice(0, 10),
+            columns: ['Bill #', 'Date', 'Supplier', 'Taxable', 'Tax', 'Total'],
+            rows: pr.map((x: any) => [
+              String(x.bill_no ?? x.billNo ?? '-'),
+              String(x.bill_date ?? x.billDate ?? '').slice(0, 10),
+              String(x.supplier_name ?? x.supplierName ?? '-'),
+              String(x.subtotal ?? x.taxable_value ?? 0),
+              String(x.tax_amount ?? x.taxAmount ?? 0),
+              String(x.total_amount ?? x.totalAmount ?? 0),
+            ]),
+          });
+        }
+        if (gstRes.status === 'fulfilled' && gstRes.value) {
+          const g = gstRes.value?.data || gstRes.value;
+          builtReports.push({
+            id: 'rep-gst-summary',
+            title: 'GST Summary (GSTR-1 / 3B)',
+            area: 'Tax (GST)',
+            description: 'Outward taxable supplies, output tax, and input tax credit summary.',
+            favourite: false,
+            lastRun: new Date().toISOString().slice(0, 10),
+            columns: ['Component', 'Value (INR)'],
+            rows: Object.entries(g)
+              .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+              .map(([k, v]) => [k, String(v)]),
+          });
+        }
+        if (catRes.status === 'fulfilled' && catRes.value) {
+          const catList = Array.isArray(catRes.value?.reports) ? catRes.value.reports : [];
+          const areaMap: Record<string, ReportDefinition['area']> = {
+            Commercial: 'Sales',
+            Finance: 'Cash',
+            Inventory: 'Inventory',
+            Production: 'Production',
+            Logistics: 'Logistics',
+          };
+          for (const cr of catList) {
+            builtReports.push({
+              id: `rep-cat-${cr.key}`,
+              catalogKey: String(cr.key),
+              title: String(cr.name),
+              area: areaMap[String(cr.category || '')] || 'Management',
+              description: `Parameterized live report (${Array.isArray(cr.params) ? cr.params.join(', ') : 'site'})`,
+              favourite: false,
+              lastRun: 'On demand',
+              columns: ['Click Run Report to execute'],
+              rows: [],
+            });
+          }
         }
         setReports(builtReports);
 
@@ -91,6 +193,48 @@ export default function ReportsLibraryPage() {
       active = false;
     };
   }, []);
+
+  async function handleRunReport(rep: ReportDefinition & { catalogKey?: string }) {
+    if (!rep.catalogKey) {
+      setActiveReport(rep);
+      return;
+    }
+    setRunningKey(rep.catalogKey);
+    try {
+      const storedSite =
+        typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+      const res = await fetch(`/api/proxy/reports/${encodeURIComponent(rep.catalogKey)}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          storedSite && storedSite !== 'all' ? { siteId: storedSite } : {},
+        ),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setToast(`Could not run report: ${data?.message || `HTTP ${res.status}`}`);
+        return;
+      }
+      const rawRows = Array.isArray(data?.rows) ? data.rows : [];
+      const cols = rawRows.length > 0 ? Object.keys(rawRows[0]) : ['Result'];
+      const rows =
+        rawRows.length > 0
+          ? rawRows.map((r: any) => cols.map((c) => String(r[c] ?? '')))
+          : [['No rows returned for selected filters']];
+      const updated: ReportDefinition = {
+        ...rep,
+        lastRun: new Date().toISOString().slice(0, 10),
+        columns: cols,
+        rows,
+      };
+      setReports((prev) => prev.map((x) => (x.id === rep.id ? updated : x)));
+      setActiveReport(updated);
+    } catch {
+      setToast('Failed to run catalog report.');
+    } finally {
+      setRunningKey(null);
+    }
+  }
 
   const areas = useMemo(
     () => ['ALL', ...Array.from(new Set(reports.map((r) => r.area)))],
@@ -198,10 +342,11 @@ export default function ReportsLibraryPage() {
                 <span className="text-[11px] text-ink-3">Last run: {r.lastRun}</span>
                 <button
                   type="button"
-                  onClick={() => setActiveReport(r)}
-                  className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  disabled={runningKey === (r as any).catalogKey}
+                  onClick={() => void handleRunReport(r as any)}
+                  className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  Run Report
+                  {runningKey === (r as any).catalogKey ? 'Running...' : 'Run Report'}
                 </button>
               </div>
             </div>

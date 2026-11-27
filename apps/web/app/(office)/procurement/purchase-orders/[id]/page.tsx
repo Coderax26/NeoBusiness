@@ -164,8 +164,8 @@ export default function PurchaseOrderDetailPage({
   };
 
   const handleDownloadPdf = () => {
-    window.open(`/api/bff/procurement/purchase-orders/${po.id}/pdf`, '_blank');
-    showToast(`Opening PO PDF for ${po.poNumber} (G-DOC-4).`);
+    window.open(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(po.id)}/pdf`, '_blank');
+    showToast(`Opening PO PDF for ${po.poNumber}.`);
   };
 
   const handleShareWhatsapp = () => {

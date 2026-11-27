@@ -176,8 +176,17 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={`/api/proxy/quotes/${encodeURIComponent(quote.id)}/pdf`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Button variant="secondary" size="sm" type="button">
+              📄 Download PDF
+            </Button>
+          </a>
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
-            🖨️ Print / PDF
+            🖨️ Print
           </Button>
           {quote.status !== 'CONVERTED' && quote.status !== 'LOST' && (
             <>
@@ -206,7 +215,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           <span className="text-leaf font-bold">
             ✓ Quote converted to Sales Order (today&apos;s price bands re-checked).
           </span>
-          <Link href={`/sales/orders/${quote.convertedOrderId || 'ord-101'}`}>
+          <Link href={quote.convertedOrderId ? `/sales/orders/${quote.convertedOrderId}` : '/sales/orders'}>
             <Button variant="primary" size="sm">View Sales Order →</Button>
           </Link>
         </div>

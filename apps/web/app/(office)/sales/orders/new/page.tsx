@@ -193,6 +193,46 @@ export default function QuickOrderEntryPage() {
               };
             });
             setDailyPrices(mappedPrices);
+
+            const dupOrderId =
+              typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search).get('duplicateFrom')
+                : null;
+            if (dupOrderId) {
+              const dupRes = await fetch(
+                `/api/proxy/orders/${encodeURIComponent(dupOrderId)}`,
+              ).catch(() => null);
+              const dupData = dupRes && dupRes.ok ? await dupRes.json().catch(() => null) : null;
+              const dupOrder = dupData?.data ?? dupData;
+              if (active && dupOrder?.id) {
+                if (dupOrder.customer_id) setSelectedCustomerId(String(dupOrder.customer_id));
+                if (dupOrder.fulfillment_site_id) setSelectedSiteId(String(dupOrder.fulfillment_site_id));
+                if (Array.isArray(dupOrder.lines) && dupOrder.lines.length > 0) {
+                  setLines(
+                    dupOrder.lines.map((l: any, idx: number) => {
+                      const pRow = mappedPrices.find((p) => p.itemId === String(l.item_id));
+                      return {
+                        id: `dup-line-${idx + 1}`,
+                        itemId: String(l.item_id),
+                        sku: String(l.sku_code || pRow?.sku || ''),
+                        itemName: String(l.item_name || pRow?.itemName || 'Item'),
+                        category: (l.item_category || pRow?.category || 'PROCESSED_FG') as any,
+                        qty: Number(l.ordered_qty ?? l.qty ?? 1),
+                        uom: String(l.uom || pRow?.uom || 'kg'),
+                        unitPrice: Number(l.unit_price ?? pRow?.targetPrice ?? 0),
+                        floorPrice: pRow?.floorPrice ?? 0,
+                        targetPrice: pRow?.targetPrice ?? 0,
+                        atpStock: pRow?.atpStock ?? 500,
+                        gstPct: Number(l.gst_pct ?? 5),
+                        reservedQty: 0,
+                      };
+                    }),
+                  );
+                  return;
+                }
+              }
+            }
+
             const firstItem = mappedPrices[0];
             setFocusedItemId(firstItem.itemId);
             const defaultTarget = firstItem.targetPrice ?? (firstItem.yesterdayTarget || 0);

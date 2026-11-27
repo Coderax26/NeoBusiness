@@ -196,12 +196,26 @@ export default function CollectionsPage() {
     }
   }
 
-  function confirmReverse(receiptId: string) {
+  async function confirmReverse(receiptId: string) {
     if (!reverseReason.trim()) return;
-    setReceipts((prev) => prev.map((r) => (r.id === receiptId ? { ...r, reversed: true } : r)));
-    setReversingId(null);
-    setReverseReason('');
-    setToast('Receipt reversed with audit reason.');
+    setToast(null);
+    try {
+      const res = await fetch(`/api/proxy/collections/${encodeURIComponent(receiptId)}/reverse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reverseReason.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      setReceipts((prev) => prev.map((r) => (r.id === receiptId ? { ...r, reversed: true } : r)));
+      setReversingId(null);
+      setReverseReason('');
+      setToast('Receipt reversed on customer ledger with contra entry.');
+    } catch (err) {
+      setToast(`Failed to reverse receipt: ${(err as Error).message}`);
+    }
   }
 
   return (
@@ -373,13 +387,23 @@ export default function CollectionsPage() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => setReversingId(r.id)}
-                          className="text-xs font-semibold text-madder hover:underline"
-                        >
-                          Reverse
-                        </button>
+                        <div className="inline-flex items-center gap-2">
+                          <a
+                            href={`/api/proxy/collections/${encodeURIComponent(r.id)}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-semibold text-action hover:underline"
+                          >
+                            PDF ↗
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setReversingId(r.id)}
+                            className="text-xs font-semibold text-madder hover:underline"
+                          >
+                            Reverse
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

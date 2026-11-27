@@ -257,4 +257,117 @@ export class CollectionService {
 
     return ptp;
   }
+
+  /**
+   * Reverse a posted collection receipt via an immutable contra entry.
+   */
+  async reverseReceipt(receiptId: string, reason: string, userId: string) {
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('Reversal reason is required');
+    }
+
+    return this.knex.transaction(async (trx) => {
+      const orig = await trx('collection_receipts')
+        .where('id', receiptId)
+        .first('*');
+      if (!orig) {
+        throw new NotFoundException(`Receipt ${receiptId} not found`);
+      }
+      if (orig.reverses_receipt_id) {
+        throw new BadRequestException('Cannot reverse a reversal receipt');
+      }
+
+      const alreadyReversed = await trx('collection_receipts')
+        .where('reverses_receipt_id', receiptId)
+        .first('id', 'receipt_no');
+      if (alreadyReversed) {
+        return {
+          reversed: true,
+          reversalReceiptId: alreadyReversed.id,
+          reversalReceiptNo: alreadyReversed.receipt_no,
+          alreadyReversed: true,
+        };
+      }
+
+      const origAmt = Money.of(orig.amount);
+      const revNo = `REV-${String(orig.receipt_no || String(receiptId).slice(0, 8))}`;
+
+      const [revReceipt] = await trx('collection_receipts')
+        .insert({
+          site_id: orig.site_id,
+          customer_id: orig.customer_id,
+          receipt_no: revNo,
+          provisional_receipt_no: orig.receipt_no,
+          amount: (-Number(origAmt.toStorageString())).toFixed(2),
+          on_account_amount: '0.00',
+          payment_mode: orig.payment_mode,
+          reference_no: `REV: ${reason.trim()}`.slice(0, 100),
+          collected_by_user_id: userId || orig.collected_by_user_id,
+          idempotency_key: `reversal:${receiptId}`,
+          reverses_receipt_id: receiptId,
+        })
+        .returning('*');
+
+      const allocs = await trx('receipt_allocations').where('receipt_id', receiptId);
+      for (const alloc of allocs) {
+        const inv = await trx('invoices').where('id', alloc.invoice_id).first('*');
+        if (!inv) continue;
+        const allocAmt = Money.of(alloc.allocated_amount);
+        const curPaid = Money.of(inv.paid_amount);
+        const nextPaid = curPaid.isLessThan(allocAmt) ? Money.zero() : curPaid.sub(allocAmt);
+        const nextBal = Money.of(inv.total_amount).sub(nextPaid);
+        const nextStatus = nextPaid.isZero()
+          ? 'UNPAID'
+          : nextBal.isZero()
+            ? 'PAID'
+            : 'PARTIAL';
+        await trx('invoices').where('id', inv.id).update({
+          paid_amount: nextPaid.toStorageString(),
+          balance_due: nextBal.toStorageString(),
+          status: nextStatus,
+          updated_at: new Date(),
+        });
+      }
+
+      const prevBal = await this.ledger.getCustomerBalance(String(orig.customer_id), trx);
+      const nextBal = prevBal.add(origAmt);
+      await trx('customer_ledger_entries').insert({
+        site_id: orig.site_id,
+        customer_id: orig.customer_id,
+        entry_type: 'REVERSAL',
+        debit: origAmt.toStorageString(),
+        ref_id: revReceipt.id,
+        ref_no: revNo,
+        running_balance: nextBal.toStorageString(),
+        note: `Receipt reversal (${orig.receipt_no}): ${reason.trim()}`,
+      });
+      await trx('customers').where('id', orig.customer_id).update({
+        current_ar_balance: nextBal.toStorageString(),
+        updated_at: new Date(),
+      });
+
+      if (['CASH', 'CHEQUE'].includes(String(orig.payment_mode))) {
+        const prevCustody = await this.ledger.getCustodyBalance(
+          String(orig.collected_by_user_id),
+          trx,
+        );
+        const nextCustody = prevCustody.sub(origAmt);
+        await trx('custody_ledger').insert({
+          user_id: orig.collected_by_user_id,
+          site_id: orig.site_id,
+          entry_type: 'REVERSAL',
+          amount_delta: (-Number(origAmt.toStorageString())).toFixed(2),
+          receipt_id: revReceipt.id,
+          running_balance: nextCustody.toStorageString(),
+        });
+      }
+
+      return {
+        reversed: true,
+        reversalReceiptId: revReceipt.id,
+        reversalReceiptNo: revNo,
+        customerBalance: nextBal.toStorageString(),
+      };
+    });
+  }
 }

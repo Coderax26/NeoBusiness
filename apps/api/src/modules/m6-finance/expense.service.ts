@@ -28,7 +28,7 @@ export class ExpenseService {
     const [entry] = await this.knex('cashbook_entries')
       .insert({
         site_id: dto.siteId,
-        entry_type: entryType.slice(0, 20),
+        entry_type: entryType.slice(0, 50),
         amount: -numAmount, // Negative for expense
         ref_no: dto.refNo || `EXP-${Date.now().toString(36).toUpperCase()}`,
         date,

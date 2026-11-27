@@ -36,13 +36,28 @@ export default function ProfilePage() {
   }, [theme]);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
+    Promise.all([
+      fetch('/api/auth/me').then((res) => (res.ok ? res.json() : null)),
+      fetch('/api/proxy/me/preferences').then((res) => (res.ok ? res.json() : null)),
+    ])
+      .then(([data, prefData]) => {
         if (data?.user) setUser(data.user);
+        const prefs = prefData?.preferences ?? prefData;
+        if (prefs?.language === 'en' || prefs?.language === 'mr') {
+          setLanguage(prefs.language);
+          setLocale(prefs.language);
+        }
+        if (prefs?.density === 'comfortable' || prefs?.density === 'compact') {
+          setSelectedDensity(prefs.density);
+          setDensity(prefs.density);
+        }
+        if (prefs?.theme === 'paper' || prefs?.theme === 'night') {
+          setSelectedTheme(prefs.theme);
+          setTheme(prefs.theme);
+        }
       })
       .catch(() => { });
-  }, []);
+  }, [setLocale, setDensity, setTheme]);
 
   const handleSavePreferences = async () => {
     setLocale(language);
@@ -50,17 +65,28 @@ export default function ProfilePage() {
     setTheme(selectedTheme);
     setSavedMsg('Saving...');
     try {
-      const res = await fetch('/api/proxy/auth/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          preferredLanguage: language,
-          uiPreferences: { theme: selectedTheme, density: selectedDensity },
+      const [authRes, prefRes] = await Promise.all([
+        fetch('/api/proxy/auth/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            preferredLanguage: language,
+            uiPreferences: { theme: selectedTheme, density: selectedDensity },
+          }),
         }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+        fetch('/api/proxy/me/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language,
+            theme: selectedTheme,
+            density: selectedDensity,
+          }),
+        }),
+      ]);
+      if (!authRes.ok && !prefRes.ok) {
+        const err = await authRes.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${authRes.status}`);
       }
       setSavedMsg('Preferences saved.');
     } catch (err) {

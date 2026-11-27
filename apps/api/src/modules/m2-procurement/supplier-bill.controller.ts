@@ -226,7 +226,7 @@ export class SupplierBillController {
   @ApiResponse({ status: 200, description: 'Bill marked as paid' })
   async pay(
     @Param('id') id: string,
-    @Body() body: { paymentRef?: string; paidAmount?: number },
+    @Body() body: { paymentRef?: string; paidAmount?: number; mode?: string },
     @Req() req: any,
   ) {
     const bill = await this.billService.updateStatus(

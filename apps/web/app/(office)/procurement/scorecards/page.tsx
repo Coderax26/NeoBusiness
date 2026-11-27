@@ -17,32 +17,149 @@ export default function SupplierScorecardsPage() {
 
   useEffect(() => {
     let active = true;
-    fetch('/api/proxy/procurement/suppliers')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows) => {
-        if (!active || !Array.isArray(rows)) return;
-        const mapped: SupplierScorecardRow[] = rows.map((s: any) => ({
-          supplierId: String(s.id),
-          code: String(s.supplier_code || s.code || ''),
-          name: String(s.company_name || s.name || 'Supplier'),
-          fillRatePct: Number(s.fill_rate_pct ?? 96),
-          onTimePct: Number(s.on_time_pct ?? 94),
-          avgPriceVariancePct: Number(s.price_variance_pct ?? 1.2),
-          monthlySpend: Number(s.monthly_spend ?? 0),
-          totalSpend: Number(s.total_spend ?? s.monthly_spend ?? 0),
-          shortfallCount: Number(s.shortfall_count ?? 0),
-          reliabilityScore: Number(s.reliability_score ?? 4.5),
-          poCount: Number(s.total_orders ?? 0),
-          grnCount: Number(s.grn_count ?? 0),
-        } as unknown as SupplierScorecardRow));
+    Promise.all([
+      fetch('/api/proxy/analytics/suppliers/scorecard').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/procurement/suppliers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/procurement/suppliers/alerts/missing-rates').then((r) =>
+        r.ok ? r.json() : [],
+      ),
+    ])
+      .then(([scRes, supRes, mrRes]) => {
+        if (!active) return;
+        const scRows = Array.isArray(scRes)
+          ? scRes
+          : Array.isArray(scRes?.suppliers)
+            ? scRes.suppliers
+            : Array.isArray(scRes?.data)
+              ? scRes.data
+              : [];
+        const supRows = Array.isArray(supRes)
+          ? supRes
+          : Array.isArray(supRes?.data)
+            ? supRes.data
+            : [];
+        const scById = new Map<string, any>(
+          scRows.map((x: any) => [String(x.supplier_id ?? x.supplierId ?? x.id), x]),
+        );
+
+        const baseRows = supRows.length > 0 ? supRows : scRows;
+        const mapped: SupplierScorecardRow[] = baseRows.map((s: any) => {
+          const sid = String(s.supplier_id ?? s.supplierId ?? s.id);
+          const sc = scById.get(sid) || {};
+          return {
+            supplierId: sid,
+            code: String(s.supplier_code || sc.supplier_code || s.code || ''),
+            name: String(s.company_name || sc.company_name || s.name || 'Supplier'),
+            fillRatePct: Number(sc.fill_rate_pct ?? s.fill_rate_pct ?? 0),
+            onTimePct: Number(sc.on_time_pct ?? s.on_time_pct ?? 0),
+            avgPriceVariancePct: Number(sc.price_variance_pct ?? s.price_variance_pct ?? 0),
+            monthlySpend: Number(sc.total_spend ?? sc.monthly_spend ?? s.monthly_spend ?? 0),
+            totalSpend: Number(sc.total_spend ?? s.total_spend ?? 0),
+            shortfallCount: Number(sc.shortfall_count ?? s.shortfall_count ?? 0),
+            reliabilityScore: Number(sc.reliability_score ?? s.reliability_score ?? 0),
+            poCount: Number(sc.po_count ?? sc.total_orders ?? s.total_orders ?? 0),
+            grnCount: Number(sc.grn_count ?? s.grn_count ?? 0),
+          } as unknown as SupplierScorecardRow;
+        });
         setScorecards(mapped);
         if (mapped.length > 0) setSelectedSupplier(mapped[0]);
+
+        const mrRows = Array.isArray(mrRes)
+          ? mrRes
+          : Array.isArray(mrRes?.data)
+            ? mrRes.data
+            : [];
+        setMissingRates(
+          mrRows.map((m: any) => ({
+            supplierId: String(m.supplier_id ?? m.supplierId ?? ''),
+            supplierName: String(m.company_name ?? m.supplierName ?? 'Supplier'),
+            itemId: m.item_id ?? m.itemId ? String(m.item_id ?? m.itemId) : undefined,
+            itemSku: String(m.sku_code ?? m.itemSku ?? ''),
+            itemName: String(m.item_name ?? m.itemName ?? 'Item'),
+            daysSinceLastQuote: Number(m.days_since_last_quote ?? m.daysSinceLastQuote ?? 0),
+            lastKnownRate: m.last_quoted_price != null ? Number(m.last_quoted_price) : undefined,
+            uom: String(m.primary_uom ?? m.uom ?? 'kg'),
+          })),
+        );
       })
       .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const sid = selectedSupplier?.supplierId;
+    if (!sid) return;
+    let active = true;
+    Promise.all([
+      fetch(`/api/proxy/procurement/suppliers/${encodeURIComponent(sid)}/performance`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
+      fetch(`/api/proxy/procurement/suppliers/${encodeURIComponent(sid)}/items`).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+    ])
+      .then(async ([perfData, itemsData]) => {
+        if (!active) return;
+        const p = perfData?.data ?? perfData;
+        if (p && selectedSupplier) {
+          setSelectedSupplier((prev) =>
+            prev && prev.supplierId === sid
+              ? {
+                  ...prev,
+                  fillRatePct: Number(p.fill_rate_pct ?? prev.fillRatePct ?? 0),
+                  onTimePct: Number(p.on_time_pct ?? prev.onTimePct ?? 0),
+                  reliabilityScore: Number(p.reliability_score ?? prev.reliabilityScore ?? 0),
+                  poCount: Number(p.po_count ?? prev.poCount ?? 0),
+                  grnCount: Number(p.grn_count ?? prev.grnCount ?? 0),
+                }
+              : prev,
+          );
+        }
+        const linkedItems = Array.isArray(itemsData)
+          ? itemsData
+          : Array.isArray(itemsData?.data)
+            ? itemsData.data
+            : [];
+        const trendBuild = await Promise.all(
+          linkedItems.slice(0, 6).map(async (it: any) => {
+            const itemId = String(it.item_id ?? it.id);
+            const rRes = await fetch(
+              `/api/proxy/procurement/suppliers/${encodeURIComponent(sid)}/rates/${encodeURIComponent(itemId)}`,
+            )
+              .then((r) => (r.ok ? r.json() : []))
+              .catch(() => []);
+            const ratesList = Array.isArray(rRes)
+              ? rRes
+              : Array.isArray(rRes?.data)
+                ? rRes.data
+                : [];
+            return {
+              itemId,
+              itemName: String(it.item_name ?? it.name ?? 'Item'),
+              suppliers: [{ id: sid, name: selectedSupplier.name, color: '#3b82f6' }],
+              points: ratesList
+                .slice()
+                .reverse()
+                .map((rt: any) => ({
+                  date: String(rt.quoted_at ?? rt.created_at ?? '').slice(0, 10),
+                  rates: { [sid]: Number(rt.quoted_price ?? rt.rate ?? 0) },
+                })),
+            };
+          }),
+        );
+        const nonEmpty = trendBuild.filter((t) => t.points.length > 0);
+        if (active && nonEmpty.length > 0) {
+          setPriceTrends(nonEmpty);
+          setSelectedTrendItemId(nonEmpty[0].itemId);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedSupplier?.supplierId, selectedSupplier?.name]);
 
   const trendSeries =
     priceTrends.find((t) => t.itemId === selectedTrendItemId) ||

@@ -376,6 +376,36 @@ export default function CustomerMasterPage() {
         return;
       }
 
+      if (
+        isEditingReal &&
+        (Math.round(newLimit) !== originalCreditLimit ||
+          creditHold !== editingCustomer!.creditHold ||
+          (parseInt(creditDays, 10) || 7) !== editingCustomer!.creditDays)
+      ) {
+        const crRes = await fetch(
+          `/api/proxy/customers/${encodeURIComponent(editingCustomer!.id)}/credit`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creditLimit: Math.round(newLimit),
+              creditDays: parseInt(creditDays, 10) || 7,
+              maxOverdueDays: parseInt(maxOverdueDays, 10) || 15,
+              creditHold,
+            }),
+          },
+        );
+        if (!crRes.ok) {
+          const crErr = await crRes.json().catch(() => null);
+          setFormErrors({
+            creditReason: crErr?.message || 'Profile saved, but Credit Override requires OWNER permission.',
+          });
+          setActiveTab('credit');
+          await loadCustomers();
+          return;
+        }
+      }
+
       await loadCustomers();
       setFormOpen(false);
     } catch {
@@ -384,10 +414,21 @@ export default function CustomerMasterPage() {
     }
   };
 
-  const toggleCustomerActive = (id: string) => {
-    setCustomers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
-    );
+  const toggleCustomerActive = async (id: string) => {
+    const target = customers.find((c) => c.id === id);
+    if (!target) return;
+    try {
+      const res = await fetch(`/api/proxy/customers/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !target.active }),
+      });
+      if (res.ok) {
+        await loadCustomers();
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   // KPIs
@@ -1128,8 +1169,30 @@ export default function CustomerMasterPage() {
           };
         }}
         onImport={async (validRows) => {
-          setCustomers((prev) => [...(validRows as CustomerRecord[]), ...prev]);
-          return { importedCount: validRows.length, skippedCount: 0 };
+          const payloadRows = validRows.map((r) => ({
+            customerCode: r.code,
+            businessName: r.businessName,
+            phone: r.phone,
+            gstin: r.gstin || undefined,
+            stateCode: r.stateCode || '27',
+            creditLimit: Number(r.creditLimitRupees || 0),
+            creditDays: Number(r.creditDays || 7),
+          }));
+          const res = await fetch('/api/proxy/import/customers/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: payloadRows }),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(data?.message || `Import failed (HTTP ${res.status})`);
+          }
+          await loadCustomers();
+          const importedCount = Number(data?.importedCount ?? payloadRows.length);
+          return {
+            importedCount,
+            skippedCount: Math.max(0, payloadRows.length - importedCount),
+          };
         }}
       />
     </div>

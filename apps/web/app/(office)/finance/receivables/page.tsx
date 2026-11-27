@@ -10,43 +10,46 @@ export default function ReceivablesPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [collectorFilter, setCollectorFilter] = useState<string>('ALL');
   const [ledgerCustomer, setLedgerCustomer] = useState<CustomerArSummary | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [ptpTarget, setPtpTarget] = useState<CustomerArSummary | null>(null);
+  const [ptpDate, setPtpDate] = useState(new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10));
+  const [ptpNote, setPtpNote] = useState('');
+  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const loadReceivables = React.useCallback(async () => {
     const storedSite =
       typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
     const siteQuery =
       storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
-    Promise.all([
-      fetch(`/api/proxy/analytics/ar/aging${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`/api/proxy/invoices${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([arRes, invRes]) => {
-        if (!active) return;
-        const arRows = Array.isArray(arRes) ? arRes : Array.isArray(arRes?.data) ? arRes.data : [];
-        const invRows = Array.isArray(invRes) ? invRes : Array.isArray(invRes?.data) ? invRes.data : [];
-        setCustomers(
-          arRows.map((c: any) => ({
-            customerId: String(c.customerId || c.customer_id || c.id),
-            customerName: String(c.customerName || c.businessName || c.business_name || 'Customer'),
-            collectorName: String(c.collectorName || c.collector_name || 'Unassigned'),
-            totalOutstanding: Number(c.totalOutstanding ?? c.total_outstanding ?? 0),
-            bucket0to7: Number(c.bucket0to7 ?? c.aging_0_7 ?? 0),
-            bucket8to15: Number(c.bucket8to15 ?? c.aging_8_15 ?? 0),
-            bucket16to30: Number(c.bucket16to30 ?? c.aging_16_30 ?? 0),
-            bucket30Plus: Number(c.bucket30Plus ?? c.aging_30_plus ?? 0),
-            creditHold: Boolean(c.creditHold ?? c.credit_hold),
-            creditLimit: Number(c.creditLimit ?? c.credit_limit ?? 0),
-          })),
-        );
-        setInvoices(invRows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    try {
+      const [arRes, invRes] = await Promise.all([
+        fetch(`/api/proxy/analytics/ar/aging${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/proxy/invoices${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const arRows = Array.isArray(arRes) ? arRes : Array.isArray(arRes?.data) ? arRes.data : [];
+      const invRows = Array.isArray(invRes) ? invRes : Array.isArray(invRes?.data) ? invRes.data : [];
+      setCustomers(
+        arRows.map((c: any) => ({
+          customerId: String(c.customerId || c.customer_id || c.id),
+          customerName: String(c.customerName || c.businessName || c.business_name || 'Customer'),
+          collectorName: String(c.collectorName || c.collector_name || 'Unassigned'),
+          totalOutstanding: Number(c.totalOutstanding ?? c.total_outstanding ?? 0),
+          bucket0to7: Number(c.bucket0to7 ?? c.aging_0_7 ?? 0),
+          bucket8to15: Number(c.bucket8to15 ?? c.aging_8_15 ?? 0),
+          bucket16to30: Number(c.bucket16to30 ?? c.aging_16_30 ?? 0),
+          bucket30Plus: Number(c.bucket30Plus ?? c.aging_30_plus ?? 0),
+          creditHold: Boolean(c.creditHold ?? c.credit_hold),
+          creditLimit: Number(c.creditLimit ?? c.credit_limit ?? 0),
+        })),
+      );
+      setInvoices(invRows);
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  useEffect(() => {
+    void loadReceivables();
+  }, [loadReceivables]);
 
   const collectors = useMemo(
     () => ['ALL', ...Array.from(new Set(customers.map((c) => c.collectorName)))],
@@ -58,11 +61,58 @@ export default function ReceivablesPage() {
     [customers, collectorFilter],
   );
 
-  function toggleCreditHold(customerId: string) {
-    setCustomers((prev) =>
-      prev.map((c) => (c.customerId === customerId ? { ...c, creditHold: !c.creditHold } : c)),
-    );
-    setToast('Updated customer credit hold status.');
+  async function toggleCreditHold(customerId: string) {
+    const target = customers.find((c) => c.customerId === customerId);
+    if (!target) return;
+    setToast(null);
+    try {
+      const res = await fetch(`/api/proxy/customers/${encodeURIComponent(customerId)}/credit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creditLimit: target.creditLimit || 100000,
+          creditDays: 15,
+          creditHold: !target.creditHold,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReceivables();
+      setToast({
+        text: `${target.customerName} ${!target.creditHold ? 'placed on Credit Hold' : 'released from Credit Hold'}.`,
+      });
+    } catch (err) {
+      setToast({ text: `Credit Hold update failed: ${(err as Error).message}`, isError: true });
+    }
+  }
+
+  async function submitPtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ptpTarget) return;
+    setToast(null);
+    try {
+      const res = await fetch('/api/proxy/ptp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: ptpTarget.customerId,
+          promisedDate: ptpDate,
+          reasonCode: 'FOLLOWUP',
+          note: ptpNote.trim() || `AR follow-up for ${formatINR(ptpTarget.totalOutstanding)}`,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      setToast({ text: `Promise to Pay logged for ${ptpTarget.customerName} (due ${ptpDate}).` });
+      setPtpTarget(null);
+      setPtpNote('');
+    } catch (err) {
+      setToast({ text: `Failed to log Promise to Pay: ${(err as Error).message}`, isError: true });
+    }
   }
 
   const customerOpenInvoices = useMemo(
@@ -99,8 +149,14 @@ export default function ReceivablesPage() {
       </div>
 
       {toast && (
-        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
-          {toast}
+        <div
+          className={`rounded-[3px] border px-4 py-2.5 text-sm font-medium ${
+            toast.isError
+              ? 'border-madder/30 bg-madder-soft text-madder'
+              : 'border-leaf/30 bg-leaf-soft text-leaf'
+          }`}
+        >
+          {toast.text}
         </div>
       )}
 
@@ -154,6 +210,13 @@ export default function ReceivablesPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setPtpTarget(c)}
+                      className="rounded border border-rule-strong bg-paper px-2.5 py-1 text-xs font-semibold text-action hover:bg-sunken"
+                    >
+                      + PTP
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => toggleCreditHold(c.customerId)}
                       className={`rounded px-2.5 py-1 text-xs font-semibold ${
                         c.creditHold
@@ -192,6 +255,50 @@ export default function ReceivablesPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+      {ptpTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <form onSubmit={submitPtp} className="w-full max-w-md rounded-[4px] border border-rule bg-sheet p-5 space-y-4 text-xs shadow-xl">
+            <h3 className="text-base font-bold text-ink">
+              Log Promise to Pay — {ptpTarget.customerName}
+            </h3>
+            <div>
+              <label className="block font-semibold text-ink-3 mb-1">Promised Date</label>
+              <input
+                type="date"
+                value={ptpDate}
+                onChange={(e) => setPtpDate(e.target.value)}
+                className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink"
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-ink-3 mb-1">Note</label>
+              <input
+                type="text"
+                value={ptpNote}
+                onChange={(e) => setPtpNote(e.target.value)}
+                placeholder="Customer promised payment details..."
+                className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPtpTarget(null)}
+                className="rounded border border-rule bg-paper px-3 py-1.5 font-semibold text-ink-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded bg-action px-4 py-1.5 font-semibold text-white"
+              >
+                Save Promise
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

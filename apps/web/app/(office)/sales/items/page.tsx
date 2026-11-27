@@ -18,7 +18,7 @@ export interface ItemRecord {
   id: string;
   sku: string;
   name: string;
-  category: 'RAW_MATERIAL' | 'PROCESSED_FG' | 'TRADED_GOOD';
+  category: 'RAW_MATERIAL' | 'PROCESSED_FG' | 'TRADED_GOOD' | 'PACKAGING';
   primaryUom: string;
   secondaryUom?: string;
   conversionFactor?: number; // e.g. 1 crate = 20.3 kg
@@ -38,11 +38,15 @@ export interface ItemRecord {
 export default function ItemMasterPage() {
   const [items, setItems] = useState<ItemRecord[]>([]);
 
+  const [uomRules, setUomRules] = useState<any[]>([]);
+  const [uomToast, setUomToast] = useState<string | null>(null);
+
   const loadItems = useCallback(async () => {
     try {
-      const [itemsRes, pricesRes] = await Promise.all([
+      const [itemsRes, pricesRes, stockRes] = await Promise.all([
         fetch('/api/proxy/items'),
         fetch('/api/proxy/prices/today').catch(() => null),
+        fetch('/api/proxy/inventory/stock/current').catch(() => null),
       ]);
       if (!itemsRes.ok) return;
       const rows = await itemsRes.json();
@@ -60,6 +64,18 @@ export default function ItemMasterPage() {
         }
       }
 
+      const stockMap = new Map<string, number>();
+      if (stockRes && stockRes.ok) {
+        const stk = await stockRes.json().catch(() => null);
+        const sRows = Array.isArray(stk?.data) ? stk.data : Array.isArray(stk) ? stk : [];
+        for (const s of sRows) {
+          const itemId = String(s.itemId ?? s.item_id ?? '');
+          if (itemId) {
+            stockMap.set(itemId, (stockMap.get(itemId) ?? 0) + Number(s.qtyOnHand ?? s.qty_on_hand ?? 0));
+          }
+        }
+      }
+
       const mapped: ItemRecord[] = rows.map((i: any) => ({
         id: String(i.id),
         sku: String(i.sku_code || ''),
@@ -67,7 +83,8 @@ export default function ItemMasterPage() {
         category:
           i.item_category === 'RAW_MATERIAL' ||
           i.item_category === 'PROCESSED_FG' ||
-          i.item_category === 'TRADED_GOOD'
+          i.item_category === 'TRADED_GOOD' ||
+          i.item_category === 'PACKAGING'
             ? i.item_category
             : 'TRADED_GOOD',
         primaryUom: String(i.primary_uom || 'KG').toLowerCase(),
@@ -87,7 +104,7 @@ export default function ItemMasterPage() {
         minMarginPct: i.min_margin_pct != null ? Number(i.min_margin_pct) * 100 : 15,
         shelfLifeDays: Number(i.shelf_life_days ?? 14),
         minStockQty: Number(i.min_stock_qty ?? 0),
-        currentStock: 0,
+        currentStock: stockMap.get(String(i.id)) ?? 0,
         todayPrice: priceMap.get(String(i.id)),
         active: i.is_active !== false,
       }));
@@ -165,8 +182,42 @@ export default function ItemMasterPage() {
     setShelfLifeDays(String(item.shelfLifeDays));
     setMinStockQty(String(item.minStockQty));
     setFormErrors({});
+    setUomToast(null);
+    setUomRules([]);
     setActiveTab('basics');
     setFormOpen(true);
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) {
+      fetch(`/api/proxy/items/${encodeURIComponent(item.id)}/uom`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list) => setUomRules(Array.isArray(list) ? list : Array.isArray(list?.data) ? list.data : []))
+        .catch(() => {});
+    }
+  };
+
+  const handleSaveUomRule = async () => {
+    if (!editingItem) return;
+    setUomToast(null);
+    try {
+      const res = await fetch(`/api/proxy/items/${encodeURIComponent(editingItem.id)}/uom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: editingItem.id,
+          fromUom: normalizeApiUom(secondaryUom || 'CRATE'),
+          toUom: normalizeApiUom(primaryUom || 'KG'),
+          factor: Number(conversionFactor) || 1,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+      setUomToast('Saved UoM conversion rule to catalog.');
+      const list = await fetch(`/api/proxy/items/${encodeURIComponent(editingItem.id)}/uom`).then((r) =>
+        r.ok ? r.json() : [],
+      );
+      setUomRules(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setUomToast(`UoM save failed: ${(err as Error).message}`);
+    }
   };
 
   const normalizeApiUom = (val: string): 'KG' | 'CRATE' | 'CARTON' | 'LITER' | 'BAG' | 'OTHER' => {
@@ -263,10 +314,22 @@ export default function ItemMasterPage() {
     }
   };
 
-  const toggleItemActive = (id: string) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, active: !i.active } : i)),
-    );
+  const toggleItemActive = async (id: string) => {
+    const target = items.find((i) => i.id === id);
+    if (!target) return;
+    try {
+      const res = await fetch(`/api/proxy/items/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !target.active }),
+      });
+      if (res.ok) {
+        await loadItems();
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   // KPIs
@@ -506,6 +569,7 @@ export default function ItemMasterPage() {
             <option value="ALL">All Categories</option>
             <option value="PROCESSED_FG">Processed Goods (FG)</option>
             <option value="RAW_MATERIAL">Raw Materials (RM)</option>
+            <option value="PACKAGING">Packaging Materials</option>
             <option value="TRADED_GOOD">Traded Goods</option>
           </select>
           <select
@@ -626,6 +690,7 @@ export default function ItemMasterPage() {
                   >
                     <option value="PROCESSED_FG">Processed Finished Goods (FG)</option>
                     <option value="RAW_MATERIAL">Raw Material (RM)</option>
+                    <option value="PACKAGING">Packaging Material</option>
                     <option value="TRADED_GOOD">Traded Goods</option>
                   </select>
                 </div>
@@ -708,6 +773,19 @@ export default function ItemMasterPage() {
                   <strong>{conversionFactor || '1'} {primaryUom || 'kg'}</strong>. When loading 10 {secondaryUom || 'crates'}, inventory deducts{' '}
                   <strong>{(parseFloat(conversionFactor) || 1) * 10} {primaryUom || 'kg'}</strong>.
                 </div>
+                {editingItem && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                    <Button variant="secondary" size="sm" onClick={handleSaveUomRule}>
+                      Save UoM Conversion Rule
+                    </Button>
+                    {uomRules.length > 0 && (
+                      <span className="text-[11px] font-mono text-ink-3">
+                        Active rules: {uomRules.map((u: any) => `1 ${u.from_uom} = ${u.conversion_factor} ${u.to_uom}`).join(', ')}
+                      </span>
+                    )}
+                    {uomToast && <span className="text-[11px] text-action">{uomToast}</span>}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -888,8 +966,29 @@ export default function ItemMasterPage() {
           };
         }}
         onImport={async (validRows) => {
-          setItems((prev) => [...(validRows as ItemRecord[]), ...prev]);
-          return { importedCount: validRows.length, skippedCount: 0 };
+          const payloadRows = validRows.map((r) => ({
+            skuCode: r.sku,
+            name: r.name,
+            itemCategory: r.category,
+            primaryUom: r.primaryUom?.toUpperCase() || 'KG',
+            taxRatePct: Number(r.gstRate || 5) / 100,
+            minMarginPct: Number(r.minMarginPct || 15) / 100,
+          }));
+          const res = await fetch('/api/proxy/import/items/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: payloadRows }),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(data?.message || `Import failed (HTTP ${res.status})`);
+          }
+          await loadItems();
+          const importedCount = Number(data?.importedCount ?? payloadRows.length);
+          return {
+            importedCount,
+            skippedCount: Math.max(0, payloadRows.length - importedCount),
+          };
         }}
       />
     </div>

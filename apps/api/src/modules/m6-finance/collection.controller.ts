@@ -125,5 +125,23 @@ export class CollectionController {
     );
     return wrapResponse(collections);
   }
+
+  @Post('collections/:id/reverse')
+  @UseInterceptors(AuditInterceptor)
+  @RequirePermission('collection.log')
+  @ApiOperation({ summary: 'Reverse a posted collection receipt via contra entry' })
+  @ApiResponse({ status: 200, description: 'Receipt reversed' })
+  async reverseReceipt(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @Req() req: any,
+  ) {
+    const result = await this.collectionService.reverseReceipt(
+      id,
+      String(body?.reason || 'Receipt reversed'),
+      req.user.id,
+    );
+    return wrapResponse(result);
+  }
 }
 

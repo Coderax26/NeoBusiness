@@ -11,6 +11,23 @@ export default function TallyExportPage() {
   const [selectedTypes, setSelectedTypes] = useState<Array<TallyVoucherInput['voucherType']>>(['Sales', 'Receipt', 'Credit Note']);
   const [vouchers, setVouchers] = useState<TallyVoucherInput[]>([]);
   const [batches, setBatches] = useState<Array<{ id: string; range: string; count: number; xml: string }>>([]);
+  const [exportStatus, setExportStatus] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadBatches = async () => {
+    const r = await fetch('/api/proxy/tally/batches');
+    if (!r.ok) return;
+    const raw = await r.json().catch(() => []);
+    const bRows = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+    setBatches(
+      bRows.map((b: any) => ({
+        id: String(b.id || b.batch_no || 'TLY'),
+        range: `${String(b.from_date || b.date_from || '').slice(0, 10)} → ${String(b.to_date || b.date_to || '').slice(0, 10)}`,
+        count: Number(b.voucher_count ?? 0),
+        xml: String(b.xml_payload || ''),
+      })),
+    );
+  };
 
   useEffect(() => {
     let active = true;
@@ -26,7 +43,7 @@ export default function TallyExportPage() {
           setBatches(
             bRows.map((b: any) => ({
               id: String(b.id || b.batch_no || 'TLY'),
-              range: `${String(b.from_date || '').slice(0, 10)} → ${String(b.to_date || '').slice(0, 10)}`,
+              range: `${String(b.from_date || b.date_from || '').slice(0, 10)} → ${String(b.to_date || b.date_to || '').slice(0, 10)}`,
               count: Number(b.voucher_count ?? 0),
               xml: String(b.xml_payload || ''),
             })),
@@ -83,18 +100,32 @@ export default function TallyExportPage() {
   }
 
   async function createExportBatch() {
-    await fetch('/api/proxy/tally/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fromDate, toDate, voucherTypes: selectedTypes }),
-    }).catch(() => {});
-    const batch = {
-      id: `TLY-2026-0${batches.length + 1}`,
-      range: `${fromDate} → ${toDate}`,
-      count: preview.includedCount,
-      xml: preview.xml,
-    };
-    setBatches((prev) => [batch, ...prev]);
+    setExportStatus(null);
+    setBusy(true);
+    try {
+      const storedSite =
+        typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
+      const res = await fetch('/api/proxy/tally/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dateFrom: fromDate,
+          dateTo: toDate,
+          voucherTypes: selectedTypes,
+          ...(storedSite && storedSite !== 'all' ? { siteId: storedSite } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBatches();
+      setExportStatus({ text: data?.data?.message || 'Tally XML export batch generated cleanly.' });
+    } catch (err) {
+      setExportStatus({ text: `Export failed: ${(err as Error).message}`, isError: true });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -105,6 +136,18 @@ export default function TallyExportPage() {
           Select date range and voucher types to generate Tally-compatible XML batches for your accountant.
         </p>
       </div>
+
+      {exportStatus && (
+        <div
+          className={`rounded-[3px] border p-3 text-sm font-medium ${
+            exportStatus.isError
+              ? 'border-madder/30 bg-madder-soft text-madder'
+              : 'border-leaf/30 bg-leaf-soft text-leaf'
+          }`}
+        >
+          {exportStatus.text}
+        </div>
+      )}
 
       <div className="rounded-[3px] border border-rule bg-sheet p-5 space-y-4">
         <div className="flex flex-wrap items-end gap-4">

@@ -2,6 +2,8 @@ import {
   IsUUID,
   IsOptional,
   IsInt,
+  IsString,
+  IsArray,
   Min,
   Max,
 } from 'class-validator';
@@ -13,6 +15,32 @@ export class TriggerTallyExportDto {
   @IsOptional()
   @IsUUID()
   siteId?: string;
+
+  @ApiPropertyOptional({ description: 'Start date YYYY-MM-DD' })
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({ description: 'End date YYYY-MM-DD' })
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @ApiPropertyOptional({ description: 'Start date alias YYYY-MM-DD' })
+  @IsOptional()
+  @IsString()
+  fromDate?: string;
+
+  @ApiPropertyOptional({ description: 'End date alias YYYY-MM-DD' })
+  @IsOptional()
+  @IsString()
+  toDate?: string;
+
+  @ApiPropertyOptional({ description: 'Voucher types filter' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  voucherTypes?: string[];
 }
 
 export class ListTallyBatchesQueryDto {

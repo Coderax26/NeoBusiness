@@ -166,6 +166,8 @@ const MODULES: ModuleConfig[] = [
       { label: 'COD Settlement', href: '/finance/cod', permission: 'finance.view' },
       { label: 'Promises to Pay', href: '/finance/ptp', permission: 'finance.view' },
       { label: 'Payables', href: '/finance/payables', permission: 'finance.view' },
+      { label: 'Expenses', href: '/finance/expenses', permission: 'finance.view' },
+      { label: 'Cashbook', href: '/finance/cashbook', permission: 'finance.view' },
       { label: 'Day Closing (EOD)', href: '/finance/eod', permission: 'eod.signoff' },
       { label: 'Tally XML Export', href: '/finance/tally', permission: 'finance.view' },
     ],

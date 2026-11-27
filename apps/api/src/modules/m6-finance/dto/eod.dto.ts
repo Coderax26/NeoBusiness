@@ -23,5 +23,10 @@ export class SignOffEodDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @ApiPropertyOptional({ description: 'Optional owner verification password' })
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 

@@ -13,11 +13,14 @@ import {
 export default function AdminRolesPage() {
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [livePermissions, setLivePermissions] = useState<Array<{ code?: string; module?: string; description?: string; roles?: string[] }>>([]);
 
   useEffect(() => {
-    fetch('/api/proxy/admin/users')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
+    Promise.all([
+      fetch('/api/proxy/admin/users').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/proxy/admin/permissions').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([res, permRes]) => {
         const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
         const mapped: AdminUserRecord[] = list.map((u: any) => ({
           id: u.id,
@@ -32,6 +35,15 @@ export default function AdminRolesPage() {
         }));
         setUsers(mapped);
         if (mapped.length > 0) setSelectedUserId(mapped[0].id);
+
+        const perms = Array.isArray(permRes?.permissions)
+          ? permRes.permissions
+          : Array.isArray(permRes?.data)
+            ? permRes.data
+            : Array.isArray(permRes)
+              ? permRes
+              : [];
+        setLivePermissions(perms);
       })
       .catch(() => setUsers([]));
   }, []);
@@ -135,6 +147,22 @@ export default function AdminRolesPage() {
           </tbody>
         </table>
       </div>
+
+      {livePermissions.length > 0 && (
+        <div className="overflow-hidden rounded-[4px] border border-rule bg-sheet">
+          <div className="border-b border-rule bg-paper px-5 py-3 text-sm font-bold text-ink">
+            Live Backend Permission Catalog ({livePermissions.length} permissions)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-4 text-xs">
+            {livePermissions.slice(0, 48).map((p, idx) => (
+              <div key={p.code || idx} className="rounded border border-rule bg-paper px-3 py-2">
+                <div className="font-mono font-semibold text-action">{p.code || String(p)}</div>
+                {p.description && <div className="text-ink-3 mt-0.5">{p.description}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

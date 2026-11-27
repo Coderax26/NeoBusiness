@@ -46,6 +46,12 @@ export default function SupplierBillsPage() {
   const [statusTab, setStatusTab] = useState<SupplierBillStatus | 'ALL'>('ALL');
   const [selectedBill, setSelectedBill] = useState<SupplierBillRecord | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [serverApAging, setServerApAging] = useState<{
+    current: number;
+    d31_60: number;
+    d61_90: number;
+    d90_plus: number;
+  } | null>(null);
 
   // Enter Bill dialog
   const [enterOpen, setEnterOpen] = useState(false);
@@ -58,10 +64,23 @@ export default function SupplierBillsPage() {
 
   const loadBillsData = async () => {
     try {
-      const [billsRes, posRes] = await Promise.all([
+      const [billsRes, posRes, agingRes] = await Promise.all([
         fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
         fetch('/api/proxy/procurement/purchase-orders').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/procurement/supplier-bills/ap/aging').then((r) =>
+          r.ok ? r.json() : null,
+        ),
       ]);
+      const agingPayload = agingRes?.data ?? agingRes;
+      if (agingPayload && (agingPayload.buckets || agingPayload.current != null || agingPayload.bucket_0_30 != null)) {
+        const b = agingPayload.buckets ?? agingPayload;
+        setServerApAging({
+          current: Number(b.current ?? b.bucket_0_30 ?? b['0-30'] ?? 0),
+          d31_60: Number(b.d31_60 ?? b.bucket_31_60 ?? b['31-60'] ?? 0),
+          d61_90: Number(b.d61_90 ?? b.bucket_61_90 ?? b['61-90'] ?? 0),
+          d90_plus: Number(b.d90_plus ?? b.bucket_90_plus ?? b['90+'] ?? 0),
+        });
+      }
       const bRows = Array.isArray(billsRes) ? billsRes : Array.isArray(billsRes?.data) ? billsRes.data : [];
       const pRows = Array.isArray(posRes) ? posRes : Array.isArray(posRes?.data) ? posRes.data : [];
       const poLookup = new Map(pRows.map((p: any) => [String(p.id), p]));
@@ -159,8 +178,9 @@ export default function SupplierBillsPage() {
 
   // AP Aging buckets (G-AP-2)
   const apAging = useMemo(() => {
+    if (serverApAging) return serverApAging;
     const openBills = bills.filter((b) => b.status !== 'PAID');
-    const now = new Date('2026-11-13').getTime();
+    const now = Date.now();
     const buckets = { current: 0, d31_60: 0, d61_90: 0, d90_plus: 0 };
     for (const b of openBills) {
       const bal = b.totalAmount - b.paidAmount;
@@ -171,7 +191,7 @@ export default function SupplierBillsPage() {
       else buckets.d90_plus += bal;
     }
     return buckets;
-  }, [bills]);
+  }, [bills, serverApAging]);
 
   const handleEnterBill = async () => {
     const po = purchaseOrders.find((p) => p.id === newPoId) || purchaseOrders[0];
