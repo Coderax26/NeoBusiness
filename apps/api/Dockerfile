@@ -18,6 +18,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV MIGRATIONS_DIR=/app/db/migrations
 
 # Create explicit non-root system user
 RUN addgroup -g 1001 -S neobus && adduser -S neobus -u 1001 -G neobus
@@ -28,7 +29,7 @@ COPY --from=builder --chown=neobus:neobus /app/package.json ./package.json
 COPY --chown=neobus:neobus db/migrations /app/db/migrations
 COPY --chown=neobus:neobus apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
 
-RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
+RUN ls -1 /app/db/migrations/*.sql > /dev/null && sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 USER neobus
 EXPOSE 3000

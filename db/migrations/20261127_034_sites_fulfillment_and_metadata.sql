@@ -13,3 +13,12 @@ WHERE site_type IN ('FACTORY', 'WAREHOUSE')
 UPDATE sites
 SET site_code = UPPER(SUBSTRING(REGEXP_REPLACE(name, '[^A-Za-z0-9]', '', 'g'), 1, 6))
 WHERE site_code IS NULL OR site_code = '';
+
+UPDATE sites
+SET is_fulfillment_site = TRUE
+WHERE id = (
+  SELECT id FROM sites WHERE is_active = TRUE ORDER BY created_at ASC LIMIT 1
+)
+  AND NOT EXISTS (
+    SELECT 1 FROM sites WHERE is_active = TRUE AND is_fulfillment_site = TRUE
+  );

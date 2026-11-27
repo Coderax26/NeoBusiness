@@ -41,8 +41,10 @@ async function main(): Promise<void> {
         const [insertedSite] = await trx('sites')
           .insert({
             name: siteName,
+            site_code: 'MAIN-01',
             site_type: siteType,
             address: siteAddress,
+            is_fulfillment_site: true,
             is_active: true,
           })
           .returning(['id', 'name']);
