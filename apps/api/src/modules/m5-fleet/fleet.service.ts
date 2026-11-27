@@ -214,10 +214,7 @@ export class FleetService {
           external_driver_name: dto.externalDriverName?.trim() || null,
           external_driver_phone: dto.externalDriverPhone?.trim() || null,
           lr_tracking_no: dto.lrTrackingNo?.trim() || null,
-          freight_cost:
-            dto.freightCost != null
-              ? Money.of(dto.freightCost).toStorageString()
-              : null,
+          freight_cost: Money.of(dto.freightCost ?? 0).toStorageString(),
           status: 'LOADING',
           planned_distance_km: dto.plannedDistanceKm ?? null,
           route_polyline: dto.routePolyline ?? null,

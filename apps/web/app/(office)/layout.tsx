@@ -432,16 +432,21 @@ export default function OfficeLayout({
     return activeModuleLabel;
   }, [activeTabs, pathname, activeModuleLabel]);
 
-  const todayDateStr = useMemo(() => {
+  const [todayDateStr, setTodayDateStr] = useState('');
+
+  useEffect(() => {
     try {
-      return new Intl.DateTimeFormat('en-IN', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }).format(new Date());
+      setTodayDateStr(
+        new Intl.DateTimeFormat('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }).format(new Date()),
+      );
     } catch {
-      return '';
+      setTodayDateStr('');
     }
   }, []);
 

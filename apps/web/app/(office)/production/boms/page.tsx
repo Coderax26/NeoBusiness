@@ -30,7 +30,7 @@ export default function BomsPage() {
   const [liveRollup, setLiveRollup] = useState<{ totalBatchCost: number; costPerUnit: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newBomNo, setNewBomNo] = useState(`BOM-${Date.now().toString().slice(-4)}`);
+  const [newBomNo, setNewBomNo] = useState('');
   const [newFgItemId, setNewFgItemId] = useState('');
   const [newLines, setNewLines] = useState<Array<{ itemId: string; qtyPerUnit: string }>>([
     { itemId: '', qtyPerUnit: '1.05' },
@@ -76,6 +76,7 @@ export default function BomsPage() {
 
   useEffect(() => {
     let active = true;
+    setNewBomNo((prev) => prev || `BOM-${Date.now().toString().slice(-4)}`);
     const storedSite =
       typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
     const effectiveSite = storedSite && storedSite !== 'all' ? storedSite : '';

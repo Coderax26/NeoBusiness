@@ -11,8 +11,8 @@ import {
 import { type DailyPriceRow } from '../../../../src/lib/sales-data';
 
 export default function TodaysPricesPage() {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [todayStr, setTodayStr] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [user, setUser] = useState<SessionUser | null>(null);
   const [rows, setRows] = useState<DailyPriceRow[]>([]);
   const [initialRows, setInitialRows] = useState<DailyPriceRow[]>([]);
@@ -27,6 +27,10 @@ export default function TodaysPricesPage() {
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 
   useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    setTodayStr(today);
+    setSelectedDate((prev) => prev || today);
+
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
@@ -44,6 +48,7 @@ export default function TodaysPricesPage() {
   }, []);
 
   useEffect(() => {
+    if (!selectedDate) return;
     let active = true;
     fetch(`/api/proxy/prices/${encodeURIComponent(selectedDate)}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -78,7 +83,7 @@ export default function TodaysPricesPage() {
     };
   }, [selectedDate]);
 
-  const isReadOnlyDate = selectedDate < todayStr;
+  const isReadOnlyDate = Boolean(selectedDate && todayStr && selectedDate < todayStr);
   const isOwner = !user || canViewMarginAndCost(user.role);
   const canEdit = isOwner && !isReadOnlyDate;
 
