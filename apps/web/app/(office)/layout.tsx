@@ -207,6 +207,15 @@ const CREATE_MENU_ITEMS = [
   { label: 'Stock adjustment', href: '/inventory/adjustments', shortcut: 'A' },
 ];
 
+const MODULE_ROOT_HREFS = new Set(['/home', '/procurement', '/production', '/finance', '/reports']);
+
+function isSubTabActive(pathname: string, tabHref: string): boolean {
+  if (pathname === tabHref) return true;
+  if (MODULE_ROOT_HREFS.has(tabHref)) return false;
+  if (tabHref === '/logistics/trips' && pathname === '/logistics/trips/new') return false;
+  return pathname.startsWith(tabHref + '/');
+}
+
 export default function OfficeLayout({
   children,
 }: {
@@ -224,9 +233,17 @@ export default function OfficeLayout({
 
   // Shell UI states
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>('today');
+  const [collapsedFlyout, setCollapsedFlyout] = useState<{
+    id: string;
+    label: string;
+    tabs: SubTabItem[];
+    top: number;
+  } | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [moreTabsOpen, setMoreTabsOpen] = useState(false);
-  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [mobileSectionOpen, setMobileSectionOpen] = useState(false);
+  const [mobileCreateOpen, setMobileCreateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [approvalsOpen, setApprovalsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -279,7 +296,7 @@ export default function OfficeLayout({
     };
   }, []);
 
-  // Global Keyboard Shortcuts (Ctrl+K, N, ?)
+  // Global Keyboard Shortcuts (Ctrl+K, N, ?, Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -293,6 +310,12 @@ export default function OfficeLayout({
       } else if (e.key === '?' && !inInput) {
         e.preventDefault();
         setHelpOpen(true);
+      } else if (e.key === 'Escape') {
+        setCreateMenuOpen(false);
+        setCollapsedFlyout(null);
+        setUserMenuOpen(false);
+        setMobileDrawerOpen(false);
+        setMobileSectionOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -325,6 +348,11 @@ export default function OfficeLayout({
     [user],
   );
 
+  const visibleSettingsTabs = useMemo(
+    () => SETTINGS_TABS.filter((tab) => !tab.permission || can(user, tab.permission)),
+    [user],
+  );
+
   const isSettingsPath =
     pathname.startsWith('/admin') ||
     pathname.startsWith('/control/audit') ||
@@ -343,8 +371,28 @@ export default function OfficeLayout({
     return raw.filter((tab) => !tab.permission || can(user, tab.permission));
   }, [isSettingsPath, activeModule, user]);
 
-  const visibleTabs = activeTabs.slice(0, 5);
-  const overflowTabs = activeTabs.slice(5);
+  // Auto-sync open accordion & dismiss overlays on navigation
+  useEffect(() => {
+    setExpandedModuleId(isSettingsPath ? 'settings' : activeModule?.id ?? null);
+    setCollapsedFlyout(null);
+    setCreateMenuOpen(false);
+    setUserMenuOpen(false);
+    setMobileDrawerOpen(false);
+    setMobileSectionOpen(false);
+  }, [pathname, isSettingsPath, activeModule?.id]);
+
+  const activeModuleLabel = isSettingsPath
+    ? 'Settings'
+    : locale === 'mr'
+    ? activeModule?.labelMr || 'Today'
+    : activeModule?.label || 'Today';
+
+  const activePageLabel = useMemo(() => {
+    const matched = activeTabs.find((t) => isSubTabActive(pathname, t.href));
+    if (matched) return matched.label;
+    if (pathname === '/me') return 'My Profile';
+    return activeModuleLabel;
+  }, [activeTabs, pathname, activeModuleLabel]);
 
   const todayDateStr = useMemo(() => {
     try {
@@ -359,6 +407,12 @@ export default function OfficeLayout({
     }
   }, []);
 
+  const selectedSiteLabel = useMemo(() => {
+    if (activeSite === 'all') return 'All Sites (Aggregated)';
+    const siteObj = user?.sites?.find((s) => s.id === activeSite);
+    return siteObj ? `${siteObj.name} (${siteObj.siteType})` : activeSite;
+  }, [activeSite, user?.sites]);
+
   const tourSteps = [
     { targetElementId: 'site-switcher', title: 'Site Switcher', content: 'Switch between factory plants, hubs, or view All Sites together.' },
     { targetElementId: 'command-palette-btn', title: 'Search Everything (Ctrl+K)', content: 'Press Ctrl+K anytime to jump directly to a customer, order, item, or trip.' },
@@ -368,13 +422,173 @@ export default function OfficeLayout({
 
   const isNight = theme === 'night' || theme === 'dark';
 
+  const openFlyoutFor = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    id: string,
+    label: string,
+    tabs: SubTabItem[],
+  ) => {
+    if (collapsedFlyout?.id === id) {
+      setCollapsedFlyout(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clampedTop = Math.max(12, Math.min(rect.top, window.innerHeight - 340));
+    setCollapsedFlyout({ id, label, tabs, top: clampedTop });
+  };
+
+  const renderAccordionList = (onNavigate?: () => void) => (
+    <div className="space-y-0.5">
+      {visibleModules.map((mod) => {
+        const Icon = NAV_ICONS[mod.iconKey];
+        const modTabs = mod.tabs.filter((t) => !t.permission || can(user, t.permission));
+        const isCurrentModule = !isSettingsPath && activeModule?.id === mod.id;
+        const isExpanded = expandedModuleId === mod.id;
+        const badgeCount = mod.id === 'approvals' ? pendingApprovalsCount : 0;
+        const modLabel = locale === 'mr' ? mod.labelMr : mod.label;
+
+        if (modTabs.length <= 1) {
+          return (
+            <Link
+              key={mod.id}
+              href={mod.href}
+              onClick={onNavigate}
+              className={`flex items-center gap-3 h-[38px] px-3.5 text-[14.5px] rounded-l-[3px] transition-colors relative z-10 ${
+                isCurrentModule
+                  ? 'bg-sheet text-ink font-semibold mr-0 shadow-[inset_1px_0_0_var(--rule),inset_0_1px_0_var(--rule),inset_0_-1px_0_var(--rule)]'
+                  : 'text-ink-2 hover:text-ink hover:bg-sheet/50 mr-3'
+              }`}
+            >
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${isCurrentModule ? 'text-action' : 'text-ink-2'}`} strokeWidth={1.75} />
+              <span className="truncate">{modLabel}</span>
+              {badgeCount > 0 && (
+                <span className="ml-auto text-[12px] font-semibold bg-madder text-white rounded-full px-1.5 leading-[18px]">
+                  {badgeCount}
+                </span>
+              )}
+            </Link>
+          );
+        }
+
+        return (
+          <div key={mod.id}>
+            <button
+              type="button"
+              onClick={() => setExpandedModuleId((prev) => (prev === mod.id ? null : mod.id))}
+              aria-expanded={isExpanded}
+              className={`w-[calc(100%-12px)] flex items-center gap-3 h-[38px] px-3.5 text-[14.5px] rounded-l-[3px] transition-colors relative z-10 text-left ${
+                isCurrentModule
+                  ? 'text-ink font-semibold bg-sheet/75'
+                  : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+              }`}
+            >
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${isCurrentModule ? 'text-action' : 'text-ink-2'}`} strokeWidth={1.75} />
+              <span className="truncate flex-1">{modLabel}</span>
+              {badgeCount > 0 && (
+                <span className="text-[12px] font-semibold bg-madder text-white rounded-full px-1.5 leading-[18px]">
+                  {badgeCount}
+                </span>
+              )}
+              {isExpanded ? (
+                <ACTION_ICONS.chevronDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+              ) : (
+                <ACTION_ICONS.chevronRight className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+              )}
+            </button>
+
+            {isExpanded && (
+              <div className="ml-6 pl-3 mr-3 my-1 border-l border-rule space-y-0.5">
+                {modTabs.map((tab) => {
+                  const active = isSubTabActive(pathname, tab.href);
+                  return (
+                    <Link
+                      key={tab.href}
+                      href={tab.href}
+                      onClick={onNavigate}
+                      className={`block px-2.5 py-1.5 text-[13.5px] rounded-[3px] transition-colors truncate ${
+                        active
+                          ? 'bg-sheet text-action font-semibold border border-rule'
+                          : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+                      }`}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Settings Accordion inside scrollable nav */}
+      {visibleSettingsTabs.length > 0 && (
+        <div className="pt-2 mt-2 border-t border-rule mr-3">
+          <button
+            type="button"
+            onClick={() => setExpandedModuleId((prev) => (prev === 'settings' ? null : 'settings'))}
+            aria-expanded={expandedModuleId === 'settings'}
+            className={`w-full flex items-center gap-3 h-[38px] px-3.5 text-[14.5px] rounded-[3px] transition-colors text-left ${
+              isSettingsPath
+                ? 'text-ink font-semibold bg-sheet/75'
+                : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+            }`}
+          >
+            <NAV_ICONS.settings className={`w-[18px] h-[18px] shrink-0 ${isSettingsPath ? 'text-action' : 'text-ink-2'}`} strokeWidth={1.75} />
+            <span className="truncate flex-1">Settings</span>
+            {expandedModuleId === 'settings' ? (
+              <ACTION_ICONS.chevronDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+            ) : (
+              <ACTION_ICONS.chevronRight className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+            )}
+          </button>
+
+          {expandedModuleId === 'settings' && (
+            <div className="ml-6 pl-3 my-1 border-l border-rule space-y-0.5">
+              {visibleSettingsTabs.map((tab) => {
+                const active = isSubTabActive(pathname, tab.href);
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    onClick={onNavigate}
+                    className={`block px-2.5 py-1.5 text-[13.5px] rounded-[3px] transition-colors truncate ${
+                      active
+                        ? 'bg-sheet text-action font-semibold border border-rule'
+                        : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+                    }`}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen bg-paper text-ink font-sans">
+      {/* Click-outside backdrop for desktop popovers */}
+      {(createMenuOpen || collapsedFlyout || userMenuOpen) && (
+        <div
+          className="fixed inset-0 z-30"
+          aria-hidden="true"
+          onClick={() => {
+            setCreateMenuOpen(false);
+            setCollapsedFlyout(null);
+            setUserMenuOpen(false);
+          }}
+        />
+      )}
+
       {/* 1. Desktop Bahi-Khata Sidebar */}
       <aside
         className={`hidden lg:flex ${
           sidebarCollapsed ? 'w-[72px]' : 'w-[236px]'
-        } bg-paper relative flex-col justify-between shrink-0 transition-all duration-150 select-none z-20 no-print`}
+        } bg-paper relative flex-col justify-between shrink-0 transition-all duration-150 select-none z-40 no-print`}
       >
         {/* Signature Double Madder Margin Rule */}
         <div
@@ -382,9 +596,9 @@ export default function OfficeLayout({
           className="absolute top-0 bottom-0 right-0 bahi-margin-rule pointer-events-none"
         />
 
-        <div className={sidebarCollapsed ? 'px-2 pt-5' : 'pl-4 pt-5'}>
+        <div className={`${sidebarCollapsed ? 'px-2 pt-5' : 'pl-4 pt-5'} flex flex-col min-h-0 flex-1`}>
           {/* Brand Wordmark & Collapse */}
-          <div className={`flex items-center justify-between pb-4 ${sidebarCollapsed ? 'px-1' : 'px-3.5 pr-6'}`}>
+          <div className={`flex items-center justify-between pb-4 shrink-0 ${sidebarCollapsed ? 'px-1' : 'px-3.5 pr-6'}`}>
             <Link href="/home" className="min-w-0">
               <div className="font-serif text-[23px] font-semibold tracking-tight text-ink leading-none">
                 {sidebarCollapsed ? 'NB' : 'NeoBus'}
@@ -397,7 +611,10 @@ export default function OfficeLayout({
             </Link>
             <button
               type="button"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={() => {
+                setSidebarCollapsed(!sidebarCollapsed);
+                setCollapsedFlyout(null);
+              }}
               className="text-ink-3 hover:text-ink p-1 rounded-[3px] hover:bg-sheet"
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -411,7 +628,7 @@ export default function OfficeLayout({
           </div>
 
           {/* Primary + New Action Button + Create Menu */}
-          <div className={`relative mb-4 ${sidebarCollapsed ? 'px-1' : 'pr-[22px]'}`}>
+          <div className={`relative mb-3 shrink-0 ${sidebarCollapsed ? 'px-1' : 'pr-[22px]'}`}>
             <button
               type="button"
               onClick={() => setCreateMenuOpen((o) => !o)}
@@ -432,10 +649,7 @@ export default function OfficeLayout({
             </button>
 
             {createMenuOpen && (
-              <div
-                className="absolute left-0 top-full mt-1.5 w-60 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50"
-                onMouseLeave={() => setCreateMenuOpen(false)}
-              >
+              <div className="absolute left-0 top-full mt-1.5 w-60 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50">
                 {CREATE_MENU_ITEMS.map((item) => (
                   <Link
                     key={item.href + item.label}
@@ -451,69 +665,124 @@ export default function OfficeLayout({
             )}
           </div>
 
-          {/* 9 Clean Module Links with Index-Tab Active State */}
-          <nav className="space-y-0.5 overflow-y-auto max-h-[calc(100vh-280px)]">
-            {visibleModules.map((mod) => {
-              const Icon = NAV_ICONS[mod.iconKey];
-              const isActive = !isSettingsPath && activeModule?.id === mod.id;
-              const badgeCount = mod.id === 'approvals' ? pendingApprovalsCount : 0;
+          {/* Navigation Accordion (Expanded) OR Icon Rail (Collapsed) */}
+          <nav className="flex-1 overflow-y-auto pb-3">
+            {sidebarCollapsed ? (
+              <div className="space-y-1">
+                {visibleModules.map((mod) => {
+                  const Icon = NAV_ICONS[mod.iconKey];
+                  const modTabs = mod.tabs.filter((t) => !t.permission || can(user, t.permission));
+                  const isCurrentModule = !isSettingsPath && activeModule?.id === mod.id;
+                  const modLabel = locale === 'mr' ? mod.labelMr : mod.label;
+                  const badgeCount = mod.id === 'approvals' ? pendingApprovalsCount : 0;
 
-              return (
-                <Link
-                  key={mod.id}
-                  href={mod.href}
-                  title={sidebarCollapsed ? mod.label : undefined}
-                  className={`flex items-center gap-3 h-[38px] text-[14.5px] transition-colors relative z-10 ${
-                    sidebarCollapsed ? 'justify-center px-2 rounded-[3px]' : 'px-3.5 rounded-l-[3px]'
-                  } ${
-                    isActive
-                      ? 'bg-sheet text-ink font-semibold mr-0 shadow-[inset_1px_0_0_var(--rule),inset_0_1px_0_var(--rule),inset_0_-1px_0_var(--rule)]'
-                      : 'text-ink-2 hover:text-ink hover:bg-sheet/50 mr-3'
-                  }`}
-                >
-                  <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-action' : 'text-ink-2'}`} strokeWidth={1.75} />
-                  {!sidebarCollapsed && (
-                    <span className="truncate">{locale === 'mr' ? mod.labelMr : mod.label}</span>
-                  )}
-                  {!sidebarCollapsed && badgeCount > 0 && (
-                    <span className="ml-auto text-[12px] font-semibold bg-madder text-white rounded-full px-1.5 leading-[18px]">
-                      {badgeCount}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+                  if (modTabs.length <= 1) {
+                    return (
+                      <Link
+                        key={mod.id}
+                        href={mod.href}
+                        title={modLabel}
+                        className={`relative flex items-center justify-center h-[38px] px-2 rounded-[3px] transition-colors ${
+                          isCurrentModule
+                            ? 'bg-sheet text-action font-semibold border border-rule'
+                            : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+                        }`}
+                      >
+                        <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                        {badgeCount > 0 && (
+                          <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-madder" />
+                        )}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      title={modLabel}
+                      onClick={(e) => openFlyoutFor(e, mod.id, modLabel, modTabs)}
+                      className={`w-full relative flex items-center justify-center h-[38px] px-2 rounded-[3px] transition-colors ${
+                        isCurrentModule || collapsedFlyout?.id === mod.id
+                          ? 'bg-sheet text-action font-semibold border border-rule'
+                          : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+                      }`}
+                    >
+                      <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                    </button>
+                  );
+                })}
+
+                {visibleSettingsTabs.length > 0 && (
+                  <div className="pt-2 mt-2 border-t border-rule">
+                    <button
+                      type="button"
+                      title="Settings"
+                      onClick={(e) => openFlyoutFor(e, 'settings', 'Settings', visibleSettingsTabs)}
+                      className={`w-full flex items-center justify-center h-[38px] px-2 rounded-[3px] transition-colors ${
+                        isSettingsPath || collapsedFlyout?.id === 'settings'
+                          ? 'bg-sheet text-action font-semibold border border-rule'
+                          : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
+                      }`}
+                    >
+                      <NAV_ICONS.settings className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              renderAccordionList()
+            )}
           </nav>
         </div>
 
-        {/* Sidebar Footer: Settings, Help, User, Language & Theme */}
-        <div className={`${sidebarCollapsed ? 'px-2 pb-4' : 'pl-4 pr-5 pb-4'} pt-2.5 border-t border-rule mr-0`}>
-          <div className="space-y-0.5 mb-2">
-            <Link
-              href="/admin/company"
-              className={`flex items-center gap-3 h-[36px] px-3 text-[14px] rounded-[3px] transition-colors ${
-                isSettingsPath ? 'bg-sheet text-ink font-semibold' : 'text-ink-2 hover:text-ink hover:bg-sheet/50'
-              } ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
-              title="Settings"
-            >
-              <NAV_ICONS.settings className="w-[17px] h-[17px] shrink-0" strokeWidth={1.75} />
-              {!sidebarCollapsed && <span>Settings</span>}
-            </Link>
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              className={`w-full flex items-center gap-3 h-[36px] px-3 text-[14px] text-ink-2 hover:text-ink hover:bg-sheet/50 rounded-[3px] transition-colors ${
-                sidebarCollapsed ? 'justify-center px-2' : ''
-              }`}
-              title="Help & Shortcuts (?)"
-            >
-              <NAV_ICONS.help className="w-[17px] h-[17px] shrink-0" strokeWidth={1.75} />
-              {!sidebarCollapsed && <span>Help</span>}
-            </button>
+        {/* Unclipped Floating Flyout Submenu (when desktop sidebar is collapsed) */}
+        {sidebarCollapsed && collapsedFlyout && (
+          <div
+            style={{ top: collapsedFlyout.top }}
+            className="fixed left-[76px] z-50 w-56 max-h-[calc(100vh-24px)] overflow-y-auto bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5"
+          >
+            <div className="px-3.5 py-2 text-[13px] font-semibold text-ink border-b border-rule">
+              {collapsedFlyout.label}
+            </div>
+            <div className="py-1">
+              {collapsedFlyout.tabs.map((tab) => {
+                const active = isSubTabActive(pathname, tab.href);
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    onClick={() => setCollapsedFlyout(null)}
+                    className={`block px-3.5 py-2 text-[13.5px] transition-colors ${
+                      active
+                        ? 'bg-paper text-action font-semibold'
+                        : 'text-ink-2 hover:text-ink hover:bg-paper'
+                    }`}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        {/* Sidebar Footer: Help, User, Language & Theme */}
+        <div className={`${sidebarCollapsed ? 'px-2 pb-4' : 'pl-4 pr-5 pb-4'} pt-2 border-t border-rule shrink-0`}>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className={`w-full flex items-center gap-3 h-[36px] px-3 text-[14px] text-ink-2 hover:text-ink hover:bg-sheet/50 rounded-[3px] transition-colors ${
+              sidebarCollapsed ? 'justify-center px-2' : ''
+            }`}
+            title="Help & Shortcuts (?)"
+          >
+            <NAV_ICONS.help className="w-[17px] h-[17px] shrink-0" strokeWidth={1.75} />
+            {!sidebarCollapsed && <span>Help</span>}
+          </button>
 
           {!sidebarCollapsed && (
-            <div className="px-3 pt-2 border-t border-rule flex items-center gap-2.5">
+            <div className="px-3 pt-2 mt-1 border-t border-rule flex items-center gap-2.5">
               <Link href="/me" className="flex items-center gap-2.5 min-w-0 flex-1 group">
                 <Avatar name={user?.name || 'User'} size="sm" />
                 <div className="min-w-0">
@@ -549,75 +818,62 @@ export default function OfficeLayout({
 
       {/* 2. Main Sheet Workspace */}
       <div className="flex-1 flex flex-col min-w-0 bg-sheet pb-16 lg:pb-0">
-        {/* Topbar with Module Tabs */}
-        <header className="h-[60px] border-b border-rule px-4 sm:px-8 flex items-center justify-between gap-4 shrink-0 sticky top-0 z-10 bg-sheet no-print">
-          {/* Left: Module Sub-Tabs or Today's Date */}
-          <div className="flex items-center gap-5 h-full overflow-x-auto min-w-0">
-            {pathname === '/home' ? (
-              <span className="text-[13.5px] text-ink-3 whitespace-nowrap">{todayDateStr}</span>
-            ) : (
-              <>
-                {visibleTabs.map((tab) => {
-                  const isTabActive =
-                    pathname === tab.href ||
-                    (tab.href !== '/procurement' &&
-                      tab.href !== '/production' &&
-                      tab.href !== '/finance' &&
-                      pathname.startsWith(tab.href + '/'));
-                  return (
-                    <Link
-                      key={tab.href}
-                      href={tab.href}
-                      className={`h-full flex items-center text-[14px] border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                        isTabActive
-                          ? 'border-ink text-ink font-semibold'
-                          : 'border-transparent text-ink-2 hover:text-ink'
-                      }`}
-                    >
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-                {overflowTabs.length > 0 && (
-                  <div className="relative h-full flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => setMoreTabsOpen((o) => !o)}
-                      className="text-[13.5px] text-ink-2 hover:text-ink flex items-center gap-1 py-1 px-1.5 rounded-[3px]"
-                    >
-                      <span>More</span>
-                      <ACTION_ICONS.chevronDown className="w-3.5 h-3.5" />
-                    </button>
-                    {moreTabsOpen && (
-                      <div
-                        className="absolute left-0 top-full mt-0.5 w-52 bg-sheet border border-rule-strong rounded-[4px] shadow-xl py-1.5 z-50"
-                        onMouseLeave={() => setMoreTabsOpen(false)}
-                      >
-                        {overflowTabs.map((tab) => (
-                          <Link
-                            key={tab.href}
-                            href={tab.href}
-                            onClick={() => setMoreTabsOpen(false)}
-                            className={`block px-3.5 py-2 text-[13.5px] hover:bg-paper ${
-                              pathname === tab.href ? 'font-semibold text-action' : 'text-ink-2'
-                            }`}
-                          >
-                            {tab.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+        {/* Clean Single-Row Topbar (Zero scrollbars, zero tabs) */}
+        <header className="h-[56px] border-b border-rule px-4 sm:px-8 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20 bg-sheet no-print">
+          {/* Left: Desktop Breadcrumb OR Mobile Menu + 1-Tap Section Switcher */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Mobile Hamburger + Contextual Pill */}
+            <div className="flex lg:hidden items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(true)}
+                className="w-10 h-10 -ml-1 border border-rule-strong bg-sheet hover:bg-paper rounded-[3px] flex items-center justify-center text-ink shrink-0"
+                aria-label="Open menu"
+              >
+                <ACTION_ICONS.menu className="w-5 h-5" />
+              </button>
+
+              {activeTabs.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setMobileSectionOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[3px] bg-paper border border-rule-strong text-[13.5px] text-ink min-w-0 max-w-[210px] sm:max-w-[300px]"
+                >
+                  <span className="text-ink-3 shrink-0">{activeModuleLabel}</span>
+                  <span className="text-ink-3 shrink-0">·</span>
+                  <span className="font-semibold truncate">{activePageLabel}</span>
+                  <ACTION_ICONS.chevronDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                </button>
+              ) : (
+                <span className="text-[14px] font-semibold text-ink truncate">
+                  {activePageLabel}
+                </span>
+              )}
+            </div>
+
+            {/* Desktop Breadcrumb */}
+            <div className="hidden lg:flex items-center gap-2 text-[13.5px] min-w-0">
+              {pathname === '/home' ? (
+                <span className="text-ink-3 whitespace-nowrap">{todayDateStr}</span>
+              ) : (
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-ink-3">{activeModuleLabel}</span>
+                  <span className="text-rule-strong">/</span>
+                  <span className="text-ink font-semibold truncate">{activePageLabel}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right: Site Switcher, Search, Approvals, Notifications, User */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div id="site-switcher" className="hidden md:flex items-center gap-1 text-[13.5px] text-ink-2">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div
+              id="site-switcher"
+              className="hidden md:flex items-center max-w-[190px]"
+              title={selectedSiteLabel}
+            >
               <select
-                className="bg-transparent text-ink-2 hover:text-ink font-medium outline-none cursor-pointer pr-1 py-1"
+                className="w-full truncate bg-transparent text-ink-2 hover:text-ink text-[13.5px] font-medium outline-none cursor-pointer pr-1 py-1"
                 value={activeSite}
                 onChange={(e) => handleSiteChange(e.target.value)}
                 aria-label="Active site"
@@ -635,7 +891,7 @@ export default function OfficeLayout({
               id="command-palette-btn"
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="hidden sm:flex items-center gap-2.5 w-60 lg:w-72 h-[36px] bg-paper border border-rule-strong hover:border-action rounded-[3px] px-3 text-[13.5px] text-ink-3 transition-colors"
+              className="hidden sm:flex items-center gap-2.5 w-52 lg:w-64 h-[36px] bg-paper border border-rule-strong hover:border-action rounded-[3px] px-3 text-[13.5px] text-ink-3 transition-colors"
             >
               <ACTION_ICONS.search className="w-4 h-4 shrink-0" />
               <span className="truncate">Search orders, customers...</span>
@@ -681,7 +937,7 @@ export default function OfficeLayout({
               )}
             </button>
 
-            <div className="relative">
+            <div className="relative z-40">
               <button
                 type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -736,7 +992,7 @@ export default function OfficeLayout({
 
         {/* Site Switch Feedback Toast */}
         {siteToast && (
-          <div className="fixed top-20 right-6 z-50 px-4 py-2.5 rounded-[4px] bg-sheet border border-rule-strong text-ink text-[13.5px] shadow-xl flex items-center gap-2">
+          <div className="fixed top-16 right-6 z-50 px-4 py-2.5 rounded-[4px] bg-sheet border border-rule-strong text-ink text-[13.5px] shadow-xl flex items-center gap-2">
             <ACTION_ICONS.check className="w-4 h-4 text-leaf" />
             <span>{siteToast}</span>
           </div>
@@ -749,72 +1005,249 @@ export default function OfficeLayout({
       {/* Mobile Bottom Navigation Bar */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-[62px] bg-sheet border-t border-rule flex items-center justify-around px-2 z-30 no-print">
         {[
-          { id: 'today', label: 'Today', href: '/home', Icon: NAV_ICONS.today },
-          { id: 'approvals', label: 'Approvals', href: '/control/approvals', Icon: NAV_ICONS.approvals, badge: pendingApprovalsCount },
-          { id: 'sales', label: 'Sales', href: '/sales/orders', Icon: NAV_ICONS.sales },
-          { id: 'money', label: 'Money', href: '/finance', Icon: NAV_ICONS.money },
-        ].map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={`relative flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 ${
-                isActive ? 'text-action font-semibold' : 'text-ink-3'
-              }`}
-            >
-              <item.Icon className="w-5 h-5" />
-              <span>{item.label}</span>
-              {item.badge ? (
-                <span className="absolute top-0 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-madder text-white text-[10.5px] font-semibold flex items-center justify-center">
-                  {item.badge}
-                </span>
-              ) : null}
-            </Link>
-          );
-        })}
+          {
+            id: 'today',
+            label: 'Today',
+            href: '/home',
+            Icon: NAV_ICONS.today,
+            active: pathname === '/home' || pathname.startsWith('/control/dashboard') || pathname.startsWith('/control/analytics'),
+          },
+          {
+            id: 'approvals',
+            label: 'Approvals',
+            href: '/control/approvals',
+            Icon: NAV_ICONS.approvals,
+            badge: pendingApprovalsCount,
+            active: pathname.startsWith('/control/approvals'),
+          },
+          {
+            id: 'sales',
+            label: 'Sales',
+            href: '/sales/orders',
+            Icon: NAV_ICONS.sales,
+            active: pathname.startsWith('/sales'),
+          },
+          {
+            id: 'money',
+            label: 'Money',
+            href: '/finance',
+            Icon: NAV_ICONS.money,
+            active: pathname.startsWith('/finance'),
+          },
+        ].map((item) => (
+          <Link
+            key={item.id}
+            href={item.href}
+            className={`relative flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 ${
+              item.active ? 'text-action font-semibold' : 'text-ink-3'
+            }`}
+          >
+            <item.Icon className="w-5 h-5" />
+            <span>{item.label}</span>
+            {item.badge ? (
+              <span className="absolute top-0 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-madder text-white text-[10.5px] font-semibold flex items-center justify-center">
+                {item.badge}
+              </span>
+            ) : null}
+          </Link>
+        ))}
         <button
           type="button"
-          onClick={() => setMobileMoreOpen((o) => !o)}
-          className="flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 text-ink-3"
+          onClick={() => setMobileDrawerOpen(true)}
+          className={`flex flex-col items-center justify-center gap-0.5 text-[12px] px-3 py-1 ${
+            mobileDrawerOpen ? 'text-action font-semibold' : 'text-ink-3'
+          }`}
         >
-          <ACTION_ICONS.more className="w-5 h-5" />
-          <span>More</span>
+          <ACTION_ICONS.menu className="w-5 h-5" />
+          <span>Menu</span>
         </button>
       </nav>
 
-      {mobileMoreOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-black/40 flex items-end" onClick={() => setMobileMoreOpen(false)}>
+      {/* Mobile 1-Tap Contextual Sub-Page Sheet */}
+      {mobileSectionOpen && activeTabs.length > 1 && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/40 flex items-end"
+          onClick={() => setMobileSectionOpen(false)}
+        >
           <div
-            className="w-full bg-sheet border-t border-rule-strong rounded-t-[8px] p-4 space-y-2 max-h-[75vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${activeModuleLabel} pages`}
+            className="w-full bg-sheet border-t border-rule-strong rounded-t-[8px] p-4 max-h-[70vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-[14px] font-semibold text-ink pb-2 border-b border-ink">All Sections</div>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {visibleModules.map((mod) => {
-                const Icon = NAV_ICONS[mod.iconKey];
+            <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-ink">
+              <span className="text-[15px] font-semibold text-ink">{activeModuleLabel}</span>
+              <button
+                type="button"
+                onClick={() => setMobileSectionOpen(false)}
+                className="p-1 text-ink-3 hover:text-ink"
+                aria-label="Close section menu"
+              >
+                <ACTION_ICONS.close className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="divide-y divide-rule">
+              {activeTabs.map((tab) => {
+                const active = isSubTabActive(pathname, tab.href);
                 return (
                   <Link
-                    key={mod.id}
-                    href={mod.href}
-                    onClick={() => setMobileMoreOpen(false)}
-                    className="flex items-center gap-2.5 p-3 rounded-[4px] border border-rule bg-paper text-[14px] text-ink"
+                    key={tab.href}
+                    href={tab.href}
+                    onClick={() => setMobileSectionOpen(false)}
+                    className={`flex items-center justify-between py-3 px-1 text-[14.5px] ${
+                      active ? 'text-action font-semibold' : 'text-ink'
+                    }`}
                   >
-                    <Icon className="w-4 h-4 text-action" />
-                    <span>{mod.label}</span>
+                    <span>{tab.label}</span>
+                    {active && <ACTION_ICONS.check className="w-4 h-4 text-action" />}
                   </Link>
                 );
               })}
-              <Link
-                href="/admin/company"
-                onClick={() => setMobileMoreOpen(false)}
-                className="flex items-center gap-2.5 p-3 rounded-[4px] border border-rule bg-paper text-[14px] text-ink"
-              >
-                <NAV_ICONS.settings className="w-4 h-4 text-action" />
-                <span>Settings</span>
-              </Link>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Slide-Over Accordion Drawer */}
+      {mobileDrawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/45 flex"
+          onClick={() => setMobileDrawerOpen(false)}
+        >
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+            className="w-[290px] max-w-[85vw] h-full bg-paper relative flex flex-col justify-between shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              aria-hidden="true"
+              className="absolute top-0 bottom-0 right-0 bahi-margin-rule pointer-events-none"
+            />
+
+            <div className="pl-4 pt-4 flex flex-col min-h-0 flex-1">
+              <div className="flex items-center justify-between px-3 pr-5 pb-3 border-b border-rule mr-3">
+                <div>
+                  <div className="font-serif text-[22px] font-semibold tracking-tight text-ink leading-none">
+                    NeoBus
+                  </div>
+                  <div className="text-[12.5px] text-ink-3 mt-1 truncate">
+                    {user?.sites?.[0]?.name || 'Baramati Agro Foods'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="p-1.5 rounded-[3px] text-ink-2 hover:text-ink hover:bg-sheet"
+                  aria-label="Close menu"
+                >
+                  <ACTION_ICONS.close className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Site Switcher on Mobile */}
+              <div className="pr-6 py-3">
+                <label className="block text-[12px] text-ink-3 mb-1 px-1">Active site</label>
+                <select
+                  className="w-full bg-sheet border border-rule-strong rounded-[3px] px-2.5 py-2 text-[13.5px] text-ink outline-none"
+                  value={activeSite}
+                  onChange={(e) => handleSiteChange(e.target.value)}
+                >
+                  {user?.role === 'OWNER' && <option value="all">All Sites (Aggregated)</option>}
+                  {(user?.sites || []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.siteType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* + New Expandable Section on Mobile */}
+              <div className="pr-6 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileCreateOpen((o) => !o)}
+                  className="w-full h-[38px] bg-action hover:bg-action-hover text-white rounded-[3px] font-medium text-[14px] px-3.5 flex items-center gap-2"
+                >
+                  <ACTION_ICONS.plus className="w-4 h-4 shrink-0" />
+                  <span>New</span>
+                  <ACTION_ICONS.chevronDown
+                    className={`w-4 h-4 ml-auto transition-transform ${mobileCreateOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {mobileCreateOpen && (
+                  <div className="mt-1.5 bg-sheet border border-rule rounded-[3px] divide-y divide-rule">
+                    {CREATE_MENU_ITEMS.map((item) => (
+                      <Link
+                        key={item.href + item.label}
+                        href={item.href}
+                        onClick={() => {
+                          setMobileCreateOpen(false);
+                          setMobileDrawerOpen(false);
+                        }}
+                        className="block px-3 py-2 text-[13.5px] text-ink hover:bg-paper"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Same Single-Open Accordion Modules */}
+              <nav className="flex-1 overflow-y-auto pb-3">
+                {renderAccordionList(() => setMobileDrawerOpen(false))}
+              </nav>
+            </div>
+
+            {/* Mobile Drawer Footer */}
+            <div className="pl-4 pr-5 pb-4 pt-2 border-t border-rule shrink-0 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setHelpOpen(true);
+                }}
+                className="w-full flex items-center gap-3 h-[36px] px-3 text-[14px] text-ink-2 hover:text-ink rounded-[3px]"
+              >
+                <NAV_ICONS.help className="w-[17px] h-[17px]" strokeWidth={1.75} />
+                <span>Help</span>
+              </button>
+
+              <div className="px-3 pt-2 border-t border-rule flex items-center gap-2.5">
+                <Link
+                  href="/me"
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="flex items-center gap-2.5 min-w-0 flex-1"
+                >
+                  <Avatar name={user?.name || 'User'} size="sm" />
+                  <div className="min-w-0">
+                    <div className="text-[13.5px] font-semibold text-ink truncate">
+                      {user?.name || 'Loading...'}
+                    </div>
+                    <div className="text-[12px] text-ink-3 truncate">{user?.role || ''}</div>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setLocale(locale === 'en' ? 'mr' : 'en')}
+                  className="text-[12px] px-1.5 py-0.5 rounded-[3px] border border-rule-strong text-ink-2"
+                >
+                  {locale === 'en' ? 'मराठी' : 'EN'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme(isNight ? 'paper' : 'night')}
+                  className="p-1.5 rounded-[3px] border border-rule-strong text-ink-2"
+                  aria-label="Toggle theme"
+                >
+                  {isNight ? <ACTION_ICONS.sun className="w-3.5 h-3.5" /> : <ACTION_ICONS.moon className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          </aside>
         </div>
       )}
 

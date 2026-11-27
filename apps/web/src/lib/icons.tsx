@@ -37,6 +37,7 @@ import {
   Trash2,
   Users,
   CheckCircle2,
+  Menu,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -82,4 +83,5 @@ export const ACTION_ICONS = {
   transfer: ArrowLeftRight,
   trash: Trash2,
   users: Users,
+  menu: Menu,
 };
