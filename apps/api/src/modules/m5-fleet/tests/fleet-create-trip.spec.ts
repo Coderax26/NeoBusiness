@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { FleetService } from '../fleet.service.js';
 
@@ -142,5 +144,17 @@ describe('FleetService.createTrip freight_cost regression', () => {
     expect(insertedTrips[0].freight_cost).toBe('0.00');
     expect(insertedTrips[1].freight_cost).toBe('0.00');
     expect(insertedTrips[2].freight_cost).toBe('2500.00');
+  });
+
+  it('includes migration 037 declaring collection_receipts(reference_type, reference_id) and delivery_stop_lines(updated_by)', () => {
+    const migPath = path.resolve(
+      __dirname,
+      '../../../../../../db/migrations/20261128_037_collection_receipts_ref_and_m5_m6_schema.sql',
+    );
+    expect(fs.existsSync(migPath)).toBe(true);
+    const sql = fs.readFileSync(migPath, 'utf8');
+    expect(sql).toMatch(/ALTER\s+TABLE\s+collection_receipts\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+reference_type/i);
+    expect(sql).toMatch(/ALTER\s+TABLE\s+collection_receipts\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+reference_id/i);
+    expect(sql).toMatch(/ALTER\s+TABLE\s+delivery_stop_lines\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+updated_by/i);
   });
 });
