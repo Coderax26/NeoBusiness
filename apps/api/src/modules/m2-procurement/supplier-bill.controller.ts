@@ -9,6 +9,7 @@ import {
   Req,
   UseInterceptors,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
 import { AuditInterceptor } from '../../shared/interceptors/audit.interceptor.js';
 import { wrapResponse } from '../../shared/utils/response-envelope.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { SupplierBillService } from './supplier-bill.service.js';
 import {
   CreateSupplierBillDto,
@@ -39,7 +41,7 @@ export class SupplierBillController {
   constructor(
     private readonly billService: SupplierBillService,
     @InjectKnex() private readonly knex: Knex,
-  ) {}
+  ) { }
 
   @Post()
   @UseInterceptors(AuditInterceptor)
@@ -47,7 +49,10 @@ export class SupplierBillController {
   @ApiOperation({ summary: 'Create a new supplier bill (DRAFT)' })
   @ApiResponse({ status: 201, description: 'Supplier bill created' })
   async create(@Body() dto: CreateSupplierBillDto, @Req() req: any) {
-    const siteId = dto.siteId || req.user.siteId;
+    const siteId = resolveUserSiteId(req.user, dto.siteId);
+    if (!siteId) {
+      throw new BadRequestException('Receiving siteId is required');
+    }
     const items = [];
 
     for (const item of dto.items) {
@@ -180,12 +185,13 @@ export class SupplierBillController {
   @ApiResponse({ status: 200, description: 'Supplier bills list' })
   async list(@Query() query: ListSupplierBillsQueryDto, @Req() req: any) {
     const rawSiteId =
-      query.siteId || (req.user.role === 'OWNER' ? undefined : req.user.siteId);
+      query.siteId ||
+      (req.user.role === 'OWNER' ? undefined : resolveUserSiteId(req.user));
     const siteId =
       rawSiteId &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        rawSiteId,
-      )
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          rawSiteId,
+        )
         ? rawSiteId
         : undefined;
     const result = await this.billService.list({
@@ -204,9 +210,9 @@ export class SupplierBillController {
   async getApAging(@Query('siteId') siteId?: string) {
     const normalizedSiteId =
       siteId &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        siteId,
-      )
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          siteId,
+        )
         ? siteId
         : undefined;
     const result = await this.billService.getApAging(normalizedSiteId);

@@ -83,7 +83,9 @@ export class AuthService {
       .where('user_id', user.id)
       .pluck('site_id');
 
-    const siteIds = [user.assigned_site_id, ...siteAccess].filter(Boolean);
+    const siteIds: string[] = [
+      ...new Set<string>([user.assigned_site_id, ...siteAccess].filter(Boolean)),
+    ];
 
     const tokens = await this.generateTokens(user, siteIds);
     return { user, ...tokens };
@@ -172,7 +174,9 @@ export class AuthService {
     const siteAccess = await this.knex('user_site_access')
       .where('user_id', user.id)
       .pluck('site_id');
-    const siteIds = [user.assigned_site_id, ...siteAccess].filter(Boolean);
+    const siteIds: string[] = [
+      ...new Set<string>([user.assigned_site_id, ...siteAccess].filter(Boolean)),
+    ];
 
     // Generate new tokens
     const tokens = await this.generateTokens(user, siteIds);

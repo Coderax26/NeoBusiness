@@ -130,7 +130,10 @@ export class WorkOrderRepository {
 
   async createMaterials(
     materials: Array<
-      Omit<WorkOrderMaterialRow, 'id' | 'created_at' | 'updated_at'> & {
+      Omit<
+        WorkOrderMaterialRow,
+        'id' | 'created_at' | 'updated_at' | 'variance_pct'
+      > & {
         id?: string;
       }
     >,
@@ -144,7 +147,10 @@ export class WorkOrderRepository {
 
   async createOutputs(
     outputs: Array<
-      Omit<WorkOrderOutputRow, 'id' | 'created_at' | 'updated_at'> & {
+      Omit<
+        WorkOrderOutputRow,
+        'id' | 'created_at' | 'updated_at' | 'yield_pct'
+      > & {
         id?: string;
       }
     >,

@@ -1,155 +1,262 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, Badge, StatusPill, Card, Dialog } from '@neo/ui';
 import {
   formatINR,
   scaleBomIngredients,
   calculateBomCostRollup,
-  activateBomVersion,
   canViewMarginAndCost,
   type BomRecord,
   type SessionUser,
 } from '@neo/shared';
 
+interface CatalogItem {
+  id: string;
+  name: string;
+  skuCode: string;
+  category: string;
+  primaryUom: string;
+}
+
 export default function BomsPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [activeSiteId, setActiveSiteId] = useState('');
   const [boms, setBoms] = useState<BomRecord[]>([]);
+  const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedBomId, setSelectedBomId] = useState<string>('');
-  const [scaleTargetQty, setScaleTargetQty] = useState<number>(500);
+  const [scaleTargetQty, setScaleTargetQty] = useState<number>(100);
+  const [liveRollup, setLiveRollup] = useState<{ totalBatchCost: number; costPerUnit: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState('Premium Dairy Cattle Feed (50kg)');
-  const [newOutputQty, setNewOutputQty] = useState(100);
+  const [newBomNo, setNewBomNo] = useState(`BOM-${Date.now().toString().slice(-4)}`);
+  const [newFgItemId, setNewFgItemId] = useState('');
+  const [newRmItemId, setNewRmItemId] = useState('');
+  const [newRmQtyPerUnit, setNewRmQtyPerUnit] = useState('1.05');
+  const [newYieldPct, setNewYieldPct] = useState('97.00');
+  const [busy, setBusy] = useState(false);
+
+  const loadBoms = useCallback(async (siteIdFilter: string) => {
+    const siteQuery = siteIdFilter ? `?siteId=${encodeURIComponent(siteIdFilter)}` : '';
+    const res = await fetch(`/api/proxy/production/boms${siteQuery}`).then((r) => (r.ok ? r.json() : []));
+    const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+    const normalized: BomRecord[] = rows.map((b: any) => ({
+      id: String(b.id),
+      code: String(b.code ?? b.bomNo ?? b.bom_no ?? 'BOM'),
+      version: Number(b.version ?? 1),
+      finishedItemId: String(b.finishedItemId ?? b.itemId ?? ''),
+      finishedItemName: String(b.finishedItemName ?? b.itemName ?? 'Item'),
+      outputQty: Number(b.outputQty ?? 1),
+      outputUom: String(b.outputUom ?? b.uom ?? 'KG'),
+      steps: Array.isArray(b.steps)
+        ? b.steps
+        : [`Blend ${(b.lines ?? []).length} raw material components and verify ${b.yieldPct ?? '95'}% yield`],
+      status: (b.status === 'OBSOLETE' ? 'ARCHIVED' : b.status ?? 'DRAFT') as BomRecord['status'],
+      ingredients: Array.isArray(b.ingredients)
+        ? b.ingredients
+        : Array.isArray(b.lines)
+          ? b.lines.map((l: any) => ({
+              itemId: String(l.itemId ?? l.componentItemId ?? ''),
+              itemSku: String(l.itemSkuCode ?? l.itemSku ?? ''),
+              itemName: String(l.itemName ?? l.componentItemName ?? 'Ingredient'),
+              qty: Number(l.qtyPerUnit ?? l.qty ?? 0),
+              uom: String(l.uom ?? 'KG'),
+              expectedLossPct: Number(l.expectedLossPct ?? l.scrapPct ?? 0),
+              unitCost: Number(l.unitCost ?? 0),
+            }))
+          : [],
+    }));
+    setBoms(normalized);
+    setSelectedBomId((prev) =>
+      prev && normalized.some((b) => b.id === prev) ? prev : normalized[0]?.id ?? '',
+    );
+  }, []);
 
   useEffect(() => {
     let active = true;
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    const effectiveSite = storedSite && storedSite !== 'all' ? storedSite : '';
+    setActiveSiteId(effectiveSite);
+
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (active && d?.user) setUser(d.user);
+        if (!active) return;
+        if (d?.user) setUser(d.user);
+        if (!effectiveSite) {
+          const fallback = d?.user?.activeSiteId || d?.user?.sites?.[0]?.id || '';
+          if (fallback) setActiveSiteId(String(fallback));
+        }
       })
       .catch(() => {});
 
-    const storedSite =
-      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') : null;
-    const siteQuery =
-      storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
-
-    fetch(`/api/proxy/production/boms${siteQuery}`)
+    fetch('/api/proxy/items')
       .then((r) => (r.ok ? r.json() : []))
       .then((res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        const normalized: BomRecord[] = rows.map((b: any) => ({
-          id: String(b.id),
-          code: String(b.code ?? b.bomNo ?? b.bom_no ?? 'BOM'),
-          name: String(b.name ?? b.itemName ?? b.bomNo ?? 'BOM'),
-          version: Number(b.version ?? 1),
-          outputItemId: String(b.outputItemId ?? b.itemId ?? ''),
-          outputItemName: String(b.outputItemName ?? b.itemName ?? 'Item'),
-          outputQty: Number(b.outputQty ?? b.batch_size ?? 100),
-          outputUom: String(b.outputUom ?? b.uom ?? 'kg'),
-          finishedItemId: String(b.finishedItemId ?? b.itemId ?? ''),
-          finishedItemName: String(b.finishedItemName ?? b.itemName ?? 'Item'),
-          steps: Array.isArray(b.steps) ? b.steps : [],
-          status: (b.status ?? 'ACTIVE') as BomRecord['status'],
-          ingredients: Array.isArray(b.ingredients)
-            ? b.ingredients
-            : Array.isArray(b.lines)
-              ? b.lines.map((l: any) => ({
-                  itemId: String(l.itemId ?? l.componentItemId ?? ''),
-                  itemName: String(l.itemName ?? l.componentItemName ?? 'Ingredient'),
-                  qtyPerBatch: Number(l.qtyPerBatch ?? l.qtyPerUnit ?? l.qty ?? 0),
-                  uom: String(l.uom ?? 'kg'),
-                  unitCost: Number(l.unitCost ?? 0),
-                  wastagePct: Number(l.wastagePct ?? l.scrapPct ?? 0),
-                }))
-              : [],
+        const mapped: CatalogItem[] = rows.map((i: any) => ({
+          id: String(i.id),
+          name: String(i.name ?? ''),
+          skuCode: String(i.sku_code ?? i.skuCode ?? ''),
+          category: String(i.category ?? i.item_category ?? ''),
+          primaryUom: String(i.primary_uom ?? i.primaryUom ?? 'KG'),
         }));
-        setBoms(normalized);
-        if (normalized.length > 0) setSelectedBomId(normalized[0].id);
+        setItems(mapped);
+        const fgs = mapped.filter((i) => i.category === 'PROCESSED_FG');
+        const rms = mapped.filter((i) => i.category === 'RAW_MATERIAL' || i.category === 'PACKAGING');
+        if (fgs.length > 0) setNewFgItemId(fgs[0].id);
+        if (rms.length > 0) setNewRmItemId(rms[0].id);
       })
       .catch(() => {});
+
+    loadBoms(effectiveSite).catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadBoms]);
 
   const showCostRollup = !user || canViewMarginAndCost(user.role);
   const selectedBom = boms.find((b) => b.id === selectedBomId) || boms[0] || {
     id: '',
     code: '—',
-    name: 'No BOMs loaded',
     version: 1,
-    outputItemId: '',
-    outputItemName: '—',
-    outputQty: 1,
-    outputUom: 'kg',
     finishedItemId: '',
-    finishedItemName: '—',
+    finishedItemName: 'No BOMs loaded',
+    outputQty: 1,
+    outputUom: 'KG',
     steps: [],
-    status: 'DRAFT',
+    status: 'DRAFT' as const,
     ingredients: [],
-  } as BomRecord;
+  };
+
+  useEffect(() => {
+    if (!showCostRollup || !selectedBom.id || selectedBom.id.startsWith('bom-')) {
+      setLiveRollup(null);
+      return;
+    }
+    let active = true;
+    fetch(`/api/proxy/production/boms/${encodeURIComponent(selectedBom.id)}/cost-rollup`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (!active || !res) return;
+        const d = res?.data ?? res;
+        const costPerUnit = Number(d?.totalCostPerUnit ?? d?.costPerUnit ?? 0);
+        if (Number.isFinite(costPerUnit)) {
+          setLiveRollup({
+            totalBatchCost: Number((costPerUnit * selectedBom.outputQty).toFixed(2)),
+            costPerUnit: Number(costPerUnit.toFixed(2)),
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedBom.id, selectedBom.outputQty, showCostRollup]);
 
   const scaledIngredients = useMemo(
-    () =>
-      scaleBomIngredients(
-        selectedBom.ingredients,
-        selectedBom.outputQty,
-        scaleTargetQty,
-      ),
+    () => scaleBomIngredients(selectedBom.ingredients, selectedBom.outputQty, scaleTargetQty),
     [selectedBom, scaleTargetQty],
   );
 
-  const costRollup = useMemo(
+  const clientRollup = useMemo(
     () => calculateBomCostRollup(selectedBom.ingredients, selectedBom.outputQty),
     [selectedBom],
   );
+  const costRollup = liveRollup && liveRollup.costPerUnit > 0 ? liveRollup : clientRollup;
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleActivate = (bom: BomRecord) => {
-    fetch(`/api/bff/production/boms/${bom.id}/activate`, { method: 'POST' }).catch(() => {});
-    const res = activateBomVersion(boms, bom.id);
-    setBoms(res.updated);
-    showToast(
-      `Activated ${bom.code} (v${bom.version}). Deactivated ${res.deactivatedIds.length} previous active version(s).`,
-    );
+  const handleActivate = async (bom: BomRecord) => {
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/proxy/production/boms/${encodeURIComponent(bom.id)}/activate`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      await loadBoms(activeSiteId);
+      showToast(`Activated ${bom.code} (v${bom.version}).`);
+    } catch (err) {
+      showToast(`Failed to activate BOM: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleDeleteDraft = (bom: BomRecord) => {
+  const handleDeleteDraft = async (bom: BomRecord) => {
     if (bom.status !== 'DRAFT') return;
-    fetch(`/api/bff/production/boms/${bom.id}`, { method: 'DELETE' }).catch(() => {});
-    const remaining = boms.filter((b) => b.id !== bom.id);
-    setBoms(remaining);
-    if (remaining[0]) setSelectedBomId(remaining[0].id);
-    showToast(`Deleted draft ${bom.code}.`);
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/proxy/production/boms/${encodeURIComponent(bom.id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      await loadBoms(activeSiteId);
+      showToast(`Deleted draft ${bom.code}.`);
+    } catch (err) {
+      showToast(`Failed to delete draft: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleCreateDraft = () => {
-    const draft: BomRecord = {
-      id: `bom-draft-${Date.now()}`,
-      code: `BOM-NEW-V${boms.length + 1}`,
-      version: boms.length + 1,
-      finishedItemId: 'itm-feed-fg',
-      finishedItemName: newName,
-      outputQty: newOutputQty,
-      outputUom: 'kg',
-      status: 'DRAFT',
-      steps: ['Standard batch mix & pack'],
-      ingredients: boms[0]?.ingredients ?? [],
-    };
-    setBoms((prev) => [draft, ...prev]);
-    setSelectedBomId(draft.id);
-    setCreateOpen(false);
-    showToast(`Created draft recipe ${draft.code}.`);
+  const handleCreateDraft = async () => {
+    if (!newFgItemId || !newRmItemId || !newBomNo.trim()) {
+      showToast('Select Finished Good, Raw Material, and enter BOM Code.');
+      return;
+    }
+    const rmItem = items.find((i) => i.id === newRmItemId);
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/production/boms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bomNo: newBomNo.trim(),
+          itemId: newFgItemId,
+          siteId: activeSiteId || undefined,
+          status: 'DRAFT',
+          yieldPct: newYieldPct || '95.00',
+          lines: [
+            {
+              itemId: newRmItemId,
+              qtyPerUnit: newRmQtyPerUnit || '1.00',
+              uom: rmItem?.primaryUom || 'KG',
+              sequenceNo: 1,
+              isCritical: true,
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBoms(activeSiteId);
+      setCreateOpen(false);
+      setNewBomNo(`BOM-${Date.now().toString().slice(-4)}`);
+      showToast(`Created draft recipe ${newBomNo}.`);
+    } catch (err) {
+      showToast(`Failed to create draft BOM: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const fgItems = items.filter((i) => i.category === 'PROCESSED_FG');
+  const rmItems = items.filter((i) => i.category === 'RAW_MATERIAL' || i.category === 'PACKAGING');
 
   return (
     <div className="space-y-6">
@@ -177,7 +284,6 @@ export default function BomsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BOM List */}
         <div className="space-y-3">
           {boms.map((bom) => (
             <div
@@ -208,15 +314,15 @@ export default function BomsPage() {
                 {bom.finishedItemName}
               </div>
               <div className="text-xs text-ink-3 mt-1">
-                Yields {bom.outputQty} {bom.outputUom} · {bom.ingredients.length} ingredients
+                Base {bom.outputQty} {bom.outputUom} · {bom.ingredients.length} ingredients
               </div>
               <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
                 {bom.status === 'DRAFT' && (
                   <>
-                    <Button variant="primary" onClick={() => handleActivate(bom)}>
+                    <Button variant="primary" disabled={busy} onClick={() => handleActivate(bom)}>
                       Activate Version
                     </Button>
-                    <Button variant="secondary" onClick={() => handleDeleteDraft(bom)}>
+                    <Button variant="secondary" disabled={busy} onClick={() => handleDeleteDraft(bom)}>
                       Delete Draft
                     </Button>
                   </>
@@ -226,7 +332,6 @@ export default function BomsPage() {
           ))}
         </div>
 
-        {/* Recipe Card Preview + Scale Calculator */}
         <div className="lg:col-span-2 space-y-4">
           <Card className="p-5 bg-sheet border-rule space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-rule">
@@ -235,20 +340,19 @@ export default function BomsPage() {
                   Recipe Card: {selectedBom.finishedItemName}
                 </h2>
                 <p className="text-xs text-ink-3">
-                  {selectedBom.code} · Base batch: {selectedBom.outputQty} {selectedBom.outputUom}
+                  {selectedBom.code} · Base: {selectedBom.outputQty} {selectedBom.outputUom}
                 </p>
               </div>
               {showCostRollup && (
                 <div className="text-right">
                   <div className="text-[11px] text-ink-3">Estimated Cost Roll-up (Owner)</div>
                   <div className="text-sm font-bold text-leaf font-mono">
-                    {formatINR(costRollup.costPerUnit)} / {selectedBom.outputUom} ({formatINR(costRollup.totalBatchCost)}/batch)
+                    {formatINR(costRollup.costPerUnit)} / {selectedBom.outputUom}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Scale Calculator */}
             <div className="p-3 rounded-lg bg-paper border border-rule flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-ink-2 font-medium">
                 Scale Calculator: Make{' '}
@@ -268,7 +372,7 @@ export default function BomsPage() {
                 <thead className="text-xs uppercase text-ink-3 border-b border-rule">
                   <tr>
                     <th className="py-2">Ingredient</th>
-                    <th className="py-2 text-right">Base ({selectedBom.outputQty} {selectedBom.outputUom})</th>
+                    <th className="py-2 text-right">Per {selectedBom.outputQty} {selectedBom.outputUom}</th>
                     <th className="py-2 text-right">Loss %</th>
                     <th className="py-2 text-right">Scaled ({scaleTargetQty} {selectedBom.outputUom})</th>
                   </tr>
@@ -293,9 +397,7 @@ export default function BomsPage() {
             </div>
 
             <div className="pt-2 border-t border-rule">
-              <h4 className="text-xs font-semibold uppercase text-ink-3 mb-2">
-                Process Steps
-              </h4>
+              <h4 className="text-xs font-semibold uppercase text-ink-3 mb-2">Process Steps</h4>
               <ol className="list-decimal list-inside space-y-1 text-xs text-ink-2">
                 {selectedBom.steps.map((s, idx) => (
                   <li key={idx}>{s}</li>
@@ -309,30 +411,68 @@ export default function BomsPage() {
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Draft BOM">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-ink-3 mb-1">Finished Item</label>
+            <label className="block text-xs text-ink-3 mb-1">BOM Code</label>
             <input
               type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              value={newBomNo}
+              onChange={(e) => setNewBomNo(e.target.value)}
               className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             />
           </div>
           <div>
-            <label className="block text-xs text-ink-3 mb-1">Base Output Qty (kg)</label>
-            <input
-              type="number"
-              value={newOutputQty}
-              onChange={(e) => setNewOutputQty(Number(e.target.value))}
+            <label className="block text-xs text-ink-3 mb-1">Finished Good Item (PROCESSED_FG)</label>
+            <select
+              value={newFgItemId}
+              onChange={(e) => setNewFgItemId(e.target.value)}
               className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-            />
+            >
+              {fgItems.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} ({i.skuCode})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-ink-3 mb-1">Primary Raw Material</label>
+            <select
+              value={newRmItemId}
+              onChange={(e) => setNewRmItemId(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            >
+              {rmItems.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} ({i.skuCode})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Qty Per Unit FG</label>
+              <input
+                type="text"
+                value={newRmQtyPerUnit}
+                onChange={(e) => setNewRmQtyPerUnit(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Target Yield %</label>
+              <input
+                type="text"
+                value={newYieldPct}
+                onChange={(e) => setNewYieldPct(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateDraft}>Create Draft</Button>
+            <Button variant="primary" disabled={busy} onClick={handleCreateDraft}>Create Draft</Button>
           </div>
         </div>
       </Dialog>
     </div>
   );
 }
-

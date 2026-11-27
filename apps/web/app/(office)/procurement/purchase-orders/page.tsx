@@ -25,40 +25,103 @@ const STATUS_TABS: Array<{ key: PurchaseOrderStatus | 'ALL'; label: string }> = 
   { key: 'CANCELLED', label: 'Cancelled' },
 ];
 
+function normalizePoStatus(raw: unknown): PurchaseOrderStatus {
+  const s = String(raw || 'DRAFT').toUpperCase();
+  if (s === 'PENDING_APPROVAL') return 'WAITING_APPROVAL';
+  if (s === 'ISSUED') return 'SENT_TO_SUPPLIER';
+  if (s === 'PARTIALLY_RECEIVED') return 'PARTLY_RECEIVED';
+  return s as PurchaseOrderStatus;
+}
+
 export default function PurchaseOrdersPage() {
   const [pos, setPos] = useState<PurchaseOrderRecord[]>([]);
+  const [liveSuppliers, setLiveSuppliers] = useState<Array<{ id: string; code: string; name: string; termsDays: number; reliability: number; fillRate: number; leadTimeDays: number }>>(PROCUREMENT_SUPPLIERS);
+  const [liveItems, setLiveItems] = useState<Array<{ id: string; sku: string; name: string; uom: string; lastRate: number }>>(PROCUREMENT_ITEMS);
+  const [liveSites, setLiveSites] = useState<Array<{ id: string; name: string }>>([]);
   const [statusTab, setStatusTab] = useState<PurchaseOrderStatus | 'ALL'>('ALL');
   const [supplierFilter, setSupplierFilter] = useState('ALL');
   const [siteFilter, setSiteFilter] = useState('ALL');
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/procurement/purchase-orders')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setPos(
-          rows.map((p: any) => ({
+  const loadPos = async () => {
+    try {
+      const r = await fetch('/api/proxy/procurement/purchase-orders');
+      if (!r.ok) return;
+      const res = await r.json();
+      const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+      setPos(
+        rows.map((p: any) => {
+          const normalized = normalizePoStatus(p.poStatus ?? p.po_status ?? p.status);
+          return {
             id: String(p.id),
-            poNumber: String(p.poNumber || p.po_number || p.po_no || p.id),
+            poNumber: String(p.poNo || p.poNumber || p.po_number || p.po_no || p.id),
             supplierId: String(p.supplierId || p.supplier_id || ''),
             supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
-            siteName: String(p.siteName || p.site_name || 'Main Site'),
-            status: (p.status || 'DRAFT') as PurchaseOrderStatus,
-            expectedDelivery: String(p.expectedDelivery || p.expected_delivery_date || '').slice(0, 10),
+            supplierPhone: String(p.supplierPhone || p.supplier_phone || ''),
+            receivingSiteId: String(p.receivingSiteId || p.receiving_site_id || ''),
+            receivingSiteName: String(p.receivingSiteName || p.siteName || p.site_name || 'Main Site'),
+            status: normalized,
+            expectedDelivery: String(p.expectedDelivery || p.expected_delivery || p.expected_delivery_date || '').slice(0, 10),
             paymentTermsDays: Number(p.paymentTermsDays ?? p.payment_terms_days ?? 15),
-            priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception),
+            priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception ?? normalized === 'WAITING_APPROVAL'),
+            quantitiesConfirmed: Boolean(p.quantitiesConfirmed ?? normalized !== 'DRAFT'),
+            createdAt: String(p.createdAt || p.created_at || '').slice(0, 10),
             issuedAt: p.issuedAt || p.issued_at || undefined,
+            totalAmountFallback: Number(p.totalAmount ?? p.total_amount ?? 0),
             lines: Array.isArray(p.lines) ? p.lines : [],
-          })),
-        );
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+          } as any;
+        }),
+      );
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    loadPos();
+    Promise.allSettled([
+      fetch('/api/proxy/procurement/suppliers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/items').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/sites').then((r) => (r.ok ? r.json() : [])),
+    ]).then(([supRes, itmRes, siteRes]) => {
+      if (supRes.status === 'fulfilled') {
+        const rows = Array.isArray(supRes.value) ? supRes.value : Array.isArray(supRes.value?.data) ? supRes.value.data : [];
+        if (rows.length > 0) {
+          const mapped = rows.map((s: any) => ({
+            id: String(s.id),
+            code: String(s.supplier_code || s.code || ''),
+            name: String(s.company_name || s.name || 'Supplier'),
+            termsDays: Number(s.payment_terms_days ?? 15),
+            reliability: Number(((Number(s.reliability_score_pct ?? 90) / 20)).toFixed(1)),
+            fillRate: Number(s.reliability_score_pct ?? 95),
+            leadTimeDays: Number(s.lead_time_days_avg ?? 3),
+          }));
+          setLiveSuppliers(mapped);
+          setWizSupplierId(mapped[0].id);
+        }
+      }
+      if (itmRes.status === 'fulfilled') {
+        const rows = Array.isArray(itmRes.value) ? itmRes.value : Array.isArray(itmRes.value?.data) ? itmRes.value.data : [];
+        if (rows.length > 0) {
+          const mapped = rows.map((i: any) => ({
+            id: String(i.id),
+            sku: String(i.sku_code || i.sku || ''),
+            name: String(i.name || 'Item'),
+            uom: String(i.primary_uom || i.uom || 'kg'),
+            lastRate: Number(i.last_purchase_price ?? i.standard_cost ?? 50),
+          }));
+          setLiveItems(mapped);
+          setWizItemId(mapped[0].id);
+          setWizRate(mapped[0].lastRate || 50);
+        }
+      }
+      if (siteRes.status === 'fulfilled') {
+        const rows = Array.isArray(siteRes.value) ? siteRes.value : Array.isArray(siteRes.value?.data) ? siteRes.value.data : [];
+        if (rows.length > 0) {
+          const mapped = rows.map((s: any) => ({ id: String(s.id), name: String(s.name) }));
+          setLiveSites(mapped);
+          setWizSite(mapped[0].id);
+        }
+      }
+    });
   }, []);
 
   // 4-step PO Builder Wizard
@@ -86,9 +149,9 @@ export default function PurchaseOrdersPage() {
   };
 
   const selectedWizSupplier =
-    PROCUREMENT_SUPPLIERS.find((s) => s.id === wizSupplierId) || PROCUREMENT_SUPPLIERS[0];
+    liveSuppliers.find((s) => s.id === wizSupplierId) || liveSuppliers[0];
   const selectedWizItem =
-    PROCUREMENT_ITEMS.find((i) => i.id === wizItemId) || PROCUREMENT_ITEMS[0];
+    liveItems.find((i) => i.id === wizItemId) || liveItems[0];
 
   const spikeEval = useMemo(
     () =>
@@ -120,116 +183,117 @@ export default function PurchaseOrdersPage() {
     });
   }, [pos, statusTab, supplierFilter, siteFilter]);
 
-  const handleCreatePo = () => {
-    const newPo: PurchaseOrderRecord = {
-      id: `po-${Date.now()}`,
-      poNumber: `PO-2026-${Math.floor(115 + Math.random() * 80)}`,
-      supplierId: selectedWizSupplier.id,
-      supplierName: selectedWizSupplier.name,
-      supplierPhone: selectedWizSupplier.phone,
-      receivingSiteId: wizSite === 'Baramati Plant' ? 'site-2' : 'site-1',
-      receivingSiteName: wizSite,
-      status: spikeEval.requiresOwnerApproval ? 'WAITING_APPROVAL' : 'DRAFT',
-      expectedDelivery: wizDeliveryDate,
-      paymentTermsDays: wizTerms,
-      priceSpikeException: spikeEval.requiresOwnerApproval,
-      priceSpikeSummary: plainSpikeSentence ?? undefined,
-      quantitiesConfirmed: false,
-      createdAt: 'Just now',
-      lines: [
-        {
-          lineId: `pol-${Date.now()}`,
-          itemId: selectedWizItem.id,
-          itemSku: selectedWizItem.sku,
-          itemName: selectedWizItem.name,
-          uom: selectedWizItem.uom,
-          orderedQty: wizQty,
-          confirmedQty: wizQty,
-          receivedQty: 0,
-          shortQty: 0,
-          unitRate: wizRate,
-          lastRate: selectedWizItem.lastRate,
-          variancePct: spikeEval.variancePct,
-          spikeFlag: spikeEval.requiresOwnerApproval,
-        },
-      ],
-    };
-
-    fetch('/api/bff/procurement/purchase-orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPo),
-    }).catch(() => {});
-
-    setPos((prev) => [newPo, ...prev]);
-    setWizardOpen(false);
-    setWizardStep(1);
-    showToast(
-      newPo.priceSpikeException
-        ? `Created ${newPo.poNumber} — flagged for Owner approval due to price spike.`
-        : `Created draft ${newPo.poNumber}.`,
-    );
+  const handleCreatePo = async () => {
+    const resolvedSiteId =
+      liveSites.find((s) => s.id === wizSite || s.name === wizSite)?.id ||
+      liveSites[0]?.id ||
+      wizSite;
+    try {
+      const res = await fetch('/api/proxy/procurement/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplierId: selectedWizSupplier.id,
+          receivingSiteId: resolvedSiteId,
+          expectedDelivery: wizDeliveryDate,
+          lines: [
+            {
+              itemId: selectedWizItem.id,
+              orderedQty: String(wizQty),
+              unitPrice: String(wizRate),
+            },
+          ],
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPos();
+      setWizardOpen(false);
+      setWizardStep(1);
+      showToast(`Created Purchase Order ${payload?.poNo ?? ''}.`);
+    } catch (err) {
+      showToast(`Failed to create PO: ${(err as Error).message}`);
+    }
   };
 
-  const handleConfirmQuantities = () => {
+  const handleConfirmQuantities = async () => {
     if (!confirmTarget) return;
-    fetch(`/api/bff/procurement/purchase-orders/${confirmTarget.id}/confirm-quantities`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirmedQty: confirmQtyValue }),
-    }).catch(() => {});
-
-    setPos((prev) =>
-      prev.map((p) =>
-        p.id === confirmTarget.id
-          ? {
-              ...p,
-              quantitiesConfirmed: true,
-              lines: p.lines.map((l, i) =>
-                i === 0 ? { ...l, confirmedQty: confirmQtyValue } : l,
-              ),
-            }
-          : p,
-      ),
-    );
-    showToast(`Supplier quantities confirmed for ${confirmTarget.poNumber}`);
-    setConfirmTarget(null);
+    try {
+      let lineId = confirmTarget.lines[0]?.lineId || (confirmTarget.lines[0] as any)?.id;
+      let rate = confirmTarget.lines[0]?.unitRate || (confirmTarget.lines[0] as any)?.unitPrice || 0;
+      if (!lineId) {
+        const lr = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(confirmTarget.id)}/lines`);
+        if (lr.ok) {
+          const lrows = await lr.json();
+          if (Array.isArray(lrows) && lrows[0]) {
+            lineId = lrows[0].id;
+            rate = Number(lrows[0].unitPrice ?? lrows[0].unit_price ?? 0);
+          }
+        }
+      }
+      const res = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(confirmTarget.id)}/confirm-quantities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmations: [
+            {
+              lineId,
+              confirmedQty: String(confirmQtyValue),
+              unitPrice: String(rate),
+            },
+          ],
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPos();
+      showToast(`Supplier quantities confirmed for ${confirmTarget.poNumber}`);
+      setConfirmTarget(null);
+    } catch (err) {
+      showToast(`Failed to confirm quantities: ${(err as Error).message}`);
+    }
   };
 
-  const handleIssuePo = (po: PurchaseOrderRecord) => {
+  const handleIssuePo = async (po: PurchaseOrderRecord) => {
     if (po.priceSpikeException) return;
-    fetch(`/api/bff/procurement/purchase-orders/${po.id}/issue`, {
-      method: 'POST',
-    }).catch(() => {});
-
-    setPos((prev) =>
-      prev.map((p) =>
-        p.id === po.id
-          ? { ...p, status: 'SENT_TO_SUPPLIER', issuedAt: 'Just now' }
-          : p,
-      ),
-    );
-    showToast(`Issued ${po.poNumber} to ${po.supplierName}. Ready to share PDF.`);
+    try {
+      const res = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(po.id)}/issue`, {
+        method: 'POST',
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPos();
+      showToast(`Issued ${po.poNumber} to ${po.supplierName}. Ready to share PDF.`);
+    } catch (err) {
+      showToast(`Failed to issue PO: ${(err as Error).message}`);
+    }
   };
 
-  const handleCancelPo = () => {
+  const handleCancelPo = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-    fetch(`/api/bff/procurement/purchase-orders/${cancelTarget.id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: cancelReason }),
-    }).catch(() => {});
-
-    setPos((prev) =>
-      prev.map((p) =>
-        p.id === cancelTarget.id
-          ? { ...p, status: 'CANCELLED', cancelReason }
-          : p,
-      ),
-    );
-    showToast(`Cancelled ${cancelTarget.poNumber}`);
-    setCancelTarget(null);
-    setCancelReason('');
+    try {
+      const res = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(cancelTarget.id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPos();
+      showToast(`Cancelled ${cancelTarget.poNumber}`);
+      setCancelTarget(null);
+      setCancelReason('');
+    } catch (err) {
+      showToast(`Failed to cancel PO: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -329,10 +393,10 @@ export default function PurchaseOrdersPage() {
             </thead>
             <tbody className="divide-y divide-rule">
               {filteredPos.map((po) => {
-                const total = po.lines.reduce(
-                  (sum, l) => sum + l.orderedQty * l.unitRate,
-                  0,
-                );
+                const total =
+                  po.lines.length > 0
+                    ? po.lines.reduce((sum, l) => sum + l.orderedQty * l.unitRate, 0)
+                    : Number((po as any).totalAmountFallback ?? 0);
                 return (
                   <tr key={po.id} className="hover:bg-sunken">
                     <td className="p-3">
@@ -476,7 +540,7 @@ export default function PurchaseOrdersPage() {
                 }}
                 className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               >
-                {PROCUREMENT_SUPPLIERS.map((s) => (
+                {liveSuppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.code})
                   </option>
@@ -512,7 +576,7 @@ export default function PurchaseOrdersPage() {
                   }}
                   className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                 >
-                  {PROCUREMENT_ITEMS.map((i) => (
+                  {liveItems.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.name} (Last rate: ₹{i.lastRate}/{i.uom})
                     </option>
@@ -576,8 +640,17 @@ export default function PurchaseOrdersPage() {
                   onChange={(e) => setWizSite(e.target.value)}
                   className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
                 >
-                  <option value="Pune Central Depot">Pune Central Depot</option>
-                  <option value="Baramati Plant">Baramati Plant</option>
+                  {(liveSites.length > 0
+                    ? liveSites
+                    : [
+                        { id: 'Pune Central Depot', name: 'Pune Central Depot' },
+                        { id: 'Baramati Plant', name: 'Baramati Plant' },
+                      ]
+                  ).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">

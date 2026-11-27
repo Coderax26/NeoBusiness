@@ -97,7 +97,6 @@ export class WastageRepository {
       .where('id', id)
       .update({
         ...data,
-        updated_at: new Date().toISOString(),
       })
       .returning('*');
     return row;

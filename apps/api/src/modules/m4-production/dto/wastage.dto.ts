@@ -1,10 +1,10 @@
 import {
   IsUUID,
   IsString,
+  IsNotEmpty,
+  Matches,
   IsOptional,
   IsEnum,
-  Min,
-  Max,
 } from 'class-validator';
 
 export enum WastageReasonType {
@@ -32,10 +32,11 @@ export class CreateWastageDto {
   batchId?: string;
 
   @IsString()
-  @Min(1, { message: 'qty must be positive' })
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,3})?$/, { message: 'qty must be positive' })
   qty: string;
 
   @IsString()
+  @IsNotEmpty()
   uom: string;
 
   @IsEnum(WastageReasonType)

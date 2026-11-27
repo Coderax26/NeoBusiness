@@ -94,6 +94,28 @@ export class DashboardEventHandler implements OnModuleInit, OnModuleDestroy {
         },
       );
 
+      this.exceptionPort.onResolved(
+        'YIELD_VARIANCE',
+        async (exceptionId: string, action: string) => {
+          await this.triggerPulseRefresh('exception_resolved');
+          await this.triggerOpsRefresh('exception_resolved');
+          await this.triggerAnalyticsRefresh('exception_resolved');
+          this.logger.log(
+            `YIELD_VARIANCE ${exceptionId} resolved with ${action} — pulse, ops, analytics refresh triggered`,
+          );
+        },
+      );
+
+      this.exceptionPort.onResolved(
+        'CASH_HANDOVER_VARIANCE',
+        async (exceptionId: string, action: string) => {
+          await this.triggerPulseRefresh('exception_resolved');
+          this.logger.log(
+            `CASH_HANDOVER_VARIANCE ${exceptionId} resolved with ${action} — pulse refresh triggered`,
+          );
+        },
+      );
+
       this.logger.log(
         'DashboardEventHandler: Exception resolution handlers registered',
       );
@@ -179,9 +201,19 @@ export class DashboardEventHandler implements OnModuleInit, OnModuleDestroy {
           break;
 
         // M4 events
+        case 'production.work_order_created':
+        case 'production.work_order_started':
         case 'workorder.started':
+          await this.triggerOpsRefresh(event.type);
+          break;
+        case 'production.output_recorded':
+          await this.triggerOpsRefresh(event.type);
+          await this.triggerInventoryAlertsRefresh(event.type);
+          break;
+        case 'production.work_order_completed':
         case 'workorder.completed':
           await this.triggerOpsRefresh(event.type);
+          await this.triggerInventoryAlertsRefresh(event.type);
           await this.triggerAnalyticsRefresh(event.type);
           break;
 

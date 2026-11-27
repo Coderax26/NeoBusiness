@@ -2,26 +2,54 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, StatusPill, Card } from '@neo/ui';
+import { Button, StatusPill, Card, Dialog } from '@neo/ui';
 import { type StockCountRecord } from '../../../../src/lib/inventory-data';
 
 export default function StockCountsPage() {
   const [counts, setCounts] = useState<StockCountRecord[]>([]);
+  const [stockBatches, setStockBatches] = useState<any[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newNotes, setNewNotes] = useState('');
+  const [countedMap, setCountedMap] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadCounts = async () => {
+    try {
+      const [cntRes, stkRes] = await Promise.all([
+        fetch('/api/proxy/inventory/stock-counts').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const rows = Array.isArray(cntRes) ? cntRes : Array.isArray(cntRes?.data) ? cntRes.data : [];
+      const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+      setStockBatches(sRows);
+
+      setCounts(
+        rows.map((s: any) => {
+          const st = String(s.status || 'DRAFT').toUpperCase();
+          const rawItems = Array.isArray(s.lines) ? s.lines : Array.isArray(s.items) ? s.items : [];
+          return {
+            id: String(s.id),
+            sheetNo: String(s.sheetNo || s.count_no || s.id),
+            siteName: String(s.siteName || s.site_name || 'Main Site'),
+            locationCode: String(s.locationCode || s.location_id || 'ALL'),
+            category: String(s.notes || s.category || 'Cycle Count'),
+            status: (st === 'DRAFT' || st === 'OPEN' ? 'OPEN' : 'POSTED') as StockCountRecord['status'],
+            createdAt: String(s.createdAt || s.created_at || ''),
+            lines: rawItems.map((it: any) => ({
+              itemId: String(it.itemId || it.item_id || ''),
+              itemName: String(it.itemName || it.item_name || 'Item'),
+              uom: String(it.uom || it.primary_uom || 'KG'),
+              systemQty: Number(it.systemQty ?? it.system_qty ?? 0),
+              countedQty: Number(it.countedQty ?? it.counted_qty ?? 0),
+            })),
+          };
+        }),
+      );
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/inventory/stock-counts')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setCounts(rows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadCounts();
   }, []);
 
   const updateCounted = (sheetId: string, itemId: string, val: number) => {
@@ -30,7 +58,7 @@ export default function StockCountsPage() {
         c.id === sheetId
           ? {
               ...c,
-              lines: c.lines.map((l) =>
+              lines: (c.lines || []).map((l) =>
                 l.itemId === itemId ? { ...l, countedQty: val } : l,
               ),
             }
@@ -39,12 +67,53 @@ export default function StockCountsPage() {
     );
   };
 
-  const postSheet = (sheet: StockCountRecord) => {
-    fetch(`/api/bff/inventory/stock-counts/${sheet.id}/approve`, { method: 'POST' }).catch(() => {});
-    setCounts((prev) =>
-      prev.map((c) => (c.id === sheet.id ? { ...c, status: 'POSTED' } : c)),
-    );
-    setToast(`Posted variance adjustments for count sheet ${sheet.sheetNo}.`);
+  const handleCreateCount = async () => {
+    if (stockBatches.length === 0) return;
+    const first = stockBatches[0];
+    const siteId = String(first.siteId || first.site_id || '');
+    const items = stockBatches.slice(0, 10).map((b: any) => {
+      const idKey = String(b.batchId || b.id);
+      const sysQty = Number(b.qtyOnHand ?? b.qty_on_hand ?? b.onHand ?? 0);
+      return {
+        itemId: String(b.itemId || b.item_id),
+        batchNo: String(b.batchNumber || b.batch_number || ''),
+        systemQty: String(sysQty),
+        countedQty: String(countedMap[idKey] ?? sysQty),
+      };
+    });
+    try {
+      const res = await fetch('/api/proxy/inventory/stock-counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, notes: newNotes || 'Physical cycle count', items }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadCounts();
+      setCreateOpen(false);
+      setNewNotes('');
+      setToast('Created physical stock count sheet.');
+    } catch (err) {
+      setToast(`Failed to create stock count: ${(err as Error).message}`);
+    }
+  };
+
+  const postSheet = async (sheet: StockCountRecord) => {
+    try {
+      const res = await fetch(`/api/proxy/inventory/stock-counts/${encodeURIComponent(sheet.id)}/approve`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadCounts();
+      setToast(`Posted variance adjustments to ledger for count sheet ${sheet.sheetNo}.`);
+    } catch (err) {
+      setToast(`Failed to approve stock count: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -61,9 +130,14 @@ export default function StockCountsPage() {
             Enter physical counts, review system vs counted variance, and post bulk adjustments.
           </p>
         </div>
-        <Button variant="secondary" onClick={() => window.print()}>
-          Print Count Sheet
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => window.print()}>
+            Print Count Sheet
+          </Button>
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            + New Stock Count
+          </Button>
+        </div>
       </div>
 
       {toast && (
@@ -138,6 +212,41 @@ export default function StockCountsPage() {
           </table>
         </Card>
       ))}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Physical Stock Count">
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Count notes (e.g. Monthly cycle count)"
+            value={newNotes}
+            onChange={(e) => setNewNotes(e.target.value)}
+            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+          />
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {stockBatches.slice(0, 10).map((b: any) => {
+              const idKey = String(b.batchId || b.id);
+              const sysQty = Number(b.qtyOnHand ?? b.qty_on_hand ?? 0);
+              return (
+                <div key={idKey} className="flex items-center justify-between gap-2 text-xs p-2 bg-paper border border-rule rounded">
+                  <div>
+                    <div className="font-medium text-ink">{b.itemName}</div>
+                    <div className="font-mono text-ink-3">{b.batchNumber} (Sys: {sysQty})</div>
+                  </div>
+                  <input
+                    type="number"
+                    value={countedMap[idKey] ?? sysQty}
+                    onChange={(e) => setCountedMap((prev) => ({ ...prev, [idKey]: Number(e.target.value) }))}
+                    className="w-24 text-right bg-sheet border border-rule-strong rounded px-2 py-1 font-mono"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreateCount}>Create Sheet</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

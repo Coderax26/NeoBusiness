@@ -106,6 +106,7 @@ export interface GrnRecord {
   receivedBy: string;
   siteName: string;
   hasShortfall: boolean;
+  lineCount?: number;
   lines: GrnLineRecord[];
 }
 
@@ -131,7 +132,7 @@ export interface OpenShortfallRecord {
   primarySupplierName: string;
   primaryRate: number;
   shortQty: number;
-  impactedSalesOrders: Array<{ id: string; orderNo: string; customerName: string }>;
+  impactedSalesOrders?: Array<{ id: string; orderNo: string; customerName: string }>;
   status: 'OPEN' | 'BACKUP_PO_CREATED' | 'ALLOCATED' | 'WRITTEN_OFF';
   backups: ShortfallBackupCandidate[];
 }

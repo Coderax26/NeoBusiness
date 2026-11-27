@@ -46,6 +46,6 @@ export class ConvertToPODto {
 
   @ApiProperty({ type: [String], example: ['req-uuid-1', 'req-uuid-2'] })
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   requisitionIds: string[];
 }

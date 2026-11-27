@@ -17,7 +17,41 @@ export default function StockLedgerExplorerPage() {
       .then((res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setEntries(rows);
+        setEntries(
+          rows.map((row: any) => {
+            const txn = String(row.txnType || row.txn_type || row.type || 'ADJUSTMENT').toUpperCase();
+            const mappedType: LedgerEntry['type'] =
+              txn === 'RECEIPT'
+                ? 'GRN'
+                : txn === 'SALE_DISPATCH'
+                  ? 'SALE'
+                  : txn === 'TRANSFER_IN' || txn === 'TRANSFER_OUT'
+                    ? 'TRANSFER'
+                    : txn === 'PROD_OUTPUT'
+                      ? 'PRODUCTION_IN'
+                      : txn === 'PROD_CONSUME'
+                        ? 'PRODUCTION_OUT'
+                        : txn === 'REVERSAL'
+                          ? 'REVERSAL'
+                          : 'ADJUSTMENT';
+            const rawQty = Number(row.qtyDelta ?? row.qty ?? 0);
+            const isOutflow = ['SALE_DISPATCH', 'TRANSFER_OUT', 'WRITEOFF', 'EXPIRY_REMOVAL', 'SHRINKAGE', 'PROD_CONSUME'].includes(txn);
+            return {
+              id: String(row.id),
+              timestamp: String(row.timestamp || row.postedAt || row.posted_at || '').slice(0, 19).replace('T', ' '),
+              itemId: String(row.itemId || row.item_id || ''),
+              itemName: String(row.itemName || row.item_name || 'Item'),
+              batchNo: String(row.batchNo || row.batchNumber || row.batch_id || ''),
+              siteName: String(row.siteName || row.site_name || 'Main Site'),
+              type: mappedType,
+              qtyDelta: row.qtyDelta !== undefined ? rawQty : (isOutflow ? -Math.abs(rawQty) : rawQty),
+              runningBalance: Number(row.runningBalance ?? 0),
+              uom: String(row.uom || 'KG'),
+              refNo: String(row.refNo || row.referenceNo || row.reference_no || ''),
+              reversesId: row.reversesId || row.reversesTxnId || row.reverses_txn_id || undefined,
+            };
+          }),
+        );
       })
       .catch(() => {});
     return () => {
@@ -26,13 +60,14 @@ export default function StockLedgerExplorerPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return entries.filter((e) => {
       if (typeFilter !== 'ALL' && e.type !== typeFilter) return false;
       if (
-        search.trim() &&
-        !e.itemName.toLowerCase().includes(search.toLowerCase()) &&
-        !e.refNo.toLowerCase().includes(search.toLowerCase()) &&
-        !e.batchNo.toLowerCase().includes(search.toLowerCase())
+        q &&
+        !(e.itemName || '').toLowerCase().includes(q) &&
+        !(e.refNo || '').toLowerCase().includes(q) &&
+        !(e.batchNo || '').toLowerCase().includes(q)
       ) {
         return false;
       }

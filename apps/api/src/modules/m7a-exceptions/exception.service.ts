@@ -6,6 +6,7 @@ import {
   BadRequestException,
   Inject,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
@@ -39,8 +40,12 @@ interface RaiseOptions {
  * are committed atomically — matching ADR-005 (Transactional Outbox).
  */
 @Injectable()
-export class ExceptionService implements ExceptionPort, OnModuleInit {
+export class ExceptionService
+  implements ExceptionPort, OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(ExceptionService.name);
+  private relayTimer: ReturnType<typeof setInterval> | null = null;
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Resolved handlers indexed by exception type (supports multiple listeners per type). */
   private handlers = new Map<
@@ -66,6 +71,39 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
     this.logger.log(
       'ExceptionService initialized (EXCEPTION_PORT → real implementation)',
     );
+    if (
+      process.env.NODE_ENV !== 'test' &&
+      process.env.DISABLE_BACKGROUND_WORKERS !== 'true'
+    ) {
+      this.relayTimer = setInterval(() => {
+        this.relayNotifications().catch((err) =>
+          this.logger.error(
+            `Background relayNotifications error: ${(err as Error).message}`,
+          ),
+        );
+      }, 10_000);
+      this.relayTimer.unref();
+
+      this.sweepTimer = setInterval(() => {
+        this.sweepExpired().catch((err) =>
+          this.logger.error(
+            `Background sweepExpired error: ${(err as Error).message}`,
+          ),
+        );
+      }, 60_000);
+      this.sweepTimer.unref();
+    }
+  }
+
+  onModuleDestroy(): void {
+    if (this.relayTimer) {
+      clearInterval(this.relayTimer);
+      this.relayTimer = null;
+    }
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+      this.sweepTimer = null;
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -468,6 +506,7 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
   async relayNotifications(): Promise<number> {
     const rows = await this.knex('notification_outbox')
       .where('status', 'QUEUED')
+      .whereIn('channel', ['FCM', 'SMS', 'WHATSAPP'])
       .where('attempts', '<', 3)
       .orderBy('created_at')
       .limit(50);
@@ -488,23 +527,64 @@ export class ExceptionService implements ExceptionPort, OnModuleInit {
         continue;
       }
 
+      const payload =
+        typeof row.payload_json === 'string'
+          ? JSON.parse(row.payload_json)
+          : (row.payload_json ?? {});
+      const channel = (row.channel || template.channel) as
+        | 'FCM'
+        | 'WHATSAPP'
+        | 'SMS'
+        | 'IN_APP';
+
       try {
-        await this.notify.send(
-          template.channel as 'FCM' | 'WHATSAPP' | 'SMS' | 'IN_APP',
-          row.template_code,
-          row.recipient_ref,
-          JSON.parse(row.payload_json as unknown as string),
-        );
+        let providerMsgId = `sent-${row.id}`;
+        if (typeof (this.notify as any).dispatch === 'function') {
+          const result = await (this.notify as any).dispatch(
+            channel,
+            row.template_code,
+            row.recipient_ref,
+            payload,
+          );
+          if (result?.providerMessageId) {
+            providerMsgId = String(result.providerMessageId);
+          }
+          if (result?.deferred) {
+            await this.knex('notification_outbox')
+              .where({ id: row.id })
+              .update({
+                status: 'FAILED',
+                error: 'WhatsApp provider deferred (WHATSAPP_WEBHOOK_URL not configured)',
+              });
+            continue;
+          }
+        } else {
+          await this.notify.send(
+            channel,
+            row.template_code,
+            row.recipient_ref,
+            payload,
+          );
+        }
+
         await this.knex('notification_outbox')
           .where({ id: row.id })
-          .update({ status: 'SENT', provider_msg_id: `sent-${row.id}` });
+          .update({
+            status: 'SENT',
+            provider_msg_id: providerMsgId,
+            error: null,
+          });
         dispatched++;
       } catch (err) {
         const error = (err as Error).message;
+        const nextAttempts = Number(row.attempts ?? 0) + 1;
         await this.knex('notification_outbox')
           .where({ id: row.id })
-          .increment('attempts', 1)
-          .update({ error });
+          .update({
+            attempts: nextAttempts,
+            status: nextAttempts >= 3 ? 'FAILED' : 'QUEUED',
+            error,
+          });
       }
     }
     return dispatched;

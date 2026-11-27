@@ -18,6 +18,7 @@ import { WastageController } from './wastage.controller.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceRepository } from './repositories/attendance.repository.js';
 import { AttendanceController } from './attendance.controller.js';
+import { WorkersController } from './workers.controller.js';
 import { ProductionPortService } from './production-port.service.js';
 import {
   PRODUCTION_PORT,
@@ -64,6 +65,7 @@ import {
     WorkOrderController,
     WastageController,
     AttendanceController,
+    WorkersController,
   ],
   exports: [
     BomRepository,

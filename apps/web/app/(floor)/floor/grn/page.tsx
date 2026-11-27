@@ -9,6 +9,7 @@ import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 interface ExpectedPo {
   poId: string;
   poNumber: string;
+  siteId: string;
   supplierName: string;
   lines: Array<{
     lineId: string;
@@ -25,15 +26,31 @@ export default function FloorBlindGrnPage() {
   const { enqueueOrSend } = useFloorOutbox();
   const [expectedPos, setExpectedPos] = useState<ExpectedPo[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>('');
+  const [userSiteId, setUserSiteId] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.user) {
+          setUserSiteId(String(d.user.siteId || d.user.siteIds?.[0] || ''));
+          setUserId(String(d.user.id || d.user.sub || ''));
+        }
+      })
+      .catch(() => {});
+
     fetch('/api/proxy/procurement/purchase-orders')
       .then((r) => (r.ok ? r.json() : null))
       .then(async (res) => {
         const pos = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        const openPos = pos.filter((p: any) => ['ISSUED', 'PARTIAL', 'APPROVED', 'DRAFT'].includes(String(p.po_status ?? p.status ?? '')));
+        const openPos = pos.filter((p: any) =>
+          ['ISSUED', 'PARTIALLY_RECEIVED', 'PARTIAL', 'APPROVED', 'DRAFT'].includes(
+            String(p.poStatus ?? p.po_status ?? p.status ?? ''),
+          ),
+        );
         const mapped: ExpectedPo[] = await Promise.all(
-          openPos.slice(0, 10).map(async (p: any) => {
+          openPos.slice(0, 15).map(async (p: any) => {
             let lines: any[] = Array.isArray(p.lines) ? p.lines : [];
             if (lines.length === 0) {
               try {
@@ -45,17 +62,18 @@ export default function FloorBlindGrnPage() {
               } catch { /* ignore */ }
             }
             return {
-              poId: p.id,
-              poNumber: p.po_no ?? p.poNumber ?? p.id.slice(0, 8),
-              supplierName: p.supplier_name ?? p.supplierName ?? 'Supplier',
+              poId: String(p.id),
+              poNumber: String(p.poNo ?? p.po_no ?? p.poNumber ?? String(p.id).slice(0, 8)),
+              siteId: String(p.receivingSiteId ?? p.receiving_site_id ?? ''),
+              supplierName: String(p.supplierName ?? p.supplier_name ?? 'Supplier'),
               lines: lines.map((l: any) => ({
-                lineId: l.id,
-                itemId: l.item_id ?? l.itemId ?? '',
-                itemSku: l.sku_code ?? l.itemSku ?? '',
-                itemName: l.item_name ?? l.itemName ?? 'Item',
-                uom: l.primary_uom ?? l.uom ?? 'KG',
-                orderedQty: Number(l.ordered_qty ?? 0),
-                unitPrice: Number(l.unit_price ?? 0),
+                lineId: String(l.id),
+                itemId: String(l.itemId ?? l.item_id ?? ''),
+                itemSku: String(l.itemSku ?? l.sku_code ?? ''),
+                itemName: String(l.itemName ?? l.item_name ?? 'Item'),
+                uom: String(l.primary_uom ?? l.uom ?? 'KG'),
+                orderedQty: Number(l.orderedQty ?? l.ordered_qty ?? 0),
+                unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
               })),
             };
           }),
@@ -101,24 +119,29 @@ export default function FloorBlindGrnPage() {
 
   const handleSaveReceipt = async () => {
     if (!selectedPo) return;
-    const payload = {
+    const effectiveSiteId = selectedPo.siteId || userSiteId;
+    const payload: Record<string, unknown> = {
       poId: selectedPo.poId,
-      poNumber: selectedPo.poNumber,
-      notes,
-      photoName,
+      ...(effectiveSiteId ? { siteId: effectiveSiteId } : {}),
+      ...(userId ? { receivedBy: userId } : {}),
       lines: blindLines.map((l) => ({
-        lineId: l.lineId,
         itemId: l.itemId,
-        receivedQty: qtys[l.lineId] ?? 0,
-        batchNo: batches[l.lineId] || `B-${Date.now().toString().slice(-4)}`,
+        receivedQty: String(qtys[l.lineId] ?? 0),
+        batchLotNo: batches[l.lineId] || `B-${Date.now().toString().slice(-4)}`,
         expiryDate: expiries[l.lineId] || '2027-02-11',
-        damaged: !!damaged[l.lineId],
+        conditionNote: [
+          damaged[l.lineId] ? 'DAMAGED' : 'GOOD',
+          notes ? notes : '',
+          photoName ? `photo:${photoName}` : '',
+        ]
+          .filter(Boolean)
+          .join(' | '),
       })),
     };
 
     const res = await enqueueOrSend({
       type: 'GRN_CAPTURE',
-      endpoint: '/api/bff/procurement/grns',
+      endpoint: '/api/proxy/procurement/grns',
       payload,
     });
     setSavedBanner(res.message);

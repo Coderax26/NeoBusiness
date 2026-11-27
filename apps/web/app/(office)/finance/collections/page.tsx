@@ -11,6 +11,9 @@ export default function CollectionsPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [mode, setMode] = useState<ReceiptRecord['mode']>('CASH');
   const [amountInput, setAmountInput] = useState<string>('');
+  const [chequeNo, setChequeNo] = useState<string>('');
+  const [chequeBank, setChequeBank] = useState<string>('');
+  const [chequeDate, setChequeDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [reverseReason, setReverseReason] = useState<string>('');
   const [reversingId, setReversingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -120,6 +123,11 @@ export default function CollectionsPage() {
       BANK: 'BANK_TRANSFER',
     };
 
+    if (mode === 'CHEQUE' && (!chequeNo.trim() || !chequeBank.trim())) {
+      setToast('Cheque Number and Bank Name are required for CHEQUE collections.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/proxy/collections', {
         method: 'POST',
@@ -129,6 +137,15 @@ export default function CollectionsPage() {
           paymentMode: paymentModeMap[mode],
           amount: parsedAmount.toFixed(2),
           idempotencyKey: `col-${selectedCustomerId}-${Date.now()}`,
+          ...(mode === 'CHEQUE'
+            ? {
+                chequeDetails: {
+                  chequeNo: chequeNo.trim(),
+                  bank: chequeBank.trim(),
+                  chequeDate,
+                },
+              }
+            : {}),
         }),
       });
       const payload = await res.json().catch(() => null);
@@ -171,6 +188,8 @@ export default function CollectionsPage() {
         }),
       );
       setAmountInput('');
+      setChequeNo('');
+      setChequeBank('');
       setToast(`Recorded ${nextNo} (${formatINR(parsedAmount)} via ${mode}) with FIFO invoice allocation.`);
     } catch (err) {
       setToast(`Failed to record receipt: ${(err as Error).message}`);
@@ -247,6 +266,34 @@ export default function CollectionsPage() {
               required
             />
           </div>
+
+          {mode === 'CHEQUE' && (
+            <div className="space-y-2 rounded-lg border border-rule bg-paper p-3">
+              <input
+                type="text"
+                value={chequeNo}
+                onChange={(e) => setChequeNo(e.target.value)}
+                placeholder="Cheque Number"
+                className="w-full rounded border border-rule bg-sheet px-2.5 py-1.5 text-xs font-mono text-ink"
+                required
+              />
+              <input
+                type="text"
+                value={chequeBank}
+                onChange={(e) => setChequeBank(e.target.value)}
+                placeholder="Bank Name"
+                className="w-full rounded border border-rule bg-sheet px-2.5 py-1.5 text-xs text-ink"
+                required
+              />
+              <input
+                type="date"
+                value={chequeDate}
+                onChange={(e) => setChequeDate(e.target.value)}
+                className="w-full rounded border border-rule bg-sheet px-2.5 py-1.5 text-xs text-ink"
+                required
+              />
+            </div>
+          )}
 
           {fifoPreview.allocations.length > 0 && (
             <div className="rounded-lg border border-rule bg-paper p-3 space-y-1.5 text-xs">

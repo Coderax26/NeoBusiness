@@ -1,72 +1,144 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NumericKeypad } from '@neo/ui';
 import { evaluateWoYieldStatus, maskWorkOrderForProdMgr } from '@neo/shared';
 import { type WorkOrderRecord } from '../../../../src/lib/production-data';
 import { useFloorOutbox } from '../../../../src/lib/floor-outbox';
 
+interface FloorWoMaterial {
+  id: string;
+  itemId: string;
+  itemName: string;
+  plannedQty: string;
+  actualQty: string;
+  uom: string;
+}
+
+interface FloorWorkOrder extends WorkOrderRecord {
+  materials?: FloorWoMaterial[];
+}
+
+function mapFloorReasonToDto(reason: string): 'NORMAL' | 'ABNORMAL' | 'EXPIRY' | 'DAMAGE' {
+  if (reason === 'BURNT') return 'ABNORMAL';
+  if (reason === 'SPILLED' || reason === 'QUALITY_REJECT') return 'DAMAGE';
+  return 'NORMAL';
+}
+
 export default function FloorProductionKanbanPage() {
   const { enqueueOrSend } = useFloorOutbox();
-  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
+  const [workOrders, setWorkOrders] = useState<FloorWorkOrder[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/proxy/production/work-orders')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        setWorkOrders(
-          list.map((w: any) =>
-            maskWorkOrderForProdMgr({
-              id: w.id,
-              woNumber: w.wo_no ?? w.woNumber ?? w.id.slice(0, 8),
-              fgItemName: w.fg_item_name ?? w.itemName ?? 'Production Item',
-              uom: w.uom ?? 'KG',
-              plannedQty: Number(w.planned_qty ?? 0),
-              issuedRmQty: Number(w.issued_rm_qty ?? 0),
-              actualOutputQty: Number(w.actual_output_qty ?? 0),
-              scrapQty: Number(w.scrap_qty ?? 0),
-              status: w.status ?? 'PLANNED',
-              startedAt: w.started_at ?? '',
-              packagingLot: w.packaging_lot ?? '',
-            } as any) as WorkOrderRecord,
-          ),
-        );
-      })
-      .catch(() => setWorkOrders([]));
+  const loadWorkOrders = useCallback(async () => {
+    const r = await fetch('/api/proxy/production/work-orders');
+    const res = r.ok ? await r.json() : [];
+    const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    setWorkOrders(
+      list.map((w: any) => {
+        const mats: FloorWoMaterial[] = Array.isArray(w.materials)
+          ? w.materials.map((m: any) => ({
+              id: String(m.id ?? ''),
+              itemId: String(m.itemId ?? m.item_id ?? ''),
+              itemName: String(m.itemName ?? m.item_name ?? 'RM Item'),
+              plannedQty: String(m.plannedQty ?? m.planned_qty ?? '0'),
+              actualQty: String(m.actualQty ?? m.actual_qty ?? '0'),
+              uom: String(m.uom ?? 'KG'),
+            }))
+          : [];
+        const issuedFromMats = mats.reduce((s, m) => s + Number(m.actualQty || 0), 0);
+        const outputFromArr = Array.isArray(w.outputs)
+          ? w.outputs.reduce(
+              (s: number, o: any) => s + Number(o.actualQty ?? o.actual_qty ?? o.qtyProduced ?? 0),
+              0,
+            )
+          : 0;
+        return maskWorkOrderForProdMgr({
+          id: String(w.id),
+          woNumber: String(w.woNo ?? w.wo_no ?? w.woNumber ?? String(w.id).slice(0, 8)),
+          finishedItemId: String(w.finishedItemId ?? w.bomItemId ?? ''),
+          finishedItemName: String(w.finishedItemName ?? w.fg_item_name ?? w.itemName ?? 'Production Item'),
+          uom: String(w.uom ?? 'KG'),
+          plannedQty: Number(w.plannedQty ?? w.planned_qty ?? 0),
+          issuedRmQty: Number(w.issuedRmQty ?? issuedFromMats),
+          actualOutputQty: Number(w.actualOutputQty ?? outputFromArr),
+          scrapQty: Number(w.scrapQty ?? 0),
+          status: w.status ?? 'PLANNED',
+          requiredBy: String(w.requiredBy ?? (w.createdAt ? String(w.createdAt).slice(0, 10) : '')),
+          startedAt: w.startedAt ?? w.started_at ?? '',
+          packagingLot: w.packagingLot ?? w.packaging_lot ?? '',
+          materials: mats,
+        } as any) as FloorWorkOrder;
+      }),
+    );
   }, []);
 
-  // Active modals
-  const [outputTarget, setOutputTarget] = useState<WorkOrderRecord | null>(null);
-  const [outputQty, setOutputQty] = useState('0');
-  const [packagingLot, setPackagingLot] = useState('LOT-1113-NEW');
+  useEffect(() => {
+    loadWorkOrders().catch(() => setWorkOrders([]));
+  }, [loadWorkOrders]);
 
-  const [wastageTarget, setWastageTarget] = useState<WorkOrderRecord | null>(null);
+  // Active modals
+  const [consumeTarget, setConsumeTarget] = useState<FloorWorkOrder | null>(null);
+  const [consumeQtys, setConsumeQtys] = useState<Record<string, string>>({});
+
+  const [outputTarget, setOutputTarget] = useState<FloorWorkOrder | null>(null);
+  const [outputQty, setOutputQty] = useState('0');
+  const [packagingLot, setPackagingLot] = useState('LOT-FG-NEW');
+
+  const [wastageTarget, setWastageTarget] = useState<FloorWorkOrder | null>(null);
   const [wastageQty, setWastageQty] = useState(5);
   const [wastageReason, setWastageReason] = useState('SPILLED');
 
-  const [completeTarget, setCompleteTarget] = useState<WorkOrderRecord | null>(null);
+  const [completeTarget, setCompleteTarget] = useState<FloorWorkOrder | null>(null);
 
-  const handleStartWo = async (wo: WorkOrderRecord) => {
+  const handleStartWo = async (wo: FloorWorkOrder) => {
     const res = await enqueueOrSend({
       type: 'WO_START',
-      endpoint: `/api/bff/production/work-orders/${wo.id}/start`,
-      payload: { woId: wo.id, issuedRmQty: wo.plannedQty },
+      endpoint: `/api/proxy/production/work-orders/${wo.id}/start`,
+      payload: {},
     });
-    setWorkOrders((prev) =>
-      prev.map((w) =>
-        w.id === wo.id
-          ? {
-              ...w,
-              status: 'IN_PROGRESS',
-              issuedRmQty: w.plannedQty,
-              startedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }
-          : w,
-      ),
-    );
-    setBanner(`Started ${wo.woNumber} & issued RM. ${res.message}`);
+    if (res.ok && !res.queued) {
+      await loadWorkOrders().catch(() => {});
+    } else {
+      setWorkOrders((prev) =>
+        prev.map((w) =>
+          w.id === wo.id
+            ? {
+                ...w,
+                status: 'IN_PROGRESS',
+                startedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }
+            : w,
+        ),
+      );
+    }
+    setBanner(`Started ${wo.woNumber}. ${res.message}`);
+  };
+
+  const handleRecordConsumption = async () => {
+    if (!consumeTarget) return;
+    const lines = (consumeTarget.materials ?? [])
+      .filter((m) => Number(consumeQtys[m.itemId] || 0) > 0)
+      .map((m) => ({
+        itemId: m.itemId,
+        actualQty: String(consumeQtys[m.itemId]),
+        uom: m.uom,
+      }));
+    if (lines.length === 0) return;
+
+    const r = await fetch(`/api/proxy/production/work-orders/${consumeTarget.id}/consumption`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines }),
+    });
+    if (r.ok) {
+      await loadWorkOrders().catch(() => {});
+      setBanner(`Issued RM batch materials for ${consumeTarget.woNumber}.`);
+    } else {
+      const err = await r.json().catch(() => null);
+      setBanner(`Failed to issue RM: ${err?.message || `HTTP ${r.status}`}`);
+    }
+    setConsumeTarget(null);
   };
 
   const handleRecordOutput = async () => {
@@ -74,16 +146,29 @@ export default function FloorProductionKanbanPage() {
     const qty = Number(outputQty) || 0;
     const res = await enqueueOrSend({
       type: 'WO_OUTPUT',
-      endpoint: `/api/bff/production/work-orders/${outputTarget.id}/output`,
-      payload: { woId: outputTarget.id, outputQty: qty, packagingLot },
+      endpoint: `/api/proxy/production/work-orders/${outputTarget.id}/output`,
+      payload: {
+        lines: [
+          {
+            itemId: outputTarget.finishedItemId,
+            actualQty: String(qty),
+            uom: outputTarget.uom,
+            batchNumber: packagingLot || undefined,
+          },
+        ],
+      },
     });
-    setWorkOrders((prev) =>
-      prev.map((w) =>
-        w.id === outputTarget.id
-          ? { ...w, actualOutputQty: w.actualOutputQty + qty, packagingLot }
-          : w,
-      ),
-    );
+    if (res.ok && !res.queued) {
+      await loadWorkOrders().catch(() => {});
+    } else {
+      setWorkOrders((prev) =>
+        prev.map((w) =>
+          w.id === outputTarget.id
+            ? { ...w, actualOutputQty: w.actualOutputQty + qty, packagingLot }
+            : w,
+        ),
+      );
+    }
     setBanner(`Recorded ${qty} ${outputTarget.uom} output on ${outputTarget.woNumber}. ${res.message}`);
     setOutputTarget(null);
   };
@@ -92,8 +177,14 @@ export default function FloorProductionKanbanPage() {
     if (!wastageTarget) return;
     const res = await enqueueOrSend({
       type: 'WO_WASTAGE',
-      endpoint: '/api/bff/production/wastage',
-      payload: { woId: wastageTarget.id, qty: wastageQty, reason: wastageReason },
+      endpoint: '/api/proxy/production/wastage',
+      payload: {
+        workOrderId: wastageTarget.id,
+        itemId: wastageTarget.finishedItemId,
+        qty: String(wastageQty),
+        uom: wastageTarget.uom,
+        reasonType: mapFloorReasonToDto(wastageReason),
+      },
     });
     setWorkOrders((prev) =>
       prev.map((w) =>
@@ -115,25 +206,25 @@ export default function FloorProductionKanbanPage() {
 
     const res = await enqueueOrSend({
       type: 'WO_COMPLETE',
-      endpoint: `/api/bff/production/work-orders/${completeTarget.id}/complete`,
-      payload: {
-        woId: completeTarget.id,
-        actualOutputQty: completeTarget.actualOutputQty,
-        yieldVarianceException: evalRes.raisesYieldVarianceException,
-      },
+      endpoint: `/api/proxy/production/work-orders/${completeTarget.id}/complete`,
+      payload: {},
     });
 
-    setWorkOrders((prev) =>
-      prev.map((w) =>
-        w.id === completeTarget.id
-          ? {
-              ...w,
-              status: 'COMPLETED',
-              yieldVarianceException: evalRes.raisesYieldVarianceException,
-            }
-          : w,
-      ),
-    );
+    if (res.ok && !res.queued) {
+      await loadWorkOrders().catch(() => {});
+    } else {
+      setWorkOrders((prev) =>
+        prev.map((w) =>
+          w.id === completeTarget.id
+            ? {
+                ...w,
+                status: 'COMPLETED',
+                yieldVarianceException: evalRes.raisesYieldVarianceException,
+              }
+            : w,
+        ),
+      );
+    }
     setBanner(
       evalRes.warningBanner
         ? `Completed ${completeTarget.woNumber}! ${evalRes.warningBanner}`
@@ -152,7 +243,7 @@ export default function FloorProductionKanbanPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Today&apos;s Production Kanban</h1>
           <p className="text-base text-zinc-400">
-            Start batches, record output &amp; wastage, and complete with BR-06 yield check.
+            Start batches, issue RM, record output &amp; wastage, and complete with BR-06 yield check.
           </p>
         </div>
       </div>
@@ -208,14 +299,31 @@ export default function FloorProductionKanbanPage() {
                   <div className="h-full bg-orange-500" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="text-sm font-mono text-zinc-300">
-                  {wo.actualOutputQty} / {wo.plannedQty} {wo.uom} ({pct}%)
+                  {wo.actualOutputQty} / {wo.plannedQty} {wo.uom} ({pct}%) · RM Issued: {wo.issuedRmQty}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
+                  {(wo.materials?.length ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const init: Record<string, string> = {};
+                        for (const m of wo.materials ?? []) {
+                          init[m.itemId] = String(Number(m.plannedQty) || '');
+                        }
+                        setConsumeQtys(init);
+                        setConsumeTarget(wo);
+                      }}
+                      className="w-full min-h-[52px] rounded-xl bg-amber-500 text-zinc-950 font-black text-base"
+                    >
+                      ISSUE / CONSUME RM
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
                       setOutputTarget(wo);
-                      setOutputQty('100');
+                      setOutputQty(String(wo.plannedQty));
+                      setPackagingLot(`FG-${wo.woNumber}`);
                     }}
                     className="w-full min-h-[56px] rounded-xl bg-sky-500 text-zinc-950 font-black text-base"
                   >
@@ -260,6 +368,49 @@ export default function FloorProductionKanbanPage() {
           })}
         </div>
       </div>
+
+      {/* Consume RM Modal */}
+      {consumeTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-white">Issue RM — {consumeTarget.woNumber}</h3>
+            <div className="space-y-2">
+              {(consumeTarget.materials ?? []).map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-2 text-sm text-white">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold truncate">{m.itemName}</div>
+                    <div className="text-xs text-zinc-400">Plan {m.plannedQty} {m.uom}</div>
+                  </div>
+                  <input
+                    type="number"
+                    value={consumeQtys[m.itemId] ?? ''}
+                    onChange={(e) =>
+                      setConsumeQtys((prev) => ({ ...prev, [m.itemId]: e.target.value }))
+                    }
+                    className="w-28 min-h-[44px] bg-zinc-950 border border-zinc-700 rounded-xl px-3 text-white font-mono"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConsumeTarget(null)}
+                className="flex-1 min-h-[52px] rounded-xl bg-zinc-800 text-white font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRecordConsumption}
+                className="flex-1 min-h-[52px] rounded-xl bg-amber-500 text-zinc-950 font-black"
+              >
+                Confirm Issue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Record Output Keypad Modal */}
       {outputTarget && (
@@ -383,4 +534,3 @@ export default function FloorProductionKanbanPage() {
     </div>
   );
 }
-

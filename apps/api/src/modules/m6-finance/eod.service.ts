@@ -103,7 +103,17 @@ export class EodService {
     date: string,
   ): Promise<{
     trips: { passed: boolean; count: number; detail: string };
-    handover: { passed: boolean; nonZeroWallets: number; detail: string };
+    handover: {
+      passed: boolean;
+      nonZeroWallets: number;
+      wallets: Array<{
+        userId: string;
+        name: string;
+        role: string;
+        balance: string;
+      }>;
+      detail: string;
+    };
     uninvoiced: { passed: boolean; count: number; detail: string };
     cashPosition: { passed: boolean; netPosition: Money; detail: string };
   }> {
@@ -124,27 +134,34 @@ export class EodService {
         : `${openTrips?.cnt} trips not closed`,
     };
 
-    // Check 2: All field cash handed over? (custody_ledger running_balance = 0 for all agents)
-    // Sum ALL entry types to get actual wallet balance (COLLECTION positive, HANDOVER/REVERSAL negative)
+    // Check 2: All field cash handed over? (custody_ledger balance = 0 across ALL roles incl. DRIVER COD & COLLECTOR)
     const nonZeroWallets = await this.knex('custody_ledger as cl')
       .join('users as u', 'cl.user_id', 'u.id')
       .where('cl.site_id', siteId)
-      .where('u.role', 'COLLECTOR')
-      .groupBy('cl.user_id', 'u.full_name')
+      .groupBy('cl.user_id', 'u.full_name', 'u.role')
       .havingRaw('SUM(cl.amount_delta) != 0')
       .select(
-        'cl.user_id',
+        'cl.user_id as userId',
         'u.full_name as name',
+        'u.role as role',
         this.knex.raw('SUM(cl.amount_delta) as balance'),
       );
 
-    const handoverPassed = nonZeroWallets.length === 0;
+    const wallets = nonZeroWallets.map((w: any) => ({
+      userId: String(w.userId ?? w.user_id ?? ''),
+      name: String(w.name ?? w.full_name ?? 'Agent'),
+      role: String(w.role ?? ''),
+      balance: Money.of(String(w.balance ?? '0')).toStorageString(),
+    }));
+
+    const handoverPassed = wallets.length === 0;
     const handover = {
       passed: handoverPassed,
-      nonZeroWallets: nonZeroWallets.length,
+      nonZeroWallets: wallets.length,
+      wallets,
       detail: handoverPassed
         ? 'All wallets zero'
-        : `${nonZeroWallets.length} agents with non-zero wallet`,
+        : `${wallets.length} field agent(s) with non-zero custody wallet`,
     };
 
     // Check 3: Uninvoiced deliveries? (Dispatched sales_orders without invoices)
@@ -319,43 +336,94 @@ export class EodService {
    * Shows cash + cheque breakdown for bank deposit
    */
   async generateDepositSlip(siteId: string, date: string) {
-    // Get handover data for the day
+    const startOfDay = `${date}T00:00:00.000+05:30`;
+    const nextDay = new Date(`${date}T00:00:00.000Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    const endOfDay = `${nextDay.toISOString().slice(0, 10)}T00:00:00.000+05:30`;
+
+    // Get verified handovers for the business day
     const handovers = await this.knex('cash_handovers')
       .where('site_id', siteId)
-      .where('verified_at', '>=', `${date} 00:00:00`)
-      .where('verified_at', '<', `${date} 23:59:59`)
+      .where('verified_at', '>=', startOfDay)
+      .where('verified_at', '<', endOfDay)
       .where('status', 'VERIFIED')
       .select('*');
 
-    let totalCash = Money.zero();
-    let totalCheques = Money.zero();
-    let chequeCount = 0;
-
-    for (const h of handovers) {
-      totalCash = totalCash.add(
-        Money.of(h.counted_amount).sub(Money.of(h.upi_amount ?? '0')),
-      );
-      totalCheques = totalCheques.add(Money.of(h.upi_amount ?? '0')); // Actually cheques tracked separately
-      chequeCount += Number(h.cheque_count ?? 0);
-    }
-
-    // Get cheque register for the day
+    // Get cheque register entries deposited on this date
     const cheques = await this.knex('cheque_register as cr')
       .join('collection_receipts as r', 'cr.receipt_id', 'r.id')
       .where('r.site_id', siteId)
-      .where('cr.deposited_on', date)
-      .select('cr.*');
+      .where(function () {
+        this.where('cr.deposited_on', date).orWhere(function () {
+          this.where('cr.deposited_at', '>=', startOfDay).andWhere(
+            'cr.deposited_at',
+            '<',
+            endOfDay,
+          );
+        });
+      })
+      .select(
+        'cr.cheque_no',
+        'cr.bank',
+        'cr.cheque_date',
+        'cr.amount',
+        'cr.status',
+        'r.collected_by_user_id',
+      );
+
+    let totalCheques = Money.zero();
+    const chequesByCollector = new Map<string, Money>();
+    for (const c of cheques) {
+      const amt = Money.of(String(c.amount ?? '0'));
+      totalCheques = totalCheques.add(amt);
+      const collectorId = c.collected_by_user_id
+        ? String(c.collected_by_user_id)
+        : '';
+      if (collectorId) {
+        const prev = chequesByCollector.get(collectorId) ?? Money.zero();
+        chequesByCollector.set(collectorId, prev.add(amt));
+      }
+    }
+
+    let totalCash = Money.zero();
+    let totalUpi = Money.zero();
+    for (const h of handovers) {
+      totalUpi = totalUpi.add(Money.of(String(h.upi_amount ?? '0')));
+      let counted = Money.of(String(h.counted_amount ?? '0'));
+      if (Number(h.cheque_count ?? 0) > 0 && h.handed_by_user_id) {
+        const agentChequeAmt =
+          chequesByCollector.get(String(h.handed_by_user_id)) ?? Money.zero();
+        const deduction = counted.isLessThan(agentChequeAmt)
+          ? counted
+          : agentChequeAmt;
+        counted = counted.sub(deduction);
+        chequesByCollector.set(
+          String(h.handed_by_user_id),
+          agentChequeAmt.sub(deduction),
+        );
+      }
+      totalCash = totalCash.add(counted);
+    }
+
+    const totalDeposit = totalCash.add(totalCheques);
 
     return {
       siteId,
       date,
       totalCash: totalCash.toStorageString(),
       totalCheques: totalCheques.toStorageString(),
-      chequeCount,
+      totalUpi: totalUpi.toStorageString(),
+      totalDeposit: totalDeposit.toStorageString(),
+      chequeCount: cheques.length,
+      handoverCount: handovers.length,
       cheques: cheques.map((c) => ({
         chequeNo: c.cheque_no,
         bank: c.bank,
-        amount: c.amount,
+        chequeDate: c.cheque_date
+          ? String(c.cheque_date).slice(0, 10)
+          : date,
+        amount: Money.of(String(c.amount ?? '0')).toStorageString(),
+        status: c.status,
       })),
     };
   }
@@ -379,11 +447,11 @@ export class EodService {
       cashAmount: slip.totalCash,
       chequeTotal: slip.totalCheques,
       totalDeposit: totalDeposit.toStorageString(),
-      handoversCount: slip.chequeCount,
+      handoversCount: slip.handoverCount,
       cheques: slip.cheques.map((c) => ({
         chequeNo: c.chequeNo,
         bank: c.bank,
-        chequeDate: date,
+        chequeDate: c.chequeDate || date,
         amount: String(c.amount),
       })),
     });

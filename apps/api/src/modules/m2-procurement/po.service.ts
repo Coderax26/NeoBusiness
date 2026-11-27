@@ -283,7 +283,7 @@ export class POService implements OnModuleInit {
         let priceVariancePct = '0.0000';
         let lineHasSpike = false;
 
-        if (lastPrice.isGreaterThanOrEqual(Money.zero())) {
+        if (!lastPrice.isZero() && lastPrice.isGreaterThanOrEqual(Money.zero())) {
           const variance = Money.marginPct(newPrice, lastPrice);
           if (variance !== null) {
             priceVariancePct = variance.toFixed(4);
@@ -323,6 +323,7 @@ export class POService implements OnModuleInit {
                   deepLink: `/procurement/purchase-orders/${input.poId}`,
                   valueAtRisk: newPrice.sub(lastPrice).toStorageString(),
                 },
+                po.receiving_site_id ? String(po.receiving_site_id) : undefined,
               );
 
               exceptionsRaised.push(exceptionId);
@@ -343,11 +344,24 @@ export class POService implements OnModuleInit {
           });
       }
 
+      // Recompute total amount from updated lines
+      const updatedLines = await trx('purchase_order_lines')
+        .where('po_id', input.poId)
+        .select('ordered_qty', 'confirmed_qty', 'unit_price');
+      const recomputedTotal = updatedLines.reduce((sum: Money, l: any) => {
+        const effQty =
+          Number(l.confirmed_qty) > 0
+            ? Number(l.confirmed_qty)
+            : Number(l.ordered_qty);
+        return sum.add(Money.of(String(l.unit_price || '0')).mul(effQty));
+      }, Money.zero());
+
       // Determine new PO status
       const newStatus = hasPriceSpike ? 'PENDING_APPROVAL' : 'DRAFT';
 
       await trx('purchase_orders').where('id', input.poId).update({
         po_status: newStatus,
+        total_amount: recomputedTotal.toStorageString(),
         updated_by: input.confirmations[0].userId,
       });
 
@@ -397,7 +411,7 @@ export class POService implements OnModuleInit {
       const lastPrice = Money.of(line.last_purchase_price_snapshot);
       const newPrice = Money.of(line.unit_price);
 
-      if (!lastPrice.isGreaterThanOrEqual(Money.zero())) continue;
+      if (lastPrice.isZero() || !lastPrice.isGreaterThanOrEqual(Money.zero())) continue;
 
       const variance = Money.marginPct(newPrice, lastPrice);
       if (
@@ -510,7 +524,17 @@ export class POService implements OnModuleInit {
    * Get PO by ID with lines
    */
   async getById(poId: string): Promise<any> {
-    const po = await this.knex('purchase_orders').where('id', poId).first();
+    const po = await this.knex('purchase_orders as po')
+      .leftJoin('suppliers as s', 's.id', 'po.supplier_id')
+      .leftJoin('sites as st', 'st.id', 'po.receiving_site_id')
+      .where('po.id', poId)
+      .select(
+        'po.*',
+        's.company_name as supplier_name',
+        's.phone as supplier_phone',
+        'st.name as site_name',
+      )
+      .first();
     if (!po) {
       throw new NotFoundException(`PO ${poId} not found`);
     }

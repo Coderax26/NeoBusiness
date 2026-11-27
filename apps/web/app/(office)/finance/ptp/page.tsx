@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { formatINR } from '@neo/shared';
 import { type PromiseToPayRecord } from '../../../../src/lib/finance-data';
 
@@ -8,36 +8,71 @@ const BUCKETS: Array<'ALL' | PromiseToPayRecord['bucket']> = ['ALL', 'TODAY', 'O
 
 export default function PromisesToPayPage() {
   const [ptps, setPtps] = useState<PromiseToPayRecord[]>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [invoices, setInvoices] = useState<Array<{ id: string; invoiceNo: string; customerId: string }>>([]);
   const [bucketFilter, setBucketFilter] = useState<'ALL' | PromiseToPayRecord['bucket']>('ALL');
-  const [customerName, setCustomerName] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [promisedAmount, setPromisedAmount] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [invoiceId, setInvoiceId] = useState('');
+  const [reasonCode, setReasonCode] = useState('OWNER_ABSENT');
+  const [note, setNote] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
+  const [toast, setToast] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadPtps = useCallback(async () => {
+    const res = await fetch('/api/proxy/ptp').then((r) => (r.ok ? r.json() : []));
+    const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+    const today = new Date().toISOString().slice(0, 10);
+    setPtps(
+      rows.map((p: any) => {
+        const dDate = String(p.dueDate || p.promised_date || '').slice(0, 10);
+        const st = String(p.status || '').toUpperCase();
+        const derivedBucket: PromiseToPayRecord['bucket'] =
+          st === 'KEPT' || st === 'BROKEN'
+            ? (st as PromiseToPayRecord['bucket'])
+            : dDate < today
+              ? 'OVERDUE'
+              : dDate === today
+                ? 'TODAY'
+                : 'UPCOMING';
+        return {
+          id: String(p.id),
+          customerName: String(p.customerName || p.customer_name || p.business_name || 'Customer'),
+          invoiceNo: String(p.invoiceNo || p.invoice_no || '—'),
+          promisedAmount: Number(p.promisedAmount ?? p.promised_amount ?? p.balance_due ?? 0),
+          dueDate: dDate,
+          bucket: (p.bucket || derivedBucket) as PromiseToPayRecord['bucket'],
+          notes: String(p.notes || p.note || p.reason_code || ''),
+        };
+      }),
+    );
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/ptp')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setPtps(
-          rows.map((p: any) => ({
-            id: String(p.id),
-            customerName: String(p.customerName || p.customer_name || 'Customer'),
-            invoiceNo: String(p.invoiceNo || p.invoice_no || '—'),
-            promisedAmount: Number(p.promisedAmount ?? p.promised_amount ?? p.amount ?? 0),
-            dueDate: String(p.dueDate || p.promised_date || '').slice(0, 10),
-            bucket: (p.bucket || 'UPCOMING') as PromiseToPayRecord['bucket'],
-            notes: String(p.notes || p.remarks || ''),
+    loadPtps().catch(() => {});
+    Promise.all([
+      fetch('/api/proxy/customers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/invoices').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([custRes, invRes]) => {
+        const cRows = Array.isArray(custRes) ? custRes : Array.isArray(custRes?.data) ? custRes.data : [];
+        const iRows = Array.isArray(invRes) ? invRes : Array.isArray(invRes?.data) ? invRes.data : [];
+        const mappedCusts = cRows.map((c: any) => ({
+          id: String(c.id),
+          name: String(c.business_name ?? c.name ?? 'Customer'),
+        }));
+        setCustomers(mappedCusts);
+        if (mappedCusts.length > 0) setCustomerId(mappedCusts[0].id);
+        setInvoices(
+          iRows.map((inv: any) => ({
+            id: String(inv.id),
+            invoiceNo: String(inv.invoice_no ?? inv.invoiceNo ?? inv.id),
+            customerId: String(inv.customer_id ?? inv.customerId ?? ''),
           })),
         );
       })
       .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [loadPtps]);
 
   const filtered = useMemo(
     () => ptps.filter((p) => (bucketFilter === 'ALL' ? true : p.bucket === bucketFilter)),
@@ -46,33 +81,56 @@ export default function PromisesToPayPage() {
 
   async function addPtp(e: React.FormEvent) {
     e.preventDefault();
-    const val = Number(promisedAmount) || 0;
-    if (val <= 0 || !customerName.trim()) return;
-    await fetch('/api/proxy/ptp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerName, invoiceNo, promisedAmount: val, dueDate }),
-    }).catch(() => {});
-    setPtps((prev) => [
-      {
-        id: `ptp-${Date.now()}`,
-        customerName,
-        invoiceNo: invoiceNo || '—',
-        promisedAmount: val,
-        dueDate,
-        bucket: 'UPCOMING',
-        notes: 'Scheduled by office coordinator',
-      },
-      ...prev,
-    ]);
-    setCustomerName('');
-    setInvoiceNo('');
-    setPromisedAmount('');
+    if (!customerId || !dueDate) return;
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/ptp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId,
+          invoiceId: invoiceId || undefined,
+          promisedDate: dueDate,
+          reasonCode,
+          note: note.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPtps();
+      setNote('');
+      setToast('Scheduled Promise to Pay follow-up.');
+    } catch (err) {
+      setToast(`Failed to schedule PTP: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function markBucket(id: string, bucket: PromiseToPayRecord['bucket']) {
-    setPtps((prev) => prev.map((p) => (p.id === id ? { ...p, bucket } : p)));
+  async function markBucket(id: string, status: 'KEPT' | 'BROKEN') {
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/proxy/ptp/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPtps();
+      setToast(`Marked PTP as ${status}.`);
+    } catch (err) {
+      setToast(`Failed to update PTP: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const customerInvoices = invoices.filter((i) => !customerId || i.customerId === customerId);
 
   return (
     <div className="space-y-6">
@@ -82,6 +140,12 @@ export default function PromisesToPayPage() {
           Track customer payment commitments by due date (Today, Overdue, Upcoming, Broken, Kept).
         </p>
       </div>
+
+      {toast && (
+        <div className="rounded-[3px] border border-leaf/30 bg-leaf-soft px-4 py-2.5 text-sm font-medium text-leaf">
+          {toast}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {BUCKETS.map((b) => (
@@ -103,29 +167,38 @@ export default function PromisesToPayPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <form onSubmit={addPtp} className="rounded-[3px] border border-rule bg-sheet p-5 space-y-3">
           <h2 className="text-base font-bold text-ink">Schedule New PTP</h2>
-          <input
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Customer Name"
-            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-3"
-            required
-          />
-          <input
-            type="text"
-            value={invoiceNo}
-            onChange={(e) => setInvoiceNo(e.target.value)}
-            placeholder="Invoice # (optional)"
-            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-3"
-          />
-          <input
-            type="number"
-            value={promisedAmount}
-            onChange={(e) => setPromisedAmount(e.target.value)}
-            placeholder="Promised Amount (₹)"
-            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-3"
-            required
-          />
+          <select
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              setInvoiceId('');
+            }}
+            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          >
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <select
+            value={invoiceId}
+            onChange={(e) => setInvoiceId(e.target.value)}
+            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-mono text-ink"
+          >
+            <option value="">All Open Invoices (Optional)</option>
+            {customerInvoices.map((inv) => (
+              <option key={inv.id} value={inv.id}>{inv.invoiceNo}</option>
+            ))}
+          </select>
+          <select
+            value={reasonCode}
+            onChange={(e) => setReasonCode(e.target.value)}
+            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          >
+            <option value="OWNER_ABSENT">OWNER_ABSENT</option>
+            <option value="SHORT_FUNDS">SHORT_FUNDS</option>
+            <option value="BILL_DISPUTE">BILL_DISPUTE</option>
+            <option value="CHEQUE_PENDING">CHEQUE_PENDING</option>
+          </select>
           <input
             type="date"
             value={dueDate}
@@ -133,7 +206,18 @@ export default function PromisesToPayPage() {
             className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink"
             required
           />
-          <button type="submit" className="w-full rounded-[3px] bg-leaf py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Collector remarks"
+            className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-3"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-[3px] bg-leaf py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
             Save Promise
           </button>
         </form>
@@ -182,6 +266,7 @@ export default function PromisesToPayPage() {
                       {p.bucket !== 'KEPT' && (
                         <button
                           type="button"
+                          disabled={busy}
                           onClick={() => markBucket(p.id, 'KEPT')}
                           className="rounded border border-leaf/30 bg-leaf-soft px-2 py-1 text-xs font-semibold text-leaf"
                         >
@@ -191,6 +276,7 @@ export default function PromisesToPayPage() {
                       {p.bucket !== 'BROKEN' && (
                         <button
                           type="button"
+                          disabled={busy}
                           onClick={() => markBucket(p.id, 'BROKEN')}
                           className="rounded border border-madder/30 bg-madder-soft px-2 py-1 text-xs font-semibold text-madder"
                         >

@@ -11,8 +11,12 @@ const STATUS_BADGE: Record<HandoverRecord['status'], string> = {
   RESOLVED: 'bg-blue-500/15 text-blue-400',
 };
 
+interface HandoverViewRecord extends HandoverRecord {
+  handedByRole?: string;
+}
+
 export default function CashHandoversPage() {
-  const [handovers, setHandovers] = useState<HandoverRecord[]>([]);
+  const [handovers, setHandovers] = useState<HandoverViewRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [countedInput, setCountedInput] = useState<string>('');
   const [n500, setN500] = useState<number>(0);
@@ -34,9 +38,10 @@ export default function CashHandoversPage() {
             : Array.isArray(res?.items)
               ? res.items
               : [];
-        const normalized: HandoverRecord[] = rows.map((h: any) => ({
+        const normalized: HandoverViewRecord[] = rows.map((h: any) => ({
           id: String(h.id),
           staffName: String(h.staffName ?? h.handedByName ?? h.handed_by_user_id ?? 'Staff'),
+          handedByRole: String(h.handedByRole ?? h.role ?? ''),
           date: String(h.date ?? h.handoverDate ?? h.created_at ?? '').slice(0, 10),
           expectedCash: Number(h.expectedCash ?? h.expected_cash ?? h.expected_amount ?? 0),
           countedCash:
@@ -123,9 +128,25 @@ export default function CashHandoversPage() {
     }
   }
 
-  function resolveDispute(id: string) {
-    setHandovers((prev) => prev.map((h) => (h.id === id ? { ...h, status: 'RESOLVED' } : h)));
-    setToast('Owner resolved disputed handover.');
+  async function resolveDispute(id: string) {
+    try {
+      const res = await fetch(`/api/proxy/handovers/${encodeURIComponent(id)}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ACCEPT_COUNTED',
+          notes: 'Owner resolved disputed handover from Handover Desk',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      setHandovers((prev) => prev.map((h) => (h.id === id ? { ...h, status: 'VERIFIED' } : h)));
+      setToast('Owner resolved disputed handover and cleared agent wallet.');
+    } catch (err) {
+      setToast(`Failed to resolve dispute: ${(err as Error).message}`);
+    }
   }
 
   return (
@@ -162,7 +183,14 @@ export default function CashHandoversPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-ink">{h.staffName}</span>
+                  <span className="font-semibold text-ink">
+                    {h.staffName}
+                    {h.handedByRole && (
+                      <span className="ml-1.5 rounded bg-sunken px-1.5 py-0.5 font-mono text-[10px] text-ink-3">
+                        {h.handedByRole}
+                      </span>
+                    )}
+                  </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[h.status]}`}>
                     {h.status}
                   </span>

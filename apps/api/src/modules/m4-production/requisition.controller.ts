@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,12 +28,13 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { RbacGuard } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 
 @ApiTags('M4 Production - Requisitions')
 @Controller('production/requisitions')
 @UseGuards(JwtAuthGuard, RbacGuard)
 export class RequisitionController {
-  constructor(private readonly reqService: RequisitionService) {}
+  constructor(private readonly reqService: RequisitionService) { }
 
   @Post()
   @RequirePermission('production.requisition.create')
@@ -51,7 +53,15 @@ export class RequisitionController {
     @Body() dto: CreateRequisitionDto,
     @Req() req: any,
   ): Promise<RequisitionResponseDto> {
-    return this.reqService.createRequisitionFromDto(dto, req.user.sub);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto.siteId);
+    return this.reqService.createRequisitionFromDto(
+      {
+        ...dto,
+        siteId: resolvedSiteId ?? dto.siteId,
+        requestedBy: dto.requestedBy || req.user.sub,
+      },
+      req.user.sub,
+    );
   }
 
   @Post('generate')
@@ -72,17 +82,21 @@ export class RequisitionController {
   async generateRequisition(
     @Body()
     dto: {
-      siteId: string;
-      demands: Array<{ itemId: string; qty: string; requiredBy: string }>;
+      siteId?: string;
+      demands?: Array<{ itemId: string; qty: string; requiredBy: string }>;
       reqNoPrefix?: string;
     },
     @Req() req: any,
   ): Promise<RequisitionResponseDto> {
+    const resolvedSiteId = resolveUserSiteId(req.user, dto?.siteId);
+    if (!resolvedSiteId) {
+      throw new BadRequestException('siteId is required to generate requisitions');
+    }
     return this.reqService.generateRequisitionFromDemand(
-      dto.siteId,
-      dto.demands,
+      resolvedSiteId,
+      dto?.demands ?? [],
       req.user.sub,
-      dto.reqNoPrefix,
+      dto?.reqNoPrefix,
     );
   }
 

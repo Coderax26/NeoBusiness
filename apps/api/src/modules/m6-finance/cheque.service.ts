@@ -72,6 +72,7 @@ export class ChequeService {
         .where('id', cmd.chequeId)
         .update({
           status: 'DEPOSITED',
+          deposited_on: Clock.todayKolkata(),
           deposited_at: now,
           deposited_by: cmd.depositedBy,
           deposit_slip_no: cmd.depositSlipNo ?? null,
@@ -174,9 +175,13 @@ export class ChequeService {
         user_id: collectorId,
         site_id: siteId,
         entry_type: 'HANDOVER',
-        amount_delta: newCustodyBal.toStorageString(),
+        amount_delta: amount.mul(-1).toStorageString(),
         receipt_id: cheque.receipt_id,
         running_balance: newCustodyBal.toStorageString(),
+      });
+
+      await trx('users').where('id', collectorId).update({
+        cash_custody_balance: newCustodyBal.toStorageString(),
       });
 
       this.logger.log(
@@ -291,9 +296,13 @@ export class ChequeService {
         user_id: collectorId,
         site_id: siteId,
         entry_type: 'ADJUSTMENT',
-        amount_delta: newCustodyBal.toStorageString(),
+        amount_delta: amount.mul(-1).toStorageString(),
         receipt_id: cheque.receipt_id,
         running_balance: newCustodyBal.toStorageString(),
+      });
+
+      await trx('users').where('id', collectorId).update({
+        cash_custody_balance: newCustodyBal.toStorageString(),
       });
 
       // Update invoice allocation if there was one
@@ -384,12 +393,13 @@ export class ChequeService {
         throw new NotFoundException(`Cheque ${cmd.chequeId} not found`);
       }
 
-      if (cheque.status !== 'RECEIVED') {
+      if (!['RECEIVED', 'BOUNCED'].includes(cheque.status)) {
         throw new BadRequestException(
           `Cheque ${cmd.chequeId} cannot be returned from status ${cheque.status}`,
         );
       }
 
+      const previousStatus = String(cheque.status);
       const now = Clock.nowUtc();
       const amount = Money.of(cheque.amount);
 
@@ -416,44 +426,48 @@ export class ChequeService {
         updated_by: cmd.returnedBy,
       });
 
-      // Reverse customer ledger entry (re-add the AR balance)
-      const prevCustomerBal = await this.ledger.getCustomerBalance(
-        customerId,
-        trx,
-      );
-      const newCustomerBal = prevCustomerBal.add(amount);
+      // Only reverse customer AR & custody if returning directly from RECEIVED (BOUNCED already reversed both)
+      if (previousStatus === 'RECEIVED') {
+        const prevCustomerBal = await this.ledger.getCustomerBalance(
+          customerId,
+          trx,
+        );
+        const newCustomerBal = prevCustomerBal.add(amount);
 
-      await trx('customer_ledger_entries').insert({
-        site_id: siteId,
-        customer_id: customerId,
-        entry_type: 'ADJUSTMENT',
-        debit: amount.toStorageString(),
-        ref_id: cheque.receipt_id,
-        ref_no: `CHEQUE_RETURN_${cheque.cheque_no}`,
-        running_balance: newCustomerBal.toStorageString(),
-        note: `Cheque ${cheque.cheque_no} returned: ${cmd.returnReason}`,
-      });
+        await trx('customer_ledger_entries').insert({
+          site_id: siteId,
+          customer_id: customerId,
+          entry_type: 'ADJUSTMENT',
+          debit: amount.toStorageString(),
+          ref_id: cheque.receipt_id,
+          ref_no: `CHEQUE_RETURN_${cheque.cheque_no}`,
+          running_balance: newCustomerBal.toStorageString(),
+          note: `Cheque ${cheque.cheque_no} returned: ${cmd.returnReason}`,
+        });
 
-      // Update customer cached balance
-      await trx('customers').where('id', customerId).update({
-        current_ar_balance: newCustomerBal.toStorageString(),
-      });
+        await trx('customers').where('id', customerId).update({
+          current_ar_balance: newCustomerBal.toStorageString(),
+        });
 
-      // Update custody ledger
-      const prevCustodyBal = await this.ledger.getCustodyBalance(
-        collectorId,
-        trx,
-      );
-      const newCustodyBal = prevCustodyBal.sub(amount);
+        const prevCustodyBal = await this.ledger.getCustodyBalance(
+          collectorId,
+          trx,
+        );
+        const newCustodyBal = prevCustodyBal.sub(amount);
 
-      await trx('custody_ledger').insert({
-        user_id: collectorId,
-        site_id: siteId,
-        entry_type: 'ADJUSTMENT',
-        amount_delta: newCustodyBal.toStorageString(),
-        receipt_id: cheque.receipt_id,
-        running_balance: newCustodyBal.toStorageString(),
-      });
+        await trx('custody_ledger').insert({
+          user_id: collectorId,
+          site_id: siteId,
+          entry_type: 'ADJUSTMENT',
+          amount_delta: amount.mul(-1).toStorageString(),
+          receipt_id: cheque.receipt_id,
+          running_balance: newCustodyBal.toStorageString(),
+        });
+
+        await trx('users').where('id', collectorId).update({
+          cash_custody_balance: newCustodyBal.toStorageString(),
+        });
+      }
 
       this.logger.log(
         `Cheque ${cheque.cheque_no} RETURNED by ${cmd.returnedBy}: ${cmd.returnReason}`,
@@ -498,12 +512,18 @@ export class ChequeService {
         'cheque_register.receipt_id',
         'collection_receipts.id',
       )
+      .leftJoin(
+        'customers',
+        'collection_receipts.customer_id',
+        'customers.id',
+      )
       .orderBy('cheque_register.created_at', 'desc')
       .limit(limit)
       .select(
         'cheque_register.*',
         'collection_receipts.receipt_no',
         'collection_receipts.customer_id',
+        'customers.business_name as customer_name',
       );
 
     if (siteId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) {

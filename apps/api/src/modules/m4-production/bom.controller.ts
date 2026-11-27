@@ -26,6 +26,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { RbacGuard } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 
 @ApiTags('M4 Production - BOM')
 @Controller('production/boms')
@@ -47,7 +48,11 @@ export class BomController {
     @Body() dto: CreateBomDto,
     @Req() req: any,
   ): Promise<BomHeaderResponseDto> {
-    return this.bomService.createBom(dto, req.user.sub);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto.siteId);
+    return this.bomService.createBom(
+      { ...dto, siteId: resolvedSiteId ?? dto.siteId },
+      req.user.sub,
+    );
   }
 
   @Get()

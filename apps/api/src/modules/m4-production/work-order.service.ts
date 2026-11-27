@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Inject,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
@@ -11,6 +12,7 @@ import type { Knex } from 'knex';
 import { v7 as uuidv7 } from 'uuid';
 import { Qty } from '../../shared/utils/qty.util.js';
 import { Clock } from '../../shared/utils/clock.util.js';
+import { ConfigService } from '../m0-platform/config.service.js';
 import {
   WorkOrderRepository,
   WorkOrderHeaderRow,
@@ -29,8 +31,10 @@ import {
   RecordOutputDto,
 } from './dto/work-order.dto.js';
 import {
+  EXCEPTION_PORT,
   INVENTORY_PORT,
   ITEM_PORT,
+  type ExceptionPort,
   type InventoryPort,
   type ItemPort,
 } from '../../shared/ports/ports.interface.js';
@@ -42,13 +46,11 @@ import { OutboxService } from '../../shared/events/outbox.service.js';
  * State Machine: PLANNED → IN_PROGRESS → COMPLETED | CANCELLED
  *
  * Key responsibilities:
- * - Create work orders from BOMs with proper validation
- * - Validate RM availability via InventoryPort.reserve() when starting
- * - Record consumption with FEFO batch selection
- * - Post PROD_CONSUME events to M3 stock ledger
- * - Record output with batch creation for FG inventory
- * - Check yield against BOM and raise wastage exception if >5% below (BR-06)
- * - Post PROD_OUTPUT events and final ledger entries on completion
+ * - Create work orders from BOMs with scaled RM planned quantities
+ * - Validate RM availability via InventoryPort.checkATP() & reserve() when starting
+ * - Record consumption & output strictly through InventoryPort (no direct M3 table writes)
+ * - Enforce BR-06 / OD-012 mass balance: (Output + Wastage) / Issued RM within ±3% tolerance
+ * - Raise YIELD_VARIANCE exception via EXCEPTION_PORT when tolerance exceeded
  */
 @Injectable()
 export class WorkOrderService {
@@ -60,11 +62,15 @@ export class WorkOrderService {
     @Inject(ITEM_PORT) private readonly itemPort: ItemPort,
     @Inject(forwardRef(() => OutboxService))
     private readonly outbox: OutboxService,
+    @Optional()
+    @Inject(EXCEPTION_PORT)
+    private readonly exceptionPort?: ExceptionPort,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   /**
    * Create a new work order from an ACTIVE BOM.
-   * Generates unique wo_no, creates header in PLANNED status with material/output lines.
+   * Generates unique wo_no when omitted, creates header in PLANNED status with scaled RM lines.
    */
   async createWorkOrder(
     dto: CreateWorkOrderDto,
@@ -81,23 +87,34 @@ export class WorkOrderService {
       );
     }
 
+    const effectiveSiteId = dto.siteId || bom.siteId;
+    if (!effectiveSiteId) {
+      throw new BadRequestException('siteId is required to create a work order');
+    }
+
+    const woNo =
+      dto.woNo?.trim() ||
+      `WO-${Clock.nowUtc().toISOString().slice(0, 10).replace(/-/g, '')}-${uuidv7().slice(-4).toUpperCase()}`;
+
     // Check if work order number already exists for this site
-    const exists = await this.woRepo.headerExists(dto.woNo, dto.siteId);
+    const exists = await this.woRepo.headerExists(woNo, effectiveSiteId);
     if (exists) {
       throw new ConflictException(
-        `Work order number ${dto.woNo} already exists for this site`,
+        `Work order number ${woNo} already exists for this site`,
       );
     }
 
+    const woPlannedQty = Qty.of(dto.plannedQty, dto.uom);
+
     return await this.knex.transaction(async (trx) => {
       const headerId = uuidv7();
-      const [header] = await trx('production_work_orders')
+      await trx('production_work_orders')
         .insert({
           id: headerId,
-          wo_no: dto.woNo,
-          site_id: dto.siteId,
+          wo_no: woNo,
+          site_id: effectiveSiteId,
           bom_header_id: dto.bomHeaderId,
-          planned_qty: dto.plannedQty,
+          planned_qty: woPlannedQty.toStorageString(),
           uom: dto.uom,
           status: WorkOrderStatus.PLANNED,
           created_by: createdBy,
@@ -105,17 +122,20 @@ export class WorkOrderService {
         })
         .returning('*');
 
-      // Create material lines from BOM
+      // Create scaled material lines from BOM (omit GENERATED ALWAYS variance_pct)
       for (let i = 0; i < bom.lines.length; i++) {
-        const lineQty = Qty.of(bom.lines[i].qtyPerUnit, bom.lines[i].uom);
+        const bomLine = bom.lines[i];
+        const qtyPerUnit = parseFloat(bomLine.qtyPerUnit);
+        const scaledPlanned = woPlannedQty.mul(
+          Number.isFinite(qtyPerUnit) ? qtyPerUnit : 0,
+        );
         await trx('work_order_materials').insert({
           id: uuidv7(),
           work_order_id: headerId,
-          item_id: bom.lines[i].itemId,
-          planned_qty: lineQty.toStorageString(),
+          item_id: bomLine.itemId,
+          planned_qty: scaledPlanned.toStorageString(),
           actual_qty: '0.000',
-          uom: bom.lines[i].uom,
-          variance_pct: '0.00',
+          uom: bomLine.uom,
         });
       }
 
@@ -126,10 +146,10 @@ export class WorkOrderService {
         headerId,
         {
           workOrderId: headerId,
-          woNo: dto.woNo,
-          siteId: dto.siteId,
+          woNo,
+          siteId: effectiveSiteId,
           bomHeaderId: dto.bomHeaderId,
-          plannedQty: dto.plannedQty,
+          plannedQty: woPlannedQty.toStorageString(),
           uom: dto.uom,
           createdBy,
         },
@@ -143,12 +163,12 @@ export class WorkOrderService {
   /**
    * Start a work order.
    * Transitions: PLANNED → IN_PROGRESS
-   * Validates RM availability via InventoryPort.reserve()
+   * Validates RM availability via InventoryPort.checkATP() & reserve()
    */
   async startWorkOrder(
     woId: string,
     startedBy: string,
-    siteId: string,
+    siteId?: string,
   ): Promise<WorkOrderResponseDto> {
     const header = await this.woRepo.getHeaderById(woId);
     if (!header) {
@@ -161,28 +181,39 @@ export class WorkOrderService {
       );
     }
 
-    // Get BOM to determine RM requirements
+    const effectiveSiteId = siteId || header.site_id;
     const bom = await this.bomService.getBom(header.bom_header_id);
     if (!bom) {
       throw new NotFoundException(`BOM for work order not found`);
     }
 
-    // Calculate required RM quantities based on planned output
-    const rmRequirements = bom.lines.map((line) => {
-      // RM qty needed = planned_qty * qty_per_unit for the UoM
-      const plannedQty = Qty.of(header.planned_qty, header.uom);
-      const requiredQty = plannedQty
-        .mul(parseFloat(line.qtyPerUnit))
-        .toStorageString();
-      return {
-        itemId: line.itemId,
-        requiredQty,
-        uom: line.uom,
-        itemName: line.itemName,
-      };
-    });
+    // Prefer persisted material lines so reservation uses their real UUIDs
+    const materials = await this.woRepo.getMaterials(woId);
+    const rmRequirements =
+      materials.length > 0
+        ? materials.map((mat) => ({
+            refId: mat.id,
+            itemId: mat.item_id,
+            requiredQty: mat.planned_qty,
+            uom: mat.uom,
+            itemName:
+              bom.lines.find((l) => l.itemId === mat.item_id)?.itemName ??
+              mat.item_id,
+          }))
+        : bom.lines.map((line) => {
+            const plannedQty = Qty.of(header.planned_qty, header.uom);
+            const requiredQty = plannedQty
+              .mul(parseFloat(line.qtyPerUnit))
+              .toStorageString();
+            return {
+              refId: woId,
+              itemId: line.itemId,
+              requiredQty,
+              uom: line.uom,
+              itemName: line.itemName,
+            };
+          });
 
-    // Reserve RMs via InventoryPort
     const reservations: Array<{
       reservationId: string;
       itemId: string;
@@ -192,7 +223,7 @@ export class WorkOrderService {
 
     for (const rm of rmRequirements) {
       const atpResult = await this.inventoryPort.checkATP(
-        '',
+        effectiveSiteId,
         rm.itemId,
         rm.requiredQty,
         deliveryDate,
@@ -205,8 +236,8 @@ export class WorkOrderService {
       }
 
       const reserveResult = await this.inventoryPort.reserve(
-        `wo-${woId}-rm`,
-        siteId,
+        rm.refId,
+        effectiveSiteId,
         rm.itemId,
         rm.requiredQty,
         deliveryDate,
@@ -222,14 +253,12 @@ export class WorkOrderService {
     }
 
     return await this.knex.transaction(async (trx) => {
-      // Update work order status
       await this.woRepo.updateHeader(woId, {
         status: WorkOrderStatus.IN_PROGRESS,
         started_at: Clock.nowUtc().toISOString(),
         started_by: startedBy,
       });
 
-      // Emit domain event
       await this.outbox.raise(
         trx,
         'production.work_order_started',
@@ -248,15 +277,13 @@ export class WorkOrderService {
   }
 
   /**
-   * Record consumption of raw materials.
-   * Validates work order is IN_PROGRESS, selects FEFO batches,
-   * updates batch availability and creates wastage if variance > 0.
+   * Record consumption of raw materials strictly via InventoryPort.postConsumption().
    */
   async recordConsumption(
     woId: string,
     dto: RecordConsumptionDto,
-    recordedBy: string,
-    siteId: string,
+    _recordedBy: string,
+    siteId?: string,
   ): Promise<WorkOrderResponseDto> {
     const header = await this.woRepo.getHeaderById(woId);
     if (!header) {
@@ -269,115 +296,81 @@ export class WorkOrderService {
       );
     }
 
-    // Get BOM to identify finished item
     const bom = await this.bomService.getBom(header.bom_header_id);
     if (!bom) {
       throw new NotFoundException('BOM not found');
     }
 
-    return await this.knex.transaction(async (trx) => {
-      const existingMaterials = await this.woRepo.getMaterials(woId);
+    const effectiveSiteId = siteId || header.site_id;
+    const existingMaterials = await this.woRepo.getMaterials(woId);
 
-      for (const line of dto.lines) {
-        const material = existingMaterials.find(
-          (m) => m.item_id === line.itemId,
-        );
-        if (!material) {
-          throw new NotFoundException(
-            `Consumption line for item ${line.itemId} not found on work order`,
-          );
-        }
-
-        if (!line.actualQty) {
-          throw new BadRequestException(
-            `Actual quantity required for item ${line.itemId}`,
-          );
-        }
-
-        // Validate batch exists and has sufficient quantity (FEFO selection)
-        const [batch] = await trx('inventory_batches')
-          .where('id', line.batchId)
-          .andWhere('item_id', line.itemId)
-          .andWhere('status', 'AVAILABLE')
-          .andWhere('available_qty', '>', '0')
-          .forUpdate()
-          .select('*');
-
-        if (!batch) {
-          throw new BadRequestException(
-            `Batch ${line.batchId} not available for item ${line.itemId}`,
-          );
-        }
-
-        // Validate quantity
-        const availableQty = Qty.of(String(batch.available_qty), 'KG');
-        const consumedQty = Qty.of(line.actualQty, 'KG');
-        if (availableQty.isLessThan(consumedQty)) {
-          throw new BadRequestException(
-            `Insufficient quantity in batch. Available: ${batch.available_qty}, Consumed: ${line.actualQty}`,
-          );
-        }
-
-        // Update batch: reduce available, increase reserved/committed
-        const remainingAvailable = availableQty.sub(consumedQty);
-        await trx('inventory_batches')
-          .where('id', batch.id)
-          .update({
-            available_qty: remainingAvailable.toStorageString(),
-            reserved_qty: Qty.of(String(batch.reserved_qty), 'KG')
-              .add(consumedQty)
-              .toStorageString(),
-            updated_at: Clock.nowUtc().toISOString(),
-          });
-
-        // Update work order material with actual qty
-        await this.woRepo.updateMaterial(material.id, {
-          actual_qty: line.actualQty,
-        });
-
-        // Post PROD_CONSUME ledger entry
-        await trx('stock_ledger_txns').insert({
-          id: uuidv7(),
-          site_id: siteId,
-          item_id: line.itemId,
-          batch_id: line.batchId,
-          qty: consumedQty.toStorageString(),
-          txn_type: 'PROD_CONSUME',
-          reference_table: 'work_order_materials',
-          reference_no: material.id,
-          created_at: Clock.nowUtc().toISOString(),
-        });
-
-        // Emit consumption event
-        await this.outbox.raise(
-          trx,
-          'production.consumption_recorded',
-          woId,
-          {
-            workOrderId: woId,
-            itemId: line.itemId,
-            batchId: line.batchId,
-            actualQty: line.actualQty,
-            plannedQty: material.planned_qty,
-          },
-          'm4',
+    for (const line of dto.lines) {
+      const material = existingMaterials.find(
+        (m) => m.item_id === line.itemId,
+      );
+      if (!material) {
+        throw new NotFoundException(
+          `Consumption line for item ${line.itemId} not found on work order`,
         );
       }
 
-      return this.toResponseDto(woId, bom);
-    });
+      if (!line.actualQty) {
+        throw new BadRequestException(
+          `Actual quantity required for item ${line.itemId}`,
+        );
+      }
+
+      const resolvedBatchId = await this.inventoryPort.postConsumption(
+        woId,
+        material.id,
+        line.itemId,
+        line.batchId ?? '',
+        line.actualQty,
+        { siteId: effectiveSiteId, uom: line.uom ?? material.uom },
+      );
+
+      const consumedQty = Qty.of(line.actualQty, material.uom);
+      const prevActual = Qty.of(material.actual_qty || '0', material.uom);
+      const nextActual = prevActual.add(consumedQty).toStorageString();
+      material.actual_qty = nextActual;
+
+      await this.woRepo.updateMaterial(material.id, {
+        actual_qty: nextActual,
+        batch_id:
+          typeof resolvedBatchId === 'string' && resolvedBatchId
+            ? resolvedBatchId
+            : (line.batchId ?? material.batch_id),
+      });
+
+      await this.outbox.raiseStandalone(
+        'production.consumption_recorded',
+        woId,
+        {
+          workOrderId: woId,
+          itemId: line.itemId,
+          batchId:
+            typeof resolvedBatchId === 'string' && resolvedBatchId
+              ? resolvedBatchId
+              : (line.batchId ?? null),
+          actualQty: consumedQty.toStorageString(),
+          plannedQty: material.planned_qty,
+        },
+        'm4',
+      );
+    }
+
+    return this.toResponseDto(woId, bom);
   }
 
   /**
-   * Record output of finished goods.
-   * Validates work order is IN_PROGRESS, creates FG batch if needed,
-   * posts PROD_OUTPUT to stock ledger.
+   * Record output of finished goods strictly via InventoryPort.postOutput().
+   * Omits GENERATED column yield_pct on work_order_outputs insert.
    */
   async recordOutput(
     woId: string,
     dto: RecordOutputDto,
     recordedBy: string,
-    siteId: string,
+    siteId?: string,
   ): Promise<WorkOrderResponseDto> {
     const header = await this.woRepo.getHeaderById(woId);
     if (!header) {
@@ -390,148 +383,96 @@ export class WorkOrderService {
       );
     }
 
-    // Get BOM for finished item
     const bom = await this.bomService.getBom(header.bom_header_id);
     if (!bom) {
       throw new NotFoundException(`BOM for work order not found`);
     }
     const finishedItemId = bom.itemId;
+    const effectiveSiteId = siteId || header.site_id;
 
-    return await this.knex.transaction(async (trx) => {
-      for (const line of dto.lines) {
-        // Ensure output is for the correct finished item
-        if (line.itemId !== finishedItemId) {
-          throw new BadRequestException(
-            `Output item must be the finished good ${finishedItemId}`,
-          );
-        }
-
-        if (!line.actualQty) {
-          throw new BadRequestException(
-            'Actual quantity required for output line',
-          );
-        }
-
-        const outputQty = Qty.of(line.actualQty, header.uom);
-
-        // Create or use batch for FG
-        let batchId = line.batchId;
-        let batchNumber: string;
-
-        if (batchId) {
-          // Validate specified batch
-          const [batch] = await trx('inventory_batches')
-            .where({ id: batchId, item_id: finishedItemId })
-            .select('batch_number')
-            .first('*');
-
-          if (!batch) {
-            throw new BadRequestException(
-              `Specified batch ${batchId} not found for finished item ${finishedItemId}`,
-            );
-          }
-          batchNumber = batch.batch_number;
-        } else {
-          // Create new batch
-          batchNumber = `FG-${finishedItemId.slice(-4)}-${Date.now().toString().slice(-6)}`;
-          const [newBatch] = await trx('inventory_batches')
-            .insert({
-              id: uuidv7(),
-              item_id: finishedItemId,
-              batch_number: batchNumber,
-              status: 'AVAILABLE',
-              available_qty: '0.000',
-              reserved_qty: '0.000',
-              expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-              created_by: recordedBy,
-              created_at: Clock.nowUtc().toISOString(),
-            })
-            .returning('*');
-          batchId = newBatch.id;
-          batchNumber = newBatch.batch_number;
-        }
-
-        // Get current batch available qty
-        const [currentBatch] = await trx('inventory_batches')
-          .where('id', batchId)
-          .select('available_qty')
-          .first('*');
-
-        // Update batch: increase available qty for FG
-        await trx('inventory_batches')
-          .where('id', batchId)
-          .update({
-            available_qty: Qty.of(
-              String(currentBatch?.available_qty || '0'),
-              'KG',
-            )
-              .add(outputQty)
-              .toStorageString(),
-            updated_at: Clock.nowUtc().toISOString(),
-          });
-
-        // Record output line
-        const plannedQty = Qty.of(header.planned_qty, header.uom);
-        const yieldPct = plannedQty.isZero()
-          ? '0.00'
-          : ((outputQty.toNumber() / plannedQty.toNumber()) * 100).toFixed(2);
-
-        await trx('work_order_outputs').insert({
-          id: uuidv7(),
-          work_order_id: woId,
-          item_id: finishedItemId,
-          batch_id: batchId,
-          planned_qty: header.planned_qty,
-          actual_qty: outputQty.toStorageString(),
-          uom: header.uom,
-          yield_pct: yieldPct,
-        });
-
-        // Post PROD_OUTPUT ledger entry
-        await trx('stock_ledger_txns').insert({
-          id: uuidv7(),
-          site_id: siteId,
-          item_id: finishedItemId,
-          batch_id: batchId,
-          qty: outputQty.toStorageString(),
-          txn_type: 'PROD_OUTPUT',
-          reference_table: 'work_order_outputs',
-          reference_no: `${woId}-out`,
-          created_at: Clock.nowUtc().toISOString(),
-        });
-
-        // Emit output event
-        await this.outbox.raise(
-          trx,
-          'production.output_recorded',
-          woId,
-          {
-            workOrderId: woId,
-            itemId: finishedItemId,
-            batchId,
-            batchNumber,
-            actualQty: outputQty.toStorageString(),
-            plannedQty: header.planned_qty,
-            recordedBy,
-          },
-          'm4',
+    for (const line of dto.lines) {
+      if (line.itemId !== finishedItemId) {
+        throw new BadRequestException(
+          `Output item must be the finished good ${finishedItemId}`,
         );
       }
 
-      return this.toResponseDto(woId, bom);
-    });
+      if (!line.actualQty) {
+        throw new BadRequestException(
+          'Actual quantity required for output line',
+        );
+      }
+
+      const outputQty = Qty.of(line.actualQty, line.uom ?? header.uom);
+      const resolvedBatchId = await this.inventoryPort.postOutput(
+        woId,
+        finishedItemId,
+        line.batchId ?? '',
+        outputQty.toStorageString(),
+        {
+          siteId: effectiveSiteId,
+          batchNumber: line.batchNumber,
+          uom: line.uom ?? header.uom,
+          createdBy: recordedBy,
+        },
+      );
+
+      await this.woRepo.createOutputs([
+        {
+          work_order_id: woId,
+          item_id: finishedItemId,
+          batch_id:
+            typeof resolvedBatchId === 'string' && resolvedBatchId
+              ? resolvedBatchId
+              : (line.batchId ?? null),
+          planned_qty: line.plannedQty ?? header.planned_qty,
+          actual_qty: outputQty.toStorageString(),
+          uom: line.uom ?? header.uom,
+        },
+      ]);
+
+      await this.outbox.raiseStandalone(
+        'production.output_recorded',
+        woId,
+        {
+          workOrderId: woId,
+          itemId: finishedItemId,
+          batchId:
+            typeof resolvedBatchId === 'string' && resolvedBatchId
+              ? resolvedBatchId
+              : (line.batchId ?? null),
+          batchNumber: line.batchNumber ?? null,
+          actualQty: outputQty.toStorageString(),
+          plannedQty: header.planned_qty,
+          recordedBy,
+        },
+        'm4',
+      );
+    }
+
+    return this.toResponseDto(woId, bom);
   }
 
   /**
    * Complete a work order.
-   * Transitions: IN_PROGRESS → COMPLETED
-   * Performs BR-06 yield check - raises WASTAGE_VARIANCE if deviation > 5%.
+   * Transitions: IN_PROGRESS → COMPLETED (never blocks completion).
+   * Enforces OD-012 / BR-06:
+   * - Mass balance against issued RM: (actualOutput + recordedWastage) / totalIssuedRm
+   * - Default tolerance ±3% (configurable via yield_variance_tolerance_pct)
+   * - Raises YIELD_VARIANCE via EXCEPTION_PORT when tolerance exceeded.
    */
   async completeWorkOrder(
     woId: string,
     completedBy: string,
-    siteId: string,
-  ): Promise<WorkOrderResponseDto> {
+    siteId?: string,
+  ): Promise<
+    WorkOrderResponseDto & {
+      yieldExceptionId?: string | null;
+      actualYieldPct?: number;
+      yieldVariancePct?: number;
+      tolerancePct?: number;
+    }
+  > {
     const header = await this.woRepo.getHeaderById(woId);
     if (!header) {
       throw new NotFoundException(`Work order ${woId} not found`);
@@ -543,87 +484,123 @@ export class WorkOrderService {
       );
     }
 
-    // Get BOM for expected yield
+    const effectiveSiteId = siteId || header.site_id;
     const bom = await this.bomService.getBom(header.bom_header_id);
     if (!bom) {
       throw new NotFoundException('BOM not found');
     }
 
-    // Get actual outputs
-    const outputs = await this.woRepo.getOutputs(woId);
-    const totalActualQty = Qty.of(
-      outputs.reduce((sum, o) => sum + parseFloat(o.actual_qty), 0),
-      header.uom,
+    const [materials, outputs] = await Promise.all([
+      this.woRepo.getMaterials(woId),
+      this.woRepo.getOutputs(woId),
+    ]);
+
+    const totalIssuedRmQty = materials.reduce(
+      (sum, m) => sum + (parseFloat(m.actual_qty) || 0),
+      0,
     );
-    const plannedQty = Qty.of(header.planned_qty, header.uom);
+    const totalActualOutput = outputs.reduce(
+      (sum, o) => sum + (parseFloat(o.actual_qty) || 0),
+      0,
+    );
 
-    // BR-06: Calculate yield and check variance
-    const expectedYield = parseFloat(bom.yieldPct);
-    const actualYield =
-      (totalActualQty.toNumber() / plannedQty.toNumber()) * 100;
-    const yieldVariance = Math.abs(expectedYield - actualYield);
+    let totalWastageQty = 0;
+    try {
+      const wastageRows = await this.knex('wastage_records')
+        .where('work_order_id', woId)
+        .select('qty');
+      if (Array.isArray(wastageRows)) {
+        totalWastageQty = wastageRows.reduce(
+          (sum, w: any) => sum + (parseFloat(w.qty) || 0),
+          0,
+        );
+      }
+    } catch {
+      totalWastageQty = 0;
+    }
 
-    // Raise WASTAGE_VARIANCE exception if > 5%
-    let wastageExceptionId: string | null = null;
-    if (yieldVariance > 5) {
-      wastageExceptionId = await this.raiseWastageException(
+    const rawTol = this.configService?.get?.('yield_variance_tolerance_pct');
+    const tolerancePct =
+      rawTol !== undefined && Number.isFinite(Number(rawTol)) && Number(rawTol) > 0
+        ? Number(rawTol)
+        : 3;
+    const basis = String(
+      this.configService?.get?.('yield_variance_basis') ?? 'ISSUED_RAW_MATERIAL',
+    );
+
+    let actualYieldPct = 100;
+    let yieldVariancePct = 0;
+
+    if (basis === 'ISSUED_RAW_MATERIAL' && totalIssuedRmQty > 0) {
+      const accountedQty = totalActualOutput + totalWastageQty;
+      actualYieldPct = (accountedQty / totalIssuedRmQty) * 100;
+      yieldVariancePct = Math.abs(100 - actualYieldPct);
+    } else {
+      const plannedQtyNum = parseFloat(header.planned_qty) || 0;
+      const expectedYieldPct = parseFloat(bom.yieldPct) || 100;
+      actualYieldPct =
+        plannedQtyNum > 0 ? (totalActualOutput / plannedQtyNum) * 100 : 0;
+      yieldVariancePct = Math.abs(expectedYieldPct - actualYieldPct);
+    }
+
+    let yieldExceptionId: string | null = null;
+    if (yieldVariancePct > tolerancePct) {
+      yieldExceptionId = await this.raiseYieldVarianceException(
         woId,
         header,
         bom,
-        actualYield,
-        yieldVariance,
+        totalIssuedRmQty,
+        totalActualOutput,
+        totalWastageQty,
+        actualYieldPct,
+        yieldVariancePct,
+        tolerancePct,
         completedBy,
-        siteId,
+        effectiveSiteId,
       );
     }
 
-    return await this.knex.transaction(async (trx) => {
-      // Update work order status
-      await this.woRepo.updateHeader(woId, {
-        status: WorkOrderStatus.COMPLETED,
-        completed_at: Clock.nowUtc().toISOString(),
-        completed_by: completedBy,
-      });
-
-      // Post final ledger entry
-      await trx('stock_ledger_txns').insert({
-        id: uuidv7(),
-        site_id: siteId,
-        item_id: bom.itemId,
-        batch_id: outputs[0]?.batch_id || null,
-        qty: totalActualQty.toStorageString(),
-        txn_type: 'PROD_COMPLETE',
-        reference_table: 'production_work_orders',
-        reference_no: woId,
-        created_at: Clock.nowUtc().toISOString(),
-      });
-
-      // Emit completion event
-      await this.outbox.raise(
-        trx,
-        'production.work_order_completed',
-        woId,
-        {
-          workOrderId: woId,
-          status: WorkOrderStatus.COMPLETED,
-          plannedQty: header.planned_qty,
-          actualQty: totalActualQty.toStorageString(),
-          expectedYield,
-          actualYield: actualYield.toFixed(2),
-          yieldVariance: yieldVariance.toFixed(2),
-          completedBy,
-          wastageExceptionRaised: yieldVariance > 5,
-          wastageExceptionId,
-        },
-        'm4',
-      );
-
-      return this.toResponseDto(woId, bom);
+    await this.woRepo.updateHeader(woId, {
+      status: WorkOrderStatus.COMPLETED,
+      completed_at: Clock.nowUtc().toISOString(),
+      completed_by: completedBy,
     });
+
+    await this.outbox.raiseStandalone(
+      'production.work_order_completed',
+      woId,
+      {
+        workOrderId: woId,
+        woNo: header.wo_no,
+        siteId: effectiveSiteId,
+        status: WorkOrderStatus.COMPLETED,
+        plannedQty: header.planned_qty,
+        actualQty: totalActualOutput.toFixed(3),
+        totalIssuedRmQty: totalIssuedRmQty.toFixed(3),
+        totalWastageQty: totalWastageQty.toFixed(3),
+        actualYield: actualYieldPct.toFixed(2),
+        yieldVariancePct: yieldVariancePct.toFixed(2),
+        tolerancePct,
+        completedBy,
+        yieldExceptionRaised: yieldVariancePct > tolerancePct,
+        yieldExceptionId,
+      },
+      'm4',
+    );
+
+    const response = await this.toResponseDto(woId, bom);
+    return {
+      ...response,
+      yieldExceptionId,
+      actualYieldPct: Number(actualYieldPct.toFixed(2)),
+      yieldVariancePct: Number(yieldVariancePct.toFixed(2)),
+      tolerancePct,
+    };
   }
 
   /**
    * Cancel a work order (from PLANNED or IN_PROGRESS status only).
+   * Releases any RM reservations if IN_PROGRESS.
    */
   async cancelWorkOrder(woId: string, cancelledBy: string): Promise<void> {
     const header = await this.woRepo.getHeaderById(woId);
@@ -633,6 +610,16 @@ export class WorkOrderService {
 
     if (header.status === WorkOrderStatus.COMPLETED) {
       throw new BadRequestException('Cannot cancel a COMPLETED work order');
+    }
+
+    if (header.status === WorkOrderStatus.IN_PROGRESS) {
+      const materials = await this.woRepo.getMaterials(woId);
+      for (const mat of materials) {
+        await this.inventoryPort.release(mat.id);
+      }
+      if (materials.length === 0) {
+        await this.inventoryPort.release(woId);
+      }
     }
 
     await this.woRepo.updateHeader(woId, {
@@ -704,69 +691,73 @@ export class WorkOrderService {
   }
 
   /**
-   * Raise WASTAGE_VARIANCE exception when yield deviation exceeds 5%.
-   * Creates entry in exception_approvals table and emits domain event.
+   * Raise YIELD_VARIANCE exception via EXCEPTION_PORT when OD-012 mass-balance
+   * variance exceeds configured tolerance (default ±3%).
    */
-  private async raiseWastageException(
+  private async raiseYieldVarianceException(
     woId: string,
     header: WorkOrderHeaderRow,
     bom: BomHeaderResponseDto,
-    actualYield: number,
-    variancePercent: number,
+    totalIssuedRmQty: number,
+    totalActualOutput: number,
+    totalWastageQty: number,
+    actualYieldPct: number,
+    variancePct: number,
+    tolerancePct: number,
     raisedBy: string,
     siteId: string,
   ): Promise<string | null> {
-    const plannedQty = Qty.of(header.planned_qty, header.uom);
-    const valueAtRisk = plannedQty.toNumber() * (variancePercent / 100);
+    const baseQty =
+      totalIssuedRmQty > 0
+        ? totalIssuedRmQty
+        : parseFloat(header.planned_qty) || 0;
+    const valueAtRisk = (baseQty * (variancePct / 100)).toFixed(2);
+    const payload = {
+      title: `Yield Variance Exceeded (±${tolerancePct}%) on ${header.wo_no}`,
+      summary: `Work order ${header.wo_no} accounted yield ${actualYieldPct.toFixed(2)}% (${variancePct.toFixed(2)}% variance vs ±${tolerancePct}% tolerance). Issued RM: ${totalIssuedRmQty.toFixed(3)} ${header.uom}, Output: ${totalActualOutput.toFixed(3)} ${header.uom}, Wastage: ${totalWastageQty.toFixed(3)} ${header.uom}.`,
+      facts: [
+        { label: 'Work Order', value: header.wo_no },
+        { label: 'BOM', value: bom.bomNo },
+        { label: 'Issued RM', value: `${totalIssuedRmQty.toFixed(3)} ${header.uom}` },
+        { label: 'Actual Output', value: `${totalActualOutput.toFixed(3)} ${header.uom}` },
+        { label: 'Recorded Wastage', value: `${totalWastageQty.toFixed(3)} ${header.uom}` },
+        { label: 'Mass Balance Yield', value: `${actualYieldPct.toFixed(2)}%` },
+        { label: 'Variance', value: `${variancePct.toFixed(2)}% (limit ±${tolerancePct}%)` },
+      ],
+      impact: 'Issued raw material mass balance exceeds acceptable tolerance',
+      actions: [
+        { code: 'APPROVE_WRITEOFF', label: 'Acknowledge & Approve' },
+        { code: 'INVESTIGATE', label: 'Investigate Variance' },
+      ],
+      deepLink: '/production/work-orders',
+      valueAtRisk,
+    };
+
+    if (this.exceptionPort) {
+      return this.exceptionPort.raise(
+        'YIELD_VARIANCE',
+        'production_work_orders',
+        woId,
+        raisedBy,
+        payload,
+        siteId,
+      );
+    }
 
     const exceptionId = uuidv7();
-
-    await this.knex.transaction(async (trx) => {
-      await trx('exception_approvals').insert({
-        id: exceptionId,
-        type: 'WASTAGE_VARIANCE',
-        reference_table: 'production_work_orders',
-        reference_id: woId,
-        requested_by: raisedBy,
-        status: 'PENDING_APPROVAL',
-        title: 'Production Yield Variance Exceeded',
-        summary: `Work order ${header.wo_no} yield is ${actualYield.toFixed(2)}%, expected ${bom.yieldPct}%`,
-        facts: JSON.stringify([
-          { label: 'Work Order', value: header.wo_no },
-          { label: 'BOM', value: bom.bomNo },
-          { label: 'Expected Yield', value: `${bom.yieldPct}%` },
-          { label: 'Actual Yield', value: `${actualYield.toFixed(2)}%` },
-          { label: 'Variance', value: `${variancePercent.toFixed(2)}%` },
-          { label: 'Planned Qty', value: header.planned_qty },
-        ]),
-        impact: `Production efficiency loss - investigate causes`,
-        actions: JSON.stringify([
-          { code: 'RECORD_WASTAGE', label: 'Record as Wastage' },
-          { code: 'INVESTIGATE', label: 'Investigate Cause' },
-        ]),
-        value_at_risk: valueAtRisk.toString(),
-        site_id: siteId,
-        created_at: Clock.nowUtc().toISOString(),
-        updated_at: Clock.nowUtc().toISOString(),
-      });
-
-      // Emit exception raised event
-      await this.outbox.raise(
-        trx,
-        'exception.wastage_variance_raised',
-        woId,
-        {
-          workOrderId: woId,
-          exceptionId,
-          actualYield: actualYield.toFixed(2),
-          expectedYield: bom.yieldPct,
-          variance: variancePercent.toFixed(2),
-          valueAtRisk: valueAtRisk.toString(),
-        },
-        'm4',
-      );
-    });
-
+    await this.outbox.raiseStandalone(
+      'exception.yield_variance_raised',
+      woId,
+      {
+        workOrderId: woId,
+        exceptionId,
+        actualYield: actualYieldPct.toFixed(2),
+        variance: variancePct.toFixed(2),
+        tolerancePct,
+        valueAtRisk,
+      },
+      'm4',
+    );
     return exceptionId;
   }
 

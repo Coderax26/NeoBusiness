@@ -23,7 +23,8 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
-import { RequirePermission } from '../m0-platform/rbac.service.js';
+import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { Clock } from '../../shared/utils/clock.util.js';
 import {
   AtpQueryDto,
@@ -40,7 +41,7 @@ import {
 
 @ApiTags('M3 Inventory & Warehouse')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('inventory')
 export class InventoryController {
   private readonly logger = new Logger(InventoryController.name);
@@ -195,8 +196,13 @@ export class InventoryController {
   async receiveTransfer(
     @Param('id') transferId: string,
     @Body() body: ReceiveTransferDto,
+    @Req() req: any,
   ) {
-    return this.inventoryService.receiveTransfer(transferId, body.lines);
+    return this.inventoryService.receiveTransfer(
+      transferId,
+      body.lines,
+      req?.user?.sub || req?.user?.id,
+    );
   }
 
   @Post('transfers/:id/complete')
@@ -253,13 +259,14 @@ export class InventoryController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create stock adjustment' })
   async createAdjustment(@Body() body: CreateAdjustmentDto, @Req() req: any) {
+    const siteId = resolveUserSiteId(req?.user, body.siteId) || body.siteId;
     return this.inventoryService.createAdjustment(
-      body.siteId,
+      siteId,
       body.itemId,
       body.adjustmentType,
       body.qty,
       body.remarks,
-      req.user.id,
+      req.user?.sub || req.user?.id,
     );
   }
 
@@ -297,7 +304,7 @@ export class InventoryController {
   async createStockCount(
     @Body()
     body: {
-      siteId: string;
+      siteId?: string;
       locationId?: string;
       notes?: string;
       items: Array<{
@@ -309,12 +316,16 @@ export class InventoryController {
     },
     @Req() req: any,
   ) {
+    const siteId = resolveUserSiteId(req?.user, body.siteId);
+    if (!siteId) {
+      throw new BadRequestException('siteId is required for stock count');
+    }
     return this.inventoryService.createStockCount(
-      body.siteId,
+      siteId,
       body.locationId,
       body.notes,
       body.items || [],
-      req.user.id,
+      req.user?.sub || req.user?.id,
     );
   }
 

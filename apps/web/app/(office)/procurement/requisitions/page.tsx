@@ -21,25 +21,88 @@ const SOURCE_LABELS: Record<RequisitionSource, string> = {
 
 export default function RequisitionsPage() {
   const [requisitions, setRequisitions] = useState<RequisitionRecord[]>([]);
+  const [liveItems, setLiveItems] = useState<Array<{ id: string; sku: string; name: string; uom: string; lastRate: number }>>(PROCUREMENT_ITEMS);
+  const [liveSuppliers, setLiveSuppliers] = useState<Array<{ id: string; name: string; fillRate: number }>>(PROCUREMENT_SUPPLIERS);
   const [viewMode, setViewMode] = useState<'LIST' | 'GROUPED'>('LIST');
   const [statusFilter, setStatusFilter] = useState<RequisitionStatus | 'ALL'>('ALL');
   const [sourceFilter, setSourceFilter] = useState<RequisitionSource | 'ALL'>('ALL');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadRequisitions = async () => {
+    try {
+      const r = await fetch('/api/proxy/procurement/requisitions');
+      if (!r.ok) return;
+      const res = await r.json();
+      const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+      const fallbackSup = liveSuppliers[0] || PROCUREMENT_SUPPLIERS[0];
+      setRequisitions(
+        rows.map((row: any) => {
+          const rawSrc = String(row.source || 'MANUAL').toUpperCase();
+          const mappedSource: RequisitionSource =
+            rawSrc === 'PRODUCTION'
+              ? 'PRODUCTION_RM'
+              : rawSrc === 'SALES_ORDER'
+                ? 'SALES_ORDER_BACK_TO_BACK'
+                : (rawSrc as RequisitionSource);
+          return {
+            id: String(row.id),
+            requisitionNo: String(row.requisitionNo || row.reqNo || row.req_no || row.id),
+            source: mappedSource,
+            sourceRefId: row.sourceRefId || row.source_ref_id || undefined,
+            itemId: String(row.itemId || row.item_id || ''),
+            itemSku: String(row.itemSku || row.item_sku || ''),
+            itemName: String(row.itemName || row.item_name || 'Item'),
+            qty: Number(row.qty ?? 0),
+            uom: String(row.uom || row.primary_uom || 'kg'),
+            neededBy: String(row.neededBy || row.needed_by || '').slice(0, 10),
+            reason: String(row.reason || mappedSource),
+            status: (row.status || 'OPEN') as RequisitionStatus,
+            preferredSupplierId: String(row.preferredSupplierId || fallbackSup.id),
+            preferredSupplierName: String(row.preferredSupplierName || fallbackSup.name),
+            latestRate: Number(row.latestRate ?? 50),
+            siteId: String(row.siteId || ''),
+            siteName: String(row.siteName || 'Main Site'),
+            createdAt: String(row.createdAt || row.created_at || ''),
+          };
+        }),
+      );
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/procurement/requisitions')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setRequisitions(rows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadRequisitions();
+    Promise.allSettled([
+      fetch('/api/proxy/items').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/proxy/procurement/suppliers').then((r) => (r.ok ? r.json() : [])),
+    ]).then(([itmRes, supRes]) => {
+      if (itmRes.status === 'fulfilled') {
+        const rows = Array.isArray(itmRes.value) ? itmRes.value : Array.isArray(itmRes.value?.data) ? itmRes.value.data : [];
+        if (rows.length > 0) {
+          const mapped = rows.map((i: any) => ({
+            id: String(i.id),
+            sku: String(i.sku_code || i.sku || ''),
+            name: String(i.name || 'Item'),
+            uom: String(i.primary_uom || 'kg'),
+            lastRate: Number(i.last_purchase_price ?? 50),
+          }));
+          setLiveItems(mapped);
+          setNewItemId(mapped[0].id);
+        }
+      }
+      if (supRes.status === 'fulfilled') {
+        const rows = Array.isArray(supRes.value) ? supRes.value : Array.isArray(supRes.value?.data) ? supRes.value.data : [];
+        if (rows.length > 0) {
+          const mapped = rows.map((s: any) => ({
+            id: String(s.id),
+            name: String(s.company_name || s.name || 'Supplier'),
+            fillRate: Number(s.reliability_score_pct ?? 95),
+          }));
+          setLiveSuppliers(mapped);
+          setNewSupplierId(mapped[0].id);
+        }
+      }
+    });
   }, []);
 
   // Create Manual Requisition modal
@@ -124,84 +187,82 @@ export default function RequisitionsPage() {
   };
 
   const handleCreateManual = async () => {
-    const item = PROCUREMENT_ITEMS.find((i) => i.id === newItemId) || PROCUREMENT_ITEMS[0];
-    const supplier = PROCUREMENT_SUPPLIERS.find((s) => s.id === newSupplierId) || PROCUREMENT_SUPPLIERS[0];
-    const created: RequisitionRecord = {
-      id: `req-${Date.now()}`,
-      requisitionNo: `REQ-2026-0${Math.floor(50 + Math.random() * 49)}`,
-      source: 'MANUAL',
-      itemId: item.id,
-      itemSku: item.sku,
-      itemName: item.name,
-      qty: newQty,
-      uom: item.uom,
-      neededBy: newNeededBy,
-      reason: newReason || 'Manual coordinator indent',
-      status: 'OPEN',
-      preferredSupplierId: supplier.id,
-      preferredSupplierName: supplier.name,
-      latestRate: item.lastRate,
-      siteId: 'site-1',
-      siteName: 'Pune Central Depot',
-      createdAt: 'Just now',
-    };
-
-    fetch('/api/bff/procurement/requisitions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created),
-    }).catch(() => {});
-
-    setRequisitions((prev) => [created, ...prev]);
-    setCreateOpen(false);
-    setNewReason('');
-    showToast(`Created manual requisition ${created.requisitionNo}`);
+    try {
+      const res = await fetch('/api/proxy/procurement/requisitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: newItemId,
+          qty: String(newQty),
+          neededBy: newNeededBy,
+          source: 'MANUAL',
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadRequisitions();
+      setCreateOpen(false);
+      setNewReason('');
+      showToast(`Created manual requisition ${payload?.reqNo ?? ''}`);
+    } catch (err) {
+      showToast(`Failed to create requisition: ${(err as Error).message}`);
+    }
   };
 
   const handleConfirmConvertToPo = async () => {
     if (selectedGroupsForPo.length === 0) return;
-
-    fetch('/api/bff/procurement/requisitions/convert-to-po', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requisitionIds: openSelectedReqs.map((r) => r.id),
-      }),
-    }).catch(() => {});
-
-    const generated = selectedGroupsForPo.map((grp, idx) => ({
-      poNumber: `PO-2026-${110 + idx}`,
-      supplierName: grp.supplierName,
-      total: grp.estimatedTotal,
-    }));
-
-    const convertedIds = new Set(openSelectedReqs.map((r) => r.id));
-    setRequisitions((prev) =>
-      prev.map((r) => (convertedIds.has(r.id) ? { ...r, status: 'PO_CREATED' } : r)),
-    );
-    setSelectedIds([]);
-    setCreatedPos(generated);
-    setConvertStep(2);
-    showToast(`Converted into ${generated.length} PO(s) — one per supplier.`);
+    try {
+      const generated: Array<{ poNumber: string; supplierName: string; total: number }> = [];
+      for (const grp of selectedGroupsForPo) {
+        const res = await fetch('/api/proxy/procurement/requisitions/convert-to-po', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            supplierId: grp.supplierId,
+            requisitionIds: grp.requisitionIds,
+          }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+        }
+        generated.push({
+          poNumber: String(payload?.poNo ?? 'PO'),
+          supplierName: grp.supplierName,
+          total: grp.estimatedTotal,
+        });
+      }
+      await loadRequisitions();
+      setSelectedIds([]);
+      setCreatedPos(generated);
+      setConvertStep(2);
+      showToast(`Converted into ${generated.length} PO(s) — one per supplier.`);
+    } catch (err) {
+      showToast(`Failed to convert requisitions: ${(err as Error).message}`);
+    }
   };
 
   const handleCancelRequisition = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-
-    fetch(`/api/bff/procurement/requisitions/${cancelTarget.id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: cancelReason }),
-    }).catch(() => {});
-
-    setRequisitions((prev) =>
-      prev.map((r) =>
-        r.id === cancelTarget.id ? { ...r, status: 'CANCELLED', cancelReason } : r,
-      ),
-    );
-    showToast(`Cancelled ${cancelTarget.requisitionNo}`);
-    setCancelTarget(null);
-    setCancelReason('');
+    try {
+      const res = await fetch(`/api/proxy/procurement/requisitions/${encodeURIComponent(cancelTarget.id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadRequisitions();
+      showToast(`Cancelled ${cancelTarget.requisitionNo}`);
+      setCancelTarget(null);
+      setCancelReason('');
+    } catch (err) {
+      showToast(`Failed to cancel requisition: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -452,7 +513,7 @@ export default function RequisitionsPage() {
               onChange={(e) => setNewItemId(e.target.value)}
               className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
-              {PROCUREMENT_ITEMS.map((item) => (
+              {liveItems.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name} ({item.sku})
                 </option>
@@ -486,7 +547,7 @@ export default function RequisitionsPage() {
               onChange={(e) => setNewSupplierId(e.target.value)}
               className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
             >
-              {PROCUREMENT_SUPPLIERS.map((s) => (
+              {liveSuppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} (Fill {s.fillRate}%)
                 </option>

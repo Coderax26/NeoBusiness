@@ -60,41 +60,47 @@ export interface SupplierRecord {
 export default function SupplierMasterPage() {
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
   const [search, setSearch] = useState('');
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  const loadSuppliers = async () => {
+    try {
+      const r = await fetch('/api/proxy/procurement/suppliers');
+      if (!r.ok) return;
+      const rows = await r.json();
+      if (!Array.isArray(rows)) return;
+      setSuppliers(
+        rows.map((s: any) => ({
+          id: String(s.id),
+          code: String(s.supplier_code || s.code || ''),
+          name: String(s.company_name || s.name || 'Supplier'),
+          gstin: String(s.gstin || ''),
+          contactPerson: String(s.contact_person || s.contactPerson || ''),
+          phone: String(s.phone || ''),
+          email: String(s.email || ''),
+          address: String(s.address || ''),
+          paymentTermsDays: Number(s.payment_terms_days ?? s.paymentTermsDays ?? 15),
+          leadTimeDays: Number(s.lead_time_days_avg ?? s.lead_time_days ?? s.leadTimeDays ?? 2),
+          reliabilityScore: Number(
+            s.reliabilityScore ??
+              (s.reliability_score_pct != null
+                ? Number((Number(s.reliability_score_pct) / 20).toFixed(1))
+                : s.reliability_score ?? 4.5),
+          ),
+          fillRatePct: Number(s.reliability_score_pct ?? s.fill_rate_pct ?? s.fillRatePct ?? 95),
+          onTimePct: Number(s.on_time_pct ?? s.onTimePct ?? 92),
+          shortfallCount: Number(s.shortfall_count ?? s.shortfallCount ?? 0),
+          lastPoDate: s.last_po_date || undefined,
+          hasMissingRates: Boolean(s.has_missing_rates),
+          items: Array.isArray(s.items) ? s.items : [],
+          rates: Array.isArray(s.rates) ? s.rates : [],
+          active: s.is_active !== false,
+        })),
+      );
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/procurement/suppliers')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows) => {
-        if (!active || !Array.isArray(rows)) return;
-        setSuppliers(
-          rows.map((s: any) => ({
-            id: String(s.id),
-            code: String(s.supplier_code || s.code || ''),
-            name: String(s.company_name || s.name || 'Supplier'),
-            gstin: String(s.gstin || ''),
-            contactPerson: String(s.contact_person || s.contactPerson || ''),
-            phone: String(s.phone || ''),
-            email: String(s.email || ''),
-            address: String(s.address || ''),
-            paymentTermsDays: Number(s.payment_terms_days ?? s.paymentTermsDays ?? 15),
-            leadTimeDays: Number(s.lead_time_days ?? s.leadTimeDays ?? 2),
-            reliabilityScore: Number(s.reliability_score ?? s.reliabilityScore ?? 4.5),
-            fillRatePct: Number(s.fill_rate_pct ?? s.fillRatePct ?? 95),
-            onTimePct: Number(s.on_time_pct ?? s.onTimePct ?? 92),
-            shortfallCount: Number(s.shortfall_count ?? s.shortfallCount ?? 0),
-            lastPoDate: s.last_po_date || undefined,
-            hasMissingRates: Boolean(s.has_missing_rates),
-            items: Array.isArray(s.items) ? s.items : [],
-            rates: Array.isArray(s.rates) ? s.rates : [],
-            active: s.is_active !== false,
-          })),
-        );
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadSuppliers();
   }, []);
   const [missingRateOnly, setMissingRateOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
@@ -157,7 +163,7 @@ export default function SupplierMasterPage() {
     setFormOpen(true);
   };
 
-  const handleSaveSupplier = () => {
+  const handleSaveSupplier = async () => {
     const errors: Record<string, string> = {};
     if (!code.trim()) errors.code = 'Supplier code is required.';
     if (!name.trim()) errors.name = 'Supplier name is required.';
@@ -179,81 +185,105 @@ export default function SupplierMasterPage() {
       return;
     }
 
-    const newRecord: SupplierRecord = {
-      id: editingSupplier ? editingSupplier.id : `sup-${Date.now()}`,
-      code: code.trim().toUpperCase(),
-      name: name.trim(),
-      gstin: gstin.trim().toUpperCase(),
-      contactPerson: contactPerson.trim(),
+    const payload = {
+      companyName: name.trim(),
       phone: phone.trim(),
-      email: email.trim(),
-      address: address.trim(),
+      whatsappNo: phone.trim(),
+      gstin: gstin.trim().toUpperCase() || undefined,
       paymentTermsDays: parseInt(paymentTermsDays, 10) || 15,
-      leadTimeDays: parseInt(leadTimeDays, 10) || 2,
-      reliabilityScore: editingSupplier ? editingSupplier.reliabilityScore : 5.0,
-      fillRatePct: editingSupplier ? editingSupplier.fillRatePct : 100,
-      onTimePct: editingSupplier ? editingSupplier.onTimePct : 100,
-      shortfallCount: editingSupplier ? editingSupplier.shortfallCount : 0,
-      lastPoDate: editingSupplier?.lastPoDate,
-      hasMissingRates: editingSupplier ? editingSupplier.hasMissingRates : false,
-      items: editingSupplier ? editingSupplier.items : [],
-      rates: editingSupplier ? editingSupplier.rates : [],
-      active: editingSupplier ? editingSupplier.active : true,
+      leadTimeDaysAvg: parseInt(leadTimeDays, 10) || 2,
+      isApproved: true,
     };
 
-    if (editingSupplier) {
-      setSuppliers((prev) => prev.map((s) => (s.id === editingSupplier.id ? newRecord : s)));
-    } else {
-      setSuppliers((prev) => [newRecord, ...prev]);
+    try {
+      const url = editingSupplier
+        ? `/api/proxy/procurement/suppliers/${encodeURIComponent(editingSupplier.id)}`
+        : '/api/proxy/procurement/suppliers';
+      const res = await fetch(url, {
+        method: editingSupplier ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.message || body?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadSuppliers();
+      setFormOpen(false);
+      setSaveToast(editingSupplier ? `Updated supplier ${name.trim()}.` : `Created supplier ${name.trim()}.`);
+    } catch (err) {
+      setFormErrors({ name: (err as Error).message });
+      setActiveTab('general');
     }
-    setFormOpen(false);
   };
 
-  const handleAddRate = () => {
+  const handleAddRate = async () => {
     if (!editingSupplier || !newRateValue || !newRateItemId) return;
     const rateVal = parseFloat(newRateValue);
     if (isNaN(rateVal) || rateVal <= 0) return;
 
-    const matchedItem = editingSupplier.items.find((i) => i.itemId === newRateItemId);
-    const newRate: SupplierRate = {
-      id: `r-${Date.now()}`,
-      itemId: newRateItemId,
-      itemName: matchedItem?.itemName || 'Item',
-      ratePerUnit: rateVal,
-      validFrom: newRateValidFrom,
-      notes: 'Added via Supplier Rate Card tab',
-    };
+    try {
+      const res = await fetch(
+        `/api/proxy/procurement/suppliers/${encodeURIComponent(editingSupplier.id)}/rates`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            itemId: newRateItemId,
+            quotedPrice: String(rateVal),
+            validUntil: newRateValidFrom ? new Date(newRateValidFrom).toISOString() : undefined,
+            source: 'CALL',
+          }),
+        },
+      );
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.message || body?.error?.message || `HTTP ${res.status}`);
+      }
 
-    const updatedRates = [newRate, ...editingSupplier.rates];
-    const updatedItems = editingSupplier.items.map((i) =>
-      i.itemId === newRateItemId ? { ...i, latestRate: rateVal } : i,
-    );
-
-    const hasMissing = updatedItems.some((i) => i.latestRate === undefined);
-
-    const updatedSupplier: SupplierRecord = {
-      ...editingSupplier,
-      rates: updatedRates,
-      items: updatedItems,
-      hasMissingRates: hasMissing,
-    };
-
-    setEditingSupplier(updatedSupplier);
-    setSuppliers((prev) => prev.map((s) => (s.id === updatedSupplier.id ? updatedSupplier : s)));
-    setRateModalOpen(false);
-    setNewRateValue('');
+      const matchedItem = editingSupplier.items.find((i) => i.itemId === newRateItemId);
+      const newRate: SupplierRate = {
+        id: String(body?.id || `r-${Date.now()}`),
+        itemId: newRateItemId,
+        itemName: matchedItem?.itemName || 'Item',
+        ratePerUnit: rateVal,
+        validFrom: newRateValidFrom,
+        notes: 'Saved to supplier rate cards',
+      };
+      const updatedSupplier: SupplierRecord = {
+        ...editingSupplier,
+        rates: [newRate, ...editingSupplier.rates],
+        items: editingSupplier.items.map((i) =>
+          i.itemId === newRateItemId ? { ...i, latestRate: rateVal } : i,
+        ),
+        hasMissingRates: false,
+      };
+      setEditingSupplier(updatedSupplier);
+      setSuppliers((prev) => prev.map((s) => (s.id === updatedSupplier.id ? updatedSupplier : s)));
+      setRateModalOpen(false);
+      setNewRateValue('');
+      setSaveToast(`Added rate ₹${rateVal} for ${editingSupplier.name}.`);
+    } catch (err) {
+      setSaveToast(`Failed to save rate: ${(err as Error).message}`);
+    }
   };
 
-  const handleRecalculateReliability = () => {
+  const handleRecalculateReliability = async () => {
     if (!editingSupplier) return;
-    // Calculate composite reliability score: (fillRate * 0.6 + onTime * 0.4) / 20
+    try {
+      const res = await fetch(
+        `/api/proxy/procurement/suppliers/${encodeURIComponent(editingSupplier.id)}/update-reliability`,
+        { method: 'POST' },
+      );
+      if (res.ok) {
+        await loadSuppliers();
+        setSaveToast(`Recalculated reliability score for ${editingSupplier.name}.`);
+        return;
+      }
+    } catch { /* fallback below */ }
     const weighted = (editingSupplier.fillRatePct * 0.6 + editingSupplier.onTimePct * 0.4) / 20;
     const newScore = parseFloat(Math.min(5.0, Math.max(1.0, weighted)).toFixed(1));
-
-    const updatedSupplier: SupplierRecord = {
-      ...editingSupplier,
-      reliabilityScore: newScore,
-    };
+    const updatedSupplier: SupplierRecord = { ...editingSupplier, reliabilityScore: newScore };
     setEditingSupplier(updatedSupplier);
     setSuppliers((prev) => prev.map((s) => (s.id === updatedSupplier.id ? updatedSupplier : s)));
   };
@@ -414,6 +444,12 @@ export default function SupplierMasterPage() {
           </Button>
         </div>
       </div>
+
+      {saveToast && (
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
+          {saveToast}
+        </div>
+      )}
 
       {/* 2. KPI Strip (§5) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

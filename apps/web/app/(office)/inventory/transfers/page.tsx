@@ -8,34 +8,84 @@ import {
   type StockRow,
 } from '../../../../src/lib/inventory-data';
 
+function normalizeTransferStatus(raw: unknown): TransferRecord['status'] {
+  const s = String(raw || 'DRAFT').toUpperCase();
+  if (s === 'RESERVED' || s === 'REQUESTED') return 'DRAFT';
+  if (s === 'IN_TRANSIT') return 'DISPATCHED';
+  return s as TransferRecord['status'];
+}
+
 export default function InventoryTransfersPage() {
-  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [transfers, setTransfers] = useState<Array<TransferRecord & { rawLines?: any[] }>>([]);
   const [stockRows, setStockRows] = useState<StockRow[]>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState('');
-  const [toSite, setToSite] = useState('Baramati Plant');
+  const [toSite, setToSite] = useState('');
   const [qty, setQty] = useState(200);
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadData = async () => {
+    try {
+      const [trfRes, stkRes, sitesRes] = await Promise.all([
+        fetch('/api/proxy/inventory/transfers').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/sites').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const tRows = Array.isArray(trfRes) ? trfRes : Array.isArray(trfRes?.data) ? trfRes.data : [];
+      const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+      const siteRows = Array.isArray(sitesRes) ? sitesRes : Array.isArray(sitesRes?.data) ? sitesRes.data : [];
+
+      setTransfers(
+        tRows.map((t: any) => ({
+          id: String(t.id),
+          transferNo: String(t.transferNo || t.transfer_no || String(t.id).slice(0, 8)),
+          fromSite: String(t.fromSite || t.from_site_name || t.from_site_id || 'Source'),
+          fromLocation: String(t.fromLocation || 'WH'),
+          toSite: String(t.toSite || t.to_site_name || t.to_site_id || 'Destination'),
+          toLocation: String(t.toLocation || 'RCV-01'),
+          itemId: String(t.itemId || t.lines?.[0]?.item_id || ''),
+          itemName: String(t.itemName || t.item_name || t.lines?.[0]?.item_name || 'Item'),
+          batchNo: String(t.batchNo || t.batch_number || 'FEFO'),
+          qty: Number(t.qty ?? t.requested_qty ?? t.lines?.[0]?.requested_qty ?? 0),
+          uom: String(t.uom || 'KG'),
+          status: normalizeTransferStatus(t.status),
+          createdAt: String(t.createdAt || t.created_at || ''),
+          rawLines: Array.isArray(t.lines) ? t.lines : [],
+        })),
+      );
+
+      const mappedStock = sRows.map((r: any) => ({
+        id: String(r.id ?? r.batchId ?? r.itemId ?? ''),
+        itemId: String(r.itemId ?? r.item_id ?? ''),
+        sku: String(r.sku ?? r.skuCode ?? r.sku_code ?? ''),
+        itemName: String(r.itemName ?? r.item_name ?? r.name ?? ''),
+        category: (r.category ?? 'RAW_MATERIAL') as any,
+        siteId: String(r.siteId ?? r.site_id ?? ''),
+        siteName: String(r.siteName ?? r.site_name ?? ''),
+        locationCode: String(r.locationCode ?? r.locationName ?? r.location_name ?? ''),
+        batchNo: String(r.batchNo ?? r.batchNumber ?? r.batch_number ?? ''),
+        onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
+        reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? 0),
+        minStock: Number(r.minStock ?? 0),
+        uom: String(r.uom ?? 'kg'),
+        altUomLabel: '',
+        unitCost: Number(r.unitCost ?? 0),
+        daysToExpiry: 30,
+        expiryDate: String(r.expiryDate ?? r.expiry_date ?? '').slice(0, 10),
+      }));
+      setStockRows(mappedStock);
+      if (mappedStock.length > 0 && !selectedBatchId) setSelectedBatchId(mappedStock[0].id);
+
+      const mappedSites = siteRows.map((s: any) => ({ id: String(s.id), name: String(s.name) }));
+      setSites(mappedSites);
+      if (mappedSites.length > 0 && !toSite) setToSite(mappedSites[0].id);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch('/api/proxy/inventory/transfers').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([trfRes, stkRes]) => {
-        if (!active) return;
-        const tRows = Array.isArray(trfRes) ? trfRes : Array.isArray(trfRes?.data) ? trfRes.data : [];
-        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
-        setTransfers(tRows);
-        setStockRows(sRows);
-        if (sRows.length > 0) setSelectedBatchId(String(sRows[0].id));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadData();
   }, []);
 
   const showToast = (msg: string) => {
@@ -47,40 +97,62 @@ export default function InventoryTransfersPage() {
     statusFilter === 'ALL' ? true : t.status === statusFilter,
   );
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const src = stockRows.find((r) => r.id === selectedBatchId) || stockRows[0];
     if (!src) return;
-    const created: TransferRecord = {
-      id: `trf-${Date.now()}`,
-      transferNo: `TRF-2026-0${Math.floor(20 + Math.random() * 79)}`,
-      fromSite: src.siteName,
-      fromLocation: src.locationCode,
-      toSite,
-      toLocation: 'RCV-01',
-      itemId: src.itemId,
-      itemName: src.itemName,
-      batchNo: src.batchNo,
-      qty,
-      uom: src.uom,
-      status: 'DRAFT',
-      createdAt: 'Just now',
-    };
-    fetch('/api/bff/inventory/transfers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created),
-    }).catch(() => {});
-    setTransfers((prev) => [created, ...prev]);
-    setCreateOpen(false);
-    showToast(`Created transfer ${created.transferNo} (FEFO batch ${created.batchNo}).`);
+    const toSiteId = sites.find((s) => s.id === toSite || s.name === toSite)?.id || toSite;
+    try {
+      const res = await fetch('/api/proxy/inventory/transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromSiteId: src.siteId,
+          toSiteId,
+          itemId: src.itemId,
+          qty: String(qty),
+          idempotencyKey: `trf-${Date.now()}`,
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadData();
+      setCreateOpen(false);
+      showToast(`Created transfer for ${src.itemName} (${qty} ${src.uom}).`);
+    } catch (err) {
+      showToast(`Failed to create transfer: ${(err as Error).message}`);
+    }
   };
 
-  const transition = (id: string, nextStatus: TransferRecord['status'], endpoint: string) => {
-    fetch(`/api/bff/inventory/transfers/${id}/${endpoint}`, { method: 'POST' }).catch(() => {});
-    setTransfers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)),
-    );
-    showToast(`Transfer updated to ${nextStatus}.`);
+  const transition = async (
+    trf: TransferRecord & { rawLines?: any[] },
+    nextStatus: TransferRecord['status'],
+    endpoint: string,
+  ) => {
+    try {
+      const body =
+        endpoint === 'receive'
+          ? JSON.stringify({
+              lines: (trf.rawLines || []).map((l: any) => ({
+                lineId: String(l.id),
+                receivedQty: String(l.dispatched_qty || l.requested_qty || trf.qty),
+              })),
+            })
+          : undefined;
+      const res = await fetch(`/api/proxy/inventory/transfers/${encodeURIComponent(trf.id)}/${endpoint}`, {
+        method: 'POST',
+        ...(body ? { headers: { 'Content-Type': 'application/json' }, body } : {}),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadData();
+      showToast(`Transfer updated to ${nextStatus}.`);
+    } catch (err) {
+      showToast(`Failed to ${endpoint} transfer: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -168,13 +240,13 @@ export default function InventoryTransfersPage() {
                   {t.status === 'DRAFT' && (
                     <>
                       <button
-                        onClick={() => transition(t.id, 'DISPATCHED', 'dispatch')}
+                        onClick={() => transition(t, 'DISPATCHED', 'dispatch')}
                         className="text-xs text-action hover:text-action font-medium"
                       >
                         Dispatch
                       </button>
                       <button
-                        onClick={() => transition(t.id, 'CANCELLED', 'cancel')}
+                        onClick={() => transition(t, 'CANCELLED', 'cancel')}
                         className="text-xs text-madder hover:text-madder font-medium"
                       >
                         Cancel
@@ -183,7 +255,7 @@ export default function InventoryTransfersPage() {
                   )}
                   {t.status === 'DISPATCHED' && (
                     <button
-                      onClick={() => transition(t.id, 'RECEIVED', 'receive')}
+                      onClick={() => transition(t, 'RECEIVED', 'receive')}
                       className="text-xs text-leaf hover:text-leaf font-medium"
                     >
                       Receive
@@ -191,7 +263,7 @@ export default function InventoryTransfersPage() {
                   )}
                   {t.status === 'RECEIVED' && (
                     <button
-                      onClick={() => transition(t.id, 'COMPLETED', 'complete')}
+                      onClick={() => transition(t, 'COMPLETED', 'complete')}
                       className="text-xs text-leaf hover:text-leaf font-medium"
                     >
                       Complete
@@ -228,8 +300,11 @@ export default function InventoryTransfersPage() {
                 onChange={(e) => setToSite(e.target.value)}
                 className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
               >
-                <option value="Baramati Plant">Baramati Plant</option>
-                <option value="Pune Central Depot">Pune Central Depot</option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

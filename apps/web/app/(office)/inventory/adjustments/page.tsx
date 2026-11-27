@@ -21,31 +21,70 @@ export default function InventoryAdjustmentsPage() {
   const [photoName, setPhotoName] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadAdjustments = async () => {
+    try {
+      const [adjRes, stkRes] = await Promise.all([
+        fetch('/api/proxy/inventory/adjustments').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const aRows = Array.isArray(adjRes) ? adjRes : Array.isArray(adjRes?.data) ? adjRes.data : [];
+      const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
+
+      const mappedStock = sRows.map((r: any) => ({
+        id: String(r.id ?? r.batchId ?? r.itemId ?? ''),
+        itemId: String(r.itemId ?? r.item_id ?? ''),
+        sku: String(r.sku ?? r.skuCode ?? r.sku_code ?? ''),
+        itemName: String(r.itemName ?? r.item_name ?? r.name ?? ''),
+        category: (r.category ?? 'RAW_MATERIAL') as any,
+        siteId: String(r.siteId ?? r.site_id ?? ''),
+        siteName: String(r.siteName ?? r.site_name ?? ''),
+        locationCode: String(r.locationCode ?? r.locationName ?? r.location_name ?? ''),
+        batchNo: String(r.batchNo ?? r.batchNumber ?? r.batch_number ?? ''),
+        onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
+        reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? 0),
+        minStock: Number(r.minStock ?? 0),
+        uom: String(r.uom ?? 'kg'),
+        altUomLabel: '',
+        unitCost: Number(r.unitCost ?? 0),
+        daysToExpiry: 30,
+        expiryDate: String(r.expiryDate ?? r.expiry_date ?? '').slice(0, 10),
+      }));
+      setStockRows(mappedStock);
+      if (mappedStock.length > 0 && !stockRowId) setStockRowId(mappedStock[0].id);
+
+      setAdjustments(
+        aRows.map((a: any) => {
+          const st = String(a.status || 'PENDING').toUpperCase();
+          return {
+            id: String(a.id),
+            adjNo: String(a.adjNo || a.adjustment_no || a.id),
+            itemId: String(a.itemId || a.item_id || ''),
+            itemName: String(a.itemName || a.item_name || 'Item'),
+            batchNo: String(a.batchNo || a.batch_id || 'FEFO'),
+            siteName: String(a.siteName || a.site_name || 'Main Site'),
+            qtyDelta: -Math.abs(Number(a.qtyDelta ?? a.qty ?? 0)),
+            uom: String(a.uom || 'kg'),
+            valueImpact: Number(a.valueImpact ?? 0),
+            reason: (a.reason || a.adjustment_type || 'OTHER') as AdjustmentRecord['reason'],
+            notes: String(a.notes || a.reason || ''),
+            isLargeVariance: Number(a.variance_pct ?? 0) > 5,
+            status: (st === 'PENDING' ? 'PENDING_APPROVAL' : st) as AdjustmentRecord['status'],
+            requestedBy: String(a.requestedBy || a.requested_by || 'Ops'),
+            createdAt: String(a.createdAt || a.created_at || ''),
+          };
+        }),
+      );
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (active && d?.user) setUser(d.user);
+        if (d?.user) setUser(d.user);
       })
       .catch(() => {});
-
-    Promise.all([
-      fetch('/api/proxy/inventory/adjustments').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([adjRes, stkRes]) => {
-        if (!active) return;
-        const aRows = Array.isArray(adjRes) ? adjRes : Array.isArray(adjRes?.data) ? adjRes.data : [];
-        const sRows = Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : [];
-        setAdjustments(aRows);
-        setStockRows(sRows);
-        if (sRows.length > 0) setStockRowId(String(sRows[0].id));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadAdjustments();
   }, []);
 
   const showValuation = !user || canViewMarginAndCost(user.role);
@@ -55,55 +94,61 @@ export default function InventoryAdjustmentsPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const row = stockRows.find((r) => r.id === stockRowId) || stockRows[0];
     if (!row) return;
-    const valueImpact = Number((qtyDelta * row.unitCost).toFixed(2));
-    const isLarge = Math.abs(valueImpact) >= 5000;
-    const created: AdjustmentRecord = {
-      id: `adj-${Date.now()}`,
-      adjNo: `ADJ-2026-0${Math.floor(40 + Math.random() * 59)}`,
-      itemId: row.itemId,
-      itemName: row.itemName,
-      batchNo: row.batchNo,
-      siteName: row.siteName,
-      qtyDelta,
-      uom: row.uom,
-      valueImpact,
-      reason,
-      notes: notes || 'Submitted from office inventory',
-      photoName: photoName || undefined,
-      isLargeVariance: isLarge,
-      status: 'PENDING_APPROVAL',
-      requestedBy: user?.name || 'Ops Coordinator',
-      createdAt: 'Just now',
-    };
-    fetch('/api/bff/inventory/adjustments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created),
-    }).catch(() => {});
-
-    setAdjustments((prev) => [created, ...prev]);
-    setCreateOpen(false);
-    setNotes('');
-    showToast(
-      isLarge
-        ? `Submitted ${created.adjNo} — STOCK_VARIANCE exception raised for Owner approval.`
-        : `Submitted ${created.adjNo} for approval.`,
-    );
+    const adjQty = Math.abs(qtyDelta);
+    if (!adjQty) return;
+    const adjType = reason === 'SPILLAGE' ? 'SHRINKAGE' : 'WRITEOFF';
+    try {
+      const res = await fetch('/api/proxy/inventory/adjustments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: row.siteId,
+          itemId: row.itemId,
+          adjustmentType: adjType,
+          qty: String(adjQty),
+          remarks: `${reason}: ${notes || 'Submitted from office inventory'}${photoName ? ` (photo: ${photoName})` : ''}`,
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadAdjustments();
+      setCreateOpen(false);
+      setNotes('');
+      showToast(
+        payload?.approvedBy
+          ? `Adjustment auto-approved for ${row.itemName}.`
+          : `Adjustment submitted for ${row.itemName} (awaiting approval).`,
+      );
+    } catch (err) {
+      showToast(`Failed to submit adjustment: ${(err as Error).message}`);
+    }
   };
 
-  const handleDecision = (id: string, action: 'approve' | 'reject') => {
-    fetch(`/api/bff/inventory/adjustments/${id}/${action}`, { method: 'POST' }).catch(() => {});
-    setAdjustments((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, status: action === 'approve' ? 'APPROVED' : 'REJECTED' }
-          : a,
-      ),
-    );
-    showToast(`Adjustment ${action === 'approve' ? 'approved' : 'rejected'}.`);
+  const handleDecision = async (id: string, action: 'approve' | 'reject') => {
+    try {
+      const res = await fetch(`/api/proxy/inventory/adjustments/${encodeURIComponent(id)}/${action}`, {
+        method: 'POST',
+        ...(action === 'reject'
+          ? {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason: 'Rejected from office adjustment queue' }),
+            }
+          : {}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadAdjustments();
+      showToast(`Adjustment ${action === 'approve' ? 'approved' : 'rejected'}.`);
+    } catch (err) {
+      showToast(`Failed to ${action} adjustment: ${(err as Error).message}`);
+    }
   };
 
   return (

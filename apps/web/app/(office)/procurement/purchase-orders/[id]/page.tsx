@@ -14,6 +14,14 @@ const LIFECYCLE_STEPS = [
   { key: 'CLOSED', label: 'Closed' },
 ];
 
+function normalizePoStatus(raw: unknown): PurchaseOrderRecord['status'] {
+  const s = String(raw || 'DRAFT').toUpperCase();
+  if (s === 'PENDING_APPROVAL') return 'WAITING_APPROVAL';
+  if (s === 'ISSUED') return 'SENT_TO_SUPPLIER';
+  if (s === 'PARTIALLY_RECEIVED') return 'PARTLY_RECEIVED';
+  return s as PurchaseOrderRecord['status'];
+}
+
 export default function PurchaseOrderDetailPage({
   params,
 }: {
@@ -26,58 +34,87 @@ export default function PurchaseOrderDetailPage({
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadPo = async () => {
+    try {
+      const [poData, grnData, billData] = await Promise.all([
+        fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/proxy/procurement/grns?poId=${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/proxy/procurement/supplier-bills?poId=${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const p = poData?.data || poData;
+      if (p && p.id) {
+        const normalizedStatus = normalizePoStatus(p.po_status ?? p.poStatus ?? p.status);
+        const mappedLines = Array.isArray(p.lines)
+          ? p.lines.map((l: any, idx: number) => {
+              const ordered = Number(l.orderedQty ?? l.ordered_qty ?? 0);
+              const received = Number(l.receivedQty ?? l.received_qty ?? 0);
+              const varianceNum = Number(l.priceVariancePct ?? l.price_variance_pct ?? 0);
+              const variancePct = Number((varianceNum <= 1 && varianceNum > -1 ? varianceNum * 100 : varianceNum).toFixed(2));
+              return {
+                lineId: String(l.lineId || l.id || `l-${idx}`),
+                itemId: String(l.itemId || l.item_id || ''),
+                itemSku: String(l.itemSku || l.sku_code || ''),
+                itemName: String(l.itemName || l.item_name || 'Item'),
+                uom: String(l.uom || l.primary_uom || 'kg'),
+                orderedQty: ordered,
+                confirmedQty: Number(l.confirmedQty ?? l.confirmed_qty ?? ordered),
+                receivedQty: received,
+                shortQty: Math.max(0, ordered - received),
+                unitRate: Number(l.unitRate ?? l.unit_rate ?? l.unitPrice ?? l.unit_price ?? 0),
+                lastRate: Number(l.lastPurchasePriceSnapshot ?? l.last_purchase_price_snapshot ?? 0),
+                variancePct,
+                spikeFlag: Boolean(variancePct > 2 || normalizedStatus === 'WAITING_APPROVAL'),
+              };
+            })
+          : [];
+        setPo({
+          id: String(p.id),
+          poNumber: String(p.poNumber || p.po_number || p.po_no || p.id),
+          supplierId: String(p.supplierId || p.supplier_id || ''),
+          supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
+          receivingSiteId: String(p.receivingSiteId || p.receiving_site_id || ''),
+          receivingSiteName: String(p.receivingSiteName || p.siteName || p.site_name || 'Main Site'),
+          supplierPhone: String(p.supplierPhone || p.supplier_phone || ''),
+          quantitiesConfirmed: Boolean(p.quantitiesConfirmed ?? mappedLines.some((l: any) => l.confirmedQty > 0)),
+          createdAt: String(p.createdAt || p.created_at || '').slice(0, 10),
+          status: normalizedStatus,
+          expectedDelivery: String(p.expectedDelivery || p.expected_delivery || p.expected_delivery_date || '').slice(0, 10),
+          paymentTermsDays: Number(p.paymentTermsDays ?? p.payment_terms_days ?? 15),
+          priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception ?? normalizedStatus === 'WAITING_APPROVAL'),
+          issuedAt: p.issuedAt || p.issued_at || undefined,
+          lines: mappedLines,
+        });
+      }
+      const grnsArr = Array.isArray(grnData) ? grnData : Array.isArray(grnData?.data) ? grnData.data : [];
+      setLinkedGrns(
+        grnsArr
+          .filter((g: any) => String(g.poId || g.po_id) === id)
+          .map((g: any) => ({
+            ...g,
+            grnNumber: g.grnNumber || g.grnNo || g.grn_no || g.id,
+            receivedDate: String(g.receivedDate || g.receivedAt || g.received_at || '').slice(0, 10),
+            receivedBy: String(g.receivedByName || g.received_by_name || g.receivedBy || 'Storekeeper'),
+          })),
+      );
+      const billsArr = Array.isArray(billData) ? billData : Array.isArray(billData?.data) ? billData.data : [];
+      setLinkedBills(
+        billsArr
+          .filter((b: any) => String(b.poId || b.po_id) === id)
+          .map((b: any) => ({
+            ...b,
+            billNumber: b.billNumber || b.bill_number || b.bill_no || b.id,
+            totalAmount: Number(b.totalAmount ?? b.total_amount ?? 0),
+          })),
+      );
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/proxy/procurement/grns').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([poData, grnData, billData]) => {
-        if (!active) return;
-        const p = poData?.data || poData;
-        if (p && p.id) {
-          setPo({
-            id: String(p.id),
-            poNumber: String(p.poNumber || p.po_number || p.po_no || p.id),
-            supplierId: String(p.supplierId || p.supplier_id || ''),
-            supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
-            receivingSiteId: String(p.receivingSiteId || p.receiving_site_id || ''),
-            receivingSiteName: String(p.receivingSiteName || p.siteName || p.site_name || 'Main Site'),
-            supplierPhone: String(p.supplierPhone || p.supplier_phone || ''),
-            quantitiesConfirmed: Boolean(p.quantitiesConfirmed ?? true),
-            createdAt: String(p.createdAt || p.created_at || '').slice(0, 10),
-            status: (p.status || 'DRAFT') as PurchaseOrderRecord['status'],
-            expectedDelivery: String(p.expectedDelivery || p.expected_delivery_date || '').slice(0, 10),
-            paymentTermsDays: Number(p.paymentTermsDays ?? p.payment_terms_days ?? 15),
-            priceSpikeException: Boolean(p.priceSpikeException ?? p.price_spike_exception),
-            issuedAt: p.issuedAt || p.issued_at || undefined,
-            lines: Array.isArray(p.lines)
-              ? p.lines.map((l: any, idx: number) => ({
-                  lineId: String(l.lineId || l.id || `l-${idx}`),
-                  itemId: String(l.itemId || l.item_id || ''),
-                  itemSku: String(l.itemSku || l.sku_code || ''),
-                  itemName: String(l.itemName || l.item_name || 'Item'),
-                  uom: String(l.uom || 'kg'),
-                  orderedQty: Number(l.orderedQty ?? l.ordered_qty ?? 0),
-                  receivedQty: Number(l.receivedQty ?? l.received_qty ?? 0),
-                  unitRate: Number(l.unitRate ?? l.unit_rate ?? l.unitPrice ?? 0),
-                }))
-              : [],
-          });
-        }
-        const grnsArr = Array.isArray(grnData) ? grnData : Array.isArray(grnData?.data) ? grnData.data : [];
-        setLinkedGrns(grnsArr.filter((g: any) => String(g.poId || g.po_id) === id));
-        const billsArr = Array.isArray(billData) ? billData : Array.isArray(billData?.data) ? billData.data : [];
-        setLinkedBills(billsArr.filter((b: any) => String(b.poId || b.po_id) === id));
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+    loadPo();
   }, [id]);
 
   if (loading) {
@@ -109,10 +146,21 @@ export default function PurchaseOrderDetailPage({
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleIssue = () => {
+  const handleIssue = async () => {
     if (po.priceSpikeException) return;
-    setPo((prev) => (prev ? { ...prev, status: 'SENT_TO_SUPPLIER', issuedAt: 'Just now' } : prev));
-    showToast(`Issued ${po.poNumber} to ${po.supplierName}.`);
+    try {
+      const res = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(po.id)}/issue`, {
+        method: 'POST',
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPo();
+      showToast(`Issued ${po.poNumber} to ${po.supplierName}.`);
+    } catch (err) {
+      showToast(`Failed to issue PO: ${(err as Error).message}`);
+    }
   };
 
   const handleDownloadPdf = () => {
@@ -152,6 +200,11 @@ export default function PurchaseOrderDetailPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {(po.status === 'SENT_TO_SUPPLIER' || po.status === 'PARTLY_RECEIVED') && (
+            <Link href="/floor/grn">
+              <Button variant="primary">Receive Goods (Blind GRN) →</Button>
+            </Link>
+          )}
           <Button variant="secondary" onClick={handleDownloadPdf}>
             Download PDF
           </Button>

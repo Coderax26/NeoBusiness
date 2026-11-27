@@ -67,8 +67,30 @@ export default function ExpiryWatchlistPage() {
     return { expired, le3, le7, le30 };
   }, [filteredBatches]);
 
-  const handleAction = (id: string, action: string) => {
-    setActionedIds((prev) => ({ ...prev, [id]: action }));
+  const handleAction = async (batch: StockRow, action: string) => {
+    if (action === 'Write off' && batch.onHand > 0 && batch.siteId && batch.itemId) {
+      try {
+        const res = await fetch('/api/proxy/inventory/adjustments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            siteId: batch.siteId,
+            itemId: batch.itemId,
+            adjustmentType: 'WRITEOFF',
+            qty: String(batch.onHand),
+            remarks: `Expiry write-off for batch ${batch.batchNo}`,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+        }
+      } catch (err) {
+        setActionedIds((prev) => ({ ...prev, [batch.id]: `Error: ${(err as Error).message}` }));
+        return;
+      }
+    }
+    setActionedIds((prev) => ({ ...prev, [batch.id]: action }));
   };
 
   return (
@@ -155,13 +177,13 @@ export default function ExpiryWatchlistPage() {
                   <Badge variant="info">Action queued: {doneAction}</Badge>
                 ) : (
                   <>
-                    <Button variant="secondary" onClick={() => handleAction(batch.id, 'Sell first')}>
+                    <Button variant="secondary" onClick={() => handleAction(batch, 'Sell first')}>
                       Sell First
                     </Button>
-                    <Button variant="secondary" onClick={() => handleAction(batch.id, 'Discount')}>
+                    <Button variant="secondary" onClick={() => handleAction(batch, 'Discount')}>
                       Discount
                     </Button>
-                    <Button variant="primary" onClick={() => handleAction(batch.id, 'Write off')}>
+                    <Button variant="primary" onClick={() => handleAction(batch, 'Write off')}>
                       Write Off
                     </Button>
                   </>

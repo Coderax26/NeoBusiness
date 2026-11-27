@@ -67,13 +67,13 @@ export default function ProcurementPipelineHomePage() {
       setLiveStats((prev) => ({
         openReqs: reqs ? reqs.filter((r: any) => r.status === 'OPEN').length : prev.openReqs,
         posToIssue: pos
-          ? pos.filter((p: any) => p.status === 'DRAFT' || p.status === 'WAITING_APPROVAL').length
+          ? pos.filter((p: any) => ['DRAFT', 'PENDING_APPROVAL', 'WAITING_APPROVAL'].includes(String(p.poStatus || p.po_status || p.status || ''))).length
           : prev.posToIssue,
         awaitingDelivery: pos
-          ? pos.filter((p: any) => p.status === 'SENT_TO_SUPPLIER' || p.status === 'PARTLY_RECEIVED').length
+          ? pos.filter((p: any) => ['ISSUED', 'PARTIALLY_RECEIVED', 'SENT_TO_SUPPLIER', 'PARTLY_RECEIVED'].includes(String(p.poStatus || p.po_status || p.status || ''))).length
           : prev.awaitingDelivery,
         billsToCheck: bills
-          ? bills.filter((b: any) => b.status === 'RECEIVED' || b.status === 'VERIFIED').length
+          ? bills.filter((b: any) => ['DRAFT', 'PENDING_APPROVAL', 'RECEIVED', 'VERIFIED'].includes(String(b.status || ''))).length
           : prev.billsToCheck,
         toPayAmount: bills
           ? bills
@@ -81,7 +81,9 @@ export default function ProcurementPipelineHomePage() {
               .reduce((sum: number, b: any) => sum + Number(b.total_amount ?? b.totalAmount ?? 0), 0)
           : prev.toPayAmount,
         openShortfalls: sfs ? sfs.length : prev.openShortfalls,
-        priceSpikes: pos ? pos.filter((p: any) => p.priceSpikeException).length : prev.priceSpikes,
+        priceSpikes: pos
+          ? pos.filter((p: any) => p.priceSpikeException || (p.poStatus || p.po_status || p.status) === 'PENDING_APPROVAL').length
+          : prev.priceSpikes,
       }));
     });
   }, []);

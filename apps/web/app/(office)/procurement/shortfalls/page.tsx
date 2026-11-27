@@ -18,32 +18,64 @@ export default function ShortfallWorkbenchPage() {
     let active = true;
     fetch('/api/proxy/procurement/shortfalls/all/open')
       .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
+      .then(async (res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setShortfalls(
-          rows.map((sf: any) => ({
-            id: String(sf.id),
-            poNumber: String(sf.poNumber ?? sf.po_no ?? ''),
-            poId: String(sf.poId ?? sf.po_id ?? ''),
-            grnNumber: String(sf.grnNumber ?? sf.grn_no ?? 'GRN'),
-            itemId: String(sf.itemId ?? sf.item_id ?? ''),
-            itemName: String(sf.itemName ?? sf.item_name ?? ''),
-            uom: String(sf.uom ?? 'kg'),
-            shortQty: Number(
-              sf.shortQty ??
-                sf.shortfall_qty ??
-                Math.max(0, Number(sf.confirmed_qty ?? 0) - Number(sf.received_qty ?? 0)),
-            ),
-            primarySupplierId: String(sf.primarySupplierId ?? sf.supplier_id ?? ''),
-            primarySupplierName: String(
-              sf.primarySupplierName ?? sf.supplier_name ?? 'Primary Supplier',
-            ),
-            primaryRate: Number(sf.primaryRate ?? sf.unit_price ?? 0),
-            status: (sf.status ?? 'OPEN') as OpenShortfallRecord['status'],
-            backups: Array.isArray(sf.backups) ? sf.backups : [],
-          })),
+        const baseList: OpenShortfallRecord[] = rows.map((sf: any) => ({
+          id: String(sf.id),
+          poNumber: String(sf.poNumber ?? sf.po_no ?? ''),
+          poId: String(sf.poId ?? sf.po_id ?? ''),
+          grnNumber: String(sf.grnNumber ?? sf.grn_no ?? 'GRN'),
+          itemId: String(sf.itemId ?? sf.item_id ?? ''),
+          itemName: String(sf.itemName ?? sf.item_name ?? ''),
+          uom: String(sf.uom ?? 'kg'),
+          shortQty: Number(
+            sf.shortQty ??
+              sf.shortfall_qty ??
+              sf.deficit_qty ??
+              Math.max(0, Number(sf.confirmed_qty ?? 0) - Number(sf.received_qty ?? 0)),
+          ),
+          primarySupplierId: String(sf.primarySupplierId ?? sf.supplier_id ?? ''),
+          primarySupplierName: String(
+            sf.primarySupplierName ?? sf.supplier_name ?? 'Primary Supplier',
+          ),
+          primaryRate: Number(sf.primaryRate ?? sf.unit_price ?? 0),
+          status: (sf.status ?? 'OPEN') as OpenShortfallRecord['status'],
+          impactedSalesOrders: Array.isArray(sf.impactedSalesOrders) ? sf.impactedSalesOrders : [],
+          backups: Array.isArray(sf.backups) ? sf.backups : [],
+        }));
+
+        const enriched = await Promise.all(
+          baseList.map(async (sf) => {
+            if (!sf.itemId || sf.backups.length > 0) return sf;
+            try {
+              const q = new URLSearchParams({
+                referencePrice: String(sf.primaryRate || 1),
+                ...(sf.primarySupplierId ? { excludeSupplierId: sf.primarySupplierId } : {}),
+              });
+              const br = await fetch(
+                `/api/proxy/procurement/shortfalls/item/${encodeURIComponent(sf.itemId)}/ranked-backups?${q.toString()}`,
+              );
+              if (!br.ok) return sf;
+              const bro = await br.json();
+              const candidates = Array.isArray(bro) ? bro : Array.isArray(bro?.data) ? bro.data : [];
+              return {
+                ...sf,
+                backups: candidates.map((c: any) => ({
+                  supplierId: String(c.supplierId || c.supplier_id || ''),
+                  supplierName: String(c.supplierName || c.company_name || 'Backup Supplier'),
+                  quotedRate: Number(c.quotedPrice ?? c.quotedRate ?? sf.primaryRate),
+                  fillRate: Number(c.reliabilityScorePct ?? c.fillRate ?? 90),
+                  leadTimeDays: Number(c.leadTimeDaysAvg ?? c.leadTimeDays ?? 2),
+                })),
+              };
+            } catch {
+              return sf;
+            }
+          }),
         );
+
+        if (active) setShortfalls(enriched);
       })
       .catch(() => {});
     return () => {
@@ -238,18 +270,20 @@ export default function ShortfallWorkbenchPage() {
               </div>
 
               {/* Impacted Sales Orders */}
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-ink-3 font-medium">Impacted Sales Orders:</span>
-                {sf.impactedSalesOrders.map((so) => (
-                  <Link
-                    key={so.id}
-                    href={`/sales/orders/${so.id}`}
-                    className="px-2.5 py-1 rounded bg-madder-soft border border-madder/30 text-madder hover:opacity-90/20"
-                  >
-                    {so.orderNo} ({so.customerName})
-                  </Link>
-                ))}
-              </div>
+              {(sf.impactedSalesOrders || []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-ink-3 font-medium">Impacted Sales Orders:</span>
+                  {(sf.impactedSalesOrders || []).map((so) => (
+                    <Link
+                      key={so.id}
+                      href={`/sales/orders/${so.id}`}
+                      className="px-2.5 py-1 rounded bg-madder-soft border border-madder/30 text-madder hover:opacity-90/20"
+                    >
+                      {so.orderNo} ({so.customerName})
+                    </Link>
+                  ))}
+                </div>
+              )}
 
               {/* Plain-language best action callout (§4 UX notes) */}
               {best && sf.status === 'OPEN' && (

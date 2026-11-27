@@ -27,6 +27,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { RbacGuard } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 
 @ApiTags('M4 Production - Work Orders')
 @Controller('production/work-orders')
@@ -48,13 +49,17 @@ export class WorkOrderController {
     @Body() dto: CreateWorkOrderDto,
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    return this.woService.createWorkOrder(dto, req.user.sub);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto.siteId);
+    return this.woService.createWorkOrder(
+      { ...dto, siteId: resolvedSiteId ?? dto.siteId },
+      req.user.sub,
+    );
   }
 
   @Get()
   @RequirePermission('production.workorder.read')
   @ApiOperation({ summary: 'List work orders for a site' })
-  @ApiQuery({ name: 'siteId', required: true, type: String })
+  @ApiQuery({ name: 'siteId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiResponse({
     status: 200,
@@ -95,10 +100,15 @@ export class WorkOrderController {
   @ApiResponse({ status: 404, description: 'Work order not found' })
   async startWorkOrder(
     @Param('id') id: string,
-    @Body() _dto: { startedBy: string },
+    @Body() dto: { startedBy?: string; siteId?: string },
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    return this.woService.startWorkOrder(id, req.user.sub, req.user.siteId);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto?.siteId);
+    return this.woService.startWorkOrder(
+      id,
+      req.user.sub,
+      resolvedSiteId,
+    );
   }
 
   @Post(':id/consumption')
@@ -120,11 +130,12 @@ export class WorkOrderController {
     @Body() dto: RecordConsumptionDto,
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
+    const resolvedSiteId = resolveUserSiteId(req.user);
     return this.woService.recordConsumption(
       id,
       dto,
       req.user.sub,
-      req.user.siteId,
+      resolvedSiteId,
     );
   }
 
@@ -147,7 +158,13 @@ export class WorkOrderController {
     @Body() dto: RecordOutputDto,
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    return this.woService.recordOutput(id, dto, req.user.sub, req.user.siteId);
+    const resolvedSiteId = resolveUserSiteId(req.user);
+    return this.woService.recordOutput(
+      id,
+      dto,
+      req.user.sub,
+      resolvedSiteId,
+    );
   }
 
   @Post(':id/complete')
@@ -168,10 +185,15 @@ export class WorkOrderController {
   @ApiResponse({ status: 404, description: 'Work order not found' })
   async completeWorkOrder(
     @Param('id') id: string,
-    @Body() _dto: { completedBy: string },
+    @Body() dto: { completedBy?: string; siteId?: string },
     @Req() req: any,
   ): Promise<WorkOrderResponseDto> {
-    return this.woService.completeWorkOrder(id, req.user.sub, req.user.siteId);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto?.siteId);
+    return this.woService.completeWorkOrder(
+      id,
+      req.user.sub,
+      resolvedSiteId,
+    );
   }
 
   @Post(':id/cancel')

@@ -297,7 +297,7 @@ export const API_ROUTES = [
   { method: 'GET', path: '/production/work-orders', module: 'modules/m4-production' },
   { method: 'POST', path: '/production/work-orders', module: 'modules/m4-production' },
   { method: 'PATCH', path: '/production/workers/:id', module: 'modules/m5-fleet' },
-  { method: 'GET', path: '/production/workers', module: 'modules/m5-fleet' },
+  { method: 'GET', path: '/production/workers', module: 'modules/m4-production' },
   { method: 'POST', path: '/production/workers', module: 'modules/m5-fleet' },
   { method: 'GET', path: '/ptp/:id', module: 'modules/m6-finance' },
   { method: 'PATCH', path: '/ptp/:id', module: 'modules/m6-finance' },

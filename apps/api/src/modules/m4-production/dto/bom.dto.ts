@@ -2,8 +2,10 @@ import {
   IsUUID,
   IsInt,
   Min,
-  Max,
   IsString,
+  IsNotEmpty,
+  MaxLength,
+  Matches,
   IsOptional,
   IsEnum,
   IsArray,
@@ -24,10 +26,11 @@ export class BomLineDto {
   itemId: string;
 
   @IsString()
-  @Min(1, { message: 'qty_per_unit must be positive' })
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,4})?$/, { message: 'qty_per_unit must be positive' })
   qtyPerUnit: string; // numeric string (Qty)
 
   @IsString()
+  @IsNotEmpty()
   uom: string;
 
   @IsInt()
@@ -41,15 +44,16 @@ export class BomLineDto {
 
 export class CreateBomDto {
   @IsString()
-  @Min(1)
-  @Max(50)
+  @IsNotEmpty()
+  @MaxLength(50)
   bomNo: string;
 
   @IsUUID()
   itemId: string; // output/finished good item
 
+  @IsOptional()
   @IsUUID()
-  siteId: string;
+  siteId?: string;
 
   @IsOptional()
   @IsInt()
@@ -68,9 +72,9 @@ export class CreateBomDto {
   @IsDateString()
   effectiveTo?: string;
 
+  @IsOptional()
   @IsString()
-  @Min(1, { message: 'yield_pct must be positive' })
-  @Max(100, { message: 'yield_pct cannot exceed 100' })
+  @Matches(/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/, { message: 'yield_pct must be between 0 and 100' })
   yieldPct: string = '95.00';
 
   @IsArray()

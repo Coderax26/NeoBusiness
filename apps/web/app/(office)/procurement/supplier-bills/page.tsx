@@ -21,14 +21,23 @@ const BILL_TABS: Array<{ key: SupplierBillStatus | 'ALL'; label: string }> = [
 ];
 
 const THREE_WAY_CHIP_MAP: Record<
-  SupplierBillRecord['three_way_status'],
+  string,
   { label: string; variant: 'success' | 'warning' | 'danger' }
 > = {
   MATCHES: { label: 'Matches', variant: 'success' },
+  MATCHED: { label: 'Matches', variant: 'success' },
   TIMING_DIFFERS: { label: 'Timing differs', variant: 'warning' },
   AMOUNT_DIFFERS: { label: 'Amount differs', variant: 'warning' },
   DOES_NOT_MATCH: { label: 'Does not match', variant: 'danger' },
 };
+
+function normalizeBillStatus(raw: unknown): SupplierBillStatus {
+  const s = String(raw || 'RECEIVED').toUpperCase();
+  if (s === 'DRAFT') return 'RECEIVED';
+  if (s === 'PENDING_APPROVAL') return 'VERIFIED';
+  if (s === 'REJECTED') return 'DISPUTED';
+  return s as SupplierBillStatus;
+}
 
 export default function SupplierBillsPage() {
   const [bills, setBills] = useState<SupplierBillRecord[]>([]);
@@ -47,25 +56,77 @@ export default function SupplierBillsPage() {
   const [newBillRate, setNewBillRate] = useState(0);
   const [newScanName, setNewScanName] = useState('');
 
+  const loadBillsData = async () => {
+    try {
+      const [billsRes, posRes] = await Promise.all([
+        fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
+        fetch('/api/proxy/procurement/purchase-orders').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const bRows = Array.isArray(billsRes) ? billsRes : Array.isArray(billsRes?.data) ? billsRes.data : [];
+      const pRows = Array.isArray(posRes) ? posRes : Array.isArray(posRes?.data) ? posRes.data : [];
+      const poLookup = new Map(pRows.map((p: any) => [String(p.id), p]));
+
+      const mappedBills: SupplierBillRecord[] = bRows.map((b: any) => {
+        const linkedPo: any = poLookup.get(String(b.po_id || b.poId));
+        const raw3Way = String(b.three_way_status || 'MATCHES').toUpperCase();
+        const mappedStatus = normalizeBillStatus(b.status);
+        const total = Number(b.totalAmount ?? b.total_amount ?? b.amount ?? 0);
+        return {
+          id: String(b.id),
+          billNumber: String(b.billNumber || b.bill_number || b.bill_no || b.id),
+          supplierId: String(b.supplierId || b.supplier_id || ''),
+          supplierName: String(b.supplierName || b.supplier_name || linkedPo?.supplierName || linkedPo?.supplier_name || 'Supplier'),
+          poId: String(b.poId || b.po_id || ''),
+          poNumber: String(b.poNumber || b.po_no || linkedPo?.poNo || linkedPo?.po_no || ''),
+          grnNumber: String(b.grnNumber || b.grn_id || 'GRN'),
+          billDate: String(b.billDate || b.bill_date || '').slice(0, 10),
+          dueDate: String(b.dueDate || b.due_date || '').slice(0, 10),
+          status: mappedStatus,
+          three_way_status: (raw3Way === 'MATCHED' ? 'MATCHES' : raw3Way) as any,
+          totalAmount: total,
+          paidAmount: mappedStatus === 'PAID' ? total : Number(b.paidAmount ?? b.paid_amount ?? 0),
+          lines: Array.isArray(b.lines)
+            ? b.lines
+            : Array.isArray(b.items)
+              ? b.items.map((it: any) => ({
+                  itemId: String(it.item_id || it.itemId || ''),
+                  itemName: String(it.item_name || it.itemName || 'Item'),
+                  uom: 'kg',
+                  poQty: Number(it.quantity ?? 0),
+                  grnQty: Number(it.quantity ?? 0),
+                  billQty: Number(it.quantity ?? 0),
+                  poRate: Number(it.rate_per_unit ?? 0),
+                  billRate: Number(it.rate_per_unit ?? 0),
+                }))
+              : [],
+        };
+      });
+      setBills(mappedBills);
+      if (mappedBills.length > 0 && !selectedBill) setSelectedBill(mappedBills[0]);
+
+      const mappedPos = pRows.map((p: any) => ({
+        id: String(p.id),
+        poNumber: String(p.poNo || p.po_no || p.poNumber || p.id),
+        supplierId: String(p.supplierId || p.supplier_id || ''),
+        supplierName: String(p.supplierName || p.supplier_name || 'Supplier'),
+        supplierPhone: '',
+        receivingSiteId: String(p.receivingSiteId || p.receiving_site_id || ''),
+        receivingSiteName: 'Main Site',
+        status: p.poStatus || p.status || 'ISSUED',
+        expectedDelivery: '',
+        paymentTermsDays: 15,
+        priceSpikeException: false,
+        quantitiesConfirmed: true,
+        createdAt: '',
+        lines: Array.isArray(p.lines) ? p.lines : [],
+      }));
+      setPurchaseOrders(mappedPos as any);
+      if (mappedPos.length > 0 && !newPoId) setNewPoId(String(mappedPos[0].id));
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch('/api/proxy/procurement/supplier-bills').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/procurement/purchase-orders').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([billsRes, posRes]) => {
-        if (!active) return;
-        const bRows = Array.isArray(billsRes) ? billsRes : Array.isArray(billsRes?.data) ? billsRes.data : [];
-        const pRows = Array.isArray(posRes) ? posRes : Array.isArray(posRes?.data) ? posRes.data : [];
-        setBills(bRows);
-        if (bRows.length > 0) setSelectedBill(bRows[0]);
-        setPurchaseOrders(pRows);
-        if (pRows.length > 0) setNewPoId(String(pRows[0].id));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadBillsData();
   }, []);
 
   // Reject dialog
@@ -112,137 +173,124 @@ export default function SupplierBillsPage() {
     return buckets;
   }, [bills]);
 
-  const handleEnterBill = () => {
-    const po =
-      purchaseOrders.find((p) => p.id === newPoId) || purchaseOrders[0];
-    if (!po || !po.lines?.[0]) return;
-    const poLine = po.lines[0];
-    const grnQty = poLine.receivedQty > 0 ? poLine.receivedQty : poLine.orderedQty;
-
-    const evalRes = evaluateThreeWayMatch([
-      {
-        itemId: poLine.itemId,
-        itemName: poLine.itemName,
-        poQty: poLine.orderedQty,
-        grnQty,
-        billQty: newBillQty,
-        poRate: poLine.unitRate,
-        billRate: newBillRate,
-      },
-    ]);
-
-    const created: SupplierBillRecord = {
-      id: `bill-${Date.now()}`,
-      billNumber: newBillNo || `INV-${Math.floor(1000 + Math.random() * 8999)}`,
-      supplierId: po.supplierId,
-      supplierName: po.supplierName,
-      poId: po.id,
-      poNumber: po.poNumber,
-      grnNumber: 'GRN-2026-AUTO',
-      billDate: newBillDate,
-      dueDate: '2026-11-28',
-      status: 'RECEIVED',
-      three_way_status: evalRes.three_way_status,
-      totalAmount: Number((newBillQty * newBillRate).toFixed(2)),
-      paidAmount: 0,
-      scanFileName: newScanName || undefined,
-      lines: [
-        {
-          itemId: poLine.itemId,
-          itemName: poLine.itemName,
-          uom: poLine.uom,
-          poQty: poLine.orderedQty,
-          grnQty,
-          billQty: newBillQty,
-          poRate: poLine.unitRate,
-          billRate: newBillRate,
-        },
-      ],
-    };
-
-    fetch('/api/bff/procurement/supplier-bills', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created),
-    }).catch(() => {});
-
-    setBills((prev) => [created, ...prev]);
-    setSelectedBill(created);
-    setEnterOpen(false);
-    setNewBillNo('');
-    showToast(`Recorded supplier bill ${created.billNumber} (${evalRes.label}).`);
-  };
-
-  const handleStatusAction = (bill: SupplierBillRecord, action: 'submit' | 'approve') => {
-    const nextStatus: SupplierBillStatus = action === 'submit' ? 'VERIFIED' : 'APPROVED';
-    fetch(`/api/bff/procurement/supplier-bills/${bill.id}/${action}`, {
-      method: 'POST',
-    }).catch(() => {});
-
-    setBills((prev) =>
-      prev.map((b) => (b.id === bill.id ? { ...b, status: nextStatus } : b)),
-    );
-    if (selectedBill?.id === bill.id) {
-      setSelectedBill({ ...bill, status: nextStatus });
+  const handleEnterBill = async () => {
+    const po = purchaseOrders.find((p) => p.id === newPoId) || purchaseOrders[0];
+    if (!po) return;
+    try {
+      let firstLine: any = po.lines?.[0];
+      if (!firstLine) {
+        const lr = await fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(po.id)}/lines`);
+        if (lr.ok) {
+          const lrows = await lr.json();
+          if (Array.isArray(lrows) && lrows[0]) firstLine = lrows[0];
+        }
+      }
+      if (!firstLine) {
+        throw new Error('Selected PO has no item lines.');
+      }
+      const res = await fetch('/api/proxy/procurement/supplier-bills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplierId: po.supplierId,
+          poId: po.id,
+          ...(po.receivingSiteId ? { siteId: po.receivingSiteId } : {}),
+          billDate: newBillDate,
+          items: [
+            {
+              itemId: String(firstLine.itemId || firstLine.item_id),
+              itemName: String(firstLine.itemName || firstLine.item_name || 'Item'),
+              quantity: String(newBillQty || firstLine.orderedQty || 1),
+              ratePerUnit: String(newBillRate || firstLine.unitPrice || firstLine.unitRate || 0),
+            },
+          ],
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBillsData();
+      setEnterOpen(false);
+      setNewBillNo('');
+      showToast(`Recorded supplier bill ${(payload?.data || payload)?.bill_number ?? ''}.`);
+    } catch (err) {
+      showToast(`Failed to record bill: ${(err as Error).message}`);
     }
-    showToast(`Bill ${bill.billNumber} marked ${nextStatus}.`);
   };
 
-  const handleRejectBill = () => {
+  const handleStatusAction = async (bill: SupplierBillRecord, action: 'submit' | 'approve') => {
+    try {
+      const res = await fetch(`/api/proxy/procurement/supplier-bills/${encodeURIComponent(bill.id)}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action === 'approve' ? { reason: 'APPROVED_BY_OWNER' } : {}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBillsData();
+      showToast(`Bill ${bill.billNumber} ${action === 'submit' ? 'submitted' : 'approved'}.`);
+    } catch (err) {
+      showToast(`Failed to ${action} bill: ${(err as Error).message}`);
+    }
+  };
+
+  const handleRejectBill = async () => {
     if (!rejectTarget || !rejectReason.trim()) return;
-    fetch(`/api/bff/procurement/supplier-bills/${rejectTarget.id}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: rejectReason }),
-    }).catch(() => {});
-
-    setBills((prev) =>
-      prev.map((b) =>
-        b.id === rejectTarget.id ? { ...b, status: 'DISPUTED', rejectReason } : b,
-      ),
-    );
-    showToast(`Rejected / disputed ${rejectTarget.billNumber}.`);
-    setRejectTarget(null);
-    setRejectReason('');
+    try {
+      const res = await fetch(`/api/proxy/procurement/supplier-bills/${encodeURIComponent(rejectTarget.id)}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: rejectReason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBillsData();
+      showToast(`Rejected / disputed ${rejectTarget.billNumber}.`);
+      setRejectTarget(null);
+      setRejectReason('');
+    } catch (err) {
+      showToast(`Failed to reject bill: ${(err as Error).message}`);
+    }
   };
 
-  const handleRecordPayment = () => {
+  const handleRecordPayment = async () => {
     if (!payTarget || payAmount <= 0 || !payRef.trim()) return;
-    fetch(`/api/bff/procurement/supplier-bills/${payTarget.id}/pay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: payMode, reference: payRef, amount: payAmount }),
-    }).catch(() => {});
-
-    const newPaid = Math.min(payTarget.totalAmount, payTarget.paidAmount + payAmount);
-    const nextStatus: SupplierBillStatus =
-      newPaid >= payTarget.totalAmount ? 'PAID' : payTarget.status;
-
-    setBills((prev) =>
-      prev.map((b) =>
-        b.id === payTarget.id ? { ...b, paidAmount: newPaid, status: nextStatus } : b,
-      ),
-    );
-    if (selectedBill?.id === payTarget.id) {
-      setSelectedBill({ ...payTarget, paidAmount: newPaid, status: nextStatus });
+    try {
+      const res = await fetch(`/api/proxy/procurement/supplier-bills/${encodeURIComponent(payTarget.id)}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: payMode, paymentRef: payRef, paidAmount: payAmount }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadBillsData();
+      setPayments((prev) => [
+        {
+          id: `spay-${Date.now()}`,
+          billId: payTarget.id,
+          billNumber: payTarget.billNumber,
+          supplierId: payTarget.supplierId,
+          supplierName: payTarget.supplierName,
+          date: new Date().toISOString().slice(0, 10),
+          mode: payMode,
+          reference: payRef,
+          amount: payAmount,
+        },
+        ...prev,
+      ]);
+      showToast(`Recorded ${formatINR(payAmount)} via ${payMode} (${payRef}).`);
+      setPayTarget(null);
+      setPayRef('');
+    } catch (err) {
+      showToast(`Failed to record payment: ${(err as Error).message}`);
     }
-    setPayments((prev) => [
-      {
-        id: `spay-${Date.now()}`,
-        billId: payTarget.id,
-        billNumber: payTarget.billNumber,
-        supplierId: payTarget.supplierId,
-        supplierName: payTarget.supplierName,
-        date: '2026-11-13',
-        mode: payMode,
-        reference: payRef,
-        amount: payAmount,
-      },
-      ...prev,
-    ]);
-    showToast(`Recorded ${formatINR(payAmount)} via ${payMode} (${payRef}).`);
-    setPayTarget(null);
-    setPayRef('');
   };
 
   return (
@@ -369,7 +417,10 @@ export default function SupplierBillsPage() {
           </thead>
           <tbody className="divide-y divide-rule">
             {filteredBills.map((b) => {
-              const chip = THREE_WAY_CHIP_MAP[b.three_way_status];
+              const chip = THREE_WAY_CHIP_MAP[b.three_way_status] || {
+                label: String(b.three_way_status || 'Pending'),
+                variant: 'warning' as const,
+              };
               return (
                 <tr
                   key={b.id}
@@ -467,8 +518,8 @@ export default function SupplierBillsPage() {
             </p>
           </div>
           {selectedBill && (
-            <Badge variant={THREE_WAY_CHIP_MAP[selectedBill.three_way_status].variant}>
-              {THREE_WAY_CHIP_MAP[selectedBill.three_way_status].label}
+            <Badge variant={(THREE_WAY_CHIP_MAP[selectedBill.three_way_status] || { variant: 'warning' }).variant}>
+              {(THREE_WAY_CHIP_MAP[selectedBill.three_way_status] || { label: String(selectedBill.three_way_status || 'Pending') }).label}
             </Badge>
           )}
         </div>

@@ -1,86 +1,126 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, StatusPill } from '@neo/ui';
-import { generateRmRequisitionsFromPlan, type BomRecord } from '@neo/shared';
-import {
-  type RmRequisitionRecord,
-  type WorkOrderRecord,
-} from '../../../../src/lib/production-data';
-import { type StockRow } from '../../../../src/lib/inventory-data';
+import { type RmRequisitionRecord } from '../../../../src/lib/production-data';
+
+function normalizeRequisitions(rawList: any[]): RmRequisitionRecord[] {
+  const rows: RmRequisitionRecord[] = [];
+  for (const r of rawList) {
+    const lines = Array.isArray(r.lines) && r.lines.length > 0 ? r.lines : [null];
+    for (const line of lines) {
+      rows.push({
+        id: String(r.id),
+        reqNo: String(r.reqNo ?? r.req_no ?? ''),
+        itemId: String(line?.itemId ?? r.itemId ?? ''),
+        itemSku: String(line?.itemSkuCode ?? r.itemSku ?? ''),
+        itemName: String(line?.itemName ?? r.itemName ?? 'Raw Material'),
+        qty: Number(line?.requiredQty ?? r.qty ?? 0),
+        uom: String(line?.uom ?? r.uom ?? 'KG'),
+        neededBy: String(r.requiredByDate ?? r.neededBy ?? '').slice(0, 10),
+        sourceWoNo: String(r.sourceWoNo ?? r.reqNo ?? 'BOM Plan'),
+        status: String(r.status ?? 'DRAFT') as RmRequisitionRecord['status'],
+      });
+    }
+  }
+  return rows;
+}
 
 export default function ProductionRequisitionsPage() {
   const [reqs, setReqs] = useState<RmRequisitionRecord[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
-  const [boms, setBoms] = useState<BomRecord[]>([]);
-  const [stockRows, setStockRows] = useState<StockRow[]>([]);
+  const [activeSiteId, setActiveSiteId] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch('/api/proxy/production/requisitions').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/production/work-orders').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/production/boms').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/proxy/inventory/stock/current').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([reqRes, woRes, bomRes, stkRes]) => {
-        if (!active) return;
-        setReqs(Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : []);
-        setWorkOrders(Array.isArray(woRes) ? woRes : Array.isArray(woRes?.data) ? woRes.data : []);
-        setBoms(Array.isArray(bomRes) ? bomRes : Array.isArray(bomRes?.data) ? bomRes.data : []);
-        setStockRows(Array.isArray(stkRes) ? stkRes : Array.isArray(stkRes?.data) ? stkRes.data : []);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+  const loadReqs = useCallback(async (siteIdFilter: string) => {
+    const siteQuery = siteIdFilter ? `?siteId=${encodeURIComponent(siteIdFilter)}` : '';
+    const reqRes = await fetch(`/api/proxy/production/requisitions${siteQuery}`).then((r) =>
+      r.ok ? r.json() : [],
+    );
+    const list = Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : [];
+    setReqs(normalizeRequisitions(list));
   }, []);
 
-  const handleGenerateFromPlan = () => {
-    const stockByItemId: Record<string, number> = {};
-    for (const s of stockRows) {
-      stockByItemId[s.itemId] = (stockByItemId[s.itemId] ?? 0) + s.onHand;
+  useEffect(() => {
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    const effectiveSite = storedSite && storedSite !== 'all' ? storedSite : '';
+    setActiveSiteId(effectiveSite);
+
+    if (!effectiveSite) {
+      fetch('/api/auth/me')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me) => {
+          const fallback = me?.user?.activeSiteId || me?.user?.sites?.[0]?.id || '';
+          if (fallback) setActiveSiteId(String(fallback));
+        })
+        .catch(() => {});
     }
 
-    const needs = generateRmRequisitionsFromPlan(
-      workOrders,
-      boms,
-      stockByItemId,
-    );
+    loadReqs(effectiveSite).catch(() => {});
+  }, [loadReqs]);
 
-    fetch('/api/bff/production/requisitions/generate', { method: 'POST' }).catch(() => {});
-
-    const generated: RmRequisitionRecord[] = needs.map((n, idx) => ({
-      id: `rmr-gen-${Date.now()}-${idx}`,
-      reqNo: `RMREQ-2026-${Math.floor(20 + Math.random() * 70)}`,
-      itemId: n.itemId,
-      itemSku: n.itemSku,
-      itemName: n.itemName,
-      qty: n.shortfallQty,
-      uom: n.uom,
-      neededBy: '2026-11-15',
-      sourceWoNo: 'Planned WOs',
-      status: 'OPEN',
-    }));
-
-    setReqs((prev) => [...generated, ...prev]);
-    setToast(
-      `Generated ${generated.length} RM requisition(s) from planned Work Orders & BOMs minus available stock.`,
-    );
+  const handleGenerateFromPlan = async () => {
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/production/requisitions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: activeSiteId || undefined,
+          demands: [],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReqs(activeSiteId);
+      setToast('Generated RM requisitions from planned Work Orders minus available & inbound stock.');
+    } catch (err) {
+      setToast(`Unable to generate requisitions: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const updateStatus = (id: string, status: RmRequisitionRecord['status'], endpoint: string) => {
-    fetch(`/api/bff/production/requisitions/${id}/${endpoint}`, { method: 'POST' }).catch(() => {});
-    setReqs((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-    setToast(`Updated requisition to ${status}.`);
+  const runAction = async (id: string, endpoint: string, label: string) => {
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/proxy/production/requisitions/${encodeURIComponent(id)}/${endpoint}`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReqs(activeSiteId);
+      setToast(label);
+    } catch (err) {
+      setToast(`Failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const deleteDraft = (id: string) => {
-    fetch(`/api/bff/production/requisitions/${id}`, { method: 'DELETE' }).catch(() => {});
-    setReqs((prev) => prev.filter((r) => r.id !== id));
-    setToast('Deleted draft requisition.');
+  const deleteDraft = async (id: string) => {
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/proxy/production/requisitions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      await loadReqs(activeSiteId);
+      setToast('Deleted requisition.');
+    } catch (err) {
+      setToast(`Failed to delete requisition: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -97,7 +137,7 @@ export default function ProductionRequisitionsPage() {
             Auto-calculate RM shortfalls from planned Work Orders &amp; BOMs, approve, and convert to PO.
           </p>
         </div>
-        <Button variant="primary" onClick={handleGenerateFromPlan}>
+        <Button variant="primary" disabled={busy} onClick={handleGenerateFromPlan}>
           ⚡ Generate from Production Plan
         </Button>
       </div>
@@ -114,7 +154,7 @@ export default function ProductionRequisitionsPage() {
             <tr>
               <th className="p-3">Req #</th>
               <th className="p-3">Raw Material</th>
-              <th className="p-3">Source WO</th>
+              <th className="p-3">Source</th>
               <th className="p-3 text-right">Qty Needed</th>
               <th className="p-3">Needed By</th>
               <th className="p-3">Status</th>
@@ -122,62 +162,70 @@ export default function ProductionRequisitionsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
-            {reqs.map((r) => (
-              <tr key={r.id} className="hover:bg-sunken">
-                <td className="p-3 font-mono text-xs text-orange-400 font-semibold">{r.reqNo}</td>
-                <td className="p-3">
-                  <div className="text-ink font-medium">{r.itemName}</div>
-                  <div className="text-[11px] font-mono text-ink-3">{r.itemSku}</div>
-                </td>
-                <td className="p-3 text-xs font-mono text-ink-2">{r.sourceWoNo || 'Manual'}</td>
-                <td className="p-3 text-right font-mono font-bold text-ink">
-                  {r.qty} {r.uom}
-                </td>
-                <td className="p-3 text-xs font-mono text-ink-2">{r.neededBy}</td>
-                <td className="p-3">
-                  <StatusPill
-                    status={r.status}
-                    tone={
-                      r.status === 'PO_CREATED' || r.status === 'APPROVED'
-                        ? 'emerald'
-                        : r.status === 'CANCELLED'
-                          ? 'rose'
-                          : 'amber'
-                    }
-                  />
-                </td>
-                <td className="p-3 text-right space-x-2">
-                  {r.status === 'OPEN' && (
-                    <button
-                      onClick={() => updateStatus(r.id, 'APPROVED', 'approve')}
-                      className="text-xs text-action hover:text-action font-medium"
-                    >
-                      Approve
-                    </button>
-                  )}
-                  {r.status === 'APPROVED' && (
-                    <button
-                      onClick={() => updateStatus(r.id, 'PO_CREATED', 'convert-to-po')}
-                      className="text-xs text-leaf hover:text-leaf font-medium"
-                    >
-                      Convert to PO
-                    </button>
-                  )}
-                  {r.status === 'DRAFT' && (
-                    <button
-                      onClick={() => deleteDraft(r.id)}
-                      className="text-xs text-madder hover:text-madder font-medium"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {reqs.map((r, idx) => {
+              const st = String(r.status);
+              const canApprove = st === 'DRAFT' || st === 'PENDING' || st === 'OPEN';
+              const canConvert = st === 'APPROVED';
+              const canDelete = st === 'DRAFT' || st === 'CANCELLED';
+              return (
+                <tr key={`${r.id}-${r.itemId}-${idx}`} className="hover:bg-sunken">
+                  <td className="p-3 font-mono text-xs text-orange-400 font-semibold">{r.reqNo}</td>
+                  <td className="p-3">
+                    <div className="text-ink font-medium">{r.itemName}</div>
+                    <div className="text-[11px] font-mono text-ink-3">{r.itemSku}</div>
+                  </td>
+                  <td className="p-3 text-xs font-mono text-ink-2">{r.sourceWoNo || 'Manual'}</td>
+                  <td className="p-3 text-right font-mono font-bold text-ink">
+                    {r.qty} {r.uom}
+                  </td>
+                  <td className="p-3 text-xs font-mono text-ink-2">{r.neededBy}</td>
+                  <td className="p-3">
+                    <StatusPill
+                      status={st}
+                      tone={
+                        st === 'CONVERTED' || st === 'PO_CREATED' || st === 'APPROVED'
+                          ? 'emerald'
+                          : st === 'CANCELLED'
+                            ? 'rose'
+                            : 'amber'
+                      }
+                    />
+                  </td>
+                  <td className="p-3 text-right space-x-2">
+                    {canApprove && (
+                      <button
+                        disabled={busy}
+                        onClick={() => runAction(r.id, 'approve', `Approved requisition ${r.reqNo}.`)}
+                        className="text-xs text-action hover:text-action font-medium"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {canConvert && (
+                      <button
+                        disabled={busy}
+                        onClick={() => runAction(r.id, 'convert-to-po', `Converted ${r.reqNo} to PO.`)}
+                        className="text-xs text-leaf hover:text-leaf font-medium"
+                      >
+                        Convert to PO
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        disabled={busy}
+                        onClick={() => deleteDraft(r.id)}
+                        className="text-xs text-madder hover:text-madder font-medium"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </div>
   );
 }
-

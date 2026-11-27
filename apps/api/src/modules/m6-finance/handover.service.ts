@@ -318,7 +318,12 @@ export class HandoverService {
     const limit = options.limit ?? 50;
     const offset = options.offset ?? 0;
     const items = await query
-      .select('cash_handovers.*', 'h.full_name as handedByName', 'r.full_name as receivedByName')
+      .select(
+        'cash_handovers.*',
+        'h.full_name as handedByName',
+        'h.role as handedByRole',
+        'r.full_name as receivedByName',
+      )
       .orderBy('cash_handovers.created_at', 'desc')
       .limit(limit)
       .offset(offset);

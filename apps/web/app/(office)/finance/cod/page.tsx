@@ -1,34 +1,60 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { formatINR } from '@neo/shared';
 import { type CodPendingStopRecord } from '../../../../src/lib/finance-data';
 
 export default function CodSettlementPage() {
   const [stops, setStops] = useState<CodPendingStopRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [busyStopId, setBusyStopId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/cod-settlements/pending')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setStops(rows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+  const loadPendingStops = useCallback(async () => {
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    const siteQuery =
+      storedSite && storedSite !== 'all' ? `?siteId=${encodeURIComponent(storedSite)}` : '';
+    const res = await fetch(`/api/proxy/cod-settlements/pending${siteQuery}`).then((r) =>
+      r.ok ? r.json() : [],
+    );
+    const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+    setStops(
+      rows.map((s: any) => ({
+        stopId: String(s.stopId ?? s.id ?? ''),
+        tripNo: String(s.tripNo ?? s.tripNumber ?? s.tripId ?? '—'),
+        driverName: String(s.driverName ?? 'Driver'),
+        orderNo: String(s.orderNo ?? s.salesOrderId ?? '—'),
+        customerName: String(s.customerName ?? 'Customer'),
+        expectedCod: Number(s.expectedCod ?? s.codAmount ?? 0),
+        collectedCod: Number(s.collectedCod ?? s.codCollectedAmount ?? 0),
+        status: (s.status ?? 'PENDING') as CodPendingStopRecord['status'],
+      })),
+    );
   }, []);
 
+  useEffect(() => {
+    loadPendingStops().catch(() => {});
+  }, [loadPendingStops]);
+
   async function settleStop(stopId: string) {
-    await fetch(`/api/proxy/cod-settlements/${encodeURIComponent(stopId)}/settle`, {
-      method: 'POST',
-    }).catch(() => {});
-    setStops((prev) => prev.map((s) => (s.stopId === stopId ? { ...s, status: 'SETTLED' } : s)));
-    setToast('COD stop settled and reconciled with trip ledger.');
+    try {
+      setBusyStopId(stopId);
+      const res = await fetch(`/api/proxy/cod-settlements/${encodeURIComponent(stopId)}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadPendingStops();
+      setToast('COD stop settled into driver custody wallet and customer ledger.');
+    } catch (err) {
+      setToast(`Failed to settle COD: ${(err as Error).message}`);
+    } finally {
+      setBusyStopId(null);
+    }
   }
 
   return (
@@ -36,7 +62,7 @@ export default function CodSettlementPage() {
       <div>
         <h1 className="text-2xl font-bold text-ink">COD Settlement</h1>
         <p className="text-sm text-ink-3">
-          Confirm cash-on-delivery stops collected per trip/driver (linked with Phase F8 trips).
+          Confirm cash-on-delivery stops collected per trip/driver (linked with Phase F8 trips &amp; EOD driver custody).
         </p>
       </div>
 
@@ -93,10 +119,11 @@ export default function CodSettlementPage() {
                     {s.status === 'PENDING' && (
                       <button
                         type="button"
+                        disabled={busyStopId === s.stopId}
                         onClick={() => settleStop(s.stopId)}
-                        className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                        className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
-                        Settle COD
+                        {busyStopId === s.stopId ? 'Settling...' : 'Settle COD'}
                       </button>
                     )}
                   </td>

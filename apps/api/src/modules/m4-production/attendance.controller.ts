@@ -23,6 +23,7 @@ import {
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RequirePermission } from '../m0-platform/rbac.service.js';
 import { RbacGuard } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 
 @ApiTags('M4 Production - Attendance')
 @Controller('production/attendance')
@@ -42,7 +43,11 @@ export class AttendanceController {
     @Body() dto: CreateAttendanceDto,
     @Req() req: any,
   ): Promise<AttendanceResponseDto> {
-    return this.attendanceService.logAttendance(dto, req.user.sub);
+    const resolvedSiteId = resolveUserSiteId(req.user, dto.siteId);
+    return this.attendanceService.logAttendance(
+      { ...dto, siteId: resolvedSiteId ?? dto.siteId },
+      req.user.sub,
+    );
   }
 
   @Get()

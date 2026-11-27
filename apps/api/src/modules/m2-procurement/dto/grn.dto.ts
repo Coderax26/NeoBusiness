@@ -56,18 +56,20 @@ export class CreateGRNDto {
   @IsUUID()
   poId?: string;
 
-  @ApiProperty({ example: 'site-uuid' })
+  @ApiPropertyOptional({ example: 'site-uuid' })
+  @IsOptional()
   @IsUUID()
-  siteId: string;
+  siteId?: string;
 
   @ApiPropertyOptional({ example: 'location-uuid' })
   @IsOptional()
   @IsUUID()
   locationId?: string;
 
-  @ApiProperty({ example: 'user-uuid' })
+  @ApiPropertyOptional({ example: 'user-uuid' })
+  @IsOptional()
   @IsUUID()
-  receivedBy: string;
+  receivedBy?: string;
 
   @ApiProperty({ type: [CreateGRNLineDto] })
   @IsArray()

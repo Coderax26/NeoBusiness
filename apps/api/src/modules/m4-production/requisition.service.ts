@@ -71,14 +71,19 @@ export class RequisitionService {
     dto: CreateRequisitionDto,
     createdBy: string,
   ): Promise<RequisitionResponseDto> {
-    // Validate site_id matches user's site (RLS will enforce)
-    // Validate requested_by user exists (optional check)
+    if (!dto.siteId) {
+      throw new BadRequestException('siteId is required for requisition');
+    }
+    const reqNo =
+      dto.reqNo?.trim() ||
+      `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${uuidv7().slice(-4).toUpperCase()}`;
+    const requestedBy = dto.requestedBy || createdBy;
 
     // Check if requisition number already exists for this site
-    const exists = await this.reqRepo.headerExists(dto.reqNo, dto.siteId);
+    const exists = await this.reqRepo.headerExists(reqNo, dto.siteId);
     if (exists) {
       throw new ConflictException(
-        `Requisition number ${dto.reqNo} already exists for this site`,
+        `Requisition number ${reqNo} already exists for this site`,
       );
     }
 
@@ -114,12 +119,12 @@ export class RequisitionService {
 
     return await this.knex.transaction(async (trx) => {
       const headerId = uuidv7();
-      const [header] = await trx('production_requisitions')
+      await trx('production_requisitions')
         .insert({
           id: headerId,
-          req_no: dto.reqNo,
+          req_no: reqNo,
           site_id: dto.siteId,
-          requested_by: dto.requestedBy,
+          requested_by: requestedBy,
           required_by_date: dto.requiredByDate,
           status: dto.status,
           created_by: createdBy,
@@ -129,13 +134,13 @@ export class RequisitionService {
         })
         .returning('*');
 
-      const lines = dto.lines.map((line, index) => ({
+      const lines = dto.lines.map((line) => ({
         id: uuidv7(),
         requisition_id: headerId,
         item_id: line.itemId,
         required_qty: line.requiredQty,
         uom: line.uom,
-        bom_header_id: line.bomHeaderId ?? null,
+        bom_header_id: line.bomHeaderId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
@@ -159,8 +164,15 @@ export class RequisitionService {
     netQty: string,
     requiredBy: Date,
   ): Promise<string> {
-    // Get active BOM for the finished item
-    const siteId = await this.getSiteIdForItem(finishedItemId);
+    const context = await this.resolveOrderContext(sourceOrderLineId);
+    const siteId = context.siteId || (await this.getSiteIdForItem(finishedItemId));
+    const actorId = context.actorId || (await this.getDefaultActorId());
+    if (!actorId) {
+      throw new BadRequestException(
+        'Cannot create production requisition without a valid actor user UUID',
+      );
+    }
+
     const activeBom = await this.bomService.getActiveBom(
       finishedItemId,
       siteId,
@@ -215,19 +227,51 @@ export class RequisitionService {
       );
     }
 
-    // Create requisition
-    const reqNo = `REQ-${sourceOrderLineId.slice(-8)}`;
+    // Create requisition with valid UUID actor references
+    const reqNo = `REQ-${sourceOrderLineId.slice(-8)}-${uuidv7().slice(-4).toUpperCase()}`;
     const reqDto: CreateRequisitionDto = {
       reqNo,
       siteId,
-      requestedBy: '', // will be filled by caller via port
+      requestedBy: actorId,
       requiredByDate: requiredBy.toISOString().split('T')[0],
       status: RequisitionStatus.DRAFT,
       lines: reqLines,
     };
 
-    const result = await this.createRequisitionFromDto(reqDto, 'system');
+    const result = await this.createRequisitionFromDto(reqDto, actorId);
     return result.id;
+  }
+
+  private async resolveOrderContext(
+    sourceOrderLineId: string,
+  ): Promise<{ siteId: string | null; actorId: string | null }> {
+    try {
+      const row = await this.knex('sales_order_lines as sol')
+        .join('sales_orders as so', 'sol.order_id', 'so.id')
+        .where('sol.id', sourceOrderLineId)
+        .first('so.site_id', 'so.created_by');
+      if (row) {
+        return {
+          siteId: row.site_id ? String(row.site_id) : null,
+          actorId: row.created_by ? String(row.created_by) : null,
+        };
+      }
+    } catch {
+      // Fallback for mocked or non-UUID source IDs
+    }
+    return { siteId: null, actorId: null };
+  }
+
+  private async getDefaultActorId(): Promise<string | null> {
+    try {
+      const [user] = await this.knex('users')
+        .where('is_active', true)
+        .limit(1)
+        .select('id');
+      return user?.id ? String(user.id) : null;
+    } catch {
+      return null;
+    }
   }
 
   private async getSiteIdForItem(itemId: string): Promise<string> {
@@ -246,9 +290,27 @@ export class RequisitionService {
     requestedBy: string,
     reqNoPrefix = 'REQ',
   ): Promise<RequisitionResponseDto> {
+    let effectiveDemands = Array.isArray(demands) ? demands : [];
+    if (effectiveDemands.length === 0) {
+      const plannedWos = await this.knex('production_work_orders as wo')
+        .join('bom_headers as bh', 'wo.bom_header_id', 'bh.id')
+        .where({ 'wo.site_id': siteId, 'wo.status': 'PLANNED' })
+        .select('bh.item_id', 'wo.planned_qty');
+      effectiveDemands = plannedWos.map((w: any) => ({
+        itemId: String(w.item_id),
+        qty: String(w.planned_qty),
+        requiredBy: new Date().toISOString().slice(0, 10),
+      }));
+    }
+    if (effectiveDemands.length === 0) {
+      throw new BadRequestException(
+        'No planned work orders or demand lines found to generate requisitions',
+      );
+    }
+
     // Step 1: Explode BOMs for each finished good demand
     const explosions: BomExplosionResult[] = [];
-    for (const demand of demands) {
+    for (const demand of effectiveDemands) {
       const activeBom = await this.bomService.getActiveBom(
         demand.itemId,
         siteId,
@@ -316,9 +378,9 @@ export class RequisitionService {
       const item = await this.itemPort.getItem(itemId);
       if (!item) continue;
 
-      // Get available stock from InventoryPort
+      // Get available stock from InventoryPort using real siteId
       const atpResult = await this.inventoryPort.checkATP(
-        '', // locationId - would need to be resolved from site
+        siteId,
         itemId,
         exp.totalQty,
         new Date().toISOString().split('T')[0],
@@ -369,7 +431,7 @@ export class RequisitionService {
       itemId: nr.itemId,
       requiredQty: nr.netQty,
       uom: nr.uom,
-      bomHeaderId: '', // would link to source BOM
+      bomHeaderId: undefined,
     }));
 
     return this.createRequisitionFromDto(
@@ -378,7 +440,8 @@ export class RequisitionService {
         siteId,
         requestedBy,
         requiredByDate:
-          demands[0]?.requiredBy ?? new Date().toISOString().slice(0, 10),
+          effectiveDemands[0]?.requiredBy ??
+          new Date().toISOString().slice(0, 10),
         status: RequisitionStatus.DRAFT,
         lines,
       },
@@ -395,7 +458,7 @@ export class RequisitionService {
       .andWhere('site_id', siteId)
       .increment('last_no', 1)
       .returning('last_no');
-    return row?.last_no ?? 1;
+    return row?.last_no ?? Number(Date.now().toString().slice(-4));
   }
 
   async getRequisition(reqId: string): Promise<RequisitionResponseDto> {
@@ -540,7 +603,7 @@ export class RequisitionService {
 
     // Emit domain event
     await this.outbox.raiseStandalone(
-      'production.requisition_created',
+      'production.requisition_converted',
       reqId,
       {
         requisitionId: reqId,

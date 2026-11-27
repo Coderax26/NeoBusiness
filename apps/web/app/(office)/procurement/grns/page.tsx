@@ -26,19 +26,25 @@ export default function GoodsReceivedPage() {
           supplierName: String(g.supplierName || g.supplier_name || 'Supplier'),
           siteName: String(g.siteName || g.site_name || 'Main Site'),
           receivedDate: String(g.receivedDate || g.received_date || g.receivedAt || g.received_at || g.created_at || '').slice(0, 10),
-          receivedBy: String(g.receivedBy || g.received_by_name || 'Storekeeper'),
+          receivedBy: String(g.receivedByName || g.received_by_name || g.receivedBy || 'Storekeeper'),
           hasShortfall: Boolean(g.hasShortfall ?? g.has_shortfall),
+          lineCount: Number(g.lineCount ?? (Array.isArray(g.lines) ? g.lines.length : 0)),
           lines: Array.isArray(g.lines)
-            ? g.lines.map((l: any, idx: number) => ({
-                lineId: String(l.lineId || l.id || `l-${idx}`),
-                itemId: String(l.itemId || l.item_id || ''),
-                itemSku: String(l.itemSku || l.sku_code || ''),
-                itemName: String(l.itemName || l.item_name || 'Item'),
-                uom: String(l.uom || 'kg'),
-                orderedQty: Number(l.orderedQty ?? l.ordered_qty ?? 0),
-                unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
-                receivedQty: Number(l.receivedQty ?? l.received_qty ?? 0),
-              }))
+            ? g.lines.map((l: any, idx: number) => {
+                const ordered = Number(l.orderedQty ?? l.ordered_qty ?? 0);
+                const received = Number(l.receivedQty ?? l.received_qty ?? 0);
+                return {
+                  lineId: String(l.lineId || l.id || `l-${idx}`),
+                  itemId: String(l.itemId || l.item_id || ''),
+                  itemSku: String(l.itemSku || l.sku_code || ''),
+                  itemName: String(l.itemName || l.item_name || 'Item'),
+                  uom: String(l.uom || l.primary_uom || 'kg'),
+                  orderedQty: ordered,
+                  unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
+                  receivedQty: received,
+                  shortQty: Number(l.shortQty ?? Math.max(0, ordered - received)),
+                };
+              })
             : [],
         }));
         setGrns(mapped);
@@ -49,6 +55,50 @@ export default function GoodsReceivedPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedGrn || selectedGrn.lines.length > 0) return;
+    let active = true;
+    const reqs: [Promise<any>, Promise<any>] = [
+      fetch(`/api/proxy/procurement/grns/${encodeURIComponent(selectedGrn.id)}/lines`).then((r) => (r.ok ? r.json() : [])),
+      selectedGrn.poId
+        ? fetch(`/api/proxy/procurement/purchase-orders/${encodeURIComponent(selectedGrn.poId)}/lines`).then((r) => (r.ok ? r.json() : []))
+        : Promise.resolve([]),
+    ];
+    Promise.all(reqs)
+      .then(([grnLinesRaw, poLinesRaw]) => {
+        if (!active) return;
+        const grnLines = Array.isArray(grnLinesRaw) ? grnLinesRaw : [];
+        const poLines = Array.isArray(poLinesRaw) ? poLinesRaw : [];
+        const poMap = new Map(poLines.map((pl: any) => [String(pl.itemId ?? pl.item_id), pl]));
+        const merged = grnLines.map((l: any, idx: number) => {
+          const itemId = String(l.itemId || l.item_id || '');
+          const poLine: any = poMap.get(itemId);
+          const ordered = Number(poLine?.confirmedQty || poLine?.orderedQty || l.receivedQty || 0);
+          const received = Number(l.receivedQty ?? l.received_qty ?? 0);
+          const shortQty = Math.max(0, ordered - received);
+          return {
+            lineId: String(l.id || `l-${idx}`),
+            itemId,
+            itemSku: String(l.itemSku || l.sku_code || ''),
+            itemName: String(l.itemName || l.item_name || 'Item'),
+            uom: String(l.primaryUom || l.primary_uom || 'kg'),
+            orderedQty: ordered,
+            receivedQty: received,
+            shortQty,
+            unitPrice: Number(poLine?.unitPrice ?? poLine?.unit_price ?? 0),
+          };
+        });
+        setSelectedGrn((prev) => (prev && prev.id === selectedGrn.id ? { ...prev, lines: merged } : prev));
+        setGrns((prev) =>
+          prev.map((g) => (g.id === selectedGrn.id ? { ...g, lines: merged } : g)),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedGrn?.id]);
 
   const blindMaskedLines = useMemo(
     () =>
@@ -84,27 +134,32 @@ export default function GoodsReceivedPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-sheet border border-rule rounded-[3px] p-1">
-          <button
-            onClick={() => setViewRoleMode('OFFICE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-              viewRoleMode === 'OFFICE'
-                ? 'bg-indigo-600 text-white'
-                : 'text-ink-3 hover:text-ink'
-            }`}
-          >
-            Office Comparison View
-          </button>
-          <button
-            onClick={() => setViewRoleMode('BLIND_STOREKEEPER')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-              viewRoleMode === 'BLIND_STOREKEEPER'
-                ? 'bg-haldi text-white'
-                : 'text-ink-3 hover:text-ink'
-            }`}
-          >
-            Blind GRN (Storekeeper)
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/floor/grn">
+            <Button variant="primary">+ Record Blind GRN</Button>
+          </Link>
+          <div className="flex items-center gap-2 bg-sheet border border-rule rounded-[3px] p-1">
+            <button
+              onClick={() => setViewRoleMode('OFFICE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                viewRoleMode === 'OFFICE'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-ink-3 hover:text-ink'
+              }`}
+            >
+              Office Comparison View
+            </button>
+            <button
+              onClick={() => setViewRoleMode('BLIND_STOREKEEPER')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                viewRoleMode === 'BLIND_STOREKEEPER'
+                  ? 'bg-haldi text-white'
+                  : 'text-ink-3 hover:text-ink'
+              }`}
+            >
+              Blind GRN (Storekeeper)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -139,7 +194,7 @@ export default function GoodsReceivedPage() {
                 <td className="p-3 text-ink font-medium">{g.supplierName}</td>
                 <td className="p-3 font-mono text-xs text-ink-2">{g.poNumber}</td>
                 <td className="p-3 text-xs text-ink-2">{g.receivedBy}</td>
-                <td className="p-3 font-mono text-xs text-ink">{g.lines.length}</td>
+                <td className="p-3 font-mono text-xs text-ink">{(g as any).lineCount || g.lines.length}</td>
                 <td className="p-3">
                   {g.hasShortfall ? (
                     <StatusPill status="SHORTFALL" tone="rose" />

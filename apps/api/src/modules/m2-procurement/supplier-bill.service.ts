@@ -93,9 +93,12 @@ export class SupplierBillService {
         throw new NotFoundException(`No GRNs found for PO ${input.po_id}`);
       }
 
-      // Get GRN totals from lines
+      // Get GRN totals across all GRNs for this PO
       const grnTotals = await trx('goods_receipt_lines')
-        .where('grn_id', grns[0].id)
+        .whereIn(
+          'grn_id',
+          grns.map((g: any) => g.id),
+        )
         .sum('received_qty as total_qty')
         .first();
 

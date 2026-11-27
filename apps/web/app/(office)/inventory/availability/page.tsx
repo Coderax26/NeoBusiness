@@ -7,6 +7,8 @@ import { computeAtp } from '@neo/shared';
 
 type AtpRow = {
   itemId: string;
+  siteId?: string;
+  siteName?: string;
   sku: string;
   itemName: string;
   uom: string;
@@ -28,16 +30,31 @@ export default function CheckAvailabilityPage() {
       .then((res) => {
         if (!active) return;
         const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        const mapped: AtpRow[] = rows.map((r: any) => ({
-          itemId: String(r.itemId || r.item_id || r.id),
-          sku: String(r.sku || r.skuCode || r.sku_code || ''),
-          itemName: String(r.itemName || r.item_name || 'Item'),
-          uom: String(r.uom || 'kg'),
-          onHand: Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0),
-          reserved: Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? r.qty_reserved ?? 0),
-          incomingPoQty: Number(r.incomingPoQty ?? 0),
-          plannedProductionQty: Number(r.plannedProductionQty ?? 0),
-        }));
+        const byItem = new Map<string, AtpRow>();
+        for (const r of rows) {
+          const itemId = String(r.itemId || r.item_id || r.id);
+          const onHand = Number(r.onHand ?? r.qtyOnHand ?? r.qty_on_hand ?? 0);
+          const reserved = Number(r.reserved ?? r.qtyCommitted ?? r.qty_committed ?? r.qty_reserved ?? 0);
+          const existing = byItem.get(itemId);
+          if (existing) {
+            existing.onHand += onHand;
+            existing.reserved += reserved;
+          } else {
+            byItem.set(itemId, {
+              itemId,
+              siteId: String(r.siteId || r.site_id || ''),
+              siteName: String(r.siteName || r.site_name || 'Main Site'),
+              sku: String(r.sku || r.skuCode || r.sku_code || ''),
+              itemName: String(r.itemName || r.item_name || 'Item'),
+              uom: String(r.uom || 'kg'),
+              onHand,
+              reserved,
+              incomingPoQty: Number(r.incomingPoQty ?? 0),
+              plannedProductionQty: Number(r.plannedProductionQty ?? 0),
+            });
+          }
+        }
+        const mapped = Array.from(byItem.values());
         setProjections(mapped);
         if (mapped.length > 0) setSelectedItemId(mapped[0].itemId);
       })
@@ -46,6 +63,36 @@ export default function CheckAvailabilityPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedItemId) return;
+    let active = true;
+    const item = projections.find((p) => p.itemId === selectedItemId);
+    const params = new URLSearchParams({ itemId: selectedItemId });
+    if (item?.siteId) params.set('siteId', item.siteId);
+    fetch(`/api/proxy/inventory/stock/projection?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((proj) => {
+        if (!active || !proj) return;
+        setProjections((prev) =>
+          prev.map((p) =>
+            p.itemId === selectedItemId
+              ? {
+                  ...p,
+                  onHand: proj.onHandQty !== undefined ? Number(proj.onHandQty) : p.onHand,
+                  reserved: proj.reservedQty !== undefined ? Number(proj.reservedQty) : p.reserved,
+                  incomingPoQty: Number(proj.incomingPoQty ?? 0),
+                  plannedProductionQty: Number(proj.plannedWoQty ?? 0),
+                }
+              : p,
+          ),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [selectedItemId]);
 
   const proj = useMemo(
     () =>

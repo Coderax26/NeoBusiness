@@ -17,8 +17,9 @@ export enum AttendanceShift {
 }
 
 export class CreateAttendanceDto {
+  @IsOptional()
   @IsUUID()
-  siteId: string;
+  siteId?: string;
 
   @IsUUID()
   workerId: string;

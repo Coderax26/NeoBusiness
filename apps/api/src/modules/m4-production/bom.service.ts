@@ -56,6 +56,9 @@ export class BomService {
     }
 
     // Check if BOM number already exists for this site
+    if (!dto.siteId) {
+      throw new BadRequestException('siteId is required to create a BOM');
+    }
     const exists = await this.bomRepo.headerExists(dto.bomNo, dto.siteId);
     if (exists) {
       throw new ConflictException(
@@ -201,7 +204,7 @@ export class BomService {
     // Emit domain event
     await this.outbox.raise(
       trx,
-      'production.requisition_created',
+      'production.bom_activated',
       bomId,
       {
         bomId,

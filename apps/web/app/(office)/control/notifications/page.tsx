@@ -1,31 +1,59 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { type NotificationLogRecord } from '../../../../src/lib/control-tower-data';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+type NotificationLogStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'RETRIED';
+
+interface NotificationLogItem {
+  id: string;
+  channel: 'WHATSAPP' | 'SMS' | 'FCM' | 'PUSH' | 'IN_APP';
+  recipient: string;
+  template: string;
+  status: NotificationLogStatus;
+  attempts: number;
+  providerMsgId?: string;
+  timestamp: string;
+  errorDetail?: string;
+}
 
 export default function NotificationsLogPage() {
-  const [logs, setLogs] = useState<NotificationLogRecord[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | NotificationLogRecord['status']>('ALL');
+  const [logs, setLogs] = useState<NotificationLogItem[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | NotificationLogStatus>('ALL');
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [bannerError, setBannerError] = useState<string | null>(null);
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/proxy/notifications/logs');
+      if (!res.ok) {
+        setLogs([]);
+        return;
+      }
+      const json = await res.json();
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      setLogs(
+        list.map((n: any) => ({
+          id: String(n.id),
+          channel: (n.channel ?? 'IN_APP') as NotificationLogItem['channel'],
+          recipient: String(n.recipient_ref ?? n.recipient ?? n.recipient_phone ?? '-'),
+          template: String(n.template_code ?? n.template_key ?? n.template ?? '-'),
+          status: (n.status ?? 'QUEUED') as NotificationLogStatus,
+          attempts: Number(n.attempts ?? 0),
+          providerMsgId: n.provider_msg_id ? String(n.provider_msg_id) : undefined,
+          timestamp: n.created_at
+            ? new Date(n.created_at).toLocaleString('en-IN')
+            : String(n.timestamp ?? '-'),
+          errorDetail: n.error ?? n.last_error ?? n.errorDetail,
+        })),
+      );
+    } catch {
+      setLogs([]);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('/api/proxy/notifications/logs')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        setLogs(
-          list.map((n: any) => ({
-            id: n.id,
-            channel: n.channel ?? 'IN_APP',
-            recipient: n.recipient ?? n.recipient_phone ?? '-',
-            template: n.template_key ?? n.template ?? '-',
-            timestamp: n.created_at ? new Date(n.created_at).toLocaleString('en-IN') : '-',
-            status: (n.status ?? 'SENT') as NotificationLogRecord['status'],
-            errorDetail: n.error ?? n.errorDetail,
-          })),
-        );
-      })
-      .catch(() => setLogs([]));
-  }, []);
+    loadLogs();
+  }, [loadLogs]);
 
   const filtered = useMemo(
     () => logs.filter((l) => (statusFilter === 'ALL' ? true : l.status === statusFilter)),
@@ -33,10 +61,34 @@ export default function NotificationsLogPage() {
   );
 
   async function retryMessage(id: string) {
-    setLogs((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: 'RETRIED', errorDetail: 'Retry queued successfully' } : l)),
-    );
-    await fetch(`/api/proxy/notifications/logs/${id}/retry`, { method: 'POST' }).catch(() => {});
+    setRetryingId(id);
+    setBannerError(null);
+    try {
+      const res = await fetch(`/api/proxy/notifications/logs/${encodeURIComponent(id)}/retry`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.message || errBody?.error?.message || `HTTP ${res.status}`);
+      }
+      const updated = await res.json().catch(() => null);
+      setLogs((prev) =>
+        prev.map((l) =>
+          l.id === id
+            ? {
+                ...l,
+                status: (updated?.status ?? 'QUEUED') as NotificationLogStatus,
+                attempts: Number(updated?.attempts ?? l.attempts + 1),
+                errorDetail: updated?.error ?? undefined,
+              }
+            : l,
+        ),
+      );
+    } catch (err) {
+      setBannerError(`Retry failed for notification ${id}: ${(err as Error).message}`);
+    } finally {
+      setRetryingId(null);
+    }
   }
 
   return (
@@ -45,11 +97,11 @@ export default function NotificationsLogPage() {
         <div>
           <h1 className="text-2xl font-bold text-ink">Notifications Outbox Log</h1>
           <p className="text-sm text-ink-3">
-            Delivery audit for WhatsApp, SMS, Push, and In-app alerts with one-click retry on failed dispatches.
+            Delivery audit for WhatsApp, SMS, FCM Push, and In-app alerts with one-click retry on failed dispatches.
           </p>
         </div>
-        <div className="flex gap-2">
-          {(['ALL', 'SENT', 'FAILED', 'RETRIED'] as const).map((st) => (
+        <div className="flex flex-wrap gap-2">
+          {(['ALL', 'QUEUED', 'SENT', 'DELIVERED', 'FAILED'] as const).map((st) => (
             <button
               key={st}
               type="button"
@@ -63,6 +115,12 @@ export default function NotificationsLogPage() {
           ))}
         </div>
       </div>
+
+      {bannerError && (
+        <div className="rounded-[3px] border border-madder/30 bg-madder-soft px-4 py-2.5 text-sm font-medium text-madder">
+          {bannerError}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-[3px] border border-rule bg-sheet">
         <table className="w-full text-left text-sm">
@@ -88,18 +146,23 @@ export default function NotificationsLogPage() {
                 <td className="px-4 py-3 font-mono text-xs font-bold text-ink-2">{n.channel}</td>
                 <td className="px-4 py-3">
                   <div className="font-semibold text-ink">{n.recipient}</div>
-                  <div className="text-xs text-ink-3">{n.template}</div>
+                  <div className="text-xs text-ink-3">
+                    {n.template} · attempts: {n.attempts}
+                    {n.providerMsgId ? ` · id: ${n.providerMsgId}` : ''}
+                  </div>
                   {n.errorDetail && <div className="text-xs text-madder">{n.errorDetail}</div>}
                 </td>
                 <td className="px-4 py-3 text-xs text-ink-3">{n.timestamp}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      n.status === 'SENT'
+                      n.status === 'SENT' || n.status === 'DELIVERED'
                         ? 'bg-leaf-soft text-leaf'
                         : n.status === 'FAILED'
                           ? 'bg-madder-soft text-madder'
-                          : 'bg-blue-500/20 text-blue-300'
+                          : n.status === 'QUEUED'
+                            ? 'bg-haldi-soft text-haldi'
+                            : 'bg-blue-500/20 text-blue-300'
                     }`}
                   >
                     {n.status}
@@ -109,10 +172,11 @@ export default function NotificationsLogPage() {
                   {n.status === 'FAILED' && (
                     <button
                       type="button"
+                      disabled={retryingId === n.id}
                       onClick={() => retryMessage(n.id)}
-                      className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950"
+                      className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 disabled:opacity-60"
                     >
-                      Retry
+                      {retryingId === n.id ? 'Retrying…' : 'Retry'}
                     </button>
                   )}
                 </td>
@@ -124,4 +188,3 @@ export default function NotificationsLogPage() {
     </div>
   );
 }
-

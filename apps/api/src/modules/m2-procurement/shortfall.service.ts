@@ -142,10 +142,11 @@ export class ShortfallService {
         );
 
         const quotedPrice = latestRate ? Money.of(latestRate) : Money.zero();
-        const marginPct = Money.marginPct(refPrice, quotedPrice);
-        const priceVariancePct = marginPct?.toNumber() ?? 0;
-        // BR-05: Backup ranking - prioritize suppliers within 2% (1 - priceVariance)
-        // Higher score = better, so within 2% gets 10000 points, within 5% gets 1000
+        const priceVariancePct = refPrice.isZero()
+          ? 0
+          : (quotedPrice.toNumber() - refPrice.toNumber()) / refPrice.toNumber();
+        // BR-05: Backup ranking - prioritize suppliers at or within +2% of reference price
+        // Higher score = better, so <= 2% gets 10000 points, <= 5% gets 1000
         const withinTwoPct = priceVariancePct <= 0.02;
         const withinFivePct = priceVariancePct <= this.PRICE_TOLERANCE_PCT;
 
@@ -377,17 +378,23 @@ export class ShortfallService {
         'purchase_order_lines.po_id',
       )
       .join('items', 'items.id', 'purchase_order_lines.item_id')
+      .leftJoin('suppliers', 'suppliers.id', 'purchase_orders.supplier_id')
       .where('po_shortfalls.status', 'OPEN')
       .select(
         'po_shortfalls.*',
+        'po_shortfalls.deficit_qty as shortfall_qty',
         'items.sku_code as item_sku',
         'items.name as item_name',
+        'items.primary_uom as uom',
+        'purchase_order_lines.item_id',
+        'purchase_order_lines.unit_price',
         'purchase_order_lines.confirmed_qty',
         'purchase_order_lines.received_qty',
         'purchase_orders.po_no',
         'purchase_orders.id as po_id',
         'purchase_orders.supplier_id',
         'purchase_orders.receiving_site_id',
+        'suppliers.company_name as supplier_name',
       );
 
     if (

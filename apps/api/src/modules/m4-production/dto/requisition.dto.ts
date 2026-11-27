@@ -1,9 +1,9 @@
 import {
   IsUUID,
   IsString,
-  IsInt,
-  Min,
-  Max,
+  IsNotEmpty,
+  MaxLength,
+  Matches,
   IsOptional,
   IsEnum,
   IsArray,
@@ -25,10 +25,11 @@ export class RequisitionLineDto {
   itemId: string;
 
   @IsString()
-  @Min(1, { message: 'required_qty must be positive' })
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,3})?$/, { message: 'required_qty must be positive' })
   requiredQty: string; // numeric string (Qty)
 
   @IsString()
+  @IsNotEmpty()
   uom: string;
 
   @IsOptional()
@@ -37,16 +38,19 @@ export class RequisitionLineDto {
 }
 
 export class CreateRequisitionDto {
+  @IsOptional()
   @IsString()
-  @Min(1)
-  @Max(50)
-  reqNo: string;
+  @IsNotEmpty()
+  @MaxLength(50)
+  reqNo?: string;
 
+  @IsOptional()
   @IsUUID()
-  siteId: string;
+  siteId?: string;
 
+  @IsOptional()
   @IsUUID()
-  requestedBy: string;
+  requestedBy?: string;
 
   @IsDateString()
   requiredByDate: string;

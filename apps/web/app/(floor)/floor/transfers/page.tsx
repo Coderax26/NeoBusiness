@@ -15,28 +15,41 @@ export default function FloorTransfersPage() {
       .then((res) => {
         const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
         setTransfers(
-          list.map((t: any) => ({
-            id: t.id,
-            transferNo: t.transfer_no ?? t.transferNo ?? t.id.slice(0, 8),
-            itemName: t.item_name ?? t.itemName ?? 'Stock Transfer',
-            fromSite: t.from_site_name ?? t.fromSite ?? 'Source',
-            toSite: t.to_site_name ?? t.toSite ?? 'Destination',
-            batchNo: t.batch_number ?? t.batchNo ?? '-',
-            qty: Number(t.qty ?? 0),
-            uom: t.uom ?? 'KG',
-            status: t.status ?? 'DRAFT',
-            createdAt: t.created_at ?? '',
-          })),
+          list.map((t: any) => {
+            const st = String(t.status ?? 'DRAFT').toUpperCase();
+            return {
+              id: String(t.id),
+              transferNo: t.transfer_no ?? t.transferNo ?? String(t.id).slice(0, 8),
+              itemName: t.item_name ?? t.itemName ?? 'Stock Transfer',
+              fromSite: t.from_site_name ?? t.fromSite ?? 'Source',
+              toSite: t.to_site_name ?? t.toSite ?? 'Destination',
+              batchNo: t.batch_number ?? t.batchNo ?? '-',
+              qty: Number(t.qty ?? t.requested_qty ?? 0),
+              uom: t.uom ?? 'KG',
+              status: st === 'RESERVED' ? 'DRAFT' : st === 'IN_TRANSIT' ? 'DISPATCHED' : st,
+              createdAt: t.created_at ?? '',
+              rawLines: Array.isArray(t.lines) ? t.lines : [],
+            };
+          }),
         );
       })
       .catch(() => setTransfers([]));
   }, []);
 
-  const handleAction = async (trf: TransferRecord, action: 'dispatch' | 'receive') => {
+  const handleAction = async (trf: TransferRecord & { rawLines?: any[] }, action: 'dispatch' | 'receive') => {
+    const payload =
+      action === 'receive'
+        ? {
+            lines: (trf.rawLines || []).map((l: any) => ({
+              lineId: String(l.id),
+              receivedQty: String(l.dispatched_qty || l.requested_qty || trf.qty),
+            })),
+          }
+        : { transferId: trf.id, qty: trf.qty };
     const res = await enqueueOrSend({
       type: 'TRANSFER_RECEIVE',
-      endpoint: `/api/bff/inventory/transfers/${trf.id}/${action}`,
-      payload: { transferId: trf.id, qty: trf.qty },
+      endpoint: `/api/proxy/inventory/transfers/${trf.id}/${action}`,
+      payload,
     });
     setTransfers((prev) =>
       prev.map((t) =>

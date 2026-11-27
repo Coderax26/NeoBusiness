@@ -58,8 +58,12 @@ export class EodController {
   @RequirePermission('eod.signoff')
   @ApiOperation({ summary: 'Get EOD status for a specific date and site' })
   @ApiResponse({ status: 200, description: 'EOD record status' })
-  async getByDate(@Param('date') date: string, @Req() req: any) {
-    const siteId = resolveUserSiteId(req.user) || '';
+  async getByDate(
+    @Param('date') date: string,
+    @Req() req: any,
+    @Query('siteId') querySiteId?: string,
+  ) {
+    const siteId = resolveUserSiteId(req.user, querySiteId) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -74,8 +78,12 @@ export class EodController {
       'Evaluate the 4 EOD closing checklist items (trips, wallets, invoices, cash position)',
   })
   @ApiResponse({ status: 200, description: '4-check evaluation status' })
-  async getChecklist(@Param('date') date: string, @Req() req: any) {
-    const siteId = resolveUserSiteId(req.user) || '';
+  async getChecklist(
+    @Param('date') date: string,
+    @Req() req: any,
+    @Query('siteId') querySiteId?: string,
+  ) {
+    const siteId = resolveUserSiteId(req.user, querySiteId) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -96,8 +104,9 @@ export class EodController {
     @Param('date') date: string,
     @Body() dto: SignOffEodDto,
     @Req() req: any,
+    @Query('siteId') querySiteId?: string,
   ) {
-    const siteId = resolveUserSiteId(req.user) || '';
+    const siteId = resolveUserSiteId(req.user, querySiteId) || '';
     const eod = await this.eodService.getEODBySiteDate(siteId, date);
     if (!eod) {
       throw new NotFoundException(`No EOD initiated for ${date} at site ${siteId}`);
@@ -110,9 +119,13 @@ export class EodController {
   @RequirePermission('eod.signoff')
   @ApiOperation({ summary: 'Generate bank deposit slip breakdown' })
   @ApiResponse({ status: 200, description: 'Deposit slip data' })
-  async getDepositSlip(@Param('date') date: string, @Req() req: any) {
+  async getDepositSlip(
+    @Param('date') date: string,
+    @Req() req: any,
+    @Query('siteId') querySiteId?: string,
+  ) {
     const slip = await this.eodService.generateDepositSlip(
-      resolveUserSiteId(req.user) || '',
+      resolveUserSiteId(req.user, querySiteId) || '',
       date,
     );
     return wrapResponse(slip);
@@ -126,9 +139,10 @@ export class EodController {
     @Param('date') date: string,
     @Req() req: any,
     @Res() res: Response,
+    @Query('siteId') querySiteId?: string,
   ): Promise<void> {
     const pdfBuffer = await this.eodService.generateDepositSlipPdf(
-      req.user.siteId,
+      resolveUserSiteId(req.user, querySiteId) || '',
       date,
     );
     res.setHeader('Content-Type', 'application/pdf');

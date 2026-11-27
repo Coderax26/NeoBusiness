@@ -32,21 +32,67 @@ export default function ProductionOverviewPage() {
           woRows.map((w: any) => {
             const outputFromArray = Array.isArray(w.outputs)
               ? w.outputs.reduce(
-                  (s: number, o: any) => s + Number(o.qtyProduced ?? o.qty_produced ?? 0),
+                  (s: number, o: any) =>
+                    s + Number(o.actualQty ?? o.actual_qty ?? o.qtyProduced ?? o.qty_produced ?? 0),
                   0,
                 )
               : 0;
+            const issuedFromMaterials = Array.isArray(w.materials)
+              ? w.materials.reduce(
+                  (s: number, m: any) => s + Number(m.actualQty ?? m.actual_qty ?? 0),
+                  0,
+                )
+              : 0;
+            const actualOut = Number(w.actualOutputQty ?? outputFromArray);
+            const varianceOutsideTol =
+              w.status === 'COMPLETED' &&
+              issuedFromMaterials > 0 &&
+              Math.abs(100 - (actualOut / issuedFromMaterials) * 100) > 3;
             return {
               ...w,
               id: String(w.id),
               woNumber: String(w.woNumber ?? w.woNo ?? w.wo_no ?? ''),
+              finishedItemName: String(w.finishedItemName ?? w.bomItemName ?? 'Item'),
+              uom: String(w.uom ?? 'KG'),
               plannedQty: Number(w.plannedQty ?? w.planned_qty ?? 0),
-              actualOutputQty: Number(w.actualOutputQty ?? outputFromArray),
+              issuedRmQty: Number(w.issuedRmQty ?? issuedFromMaterials),
+              actualOutputQty: actualOut,
+              requiredBy: String(w.requiredBy ?? (w.createdAt ? String(w.createdAt).slice(0, 10) : '')),
+              yieldVarianceException: Boolean(w.yieldVarianceException ?? varianceOutsideTol),
             };
           }),
         );
-        setRmReqs(Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : []);
-        setWastageLogs(Array.isArray(wstRes) ? wstRes : Array.isArray(wstRes?.data) ? wstRes.data : []);
+        const rawReqs = Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : [];
+        const normalizedReqs: RmRequisitionRecord[] = rawReqs.map((r: any) => {
+          const firstLine = Array.isArray(r.lines) && r.lines.length > 0 ? r.lines[0] : null;
+          const totalLineQty = Array.isArray(r.lines)
+            ? r.lines.reduce((s: number, l: any) => s + Number(l.requiredQty ?? l.qty ?? 0), 0)
+            : Number(r.qty ?? 0);
+          return {
+            id: String(r.id),
+            reqNo: String(r.reqNo ?? r.req_no ?? ''),
+            itemId: String(firstLine?.itemId ?? r.itemId ?? ''),
+            itemSku: String(firstLine?.itemSkuCode ?? r.itemSku ?? ''),
+            itemName:
+              Array.isArray(r.lines) && r.lines.length > 1
+                ? `${firstLine?.itemName ?? 'Material'} (+${r.lines.length - 1} more)`
+                : String(firstLine?.itemName ?? r.itemName ?? 'Raw Material'),
+            qty: totalLineQty,
+            uom: String(firstLine?.uom ?? r.uom ?? 'KG'),
+            neededBy: String(r.requiredByDate ?? r.neededBy ?? '').slice(0, 10),
+            sourceWoNo: String(r.sourceWoNo ?? r.reqNo ?? 'BOM Plan'),
+            status: String(r.status ?? 'DRAFT') as RmRequisitionRecord['status'],
+          };
+        });
+        setRmReqs(normalizedReqs);
+        const rawWst = Array.isArray(wstRes) ? wstRes : Array.isArray(wstRes?.data) ? wstRes.data : [];
+        setWastageLogs(
+          rawWst.map((w: any) => ({
+            ...w,
+            id: String(w.id),
+            qty: Number(w.qty ?? 0),
+          })),
+        );
       })
       .catch(() => {});
     return () => {
@@ -68,7 +114,9 @@ export default function ProductionOverviewPage() {
   const wastagePct = totalOutputKg > 0 ? ((totalWastageKg / totalOutputKg) * 100).toFixed(2) : '0.00';
 
   const varianceAlerts = workOrders.filter((w) => w.yieldVarianceException);
-  const openShortages = rmReqs.filter((r) => r.status === 'OPEN');
+  const openShortages = rmReqs.filter((r) =>
+    ['DRAFT', 'PENDING', 'OPEN', 'APPROVED'].includes(String(r.status)),
+  );
 
   const yieldTrend = workOrders.slice(0, 7).map((w, idx) => ({
     day: w.woNumber || `WO-${idx + 1}`,

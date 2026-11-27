@@ -1,14 +1,13 @@
 import {
   IsUUID,
   IsString,
-  IsInt,
-  Min,
-  Max,
+  IsNotEmpty,
+  MaxLength,
+  Matches,
   IsOptional,
   IsEnum,
   IsArray,
   ValidateNested,
-  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -23,12 +22,14 @@ export class WorkOrderMaterialDto {
   @IsUUID()
   itemId: string;
 
+  @IsOptional()
   @IsString()
-  @Min(1, { message: 'planned_qty must be positive' })
-  plannedQty: string;
+  @Matches(/^\d+(?:\.\d{1,3})?$/, { message: 'planned_qty must be a valid non-negative numeric string' })
+  plannedQty?: string;
 
+  @IsOptional()
   @IsString()
-  uom: string;
+  uom?: string;
 
   @IsOptional()
   @IsUUID()
@@ -36,6 +37,7 @@ export class WorkOrderMaterialDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,3})?$/, { message: 'actual_qty must be positive' })
   actualQty?: string;
 }
 
@@ -43,12 +45,14 @@ export class WorkOrderOutputDto {
   @IsUUID()
   itemId: string;
 
+  @IsOptional()
   @IsString()
-  @Min(1, { message: 'planned_qty must be positive' })
-  plannedQty: string;
+  @Matches(/^\d+(?:\.\d{1,3})?$/, { message: 'planned_qty must be a valid non-negative numeric string' })
+  plannedQty?: string;
 
+  @IsOptional()
   @IsString()
-  uom: string;
+  uom?: string;
 
   @IsOptional()
   @IsUUID()
@@ -56,26 +60,35 @@ export class WorkOrderOutputDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
+  batchNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,3})?$/, { message: 'actual_qty must be positive' })
   actualQty?: string;
 }
 
 export class CreateWorkOrderDto {
+  @IsOptional()
   @IsString()
-  @Min(1)
-  @Max(50)
-  woNo: string;
+  @IsNotEmpty()
+  @MaxLength(50)
+  woNo?: string;
 
+  @IsOptional()
   @IsUUID()
-  siteId: string;
+  siteId?: string;
 
   @IsUUID()
   bomHeaderId: string;
 
   @IsString()
-  @Min(1, { message: 'planned_qty must be positive' })
+  @Matches(/^(?=.*[1-9])\d+(?:\.\d{1,3})?$/, { message: 'planned_qty must be positive' })
   plannedQty: string;
 
   @IsString()
+  @IsNotEmpty()
   uom: string;
 
   @IsOptional()

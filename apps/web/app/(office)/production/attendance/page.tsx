@@ -1,61 +1,104 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Badge, Button, StatusPill, Dialog } from '@neo/ui';
 import { type WorkerMasterRecord } from '../../../../src/lib/production-data';
 
 export default function ProductionAttendancePage() {
   const [workers, setWorkers] = useState<WorkerMasterRecord[]>([]);
-  const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newStation, setNewStation] = useState('Pelletizer Line A');
+  const [workOrders, setWorkOrders] = useState<Array<{ id: string; woNo: string }>>([]);
+  const [activeSiteId, setActiveSiteId] = useState('');
+  const [logOpen, setLogOpen] = useState(false);
+  const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [selectedWoId, setSelectedWoId] = useState('');
+  const [shift, setShift] = useState<'MORNING' | 'AFTERNOON' | 'NIGHT' | 'GENERAL'>('MORNING');
+  const [hoursWorked, setHoursWorked] = useState('8');
+  const [overtimeHours, setOvertimeHours] = useState('0');
+  const [toast, setToast] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadWorkersAndWos = useCallback(async (siteIdFilter: string) => {
+    const siteQuery = siteIdFilter ? `?siteId=${encodeURIComponent(siteIdFilter)}` : '';
+    const [wrkRes, woRes] = await Promise.all([
+      fetch(`/api/proxy/production/workers${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`/api/proxy/production/work-orders${siteQuery}`).then((r) => (r.ok ? r.json() : [])),
+    ]);
+    const rows = Array.isArray(wrkRes) ? wrkRes : Array.isArray(wrkRes?.data) ? wrkRes.data : [];
+    setWorkers(rows);
+    if (rows.length > 0 && !selectedWorkerId) {
+      setSelectedWorkerId(String(rows[0].id));
+    }
+    const woRows = Array.isArray(woRes) ? woRes : Array.isArray(woRes?.data) ? woRes.data : [];
+    setWorkOrders(woRows.map((w: any) => ({ id: String(w.id), woNo: String(w.woNo ?? w.woNumber ?? '') })));
+  }, [selectedWorkerId]);
 
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/production/workers')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setWorkers(rows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+    const storedSite =
+      typeof window !== 'undefined' ? localStorage.getItem('neobus_active_site_id') ?? '' : '';
+    const effectiveSite = storedSite && storedSite !== 'all' ? storedSite : '';
+    setActiveSiteId(effectiveSite);
+    loadWorkersAndWos(effectiveSite).catch(() => {});
+  }, [loadWorkersAndWos]);
 
-  const togglePunch = (id: string) => {
-    setWorkers((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              status: w.status === 'IN' ? 'OUT' : 'IN',
-              lastPunch: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }
-          : w,
-      ),
-    );
+  const togglePunch = async (worker: WorkerMasterRecord) => {
+    const clockingOut = worker.status === 'IN';
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/production/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: activeSiteId || undefined,
+          workerId: worker.id,
+          date: new Date().toISOString().slice(0, 10),
+          shift: 'MORNING',
+          hoursWorked: clockingOut ? 8 : 0,
+          overtimeHours: 0,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      await loadWorkersAndWos(activeSiteId);
+      setToast(`${worker.name} ${clockingOut ? 'clocked out (8h logged)' : 'clocked in'}.`);
+    } catch (err) {
+      setToast(`Failed to record attendance: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleAddWorker = () => {
-    if (!newName.trim()) return;
-    const created: WorkerMasterRecord = {
-      id: `wrk-${Date.now()}`,
-      code: `WRK-0${workers.length + 1}`,
-      name: newName,
-      station: newStation,
-      shift: 'SHIFT_1',
-      status: 'IN',
-      lastPunch: 'Just now',
-      hoursToday: 0,
-      monthlyHours: 0,
-    };
-    setWorkers((prev) => [...prev, created]);
-    setNewName('');
-    setAddOpen(false);
+  const handleLogAttendance = async () => {
+    if (!selectedWorkerId) return;
+    try {
+      setBusy(true);
+      const res = await fetch('/api/proxy/production/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId: activeSiteId || undefined,
+          workerId: selectedWorkerId,
+          workOrderId: selectedWoId || undefined,
+          date: new Date().toISOString().slice(0, 10),
+          shift,
+          hoursWorked: Number(hoursWorked || 0),
+          overtimeHours: Number(overtimeHours || 0),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      await loadWorkersAndWos(activeSiteId);
+      setLogOpen(false);
+      setToast('Logged shift attendance.');
+    } catch (err) {
+      setToast(`Failed to log attendance: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -72,10 +115,16 @@ export default function ProductionAttendancePage() {
             Daily In/Out register, assigned Work Orders, and monthly hours summary (G-M4-2).
           </p>
         </div>
-        <Button variant="primary" onClick={() => setAddOpen(true)}>
-          + Add Worker
+        <Button variant="primary" onClick={() => setLogOpen(true)}>
+          + Log Shift Attendance
         </Button>
       </div>
+
+      {toast && (
+        <div className="p-3 rounded-lg bg-leaf-soft border border-leaf/30 text-leaf text-sm">
+          {toast}
+        </div>
+      )}
 
       <div className="bg-sheet border border-rule rounded-[3px] overflow-hidden">
         <table className="w-full text-left text-sm">
@@ -114,7 +163,8 @@ export default function ProductionAttendancePage() {
                 </td>
                 <td className="p-3 text-right">
                   <button
-                    onClick={() => togglePunch(w.id)}
+                    disabled={busy}
+                    onClick={() => togglePunch(w)}
                     className="text-xs text-orange-400 hover:text-orange-300 font-medium"
                   >
                     {w.status === 'IN' ? 'Clock Out' : 'Clock In'}
@@ -126,29 +176,74 @@ export default function ProductionAttendancePage() {
         </table>
       </div>
 
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} title="Add Factory Worker">
+      <Dialog open={logOpen} onClose={() => setLogOpen(false)} title="Log Shift Attendance">
         <div className="space-y-4">
-          <input
-            type="text"
-            placeholder="Worker full name..."
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-          />
-          <input
-            type="text"
-            placeholder="Station"
-            value={newStation}
-            onChange={(e) => setNewStation(e.target.value)}
-            className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
-          />
+          <div>
+            <label className="block text-xs text-ink-3 mb-1">Worker</label>
+            <select
+              value={selectedWorkerId}
+              onChange={(e) => setSelectedWorkerId(e.target.value)}
+              className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+            >
+              {workers.map((w) => (
+                <option key={w.id} value={w.id}>{w.name} ({w.station})</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Shift</label>
+              <select
+                value={shift}
+                onChange={(e) => setShift(e.target.value as any)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              >
+                <option value="MORNING">MORNING</option>
+                <option value="AFTERNOON">AFTERNOON</option>
+                <option value="NIGHT">NIGHT</option>
+                <option value="GENERAL">GENERAL</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Work Order (Optional)</label>
+              <select
+                value={selectedWoId}
+                onChange={(e) => setSelectedWoId(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              >
+                <option value="">General Floor</option>
+                {workOrders.map((wo) => (
+                  <option key={wo.id} value={wo.id}>{wo.woNo}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Hours Worked</label>
+              <input
+                type="number"
+                value={hoursWorked}
+                onChange={(e) => setHoursWorked(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-ink-3 mb-1">Overtime Hours</label>
+              <input
+                type="number"
+                value={overtimeHours}
+                onChange={(e) => setOvertimeHours(e.target.value)}
+                className="w-full bg-paper border border-rule-strong rounded-lg p-2.5 text-sm text-ink"
+              />
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleAddWorker}>Save Worker</Button>
+            <Button variant="secondary" onClick={() => setLogOpen(false)}>Cancel</Button>
+            <Button variant="primary" disabled={busy} onClick={handleLogAttendance}>Save Attendance</Button>
           </div>
         </div>
       </Dialog>
     </div>
   );
 }
-

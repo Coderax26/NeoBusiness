@@ -49,11 +49,17 @@ export default function FloorRmRequestPage() {
     if (!selected.id) return;
     const res = await enqueueOrSend({
       type: 'RM_REQUEST',
-      endpoint: '/api/bff/production/requisitions',
+      endpoint: '/api/proxy/production/requisitions',
       payload: {
-        itemId: selected.id,
-        qty: Number(qty) || 0,
-        neededBy,
+        requiredByDate: neededBy,
+        status: 'PENDING',
+        lines: [
+          {
+            itemId: selected.id,
+            requiredQty: String(Number(qty) || 0),
+            uom: selected.uom,
+          },
+        ],
       },
     });
     setBanner(`Requested ${qty} ${selected.uom} of ${selected.name}. ${res.message}`);

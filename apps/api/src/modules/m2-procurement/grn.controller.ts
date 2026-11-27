@@ -20,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../m0-platform/jwt-auth.guard.js';
 import { RbacGuard, RequirePermission } from '../m0-platform/rbac.service.js';
+import { resolveUserSiteId } from '../../shared/utils/user-site.util.js';
 import { GRNService } from './grn.service.js';
 import { CreateGRNDto, BlindReceiveLineDto } from './dto/grn.dto.js';
 
@@ -43,7 +44,14 @@ export class GRNController {
     @Req() req?: any,
   ) {
     const actorId = userId || req?.user?.sub || req?.user?.id;
-    return this.grnService.createBlindGRN({ ...dto, userId: actorId });
+    const siteId = resolveUserSiteId(req?.user, dto.siteId);
+    const receivedBy = dto.receivedBy || actorId;
+    return this.grnService.createBlindGRN({
+      ...dto,
+      siteId: siteId || '',
+      receivedBy,
+      userId: actorId,
+    });
   }
 
   @Get()

@@ -84,13 +84,18 @@ export default function ControlAnalyticsPage() {
         if (woRes.status === 'fulfilled') {
           const rows = Array.isArray(woRes.value) ? woRes.value : Array.isArray(woRes.value?.data) ? woRes.value.data : [];
           setFactoryRows(
-            rows.slice(0, 10).map((w: any) => ({
-              week: String(w.woNumber || w.wo_number || w.id),
-              plannedKg: Number(w.plannedQty ?? w.planned_qty ?? 0),
-              outputKg: Number(w.actualOutputQty ?? w.actual_output_qty ?? 0),
-              yieldPct: w.plannedQty > 0 ? Number((((w.actualOutputQty ?? 0) / w.plannedQty) * 100).toFixed(1)) : 100,
-              wastagePct: w.plannedQty > 0 ? Number((((w.scrapQty ?? 0) / w.plannedQty) * 100).toFixed(1)) : 0,
-            })),
+            rows.slice(0, 10).map((w: any) => {
+              const plannedKg = Number(w.plannedQty ?? w.planned_qty ?? 0);
+              const outputKg = Number(w.actualOutputQty ?? w.actual_output_qty ?? 0);
+              const scrapKg = Number(w.scrapQty ?? w.scrap_qty ?? w.wastage_qty ?? 0);
+              return {
+                week: String(w.woNumber || w.wo_number || w.id),
+                plannedKg,
+                outputKg,
+                yieldPct: plannedKg > 0 ? Number(((outputKg / plannedKg) * 100).toFixed(1)) : 100,
+                wastagePct: plannedKg > 0 ? Number(((scrapKg / plannedKg) * 100).toFixed(1)) : 0,
+              };
+            }),
           );
         }
         if (ordRes.status === 'fulfilled') {

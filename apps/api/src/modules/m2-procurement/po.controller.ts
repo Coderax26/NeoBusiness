@@ -102,12 +102,19 @@ export class POController {
       supplierName: supplier?.company_name || 'Supplier',
       supplierGstin: supplier?.gstin,
       siteName: site?.name || 'NeoBus',
-      lines: lines.map((l: any) => ({
-        itemName: l.item_name || 'Item',
-        qty: String(l.ordered_qty),
-        unitPrice: String(l.unit_price || '0'),
-        lineTotal: String(l.line_total || '0'),
-      })),
+      lines: lines.map((l: any) => {
+        const qtyStr = String(l.orderedQty ?? l.ordered_qty ?? '0');
+        const priceStr = String(l.unitPrice ?? l.unit_price ?? '0');
+        const computedTotal = (
+          parseFloat(qtyStr) * parseFloat(priceStr)
+        ).toFixed(2);
+        return {
+          itemName: l.itemName || l.item_name || 'Item',
+          qty: qtyStr,
+          unitPrice: priceStr,
+          lineTotal: String(l.line_total ?? computedTotal),
+        };
+      }),
       totalAmount: String(po.total_amount || '0'),
     });
 
@@ -163,10 +170,12 @@ export class POController {
   async cancelPO(
     @Param('id') poId: string,
     @Query('userId') userId?: string,
-    @Query('reason') reason?: string,
+    @Query('reason') queryReason?: string,
+    @Body() body?: { reason?: string },
     @Req() req?: any,
   ) {
     const actorId = userId || req?.user?.sub || req?.user?.id;
+    const reason = body?.reason || queryReason;
     return this.poService.cancelPO(poId, actorId, reason);
   }
 

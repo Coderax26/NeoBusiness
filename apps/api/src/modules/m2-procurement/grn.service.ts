@@ -4,12 +4,18 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectKnex } from 'nestjs-knex';
 import type { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { Money } from '../../shared/utils/money.util.js';
 import { Qty } from '../../shared/utils/qty.util.js';
+import {
+  INVENTORY_PORT,
+  type InventoryPort,
+} from '../../shared/ports/ports.interface.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
@@ -101,6 +107,9 @@ export class GRNService {
     private readonly exceptionService: ExceptionService,
     private readonly supplierService: SupplierService,
     private readonly poService: POService,
+    @Optional()
+    @Inject(INVENTORY_PORT)
+    private readonly inventoryPort?: InventoryPort,
   ) {}
 
   /**
@@ -113,11 +122,15 @@ export class GRNService {
     // Get PO details if linked
     let po = null;
     let supplierId = null;
+    let resolvedSiteId = input.siteId;
     let poLines: Map<string, any> = new Map();
 
     if (input.poId) {
       po = await this.poService.getById(input.poId);
       supplierId = po.supplier_id;
+      if (!resolvedSiteId) {
+        resolvedSiteId = String(po.receiving_site_id);
+      }
       const lines = await this.poService.getLines(input.poId);
       for (const line of lines) {
         poLines.set(line.itemId, line);
@@ -136,7 +149,16 @@ export class GRNService {
       supplierId = suppliers[0].id;
     }
 
-    const grnNo = await this.docNumber.next('GRN', input.siteId, input.userId);
+    if (!resolvedSiteId) {
+      throw new BadRequestException('Receiving siteId is required for GRN');
+    }
+
+    const effectiveInput: GRNCreateInput = {
+      ...input,
+      siteId: resolvedSiteId,
+    };
+
+    const grnNo = await this.docNumber.next('GRN', effectiveInput.siteId, effectiveInput.userId);
 
     const shortfalls: any[] = [];
     let grnId = '';
@@ -146,16 +168,16 @@ export class GRNService {
         .insert({
           id: uuidv4(),
           grn_no: grnNo,
-          po_id: input.poId,
+          po_id: effectiveInput.poId,
           supplier_id: supplierId,
-          site_id: input.siteId,
-          location_id: input.locationId,
-          received_by: input.receivedBy,
-          received_at: input.receivedAt ?? new Date(),
-          gps_lat: input.gpsLat,
-          gps_lng: input.gpsLng,
-          created_by: input.userId,
-          updated_by: input.userId,
+          site_id: effectiveInput.siteId,
+          location_id: effectiveInput.locationId,
+          received_by: effectiveInput.receivedBy,
+          received_at: effectiveInput.receivedAt ?? new Date(),
+          gps_lat: effectiveInput.gpsLat,
+          gps_lng: effectiveInput.gpsLng,
+          created_by: effectiveInput.userId,
+          updated_by: effectiveInput.userId,
         })
         .returning(['id', 'grn_no']);
       grnId = String(grn.id);
@@ -269,21 +291,21 @@ export class GRNService {
                   { code: 'APPROVE', label: 'Accept Shortfall' },
                   { code: 'REJECT', label: 'Request Replacement' },
                 ],
-                deepLink: `/procurement/grns/${grn.id}`,
+                deepLink: `/procurement/grns`,
                 valueAtRisk: deficitQtyStr,
               },
-              input.siteId,
+              effectiveInput.siteId,
             );
           }
         }
       }
 
       // Update PO status if fully received
-      if (input.poId) {
-        await this.updatePOStatusFromGRN(trx, input.poId);
+      if (effectiveInput.poId) {
+        await this.updatePOStatusFromGRN(trx, effectiveInput.poId);
       }
 
-      // Emit grn.posted event for M3 inventory
+      // Emit grn.posted event for M3 inventory with full line & requestedQty payload
       await this.outbox.raise(
         trx,
         'grn.posted',
@@ -291,24 +313,34 @@ export class GRNService {
         {
           grnId: String(grn.id),
           grnNo: grnNo,
-          poId: input.poId,
+          poId: effectiveInput.poId,
           supplierId: supplierId,
-          siteId: input.siteId,
-          lines: input.lines.map((l) => ({
-            itemId: l.itemId,
-            receivedQty: l.receivedQty,
-            receivedQtySecondary: l.receivedQtySecondary ?? '0.000',
-            batchLotNo: l.batchLotNo,
-            mfgDate: l.mfgDate,
-            expiryDate: l.expiryDate,
-          })),
+          siteId: effectiveInput.siteId,
+          locationId: effectiveInput.locationId,
+          receivedBy: effectiveInput.receivedBy,
+          lines: effectiveInput.lines.map((l) => {
+            const matchedPoLine = poLines.get(l.itemId);
+            return {
+              itemId: l.itemId,
+              requestedQty: String(matchedPoLine?.confirmedQty || matchedPoLine?.orderedQty || l.receivedQty),
+              receivedQty: l.receivedQty,
+              receivedQtySecondary: l.receivedQtySecondary ?? '0.000',
+              batchLotNo: l.batchLotNo,
+              mfgDate: l.mfgDate,
+              expiryDate: l.expiryDate,
+            };
+          }),
         },
         'm2-procurement',
       );
     });
 
+    if (this.inventoryPort) {
+      await this.inventoryPort.postGRN(grnId);
+    }
+
     this.logger.log(
-      `Created blind GRN: ${grnNo} (${input.lines.length} lines, ${shortfalls.length} shortfalls)`,
+      `Created blind GRN: ${grnNo} (${effectiveInput.lines.length} lines, ${shortfalls.length} shortfalls)`,
     );
     return { id: grnId, grnNo, shortfalls };
   }
@@ -391,7 +423,7 @@ export class GRNService {
   async getById(grnId: string): Promise<any> {
     const grn = await this.knex('goods_receipts')
       .join('suppliers', 'suppliers.id', 'goods_receipts.supplier_id')
-      .join('purchase_orders', 'purchase_orders.id', 'goods_receipts.po_id')
+      .leftJoin('purchase_orders', 'purchase_orders.id', 'goods_receipts.po_id')
       .where('goods_receipts.id', grnId)
       .select(
         'goods_receipts.*',
@@ -457,18 +489,31 @@ export class GRNService {
     const po = await this.poService.getById(poId);
     const supplier = await this.supplierService.getById(po.supplier_id);
     const poLines = await this.poService.getLines(poId);
+    const itemIds = poLines.map((l) => l.itemId);
+    const itemsRows =
+      itemIds.length > 0
+        ? await this.knex('items')
+            .whereIn('id', itemIds)
+            .select('id', 'primary_uom', 'secondary_uom')
+        : [];
+    const uomMap = new Map(
+      itemsRows.map((i: any) => [String(i.id), i]),
+    );
 
     return {
       poId: po.id,
       poNo: po.po_no,
       supplierName: supplier.company_name,
-      lines: poLines.map((line) => ({
-        itemId: line.itemId,
-        itemSku: line.itemSku,
-        itemName: line.itemName,
-        primaryUom: '', // Would need to fetch from items table
-        secondaryUom: null,
-      })),
+      lines: poLines.map((line) => {
+        const uomInfo: any = uomMap.get(line.itemId);
+        return {
+          itemId: line.itemId,
+          itemSku: line.itemSku,
+          itemName: line.itemName,
+          primaryUom: uomInfo?.primary_uom || 'KG',
+          secondaryUom: uomInfo?.secondary_uom ?? null,
+        };
+      }),
     };
   }
 
@@ -489,11 +534,15 @@ export class GRNService {
     let query = this.knex('goods_receipts')
       .join('suppliers', 'suppliers.id', 'goods_receipts.supplier_id')
       .leftJoin('purchase_orders', 'purchase_orders.id', 'goods_receipts.po_id')
+      .leftJoin('sites', 'sites.id', 'goods_receipts.site_id')
+      .leftJoin('users', 'users.id', 'goods_receipts.received_by')
       .select(
         'goods_receipts.*',
         'suppliers.supplier_code',
         'suppliers.company_name as supplier_name',
         'purchase_orders.po_no',
+        'sites.name as site_name',
+        'users.full_name as received_by_name',
       );
 
     if (filters.poId) {
@@ -524,6 +573,31 @@ export class GRNService {
     }
 
     const grns = await query.orderBy('goods_receipts.received_at', 'desc');
+    const grnIds = grns.map((g: any) => g.id);
+    const poIds = grns.map((g: any) => g.po_id).filter(Boolean);
+
+    const lineCountMap = new Map<string, number>();
+    if (grnIds.length > 0) {
+      const counts = await this.knex('goods_receipt_lines')
+        .whereIn('grn_id', grnIds)
+        .groupBy('grn_id')
+        .select('grn_id')
+        .count('id as cnt');
+      for (const row of counts) {
+        lineCountMap.set(String(row.grn_id), Number(row.cnt || 0));
+      }
+    }
+
+    const shortfallPoIds = new Set<string>();
+    if (poIds.length > 0) {
+      const sfRows = await this.knex('po_shortfalls')
+        .join('purchase_order_lines', 'purchase_order_lines.id', 'po_shortfalls.po_line_id')
+        .whereIn('purchase_order_lines.po_id', poIds)
+        .select('purchase_order_lines.po_id');
+      for (const sf of sfRows) {
+        shortfallPoIds.add(String(sf.po_id));
+      }
+    }
 
     return grns.map((grn) => ({
       id: String(grn.id),
@@ -534,9 +608,13 @@ export class GRNService {
       supplierCode: grn.supplier_code,
       supplierName: grn.supplier_name,
       siteId: String(grn.site_id),
+      siteName: grn.site_name ?? null,
       locationId: grn.location_id ? String(grn.location_id) : null,
       receivedAt: grn.received_at.toISOString(),
       receivedBy: String(grn.received_by),
+      receivedByName: grn.received_by_name ?? null,
+      lineCount: lineCountMap.get(String(grn.id)) ?? 0,
+      hasShortfall: grn.po_id ? shortfallPoIds.has(String(grn.po_id)) : false,
       createdAt: grn.created_at.toISOString(),
     }));
   }

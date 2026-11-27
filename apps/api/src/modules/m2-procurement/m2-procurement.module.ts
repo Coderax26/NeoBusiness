@@ -21,7 +21,6 @@ import { SupplierBillController } from './supplier-bill.controller.js';
 import { DocNumberService } from '../m0-platform/doc-number.service.js';
 import { ConfigService } from '../m0-platform/config.service.js';
 import { OutboxService } from '../../shared/events/outbox.service.js';
-import { ExceptionService } from '../m7a-exceptions/exception.service.js';
 import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
 
 /**
@@ -67,7 +66,6 @@ import { PROCUREMENT_PORT } from '../../shared/ports/ports.interface.js';
     DocNumberService,
     ConfigService,
     OutboxService,
-    ExceptionService,
   ],
   exports: [
     PROCUREMENT_PORT,

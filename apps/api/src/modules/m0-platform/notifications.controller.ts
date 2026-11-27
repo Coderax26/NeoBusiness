@@ -45,7 +45,7 @@ export class NotificationsController {
         this.orWhere('recipient_ref', String(req.user.phone));
       }
       if (req.user?.role === 'OWNER') {
-        this.orWhere('channel', 'PUSH').orWhere('channel', 'IN_APP');
+        this.orWhere('channel', 'FCM').orWhere('channel', 'IN_APP');
       }
     });
 

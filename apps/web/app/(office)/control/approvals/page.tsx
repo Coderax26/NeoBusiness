@@ -9,6 +9,39 @@ import {
   type ExceptionType,
 } from '@neo/shared';
 
+function extractFacts(payload: unknown): Record<string, string> {
+  if (!payload || typeof payload !== 'object') return {};
+  const obj = payload as Record<string, unknown>;
+  const result: Record<string, string> = {};
+
+  if (typeof obj.summary === 'string' && obj.summary.trim()) {
+    result.Summary = obj.summary.trim();
+  }
+  if (typeof obj.impact === 'string' && obj.impact.trim()) {
+    result.Impact = obj.impact.trim();
+  }
+  if (Array.isArray(obj.facts)) {
+    for (const item of obj.facts) {
+      if (item && typeof item === 'object') {
+        const entry = item as Record<string, unknown>;
+        const label = String(entry.label ?? '').trim();
+        const value = entry.value !== undefined && entry.value !== null ? String(entry.value) : '';
+        if (label && value) {
+          result[label] = value;
+        }
+      }
+    }
+    return result;
+  }
+
+  for (const [k, v] of Object.entries(obj)) {
+    if (['title', 'summary', 'impact', 'actions', 'facts'].includes(k)) continue;
+    if (v === null || v === undefined) continue;
+    result[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+  }
+  return result;
+}
+
 export default function ControlApprovalsPage() {
   const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [tab, setTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
@@ -53,7 +86,7 @@ export default function ControlApprovalsPage() {
               escalatesInMinutes: Number(e.escalates_in_minutes ?? 30),
               delegatedTo: e.delegated_to,
               originOrderNo: e.reference_id ?? e.entity_no ?? e.originOrderNo ?? '',
-              facts: typeof payload === 'object' && payload ? payload : {},
+              facts: extractFacts(payload),
               resolvedBy: e.resolved_by,
               resolvedAt: e.resolved_at,
               remarks: e.owner_remarks ?? e.remarks,
@@ -153,7 +186,7 @@ export default function ControlApprovalsPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [tab, visibleList, focusedIdx, remarksDraft, counterDraft]);
 
   return (
     <div className="space-y-6">

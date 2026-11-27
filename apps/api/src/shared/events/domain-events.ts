@@ -35,6 +35,11 @@ export type EventType =
   | 'stock.low'
   | 'stock.expiring'
   | 'production.requisition_created'
+  | 'production.work_order_created'
+  | 'production.work_order_started'
+  | 'production.consumption_recorded'
+  | 'production.output_recorded'
+  | 'production.work_order_completed'
   | 'workorder.started'
   | 'workorder.completed'
   | 'po.price_spike_detected'
@@ -368,6 +373,11 @@ export interface DomainEventPayloads {
   'stock.low': StockLowPayload;
   'stock.expiring': StockExpiringPayload;
   'production.requisition_created': ProductionRequisitionPayload;
+  'production.work_order_created': WorkorderStartedPayload;
+  'production.work_order_started': WorkorderStartedPayload;
+  'production.consumption_recorded': Record<string, unknown>;
+  'production.output_recorded': WorkorderCompletedPayload;
+  'production.work_order_completed': WorkorderCompletedPayload;
   'workorder.started': WorkorderStartedPayload;
   'workorder.completed': WorkorderCompletedPayload;
   'grn.posted': GrnPostedPayload;

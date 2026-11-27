@@ -157,6 +157,8 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
     let query = this.knex('delivery_stops as ds')
       .join('delivery_trips as dt', 'ds.trip_id', 'dt.id')
       .join('customers as c', 'ds.customer_id', 'c.id')
+      .leftJoin('users as d', 'dt.driver_id', 'd.id')
+      .leftJoin('sales_orders as so', 'ds.sales_order_id', 'so.id')
       .where('ds.is_cod', true)
       .whereNotExists(function () {
         this.select('id')
@@ -173,9 +175,11 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
       'ds.id as stopId',
       'ds.trip_id as tripId',
       'dt.trip_no as tripNumber',
+      'd.full_name as driverName',
       'ds.customer_id as customerId',
       'c.business_name as customerName',
       'ds.sales_order_id as salesOrderId',
+      'so.order_no as orderNo',
       'ds.cod_amount as codAmount',
       'ds.cod_collected_amount as codCollectedAmount',
       'ds.status as stopStatus',
@@ -384,6 +388,9 @@ export class CodSettlementService implements OnModuleInit, OnModuleDestroy {
           amount_delta: amountToSettle.toStorageString(),
           receipt_id: receiptId,
           running_balance: newCustodyBal.toStorageString(),
+        });
+        await trx('users').where('id', driverId).update({
+          cash_custody_balance: newCustodyBal.toStorageString(),
         });
       }
 

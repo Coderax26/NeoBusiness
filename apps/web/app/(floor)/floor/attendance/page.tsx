@@ -17,10 +17,14 @@ export default function FloorAttendancePage() {
         setWorkers(
           list.map((w: any) => ({
             id: w.id,
+            code: w.code ?? 'WRK',
             name: w.fullName ?? w.full_name ?? w.name ?? 'Worker',
-            station: w.role ?? w.station ?? 'Floor',
-            status: 'OUT',
-            lastPunch: '--:--',
+            station: w.station ?? w.role ?? 'Floor',
+            shift: w.shift ?? 'SHIFT_1',
+            status: (w.status === 'IN' ? 'IN' : 'OUT') as 'IN' | 'OUT',
+            lastPunch: w.lastPunch ?? '--:--',
+            hoursToday: Number(w.hoursToday ?? 0),
+            monthlyHours: Number(w.monthlyHours ?? 0),
             assignedWoNo: w.assignedWoNo,
           })),
         );
@@ -32,11 +36,13 @@ export default function FloorAttendancePage() {
     const nextStatus = worker.status === 'IN' ? 'OUT' : 'IN';
     const res = await enqueueOrSend({
       type: 'ATTENDANCE_LOG',
-      endpoint: '/api/bff/production/attendance',
+      endpoint: '/api/proxy/production/attendance',
       payload: {
         workerId: worker.id,
-        action: nextStatus,
-        assignedWoNo: worker.assignedWoNo || 'WO-2026-088',
+        date: new Date().toISOString().slice(0, 10),
+        shift: 'MORNING',
+        hoursWorked: nextStatus === 'OUT' ? 8 : 0,
+        overtimeHours: 0,
       },
     });
     setWorkers((prev) =>

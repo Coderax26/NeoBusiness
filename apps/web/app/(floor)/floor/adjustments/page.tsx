@@ -80,13 +80,13 @@ export default function FloorAdjustmentsPage() {
     if (!selected) return;
     const res = await enqueueOrSend({
       type: 'ADJUSTMENT_REQUEST',
-      endpoint: '/api/bff/inventory/adjustments',
+      endpoint: '/api/proxy/inventory/adjustments',
       payload: {
+        siteId: selected.siteId,
         itemId: selected.itemId,
-        batchNo: selected.batchNo,
-        qtyDelta: -Math.abs(qty),
-        reason,
-        photoName,
+        adjustmentType: reason === 'SPILLAGE' ? 'SHRINKAGE' : 'WRITEOFF',
+        qty: String(Math.abs(qty)),
+        remarks: `Floor report (${reason}) batch ${selected.batchNo}${photoName ? ` photo:${photoName}` : ''}`,
       },
     });
     setBanner(`Adjustment request for ${selected.itemName} submitted! ${res.message}`);

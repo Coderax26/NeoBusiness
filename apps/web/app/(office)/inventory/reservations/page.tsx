@@ -11,35 +11,56 @@ export default function InventoryReservationsPage() {
   const [releaseReason, setReleaseReason] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadReservations = async () => {
+    try {
+      const r = await fetch('/api/proxy/inventory/reservations');
+      if (!r.ok) return;
+      const res = await r.json();
+      const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+      setReservations(
+        rows.map((row: any) => ({
+          id: String(row.id),
+          orderNo: String(row.orderNo || row.order_no || row.order_id || row.id),
+          customerName: String(row.customerName || row.order_type || 'SALES_ORDER'),
+          itemId: String(row.itemId || row.item_id || ''),
+          itemName: String(row.itemName || row.item_name || 'Item'),
+          batchNo: String(row.batchNo || row.batch_number || row.batch_id || ''),
+          siteName: String(row.siteName || row.site_name || 'Main Site'),
+          qty: Number(row.qty ?? 0),
+          uom: String(row.uom || 'kg'),
+          expiresAt: String(row.expires_at || ''),
+          status: (row.status || 'ACTIVE') as ReservationRecord['status'],
+        })),
+      );
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    let active = true;
-    fetch('/api/proxy/inventory/reservations')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((res) => {
-        if (!active) return;
-        const rows = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        setReservations(rows);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    loadReservations();
   }, []);
 
-  const handleRelease = () => {
+  const handleRelease = async () => {
     if (!releaseTarget || !releaseReason.trim()) return;
-    fetch(`/api/bff/inventory/reservations/${releaseTarget.id}/release`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: releaseReason }),
-    }).catch(() => {});
-
-    setReservations((prev) =>
-      prev.map((r) => (r.id === releaseTarget.id ? { ...r, status: 'RELEASED' } : r)),
-    );
-    setToast(`Released ${releaseTarget.qty} ${releaseTarget.uom} reserved for ${releaseTarget.orderNo}.`);
-    setReleaseTarget(null);
-    setReleaseReason('');
+    try {
+      const res = await fetch(`/api/proxy/inventory/reservations/${encodeURIComponent(releaseTarget.id)}/release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idempotencyKey: `release-${releaseTarget.id}-${Date.now()}`,
+          reason: releaseReason,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || err?.error?.message || `HTTP ${res.status}`);
+      }
+      await loadReservations();
+      setToast(`Released ${releaseTarget.qty} ${releaseTarget.uom} reserved for ${releaseTarget.orderNo}.`);
+      setReleaseTarget(null);
+      setReleaseReason('');
+    } catch (err) {
+      setToast(`Failed to release reservation: ${(err as Error).message}`);
+    }
   };
 
   return (

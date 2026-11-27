@@ -55,19 +55,20 @@ export class WastageService {
     }
 
     const now = Clock.nowUtc().toISOString();
-    const [row] = await this.knex('wastage_records').insert({
-      id: uuidv7(),
-      work_order_id: dto.workOrderId,
-      item_id: dto.itemId,
-      batch_id: dto.batchId ?? null,
-      qty: dto.qty,
-      uom: dto.uom,
-      reason_type: dto.reasonType,
-      status: WastageStatus.RECORDED,
-      created_by: recordedBy,
-      created_at: now,
-      updated_at: now,
-    });
+    const [row] = await this.knex('wastage_records')
+      .insert({
+        id: uuidv7(),
+        work_order_id: dto.workOrderId,
+        item_id: dto.itemId,
+        batch_id: dto.batchId ?? null,
+        qty: dto.qty,
+        uom: dto.uom,
+        reason_type: dto.reasonType,
+        status: WastageStatus.RECORDED,
+        created_by: recordedBy,
+        created_at: now,
+      })
+      .returning('*');
 
     return this.mapRowToDto(row, item.name, item.skuCode, batchNumber);
   }

@@ -157,14 +157,21 @@ export interface InventoryPort {
     itemId: string,
     batchId: string,
     qty: string,
-  ): Promise<void>;
+    opts?: { siteId?: string; uom?: string },
+  ): Promise<string | void>;
   /** Post production output to stock ledger (M4 → M3) */
   postOutput(
     workOrderId: string,
     itemId: string,
     batchId: string,
     qty: string,
-  ): Promise<void>;
+    opts?: {
+      siteId?: string;
+      batchNumber?: string;
+      uom?: string;
+      createdBy?: string;
+    },
+  ): Promise<string | void>;
 }
 
 // ─── Procurement Port (owned by M2) ──────────────────────────────────────────
