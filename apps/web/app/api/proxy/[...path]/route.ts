@@ -61,10 +61,15 @@ async function handleProxy(
     }
 
     const contentType = upstream.headers.get('content-type') || 'application/json';
+    const contentDisposition = upstream.headers.get('content-disposition');
+    const responseHeaders: Record<string, string> = { 'Content-Type': contentType };
+    if (contentDisposition) {
+      responseHeaders['Content-Disposition'] = contentDisposition;
+    }
     const upstreamData = await upstream.arrayBuffer();
     const response = new NextResponse(upstreamData, {
       status: upstream.status,
-      headers: { 'Content-Type': contentType },
+      headers: responseHeaders,
     });
 
     const isSecureCookie = shouldUseSecureCookies(req);

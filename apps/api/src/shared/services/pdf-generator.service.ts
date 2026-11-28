@@ -176,6 +176,14 @@ export class PdfGeneratorService {
     });
   }
 
+  private formatDate(val: unknown): string {
+    if (!val) return '';
+    if (val instanceof Date) {
+      return Number.isNaN(val.getTime()) ? '' : val.toISOString().slice(0, 10);
+    }
+    return String(val).slice(0, 10);
+  }
+
   private drawChallan(doc: PDFKit.PDFDocument, data: ChallanData): void {
     const pageWidth = doc.page.width - 80; // 40 margin on each side
     let y = 40;
@@ -203,59 +211,60 @@ export class PdfGeneratorService {
     // Challan info row
     const infoStartX = 40;
     const infoColWidth = pageWidth / 2;
+    const infoStartY = y;
 
     // Left column - Challan details
     doc.fontSize(9).font('Helvetica-Bold').text('Challan No:', infoStartX, y);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.challanNo, infoStartX + 70, y);
+      .text(String(data.challanNo ?? ''), infoStartX + 70, y);
     y += 14;
     doc.fontSize(9).font('Helvetica-Bold').text('Challan Date:', infoStartX, y);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.challanDate, infoStartX + 70, y);
+      .text(this.formatDate(data.challanDate) || 'N/A', infoStartX + 70, y);
     y += 14;
     doc.fontSize(9).font('Helvetica-Bold').text('Trip No:', infoStartX, y);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.tripNo, infoStartX + 70, y);
+      .text(String(data.tripNo ?? ''), infoStartX + 70, y);
     if (data.ewayBillNo) {
       y += 14;
       doc.fontSize(9).font('Helvetica-Bold').text('E-Way Bill:', infoStartX, y);
       doc
         .fontSize(9)
         .font('Helvetica')
-        .text(data.ewayBillNo, infoStartX + 70, y);
+        .text(String(data.ewayBillNo), infoStartX + 70, y);
     }
 
     // Right column - Trip details
-    let rightX = infoStartX + infoColWidth;
+    const rightX = infoStartX + infoColWidth;
     doc
       .fontSize(9)
       .font('Helvetica-Bold')
-      .text('Trip Date:', rightX, y - 28);
+      .text('Trip Date:', rightX, infoStartY);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.tripDate, rightX + 60, y - 28);
+      .text(this.formatDate(data.tripDate) || 'N/A', rightX + 60, infoStartY);
     doc
       .fontSize(9)
       .font('Helvetica-Bold')
-      .text('Vehicle No:', rightX, y - 14);
+      .text('Vehicle No:', rightX, infoStartY + 14);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.vehicleNo, rightX + 60, y - 14);
-    doc.fontSize(9).font('Helvetica-Bold').text('Driver:', rightX, y);
+      .text(String(data.vehicleNo ?? 'N/A'), rightX + 60, infoStartY + 14);
+    doc.fontSize(9).font('Helvetica-Bold').text('Driver:', rightX, infoStartY + 28);
     doc
       .fontSize(9)
       .font('Helvetica')
-      .text(data.driverName, rightX + 60, y);
+      .text(String(data.driverName ?? 'N/A'), rightX + 60, infoStartY + 28);
 
-    y += 25;
+    y = Math.max(y, infoStartY + 28) + 25;
 
     // ===== CUSTOMER DETAILS =====
     doc.fontSize(10).font('Helvetica-Bold').text('Bill To / Ship To:', 40, y);
@@ -349,12 +358,12 @@ export class PdfGeneratorService {
       doc.fillColor('#000000');
       const rowData = [
         String(index + 1),
-        line.itemName,
-        line.hsnCode || 'N/A',
-        line.uom,
-        line.loadedQty,
-        line.batchNo || 'N/A',
-        line.expiryDate ? line.expiryDate.slice(0, 10) : 'N/A',
+        String(line.itemName ?? 'Item'),
+        String(line.hsnCode || 'N/A'),
+        String(line.uom ?? ''),
+        String(line.loadedQty ?? '0'),
+        line.batchNo ? String(line.batchNo) : 'N/A',
+        this.formatDate(line.expiryDate) || 'N/A',
       ];
 
       for (let i = 0; i < rowData.length; i++) {

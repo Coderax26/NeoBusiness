@@ -90,6 +90,15 @@ export class FleetService {
     return trimmed ? trimmed.slice(0, 10) : null;
   }
 
+  private formatDateForPdf(val: unknown): string | undefined {
+    if (!val) return undefined;
+    if (val instanceof Date) {
+      return Number.isNaN(val.getTime()) ? undefined : val.toISOString().slice(0, 10);
+    }
+    const str = String(val).trim();
+    return str ? str.slice(0, 10) : undefined;
+  }
+
   async createVehicle(
     dto: CreateVehicleDto,
     userId: string,
@@ -899,9 +908,11 @@ export class FleetService {
     const trip = await this.knex('delivery_trips')
       .where('id', tripId)
       .first('*');
+    if (!trip) throw new NotFoundException('Trip not found');
     const stop = await this.knex('delivery_stops')
       .where({ id: stopId, trip_id: tripId })
       .first('*');
+    if (!stop) throw new NotFoundException('Trip stop not found');
     const vehicle = trip.vehicle_id
       ? await this.knex('vehicles')
           .where('id', trip.vehicle_id)
@@ -944,8 +955,8 @@ export class FleetService {
     const challanData = {
       challanNo,
       challanDate: new Date().toISOString().split('T')[0],
-      tripNo: trip.trip_no,
-      tripDate: trip.trip_date,
+      tripNo: String(trip.trip_no || trip.id.slice(0, 8)),
+      tripDate: this.formatDateForPdf(trip.trip_date) || 'N/A',
       vehicleNo:
         vehicle?.registration_no || trip.external_vehicle_no || trip.transporter_name || 'N/A',
       driverName:
@@ -959,17 +970,21 @@ export class FleetService {
       siteAddress: site?.address || 'N/A',
       siteGstin: site?.gstin || 'N/A',
       siteStateCode: site?.state_code || 'N/A',
-      lines: lines.map((line) => ({
-        itemName: line.itemName,
-        hsnCode: line.hsn_code || 'N/A',
-        uom: line.uom,
-        loadedQty: line.loaded_qty,
-        batchNo: batchDetails.get(line.batch_id)?.batch_number,
-        expiryDate: batchDetails.get(line.batch_id)?.expiry_date,
-      })),
+      lines: lines.map((line) => {
+        const batch = batchDetails.get(line.batch_id);
+        return {
+          itemName: String(line.itemName ?? 'Item'),
+          hsnCode: String(line.hsn_code || 'N/A'),
+          uom: String(line.uom ?? ''),
+          loadedQty: String(line.loaded_qty ?? '0'),
+          batchNo: batch?.batch_number ? String(batch.batch_number) : undefined,
+          expiryDate: this.formatDateForPdf(batch?.expiry_date),
+        };
+      }),
     };
 
-    return this.pdfGenerator!.generateChallan(challanData);
+    const pdfGen = this.pdfGenerator ?? new PdfGeneratorService();
+    return pdfGen.generateChallan(challanData);
   }
 
   async createIssue(tripId: string, dto: CreateIssueDto, userId: string) {
@@ -2522,8 +2537,8 @@ export class FleetService {
     const buffer = await pdfGen.generateChallan({
       challanNo: `MANIFEST-${trip.trip_no || trip.id.slice(0, 8)}`,
       challanDate: new Date().toISOString().split('T')[0],
-      tripNo: trip.trip_no || trip.id.slice(0, 8),
-      tripDate: String(trip.trip_date ?? ''),
+      tripNo: String(trip.trip_no || trip.id.slice(0, 8)),
+      tripDate: this.formatDateForPdf(trip.trip_date) || 'N/A',
       vehicleNo:
         vehicle?.registration_no || trip.external_vehicle_no || trip.transporter_name || 'N/A',
       driverName:
@@ -2537,10 +2552,10 @@ export class FleetService {
       siteGstin: site?.gstin || 'N/A',
       siteStateCode: site?.state_code || '27',
       lines: lines.map((l: any) => ({
-        itemName: l.itemName,
-        hsnCode: l.hsn_code || 'N/A',
-        uom: l.uom,
-        loadedQty: l.loaded_qty,
+        itemName: String(l.itemName ?? 'Item'),
+        hsnCode: String(l.hsn_code || 'N/A'),
+        uom: String(l.uom ?? ''),
+        loadedQty: String(l.loaded_qty ?? '0'),
       })),
     });
     return { buffer, tripNo: trip.trip_no || trip.id.slice(0, 8) };
